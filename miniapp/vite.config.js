@@ -71,7 +71,7 @@ function pwaShell() {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const isLanding = env.VITE_APP_MODE === 'landing';
-  const rawBase = (env.VITE_BASE || '/app/').trim();
+  const rawBase = (isLanding ? '/' : (env.VITE_BASE || '/app/')).trim();
   // Vite به base با اسلش پایانی نیاز دارد؛ /app → /app/
   const base = rawBase === '/' ? '/' : rawBase.replace(/\/+$/, '') + '/';
 

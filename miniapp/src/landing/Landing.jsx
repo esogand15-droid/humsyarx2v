@@ -128,7 +128,7 @@ const FAQ = [
 ];
 
 export default function Landing() {
-  const [botUrl, setBotUrl] = useState('https://t.me/humsyarbot');
+  const [botUrl, setBotUrl] = useState('');
   const [pingMs, setPingMs] = useState(null);
   const [lastCheck, setLastCheck] = useState(null);
   const [serviceStatus, setServiceStatus] = useState('checking'); // 'healthy', 'degraded', 'checking'
@@ -446,8 +446,9 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── ۵) پایش زنده وضعیت سرویس‌ها (Service Status) ── */}
-        <section className="lp-section lp-status-section" id="status" aria-labelledby="status-title">
+        {/* ── ۵) پایش زنده وضعیت سرویس‌ها و پلتفرم‌ها (Platforms & Service Status) ── */}
+        <section className="lp-section lp-status-section" id="platforms" aria-labelledby="status-title">
+          <span id="status" className="lp-anchor-target" />
           <div className="lp-wrap">
             <div className="lp-status-box">
               <div className="lp-status-box__head">

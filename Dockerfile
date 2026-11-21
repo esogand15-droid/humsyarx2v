@@ -50,7 +50,7 @@ RUN npm --prefix ./miniapp run build
 # 📲 نسخهٔ نصب‌شدنی (PWA) — همان کد با base=/pwa/ و پوستهٔ نصب مستقل
 RUN npm --prefix ./miniapp run build:pwa
 # 🏠 لندینگ — صفحهٔ ریشهٔ دامنه (base=/، خروجی dist-landing)
-RUN npm --prefix ./miniapp run build:landing
+RUN VITE_BASE=/ npm --prefix ./miniapp run build:landing
 
 # ── Web Admin ── (base آن از قبل در webadmin/vite.config.js روی /admin/ است)
 COPY webadmin/package.json webadmin/package-lock.json ./webadmin/

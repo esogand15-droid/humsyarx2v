@@ -865,21 +865,7 @@ def _mount_spa(prefix: str, dist: str, name: str, state: dict) -> bool:
     return ok
 
 
-#: وضعیت بیلدها برای /api/health — در زمان import یک‌بار محاسبه می‌شود
-#: (ls‌کردنِ dir در هر healthcheck بی‌مصرف است).
-_MINIAPP_DIST_STATE: dict = {"built": False, "path": "miniapp/dist"}
-_WEBADMIN_DIST_STATE: dict = {"built": False, "path": "webadmin/dist"}
-
-# اول /admin (تا مینی‌اپ هیچ‌وقت فرصت تصاحب این پیشوند را پیدا نکند)
-_WA_MOUNTED = _mount_spa("/admin", _WA_DIST, "web-admin-spa", _WEBADMIN_DIST_STATE)
-# بعد /app
-_MA_MOUNTED = _mount_spa("/app", _MA_DIST, "mini-app-spa", _MINIAPP_DIST_STATE)
-# 📲 و /pwa — نسخهٔ نصب‌شدنی (iOS/Android/Windows)
-_PWA_DIST_STATE: dict = {"built": False, "path": "miniapp/dist-pwa"}
-_PWA_MOUNTED = _mount_spa("/pwa", _PWA_DIST, "pwa-spa", _PWA_DIST_STATE)
-
-
-# ── فونت/آیکون روی ریشه (مشترک سه بیلد) ─────────────────────────
+# ── فونت/آیکون/دارایی‌های استاتیک روی ریشه ─────────────────────────
 # عمداً StaticFiles خام (بدون SPA-fallback): مسیر ناموجود باید ۴۰۴
 # بدهد، نه index.html.
 def _mount_static(prefix: str, directory: str, name: str) -> bool:
@@ -892,12 +878,27 @@ def _mount_static(prefix: str, directory: str, name: str) -> bool:
 _FONTS_MOUNTED = _mount_static("/fonts", os.path.join(_PUBLIC_DIR, "fonts"), "shared-fonts")
 _ICONS_MOUNTED = _mount_static("/icons", os.path.join(_PUBLIC_DIR, "icons"), "shared-icons")
 
-# ── دارایی‌های لندینگ (نام اختصاصی، نه /assets/) ────────────────
+# ── دارایی‌های لندینگ (هم /landing-assets و هم /app/landing-assets برای اطمینان) ────
 _LANDING_ASSETS_MOUNTED = _mount_static(
     "/landing-assets", os.path.join(_LANDING_DIST, "landing-assets"), "landing-assets")
+_APP_LANDING_ASSETS_MOUNTED = _mount_static(
+    "/app/landing-assets", os.path.join(_LANDING_DIST, "landing-assets"), "landing-assets-app-prefix")
 _LANDING_DIST_STATE: dict = {"built": False, "path": "miniapp/dist-landing"}
 _LANDING_INDEX = os.path.join(_LANDING_DIST, "index.html")
 _LANDING_DIST_STATE["built"] = os.path.isfile(_LANDING_INDEX)
+
+#: وضعیت بیلدها برای /api/health — در زمان import یک‌بار محاسبه می‌شود
+#: (ls‌کردنِ dir در هر healthcheck بی‌مصرف است).
+_MINIAPP_DIST_STATE: dict = {"built": False, "path": "miniapp/dist"}
+_WEBADMIN_DIST_STATE: dict = {"built": False, "path": "webadmin/dist"}
+
+# اول /admin (تا مینی‌اپ هیچ‌وقت فرصت تصاحب این پیشوند را پیدا نکند)
+_WA_MOUNTED = _mount_spa("/admin", _WA_DIST, "web-admin-spa", _WEBADMIN_DIST_STATE)
+# بعد /app
+_MA_MOUNTED = _mount_spa("/app", _MA_DIST, "mini-app-spa", _MINIAPP_DIST_STATE)
+# 📲 و /pwa — نسخهٔ نصب‌شدنی (iOS/Android/Windows)
+_PWA_DIST_STATE: dict = {"built": False, "path": "miniapp/dist-pwa"}
+_PWA_MOUNTED = _mount_spa("/pwa", _PWA_DIST, "pwa-spa", _PWA_DIST_STATE)
 
 
 if not _WA_MOUNTED:
@@ -977,7 +978,8 @@ async def _spa_cache_headers(request, call_next):
     except Exception:
         path = ""
     if (path.startswith("/app/assets/") or path.startswith("/admin/assets/")
-            or path.startswith("/landing-assets/") or path.startswith("/student/assets/")):
+            or path.startswith("/landing-assets/") or path.startswith("/app/landing-assets/")
+            or path.startswith("/student/assets/")):
         resp.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
     elif path == "/" or path == "/index.html":
         # لندینگ: همیشه تازه چک شود تا لینک‌های تازه سریع دیده شوند
