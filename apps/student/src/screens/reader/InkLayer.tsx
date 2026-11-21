@@ -1,0 +1,1046 @@
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+
+import {
+  generateUUID,
+  ink,
+  type InkTool,
+  type Point,
+  type Scope,
+  type Stroke,
+} from '../../lib/ink';
+
+export interface InkApi {
+  undo: () => void;
+  redo: () => void;
+  clear: () => void;
+  count: () => number;
+}
+
+export type InkStatus = 'idle' | 'saving' | 'saved' | 'pending';
+
+interface Props {
+  scope: Scope;
+  id: string;
+  page: number;
+  /** اندازهٔ نمایشی صفحه (CSS px) — خطوط نسبت به همین کادر رسم می‌شوند */
+  width: number;
+  height: number;
+  /** ابزار فعال؛ `null` یعنی فقط خواندن (لمس روی صفحه نقاشی نمی‌کند) */
+  tool: InkTool | 'eraser' | 'lasso' | null;
+  color: string;
+  /** ضخامت پایه به‌صورت کسری از عرض صفحه */
+  strokeWidth: number;
+  onCount: (n: number) => void;
+  /** برای فعال/غیرفعال کردن دکمه‌های بازگردانی — عدد واقعی، نه حدس */
+  onHistory: (s: { undo: number; redo: number }) => void;
+  onStatus: (s: InkStatus) => void;
+  /** یک بار پس از تغییر، پنل دفتر را به‌روز کن */
+  onChanged?: () => void;
+  // Tablet features:
+  eraserMode?: 'stroke' | 'partial';
+  eraseHighlighterOnly?: boolean;
+  shapeSnap?: boolean;
+  stylusOnly?: boolean;
+  onPinchZoom?: (factor: number) => void;
+}
+
+const SAVE_DELAY = 900;
+const MAX_HISTORY = 50;
+const STYLUS_DECAY_MS = 750;
+const PALM_TOUCH_BOUND_PX = 25;
+
+function isPointInPolygon(point: { x: number; y: number }, polygon: Array<{ x: number; y: number }>): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    const intersect = ((yi > point.y) !== (yj > point.y))
+        && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function distToSegment(
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  const projX = x1 + t * dx;
+  const projY = y1 + t * dy;
+  return Math.hypot(px - projX, py - projY);
+}
+
+/** الگوریتم پاک‌کن برشی / جزئی: برش نقاط در شعاع R و تقسیم خط به زیرخط‌ها */
+function slicePointsAtCircle(
+  points: Point[],
+  eraserX: number,
+  eraserY: number,
+  radius: number,
+): Point[][] {
+  const subStrokes: Point[][] = [];
+  let currentChain: Point[] = [];
+
+  for (const pt of points) {
+    const dist = Math.hypot(pt.x - eraserX, pt.y - eraserY);
+    if (dist > radius) {
+      currentChain.push(pt);
+    } else {
+      if (currentChain.length >= 2) {
+        subStrokes.push(currentChain);
+      }
+      currentChain = [];
+    }
+  }
+  if (currentChain.length >= 2) {
+    subStrokes.push(currentChain);
+  }
+  return subStrokes;
+}
+
+/** الگوریتم تشخیص و صاف‌سازی هوشمند اشکال هندسی (Dwell-to-Snap) */
+function snapToCleanShape(points: Point[]): Point[] {
+  if (points.length < 5) return points;
+  const p0 = points[0];
+  const pn = points[points.length - 1];
+  const dx = pn.x - p0.x;
+  const dy = pn.y - p0.y;
+  const length = Math.hypot(dx, dy);
+
+  // ۱. تست خط مستقیم: نسبت انحراف وتر d_max / L < 0.08
+  if (length > 0.03) {
+    let maxDev = 0;
+    for (const pt of points) {
+      const dev = Math.abs(dy * pt.x - dx * pt.y + pn.x * p0.y - pn.y * p0.x) / length;
+      if (dev > maxDev) maxDev = dev;
+    }
+    if (maxDev / length < 0.08) {
+      const steps = Math.max(6, Math.min(20, points.length));
+      const snapped: Point[] = [];
+      for (let i = 0; i < steps; i++) {
+        const t = i / (steps - 1);
+        snapped.push({
+          x: p0.x + t * dx,
+          y: p0.y + t * dy,
+          pressure: (p0.pressure + pn.pressure) / 2,
+          time: Math.round(p0.time + t * (pn.time - p0.time)),
+        });
+      }
+      return snapped;
+    }
+  }
+
+  // ۲. تست دایره / بیضی: نسبت انحراف معیار شعاعی sigma / mu < 0.15
+  const closeDist = Math.hypot(pn.x - p0.x, pn.y - p0.y);
+  if (points.length >= 10 && closeDist < length * 0.45 + 0.05) {
+    let sumX = 0, sumY = 0;
+    for (const pt of points) {
+      sumX += pt.x;
+      sumY += pt.y;
+    }
+    const cx = sumX / points.length;
+    const cy = sumY / points.length;
+    const radii = points.map((p) => Math.hypot(p.x - cx, p.y - cy));
+    const mu = radii.reduce((a, b) => a + b, 0) / radii.length;
+    if (mu > 0.02) {
+      const variance = radii.reduce((acc, r) => acc + (r - mu) ** 2, 0) / radii.length;
+      const sigma = Math.sqrt(variance);
+      if (sigma / mu < 0.15) {
+        const circleSteps = 24;
+        const snapped: Point[] = [];
+        const avgP = points.reduce((acc, p) => acc + p.pressure, 0) / points.length;
+        for (let i = 0; i <= circleSteps; i++) {
+          const angle = (i / circleSteps) * Math.PI * 2;
+          snapped.push({
+            x: cx + mu * Math.cos(angle),
+            y: cy + mu * Math.sin(angle),
+            pressure: avgP,
+            time: Math.round(p0.time + (i / circleSteps) * (pn.time - p0.time)),
+          });
+        }
+        return snapped;
+      }
+    }
+  }
+
+  return points;
+}
+
+function normalizeStroke(s: any): Stroke {
+  const pts: Point[] = (s.points || []).map((p: any) => {
+    if (Array.isArray(p)) {
+      return { x: p[0], y: p[1], pressure: 0.5, time: 0 };
+    }
+    return {
+      x: Number.isFinite(p.x) ? p.x : 0,
+      y: Number.isFinite(p.y) ? p.y : 0,
+      pressure: Number.isFinite(p.pressure) ? p.pressure : 0.5,
+      time: Number.isFinite(p.time) ? p.time : 0,
+      tiltX: p.tiltX,
+      tiltY: p.tiltY,
+    };
+  });
+  return {
+    stroke_id: s.stroke_id || generateUUID(),
+    tool: s.tool || 'pen',
+    color: s.color || '#1740B8',
+    width: Number.isFinite(s.width) ? s.width : 0.0035,
+    opacity: s.opacity ?? (s.tool === 'highlighter' ? 0.35 : s.tool === 'pencil' ? 0.65 : 1.0),
+    blend_mode: s.blend_mode ?? (s.tool === 'highlighter' ? 'multiply' : 'source-over'),
+    points: pts,
+    created_at: s.created_at || new Date().toISOString(),
+    updated_at: s.updated_at,
+    is_deleted: s.is_deleted,
+    nibAngle: s.nibAngle,
+  };
+}
+
+/** لایهٔ وکتور دیجیتال اینک (Wave 5) — بوم پویا روی صفحهٔ PDF با خطوط نرمال‌شده و PointerEvents */
+export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
+  {
+    scope,
+    id,
+    page,
+    width,
+    height,
+    tool,
+    color,
+    strokeWidth,
+    onCount,
+    onHistory,
+    onStatus,
+    onChanged,
+    eraserMode = 'stroke',
+    eraseHighlighterOnly = false,
+    shapeSnap = false,
+    stylusOnly = false,
+    onPinchZoom,
+  },
+  ref,
+) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const highlighterCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const scratchRef = useRef<HTMLCanvasElement | null>(null);
+  const cbs = useRef({ onCount, onHistory, onStatus, onChanged });
+  cbs.current = { onCount, onHistory, onStatus, onChanged };
+
+  const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const strokesRef = useRef<Stroke[]>([]);
+  const past = useRef<Stroke[][]>([]);
+  const future = useRef<Stroke[][]>([]);
+  const drawing = useRef<Stroke | null>(null);
+  const strokeStartTime = useRef<number>(0);
+  const saveTimer = useRef<number | undefined>(undefined);
+  const dirty = useRef(false);
+  const [ready, setReady] = useState(false);
+
+  // ── Dwell-to-Snap Timer ─────────────────────────────────────
+  const dwellTimer = useRef<number | undefined>(undefined);
+  const lastDwellPoint = useRef<{ x: number; y: number } | null>(null);
+
+  // ── Lasso Selection Engine ──────────────────────────────────
+  const lassoPoints = useRef<Point[]>([]);
+  const selectedIds = useRef<Set<string>>(new Set());
+  const selectionBBox = useRef<{ minX: number; minY: number; maxX: number; maxY: number } | null>(null);
+  const isDraggingSelection = useRef(false);
+  const dragStartPt = useRef<{ x: number; y: number } | null>(null);
+
+  // ── Software Palm Rejection Engine & Touch Gestures ─────────
+  const lastStylusTime = useRef<number>(0);
+  const isStylusActive = useRef<boolean>(false);
+  const stylusDecayTimer = useRef<number | undefined>(undefined);
+  const touchPointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const lastPinchDist = useRef<number | null>(null);
+
+  const commit = useCallback(
+    (next: Stroke[], opts: { history?: boolean } = { history: true }) => {
+      if (opts.history !== false) {
+        past.current.push(strokesRef.current);
+        if (past.current.length > MAX_HISTORY) past.current.shift();
+        future.current = [];
+      }
+      strokesRef.current = next;
+      setStrokes(next);
+      cbs.current.onCount(next.length);
+      cbs.current.onHistory({ undo: past.current.length, redo: future.current.length });
+      dirty.current = true;
+    },
+    [],
+  );
+
+  // ── بارگذاری خطوط صفحه ───────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    setReady(false);
+    past.current = [];
+    future.current = [];
+    (async () => {
+      let list: Stroke[] = [];
+      try {
+        const res = await ink.page(scope, id, page);
+        list = (res.strokes ?? []).map(normalizeStroke);
+      } catch {
+        list = [];
+      }
+      if (cancelled) return;
+      strokesRef.current = list;
+      setStrokes(list);
+      cbs.current.onCount(list.length);
+      cbs.current.onHistory({ undo: 0, redo: 0 });
+      setReady(true);
+      cbs.current.onStatus('idle');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [scope, id, page]);
+
+  // ── ذخیرهٔ دسته‌ای (debounce) ────────────────────────────────
+  const flushSave = useCallback(async () => {
+    if (!dirty.current) return;
+    dirty.current = false;
+    cbs.current.onStatus('saving');
+    const res = await ink.save(scope, id, page, strokesRef.current);
+    cbs.current.onStatus(res.ok ? 'saved' : 'pending');
+    if (res.ok) cbs.current.onChanged?.();
+  }, [scope, id, page]);
+
+  useEffect(() => {
+    if (!dirty.current) return;
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => void flushSave(), SAVE_DELAY);
+    return () => window.clearTimeout(saveTimer.current);
+  }, [strokes, flushSave]);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(saveTimer.current);
+      if (dirty.current) {
+        dirty.current = false;
+        void ink.save(scope, id, page, strokesRef.current);
+      }
+    };
+  }, [scope, id, page]);
+
+  // ── رسم خطوط با منحنی بیر و ضخامت متغیر بر مبنای فشار و سرعت ──────────
+  const drawStrokeOnCtx = useCallback(
+    (ctx: CanvasRenderingContext2D, s: Stroke) => {
+      const pts = s.points;
+      if (!pts || pts.length === 0) return;
+
+      ctx.save();
+      if (s.tool === 'pencil') {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = s.color;
+        ctx.fillStyle = s.color;
+        ctx.globalAlpha = s.opacity ?? 0.65;
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (s.tool === 'ballpoint') {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = s.color;
+        ctx.fillStyle = s.color;
+        ctx.globalAlpha = s.opacity ?? 0.95;
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (s.tool === 'fountain') {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = s.color;
+        ctx.fillStyle = s.color;
+        ctx.globalAlpha = s.opacity ?? 1.0;
+        ctx.globalCompositeOperation = 'source-over';
+      } else {
+        ctx.lineCap = s.tool === 'highlighter' ? 'square' : 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = s.color;
+        ctx.fillStyle = s.color;
+        ctx.globalAlpha = s.opacity ?? (s.tool === 'highlighter' ? 0.35 : 1.0);
+        ctx.globalCompositeOperation =
+          s.blend_mode ?? (s.tool === 'highlighter' ? 'multiply' : 'source-over');
+      }
+
+      const isPencil = s.tool === 'pencil';
+      const isFountain = s.tool === 'fountain';
+      const isBallpoint = s.tool === 'ballpoint';
+
+      const computeWidth = (p0: Point, p1?: Point) => {
+        const segP = p1 ? (p0.pressure + p1.pressure) / 2 : p0.pressure;
+        if (isPencil) {
+          return Math.max(0.75, s.width * width * (0.35 + 0.85 * segP));
+        }
+        if (isBallpoint) {
+          const ballpointP = 0.6 + 0.6 * segP;
+          return Math.max(0.75, s.width * width * ballpointP);
+        }
+        if (isFountain && p1) {
+          const dx = p1.x - p0.x;
+          const dy = p1.y - p0.y;
+          const dt = Math.max(1.0, Math.abs(p1.time - p0.time));
+          const dist = Math.hypot(dx, dy);
+          const v = dist / dt;
+          const vFactor = Math.max(0.45, 1.0 - Math.min(0.55, v * 12.0));
+          const strokeAngle = Math.atan2(dy, dx);
+          const nibAngle = s.nibAngle ?? (Math.PI / 4); // 45 deg chisel nib
+          const angleDiff = Math.abs(strokeAngle - nibAngle);
+          const chiselFactor = 0.65 + 0.70 * Math.sin(angleDiff);
+          const pressureFactor = 0.4 + 1.2 * Math.max(0.0, Math.min(1.0, segP));
+          return Math.max(0.75, s.width * width * pressureFactor * vFactor * chiselFactor);
+        }
+        return Math.max(1, s.width * width * (0.4 + 1.2 * segP));
+      };
+
+      if (pts.length === 1) {
+        const p = pts[0];
+        const w = computeWidth(p);
+        ctx.beginPath();
+        ctx.arc(p.x * width, p.y * height, w / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        return;
+      }
+
+      // رسم پیوسته و یکپارچهٔ خط (Single Continuous Path)
+      // این ساختار مانع از تولید آرتیفکت‌های مهره‌ای (تسبیحی) و لکه‌های تیره در هایلایتر می‌شود
+      if (s.tool === 'highlighter') {
+        ctx.lineWidth = Math.max(16, s.width * width * 3.8);
+      } else {
+        ctx.lineWidth = computeWidth(pts[0], pts[pts.length - 1]);
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x * width, pts[0].y * height);
+
+      if (pts.length === 2) {
+        ctx.lineTo(pts[1].x * width, pts[1].y * height);
+      } else {
+        for (let i = 1; i < pts.length - 1; i++) {
+          const midX = ((pts[i].x + pts[i + 1].x) / 2) * width;
+          const midY = ((pts[i].y + pts[i + 1].y) / 2) * height;
+          ctx.quadraticCurveTo(pts[i].x * width, pts[i].y * height, midX, midY);
+        }
+        const last = pts[pts.length - 1];
+        ctx.lineTo(last.x * width, last.y * height);
+      }
+      ctx.stroke();
+
+      ctx.restore();
+    },
+    [width, height],
+  );
+
+  const paint = useCallback(() => {
+    const canvas = canvasRef.current;
+    const hlCanvas = highlighterCanvasRef.current;
+    if (!canvas || !width || !height) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    let hlCtx: CanvasRenderingContext2D | null = null;
+    if (hlCanvas) {
+      hlCanvas.width = Math.floor(width * dpr);
+      hlCanvas.height = Math.floor(height * dpr);
+      hlCanvas.style.width = `${width}px`;
+      hlCanvas.style.height = `${height}px`;
+      hlCtx = hlCanvas.getContext('2d');
+      if (hlCtx) {
+        hlCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        hlCtx.clearRect(0, 0, width, height);
+      }
+    }
+
+    const scratch = scratchRef.current;
+    if (scratch) {
+      scratch.width = Math.floor(width * dpr);
+      scratch.height = Math.floor(height * dpr);
+      scratch.style.width = `${width}px`;
+      scratch.style.height = `${height}px`;
+      const sCtx = scratch.getContext('2d');
+      if (sCtx) {
+        sCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+    }
+
+    for (const s of strokesRef.current) {
+      if (s.tool === 'highlighter' && hlCtx) {
+        drawStrokeOnCtx(hlCtx, s);
+      } else {
+        drawStrokeOnCtx(ctx, s);
+      }
+    }
+
+    if (drawing.current) {
+      if (drawing.current.tool === 'highlighter' && hlCtx) {
+        drawStrokeOnCtx(hlCtx, drawing.current);
+      } else {
+        drawStrokeOnCtx(ctx, drawing.current);
+      }
+    }
+
+    // Render active lasso path
+    if (lassoPoints.current.length > 1) {
+      ctx.save();
+      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = '#2563EB';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(lassoPoints.current[0].x * width, lassoPoints.current[0].y * height);
+      for (let i = 1; i < lassoPoints.current.length; i++) {
+        ctx.lineTo(lassoPoints.current[i].x * width, lassoPoints.current[i].y * height);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Render selection bounding box
+    if (selectionBBox.current && selectedIds.current.size > 0) {
+      ctx.save();
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = '#2563EB';
+      ctx.lineWidth = 2;
+      ctx.fillStyle = 'rgba(37, 99, 235, 0.08)';
+      const bx = (selectionBBox.current.minX - 0.01) * width;
+      const by = (selectionBBox.current.minY - 0.01) * height;
+      const bw = (selectionBBox.current.maxX - selectionBBox.current.minX + 0.02) * width;
+      const bh = (selectionBBox.current.maxY - selectionBBox.current.minY + 0.02) * height;
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeRect(bx, by, bw, bh);
+      ctx.restore();
+    }
+  }, [width, height, drawStrokeOnCtx]);
+
+  useEffect(() => {
+    paint();
+  }, [paint, strokes, ready, width, height]);
+
+  // ── Eraser Collision: فاصلهٔ نقطه تا پاره‌خط وکتور ──────────
+  const hitStroke = useCallback(
+    (ex: number, ey: number): number => {
+      const r = Math.max(0.01, Math.min(0.065, (strokeWidth || 0.0035) * 3.5));
+      const list = strokesRef.current;
+      for (let i = list.length - 1; i >= 0; i -= 1) {
+        const pts = list[i].points;
+        if (!pts || pts.length === 0) continue;
+        if (pts.length === 1) {
+          if (Math.hypot(ex - pts[0].x, ey - pts[0].y) < r) return i;
+          continue;
+        }
+        for (let j = 0; j < pts.length - 1; j += 1) {
+          if (distToSegment(ex, ey, pts[j].x, pts[j].y, pts[j + 1].x, pts[j + 1].y) < r) {
+            return i;
+          }
+        }
+      }
+      return -1;
+    },
+    [strokeWidth],
+  );
+
+  // ── اجرای پاک‌کن بر اساس حالت (کل خط یا برشی) ──────────────
+  const applyEraser = useCallback(
+    (pt: { x: number; y: number }) => {
+      if (eraserMode === 'partial') {
+        const r = Math.max(0.006, Math.min(0.065, (strokeWidth || 0.0035) * 4.0));
+        let modified = false;
+        const nextList: Stroke[] = [];
+
+        for (const s of strokesRef.current) {
+          if (eraseHighlighterOnly && s.tool !== 'highlighter') {
+            nextList.push(s);
+            continue;
+          }
+          const subChains = slicePointsAtCircle(s.points, pt.x, pt.y, r);
+          if (subChains.length === 1 && subChains[0].length === s.points.length) {
+            nextList.push(s);
+          } else {
+            modified = true;
+            for (const chain of subChains) {
+              nextList.push({
+                ...s,
+                stroke_id: generateUUID(),
+                points: chain,
+              });
+            }
+          }
+        }
+        if (modified) {
+          commit(nextList);
+        }
+      } else {
+        const i = hitStroke(pt.x, pt.y);
+        if (i >= 0) {
+          if (!eraseHighlighterOnly || strokesRef.current[i].tool === 'highlighter') {
+            commit(strokesRef.current.filter((_, k) => k !== i));
+          }
+        }
+      }
+    },
+    [eraserMode, eraseHighlighterOnly, strokeWidth, hitStroke, commit],
+  );
+
+  // ── استخراج نقطه و اعتبارسنجی ───────────────────────────────
+  const extractPoint = useCallback(
+    (
+      e: React.PointerEvent<HTMLCanvasElement> | PointerEvent,
+      rect: DOMRect,
+      t0: number,
+    ): Point => {
+      const rawX = (e.clientX - rect.left) / Math.max(1, rect.width);
+      const rawY = (e.clientY - rect.top) / Math.max(1, rect.height);
+      const p = e.pressure > 0 ? e.pressure : 0.5;
+      return {
+        x: Math.min(1.0, Math.max(0.0, rawX)),
+        y: Math.min(1.0, Math.max(0.0, rawY)),
+        pressure: Math.min(1.0, Math.max(0.0, p)),
+        time: Math.max(0, Math.round(performance.now() - t0)),
+        tiltX: e.tiltX || 0,
+        tiltY: e.tiltY || 0,
+      };
+    },
+    [],
+  );
+
+  // ── بررسی فیلتر نخل و لمس دست (Palm Rejection) ──────────────
+  const isPalmRejected = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>): boolean => {
+      // حالت اختصاصی قلم: رد کامل لمس انگشت برای نوشتن
+      if (stylusOnly && e.pointerType === 'touch') {
+        return true;
+      }
+
+      if (e.pointerType === 'pen') {
+        lastStylusTime.current = performance.now();
+        isStylusActive.current = true;
+        if (stylusDecayTimer.current) window.clearTimeout(stylusDecayTimer.current);
+        stylusDecayTimer.current = window.setTimeout(() => {
+          isStylusActive.current = false;
+        }, STYLUS_DECAY_MS);
+        return false;
+      }
+
+      if (e.pointerType === 'touch') {
+        touchPointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        // لمس چندانگشتی (>= 2): رهاسازی ترسیم و محاسبه پیوسته زوم دومعرفی (Touch Pinch-to-Zoom)
+        if (touchPointers.current.size >= 2) {
+          if (drawing.current) {
+            drawing.current = null;
+            paint();
+          }
+          // محاسبه پیوسته زوم دومعرفی (Direct Touchscreen Pinch-to-Zoom)
+          if (touchPointers.current.size === 2) {
+            const pts = Array.from(touchPointers.current.values());
+            const curDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+            if (lastPinchDist.current !== null && lastPinchDist.current > 5) {
+              const factor = curDist / lastPinchDist.current;
+              if (Math.abs(factor - 1.0) > 0.003) {
+                onPinchZoom?.(factor);
+              }
+            }
+            lastPinchDist.current = curDist;
+          }
+          return true;
+        }
+
+        // مساحت برخورد بزرگ‌تر از انگشت (نخل یا کنارهٔ دست)
+        if (e.width > PALM_TOUCH_BOUND_PX || e.height > PALM_TOUCH_BOUND_PX) {
+          return true;
+        }
+
+        // پنجرهٔ تاخیر قلم (750ms decay timer)
+        const elapsed = performance.now() - lastStylusTime.current;
+        if (isStylusActive.current || elapsed < STYLUS_DECAY_MS) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+    [stylusOnly, paint],
+  );
+
+  // ── پاک‌سازی انتخاب در صورت تغییر ابزار ───────────────
+  useEffect(() => {
+    if (tool !== 'lasso') {
+      selectedIds.current.clear();
+      selectionBBox.current = null;
+      lassoPoints.current = [];
+      paint();
+    }
+  }, [tool, paint]);
+
+  // ── رویدادهای اشاره‌گر (PointerEvents) ────────────────────────
+  const onDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!tool) return;
+    if (isPalmRejected(e)) return;
+    if (e.pointerType === 'touch') e.preventDefault();
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    strokeStartTime.current = performance.now();
+    const pt = extractPoint(e, rect, strokeStartTime.current);
+
+    if (tool === 'eraser') {
+      applyEraser(pt);
+      const sCtx = scratchRef.current?.getContext('2d');
+      if (sCtx) {
+        sCtx.clearRect(0, 0, width, height);
+        const rPx = Math.max(0.006, Math.min(0.065, (strokeWidth || 0.0035) * 4.0)) * width;
+        sCtx.save();
+        sCtx.beginPath();
+        sCtx.arc(pt.x * width, pt.y * height, rPx, 0, Math.PI * 2);
+        sCtx.strokeStyle = 'rgba(0, 242, 254, 0.85)';
+        sCtx.lineWidth = 1.5;
+        sCtx.setLineDash([3, 3]);
+        sCtx.fillStyle = 'rgba(0, 242, 254, 0.12)';
+        sCtx.fill();
+        sCtx.stroke();
+        sCtx.restore();
+      }
+      return;
+    }
+
+    if (tool === 'lasso') {
+      const bbox = selectionBBox.current;
+      if (
+        bbox &&
+        selectedIds.current.size > 0 &&
+        pt.x >= bbox.minX - 0.02 &&
+        pt.x <= bbox.maxX + 0.02 &&
+        pt.y >= bbox.minY - 0.02 &&
+        pt.y <= bbox.maxY + 0.02
+      ) {
+        // شروع جابه‌جایی استروک‌های انتخاب‌شده
+        isDraggingSelection.current = true;
+        dragStartPt.current = { x: pt.x, y: pt.y };
+        return;
+      }
+      // شروع منحنی جدید کمند
+      selectedIds.current.clear();
+      selectionBBox.current = null;
+      isDraggingSelection.current = false;
+      dragStartPt.current = null;
+      lassoPoints.current = [pt];
+      paint();
+      return;
+    }
+
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // safe fallback
+    }
+
+    const newStroke: Stroke = {
+      stroke_id: generateUUID(),
+      tool,
+      color,
+      width: strokeWidth,
+      opacity: tool === 'highlighter' ? 0.35 : 1.0,
+      blend_mode: tool === 'highlighter' ? 'multiply' : 'source-over',
+      points: [pt],
+      created_at: new Date().toISOString(),
+    };
+    drawing.current = newStroke;
+    paint();
+
+    // شروع تایمر صاف‌سازی درجا (Dwell to Snap: 450ms)
+    lastDwellPoint.current = { x: pt.x, y: pt.y };
+    if (dwellTimer.current) window.clearTimeout(dwellTimer.current);
+    dwellTimer.current = window.setTimeout(() => {
+      if (shapeSnap && drawing.current && drawing.current.points.length >= 6) {
+        drawing.current.points = snapToCleanShape(drawing.current.points);
+        paint();
+      }
+    }, 450);
+  };
+
+  const onMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!tool) return;
+    if (isPalmRejected(e)) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+
+    if (tool === 'eraser') {
+      if (e.buttons !== 1) return;
+      const pt = extractPoint(e, rect, strokeStartTime.current);
+      applyEraser(pt);
+      const sCtx = scratchRef.current?.getContext('2d');
+      if (sCtx) {
+        sCtx.clearRect(0, 0, width, height);
+        const rPx = Math.max(0.006, Math.min(0.065, (strokeWidth || 0.0035) * 4.0)) * width;
+        sCtx.save();
+        sCtx.beginPath();
+        sCtx.arc(pt.x * width, pt.y * height, rPx, 0, Math.PI * 2);
+        sCtx.strokeStyle = 'rgba(0, 242, 254, 0.85)';
+        sCtx.lineWidth = 1.5;
+        sCtx.setLineDash([3, 3]);
+        sCtx.fillStyle = 'rgba(0, 242, 254, 0.12)';
+        sCtx.fill();
+        sCtx.stroke();
+        sCtx.restore();
+      }
+      return;
+    }
+
+    if (tool === 'lasso') {
+      const pt = extractPoint(e, rect, strokeStartTime.current);
+      if (isDraggingSelection.current && dragStartPt.current && selectionBBox.current) {
+        const dx = pt.x - dragStartPt.current.x;
+        const dy = pt.y - dragStartPt.current.y;
+        dragStartPt.current = { x: pt.x, y: pt.y };
+
+        for (const s of strokesRef.current) {
+          if (selectedIds.current.has(s.stroke_id)) {
+            for (const p of s.points) {
+              p.x = Math.min(1.0, Math.max(0.0, p.x + dx));
+              p.y = Math.min(1.0, Math.max(0.0, p.y + dy));
+            }
+          }
+        }
+        selectionBBox.current.minX += dx;
+        selectionBBox.current.maxX += dx;
+        selectionBBox.current.minY += dy;
+        selectionBBox.current.maxY += dy;
+        paint();
+        return;
+      }
+      if (lassoPoints.current.length > 0) {
+        lassoPoints.current.push(pt);
+        paint();
+      }
+      return;
+    }
+
+    const live = drawing.current;
+    if (!live) return;
+
+    // پردازش رویدادهای منسجم (120Hz/240Hz Coalesced Events)
+    const nativeEvt = e.nativeEvent;
+    const events =
+      typeof nativeEvt.getCoalescedEvents === 'function'
+        ? nativeEvt.getCoalescedEvents()
+        : [nativeEvt];
+
+    for (const subEvt of events) {
+      const pt = extractPoint(subEvt, rect, strokeStartTime.current);
+      const last = live.points[live.points.length - 1];
+      if (!last || Math.hypot(pt.x - last.x, pt.y - last.y) >= 0.0004) {
+        live.points.push(pt);
+      }
+    }
+    paint();
+
+    // مدیریت مکث برای صاف‌سازی (Dwell Detection)
+    const curPt = live.points[live.points.length - 1];
+    if (curPt && lastDwellPoint.current) {
+      const moveDist = Math.hypot(curPt.x - lastDwellPoint.current.x, curPt.y - lastDwellPoint.current.y);
+      if (moveDist > 0.008) {
+        lastDwellPoint.current = { x: curPt.x, y: curPt.y };
+        if (dwellTimer.current) window.clearTimeout(dwellTimer.current);
+        dwellTimer.current = window.setTimeout(() => {
+          if (shapeSnap && drawing.current && drawing.current.points.length >= 6) {
+            drawing.current.points = snapToCleanShape(drawing.current.points);
+            paint();
+          }
+        }, 450);
+      }
+    }
+  };
+
+  const onUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (tool === 'eraser') {
+      scratchRef.current?.getContext('2d')?.clearRect(0, 0, width, height);
+    }
+    touchPointers.current.delete(e.pointerId);
+    if (touchPointers.current.size < 2) {
+      lastPinchDist.current = null;
+    }
+    if (dwellTimer.current) window.clearTimeout(dwellTimer.current);
+
+    if (tool === 'lasso') {
+      if (isDraggingSelection.current) {
+        isDraggingSelection.current = false;
+        dragStartPt.current = null;
+        commit([...strokesRef.current]);
+        paint();
+        return;
+      }
+      const poly = lassoPoints.current;
+      lassoPoints.current = [];
+      if (poly.length > 2) {
+        const matched = new Set<string>();
+        let bMinX = 1.0, bMaxX = 0.0, bMinY = 1.0, bMaxY = 0.0;
+        for (const s of strokesRef.current) {
+          if (!s.points || s.points.length === 0) continue;
+          let insideCount = 0;
+          for (const p of s.points) {
+            if (isPointInPolygon(p, poly)) insideCount++;
+          }
+          if (insideCount >= Math.ceil(s.points.length * 0.45) || (s.points.length === 1 && insideCount === 1)) {
+            matched.add(s.stroke_id);
+            for (const p of s.points) {
+              bMinX = Math.min(bMinX, p.x);
+              bMaxX = Math.max(bMaxX, p.x);
+              bMinY = Math.min(bMinY, p.y);
+              bMaxY = Math.max(bMaxY, p.y);
+            }
+          }
+        }
+        if (matched.size > 0) {
+          selectedIds.current = matched;
+          selectionBBox.current = { minX: bMinX, minY: bMinY, maxX: bMaxX, maxY: bMaxY };
+        } else {
+          selectedIds.current.clear();
+          selectionBBox.current = null;
+        }
+      } else {
+        selectedIds.current.clear();
+        selectionBBox.current = null;
+      }
+      paint();
+      return;
+    }
+
+    const live = drawing.current;
+    if (!live) return;
+    drawing.current = null;
+
+    if (live.points.length < 2) {
+      // ایجاد نقطهٔ کوچک برای کلیک تکی
+      const p0 = live.points[0];
+      live.points.push({
+        x: p0.x + 0.0004,
+        y: p0.y,
+        pressure: p0.pressure,
+        time: p0.time + 10,
+      });
+    } else if (live.tool === 'highlighter' && live.points.length >= 3) {
+      // صاف‌سازی خودکار هایلایتر روی خطوط متن به سبک GoodNotes
+      const p0 = live.points[0];
+      const pn = live.points[live.points.length - 1];
+      const dx = Math.abs(pn.x - p0.x);
+      const dy = Math.abs(pn.y - p0.y);
+      if (dx > 0.03 && dy / dx < 0.28) {
+        const avgY = (p0.y + pn.y) / 2;
+        live.points = live.points.map((p) => ({ ...p, y: avgY }));
+      }
+    } else if (shapeSnap) {
+      live.points = snapToCleanShape(live.points);
+    }
+
+    commit([...strokesRef.current, live]);
+    paint();
+  };
+
+  const onCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    touchPointers.current.delete(e.pointerId);
+    if (touchPointers.current.size < 2) {
+      lastPinchDist.current = null;
+    }
+    if (dwellTimer.current) window.clearTimeout(dwellTimer.current);
+    if (tool === 'lasso') {
+      lassoPoints.current = [];
+      isDraggingSelection.current = false;
+      dragStartPt.current = null;
+      paint();
+    }
+    if (drawing.current) {
+      drawing.current = null;
+      paint();
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    undo: () => {
+      const prev = past.current.pop();
+      if (!prev) return;
+      future.current.push(strokesRef.current);
+      strokesRef.current = prev;
+      setStrokes(prev);
+      cbs.current.onCount(prev.length);
+      cbs.current.onHistory({ undo: past.current.length, redo: future.current.length });
+      dirty.current = true;
+      paint();
+    },
+    redo: () => {
+      const next = future.current.pop();
+      if (!next) return;
+      past.current.push(strokesRef.current);
+      strokesRef.current = next;
+      setStrokes(next);
+      cbs.current.onCount(next.length);
+      cbs.current.onHistory({ undo: past.current.length, redo: future.current.length });
+      dirty.current = true;
+      paint();
+    },
+    clear: () => {
+      if (strokesRef.current.length === 0) return;
+      past.current.push(strokesRef.current);
+      future.current = [];
+      strokesRef.current = [];
+      setStrokes([]);
+      cbs.current.onCount(0);
+      cbs.current.onHistory({ undo: past.current.length, redo: future.current.length });
+      dirty.current = true;
+      paint();
+    },
+    count: () => strokesRef.current.length,
+  }));
+
+  return (
+    <>
+      <canvas
+        ref={highlighterCanvasRef}
+        className="ink-canvas ink-canvas--highlighter"
+        style={{
+          width,
+          height,
+          position: 'absolute',
+          inset: 0,
+          zIndex: 2,
+          mixBlendMode: 'multiply',
+          pointerEvents: 'none',
+        }}
+        aria-hidden="true"
+      />
+      <canvas
+        ref={canvasRef}
+        className={`ink-canvas${tool ? ' ink-canvas--active' : ''}`}
+        style={{ width, height, position: 'absolute', inset: 0, zIndex: 3, touchAction: tool ? (stylusOnly ? 'pan-y' : 'none') : 'auto' }}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onCancel}
+        aria-label={
+          tool
+            ? 'سطح حاشیه‌نویسی دیجیتال؛ با قلم یا ماوس خط بکشید'
+            : 'حاشیه‌نویسی‌های این صفحه'
+        }
+        role="img"
+      />
+      <canvas
+        ref={scratchRef}
+        className="ink-canvas ink-canvas--scratch"
+        style={{ width, height, position: 'absolute', inset: 0, zIndex: 4, pointerEvents: 'none' }}
+        aria-hidden="true"
+      />
+    </>
+  );
+});

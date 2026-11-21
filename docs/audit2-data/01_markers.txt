@@ -1,0 +1,280 @@
+══ TODO (6) ══
+  apps\student\dist\assets\PdfView-BfzRlB6X.js:2: `);return t.join("")}}function ua(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  apps\student\dist\assets\PdfView-BMjHdk5q.js:2: `);return t.join("")}}function ua(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  apps\student\dist\assets\PdfView-Dm3jDYvn.js:2: `);return t.join("")}}function na(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  apps\student\dist\assets\PdfView-Dp2tWN-e.js:2: `);return t.join("")}}function ua(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  scripts\tools\audit2\m01_markers.py:26: (r'\bTODO\b', 'TODO'), (r'\bFIXME\b', 'FIXME'), (r'\bXXX\b', 'XXX'),
+  tools\audit2\m01_markers.py:26: (r'\bTODO\b', 'TODO'), (r'\bFIXME\b', 'FIXME'), (r'\bXXX\b', 'XXX'),
+
+══ FIXME (2) ══
+  scripts\tools\audit2\m01_markers.py:26: (r'\bTODO\b', 'TODO'), (r'\bFIXME\b', 'FIXME'), (r'\bXXX\b', 'XXX'),
+  tools\audit2\m01_markers.py:26: (r'\bTODO\b', 'TODO'), (r'\bFIXME\b', 'FIXME'), (r'\bXXX\b', 'XXX'),
+
+══ XXX (6) ══
+  apps\student\dist\assets\PdfView-BfzRlB6X.js:2: `);return t.join("")}}function ua(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  apps\student\dist\assets\PdfView-BMjHdk5q.js:2: `);return t.join("")}}function ua(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  apps\student\dist\assets\PdfView-Dm3jDYvn.js:2: `);return t.join("")}}function na(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  apps\student\dist\assets\PdfView-Dp2tWN-e.js:2: `);return t.join("")}}function ua(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  scripts\tools\audit2\m01_markers.py:26: (r'\bTODO\b', 'TODO'), (r'\bFIXME\b', 'FIXME'), (r'\bXXX\b', 'XXX'),
+  tools\audit2\m01_markers.py:26: (r'\bTODO\b', 'TODO'), (r'\bFIXME\b', 'FIXME'), (r'\bXXX\b', 'XXX'),
+
+══ HACK (2) ══
+  scripts\tools\audit2\m01_markers.py:27: (r'\bHACK\b', 'HACK'),
+  tools\audit2\m01_markers.py:27: (r'\bHACK\b', 'HACK'),
+
+══ NotImplementedError (2) ══
+  scripts\tools\audit2\m01_markers.py:28: (r'NotImplementedError', 'NotImplementedError'),
+  tools\audit2\m01_markers.py:28: (r'NotImplementedError', 'NotImplementedError'),
+
+══ placeholder (14) ══
+  backend\api\routers\admin_panel.py:115: نیز برای مصرف‌کننده‌های قدیمی باقی می‌مانند. هیچ مقدار placeholder یا
+  backend\database\content.py:263: # و نمایش‌ها مقدار واقعی (خالی = اختیاری) را ببینند، نه placeholder.
+  backend\database\core.py:866: placeholders = {'کاربر', 'دانشجو', 'تست', 'ناشناس', 'ادمین', 'بی', 'نام', 'حساب', 'دکتر', 'مهندس', 'استاد'}
+  backend\database\core.py:867: if all(t in placeholders for t in persian_tokens):
+  backend\database\core.py:868: return _ret('unknown', 0.0, 'placeholder_name')
+  backend\services\discount_campaign.py:157: """جایگذاری {{placeholder}} — ساده و در برابر کلید ناموجود امن."""
+  docs\archive\prototypes\src\screens\Notes.tsx:359: <div className="notes__placeholder">
+  miniapp\src\components\shared\SearchField.jsx:81: ariaLabel || placeholder
+  scripts\tools\audit2\m01_markers.py:29: (r'placeholder', 'placeholder'), (r'\bdummy\b', 'dummy'),
+  scripts\tools\audit2\m01_markers.py:33: (r'فعلا[\u200c ]?این[\u200c ]?طوری|placeholder only', 'stub'),
+  scripts\tools\audit2\m01_markers.py:55: if name == 'placeholder' and re.search(
+  tools\audit2\m01_markers.py:29: (r'placeholder', 'placeholder'), (r'\bdummy\b', 'dummy'),
+  tools\audit2\m01_markers.py:33: (r'فعلا[\u200c ]?این[\u200c ]?طوری|placeholder only', 'stub'),
+  tools\audit2\m01_markers.py:55: if name == 'placeholder' and re.search(
+
+══ dummy (2) ══
+  scripts\tools\audit2\m01_markers.py:29: (r'placeholder', 'placeholder'), (r'\bdummy\b', 'dummy'),
+  tools\audit2\m01_markers.py:29: (r'placeholder', 'placeholder'), (r'\bdummy\b', 'dummy'),
+
+══ mock-ish (190) ══
+  apps\student\src\App.tsx:113: <Route path="/exam/mock/history" element={<Gate><MockExamHistory /></Gate>} />
+  apps\student\src\App.tsx:114: <Route path="/exam/run/:sid" element={<Gate><MockRun /></Gate>} />
+  apps\student\src\lib\exam.ts:146: export interface MockStartBody {
+  apps\student\src\lib\exam.ts:156: export interface MockPreview {
+  apps\student\src\lib\exam.ts:166: export interface MockSummary {
+  apps\student\src\lib\exam.ts:185: export interface MockNext {
+  apps\student\src\lib\exam.ts:200: export interface MockAnswerResult {
+  apps\student\src\lib\exam.ts:222: export interface MockReview extends MockSummary {
+  apps\student\src\lib\exam.ts:228: export const mockExam = {
+  apps\student\src\lib\exam.ts:229: preview: (b: MockStartBody) =>
+  apps\student\src\lib\exam.ts:230: apiCall<MockPreview>('/exam/mock/preview', { method: 'POST', body: JSON.stringify(b) }),
+  apps\student\src\lib\exam.ts:232: start: (b: MockStartBody) =>
+  apps\student\src\lib\exam.ts:233: apiCall<MockSummary>('/exam/mock/start', { method: 'POST', body: JSON.stringify(b) }),
+  apps\student\src\lib\exam.ts:235: active: () => apiCall<{ exam: MockSummary | null }>('/exam/mock/active'),
+  apps\student\src\lib\exam.ts:237: session: (sid: string) => apiCall<MockSummary>(`/exam/mock/${sid}`),
+  apps\student\src\lib\exam.ts:239: next: (sid: string) => apiCall<MockNext>(`/exam/mock/${sid}/next`),
+  apps\student\src\lib\exam.ts:242: apiCall<MockAnswerResult>(`/exam/mock/${sid}/answer`, {
+  apps\student\src\lib\exam.ts:248: apiCall<{ ok: boolean }>(`/exam/mock/${sid}/abandon`, { method: 'POST' }),
+  apps\student\src\lib\exam.ts:250: history: () => apiCall<{ exams: MockSummary[]; total: number }>('/exam/mock/history'),
+  apps\student\src\lib\exam.ts:252: review: (sid: string) => apiCall<MockReview>(`/exam/mock/${sid}/review`),
+  apps\student\src\screens\exam\ExamResult.tsx:19: const [data, setData] = useState<MockReview | null>(null);
+  apps\student\src\screens\exam\ExamResult.tsx:25: const res = await mockExam.review(sid);
+  apps\student\src\screens\exam\ExamResult.tsx:76: <Button variant="ghost" size="sm" onClick={() => navigate('/exam/mock/history')}>
+  apps\student\src\screens\exam\ExamSetup.tsx:15: *  تعداد پیش از شروع با سرور چک می‌شود (`/exam/mock/preview`) تا کاربر
+  apps\student\src\screens\exam\ExamSetup.tsx:27: const [preview, setPreview] = useState<MockPreview | null>(null);
+  apps\student\src\screens\exam\ExamSetup.tsx:29: const [active, setActive] = useState<MockSummary | null>(null);
+  apps\student\src\screens\exam\ExamSetup.tsx:38: mockExam.active().catch(() => ({ exam: null })),
+  apps\student\src\screens\exam\ExamSetup.tsx:62: const p = await mockExam.preview({
+  apps\student\src\screens\exam\ExamSetup.tsx:96: const s = await mockExam.start({
+  apps\student\src\screens\exam\ExamSetup.tsx:110: const existing = (err.detail?.exam ?? null) as MockSummary | null;
+  apps\student\src\screens\exam\ExamSetup.tsx:148: await mockExam.abandon(active.session_id).catch(() => undefined);
+  apps\student\src\screens\exam\ExamSetup.tsx:284: <Button variant="ghost" size="sm" onClick={() => navigate('/exam/mock/history')}>
+  apps\student\src\screens\exam\ExamSetup.tsx:296: export function MockExamHistory() {
+  apps\student\src\screens\exam\ExamSetup.tsx:298: const [items, setItems] = useState<MockSummary[]>([]);
+  apps\student\src\screens\exam\ExamSetup.tsx:304: const res = await mockExam.history();
+  apps\student\src\screens\exam\ExamSetup.tsx:335: className="mock-row"
+  apps\student\src\screens\exam\MockRun.tsx:11: mockExam,
+  apps\student\src\screens\exam\MockRun.tsx:12: type MockNext,
+  apps\student\src\screens\exam\MockRun.tsx:13: type MockSummary,
+  apps\student\src\screens\exam\MockRun.tsx:24: *  ۳) رفرش صفحه آزمون را از بین نمی‌برد؛ وضعیت از `/mock/{id}` می‌آید.
+  apps\student\src\screens\exam\MockRun.tsx:26: export function MockRun() {
+  apps\student\src\screens\exam\MockRun.tsx:30: const [summary, setSummary] = useState<MockSummary | null>(null);
+  apps\student\src\screens\exam\MockRun.tsx:31: const [current, setCurrent] = useState<MockNext | null>(null);
+  apps\student\src\screens\exam\MockRun.tsx:46: const [s, n] = await Promise.all([mockExam.session(sid), mockExam.next(sid)]);
+  apps\student\src\screens\exam\MockRun.tsx:72: const n = await mockExam.next(sid);
+  apps\student\src\screens\exam\MockRun.tsx:94: const res = await mockExam.answer(sid, selected);
+  apps\student\src\screens\exam\MockRun.tsx:100: const n = await mockExam.next(sid);
+  backend\api\routers\payment_gateway.py:30: is_mock: bool
+  backend\api\routers\payment_gateway.py:54: is_mock = not bool(mid) or mid.lower() in ("test","mock","sandbox")
+  backend\api\routers\payment_gateway.py:61: is_mock=is_mock,
+  backend\api\routers\payment_gateway.py:66: # Validate merchant_id format (Zarinpal UUID 36 chars, but allow test/mock for mock mode)
+  backend\api\routers\payment_gateway.py:69: if mid and mid.lower() not in ("test","mock","sandbox"):
+  backend\api\routers\payment_gateway.py:105: # Light test: try request with 1000 Toman mock amount (will be mock if no merchant, else real request but we d
+  backend\api\routers\payment_gateway.py:108: if cfg.is_mock:
+  backend\api\routers\payment_gateway.py:109: return {"ok": True, "mock": True, "message": "حالت آزمایشی (mock) فعال است — بدون merchant واقعی، پرداخت شبیه‌
+  backend\api\routers\payment_gateway.py:112: return {"ok": True, "mock": False, "sandbox": cfg.sandbox, "message": f"درگاه {'سندباکس' if cfg.sandbox else '
+  backend\api\routers\questions.py:844: user=Depends(require_feature("mock_exam")),
+  backend\api\routers\questions.py:851: async def active_exam(user=Depends(require_feature("mock_exam"))):
+  backend\api\routers\questions.py:856: async def preview_exam(body: ExamStartInput, user=Depends(require_feature("mock_exam"))):
+  backend\api\routers\subscription.py:1250: # 💳 W2 — زرین‌پال (درگاه خودکار + Sandbox mock)
+  backend\api\routers\subscription.py:1334: return {"ok": True, "authority": authority, "url": zp["url"], "payment_id": pid, "final_price": price, "mock":
+  backend\api\routers\subscription.py:1385: "payment_id": str(pid), "final_price": amount, "mock": zp.get("mock", False)}
+  backend\api\routers\subscription.py:1451: return {"ok": True, "ref_id": ref_id, "end_date": act.get("end_date"), "days": act.get("days"), "mock": zp.get
+  backend\api\routers\web_exam.py:81: هندلر (`mock_session`، `mock_review`) جا افتاده بودند → ۵۰۰ به‌جای ۴۰۴.
+  backend\api\routers\web_exam.py:221: class MockExamStart(BaseModel):
+  backend\api\routers\web_exam.py:231: async def _mock_gate(user: dict) -> dict:
+  backend\api\routers\web_exam.py:232: """گیت آزمون: `question_bank` + `mock_exam` — همان دو شرطی که مینی‌اپ دارد.
+  backend\api\routers\web_exam.py:234: بدون این، کسی که پلنش `mock_exam` ندارد می‌توانست از مسیر وب آزمون
+  backend\api\routers\web_exam.py:242: await require_feature("mock_exam")(user=web)
+  backend\api\routers\web_exam.py:246: logger.warning("web_exam_mock_gate_failed err=%s", type(exc).__name__)
+  backend\api\routers\web_exam.py:251: @router.post("/exam/mock/preview")
+  backend\api\routers\web_exam.py:253: async def mock_preview(body: MockExamStart, user: dict = Depends(current_student)):
+  backend\api\routers\web_exam.py:256: web = await _mock_gate(user)
+  backend\api\routers\web_exam.py:266: @router.post("/exam/mock/start")
+  backend\api\routers\web_exam.py:268: async def mock_start(body: MockExamStart, user: dict = Depends(current_student)):
+  backend\api\routers\web_exam.py:271: web = await _mock_gate(user)
+  backend\api\routers\web_exam.py:281: @router.get("/exam/mock/active")
+  backend\api\routers\web_exam.py:282: async def mock_active(user: dict = Depends(current_student)):
+  backend\api\routers\web_exam.py:284: web = await _mock_gate(user)
+  backend\api\routers\web_exam.py:288: # ⚠️ ترتیب مسیر مهم است: این مسیر ثابت باید **پیش از** `/exam/mock/{session_id}`
+  … و 110 مورد دیگر
+
+══ fake (6) ══
+  apps\student\dist\assets\PdfView-BfzRlB6X.js:2: `);return t.join("")}}function ua(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  apps\student\dist\assets\PdfView-BMjHdk5q.js:2: `);return t.join("")}}function ua(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  apps\student\dist\assets\PdfView-Dm3jDYvn.js:2: `);return t.join("")}}function na(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  apps\student\dist\assets\PdfView-Dp2tWN-e.js:2: `);return t.join("")}}function ua(d,t){try{const{protocol:e}=t?new URL(d,t):new URL(d);return e==="http:"||e==
+  scripts\tools\audit2\m01_markers.py:30: (r'\bmock(?!ed)', 'mock-ish'), (r'\bfake\b', 'fake'),
+  tools\audit2\m01_markers.py:30: (r'\bmock(?!ed)', 'mock-ish'), (r'\bfake\b', 'fake'),
+
+══ به‌زودی (8) ══
+  backend\bot\referral.py:105: """نمایش لینک/آمار دعوت. با کلید خاموش → پیام به‌زودی."""
+  backend\bot\referral.py:112: await query.answer('بخش دعوت دوستان به‌زودی فعال می‌شود 🌱',
+  backend\bot\start.py:82: "به زودی دسترسی شما فعال می‌شود. 🙏",
+  backend\bot\ticket.py:770: "📬 به زودی پاسخ داده خواهد شد.\n"
+  backend\services\ring\texts.py:582: "به‌زودی دوباره برمی‌گردیم.\n\n"
+  miniapp\src\components\shared\SubscriptionLock.jsx:177: ? 'این قابلیت موقتاً توسط تیم فنی خاموش شده است؛ به‌زودی برمی‌گردد.'
+  scripts\tools\audit2\m01_markers.py:31: (r'به[\u200c ]?زودی', 'به‌زودی'), (r'در دست ساخت', 'در-دست-ساخت'),
+  tools\audit2\m01_markers.py:31: (r'به[\u200c ]?زودی', 'به‌زودی'), (r'در دست ساخت', 'در-دست-ساخت'),
+
+══ در-دست-ساخت (6) ══
+  miniapp\src\landing\Landing.jsx:142: a: 'نسخهٔ وب دقیقاً به‌صورت اپ روی صفحهٔ اصلی نصب می‌شود. نسخهٔ بومی اندروید و iOS در دست ساخت است و بعد از ان
+  miniapp\src\landing\Landing.jsx:345: {/* ── ۵) نصب روی سکوها + نشانهٔ «در دست ساخت» ─────────── */}
+  miniapp\src\landing\Landing.jsx:367: <span className="lp-soon__badge">در دست ساخت</span>
+  miniapp\src\landing\Landing.jsx:431: نسخهٔ بومی اندروید و iOS در دست ساخت است · این صفحه بدون هیچ اسکریپت ردیابی
+  scripts\tools\audit2\m01_markers.py:31: (r'به[\u200c ]?زودی', 'به‌زودی'), (r'در دست ساخت', 'در-دست-ساخت'),
+  tools\audit2\m01_markers.py:31: (r'به[\u200c ]?زودی', 'به‌زودی'), (r'در دست ساخت', 'در-دست-ساخت'),
+
+══ coming-soon (2) ══
+  scripts\tools\audit2\m01_markers.py:32: (r'coming soon', 'coming-soon'), (r'not implemented', 'not-implemented'),
+  tools\audit2\m01_markers.py:32: (r'coming soon', 'coming-soon'), (r'not implemented', 'not-implemented'),
+
+══ not-implemented (2) ══
+  scripts\tools\audit2\m01_markers.py:32: (r'coming soon', 'coming-soon'), (r'not implemented', 'not-implemented'),
+  tools\audit2\m01_markers.py:32: (r'coming soon', 'coming-soon'), (r'not implemented', 'not-implemented'),
+
+══ stub (2) ══
+  scripts\tools\audit2\m01_markers.py:33: (r'فعلا[\u200c ]?این[\u200c ]?طوری|placeholder only', 'stub'),
+  tools\audit2\m01_markers.py:33: (r'فعلا[\u200c ]?این[\u200c ]?طوری|placeholder only', 'stub'),
+
+══ print-temp (80) ══
+  backend\services\time_audit.py:168: print(json.dumps(output, ensure_ascii=False, indent=2, default=str))
+  scripts\build_single.py:110: print(f"✅ {os.path.basename(OUT)} — {size:.0f} KB — بدون هیچ درخواست بیرونی")
+  scripts\migrate_round1.py:188: print('🔴 migrate_round1 — شروع' + (' (DRY-RUN: فقط گزارش، بدون تغییر)' if DRY else ''))
+  scripts\migrate_round1.py:201: print(f'— {title} …')
+  scripts\migrate_round1.py:205: print('   (dry-run: رد شد)')
+  scripts\migrate_round1.py:210: print('\n🏁 dry-run تمام شد — برای اجرای واقعی بدون --dry اجرا کن.')
+  scripts\migrate_round1.py:214: print('\n══════ گزارش migration ══════')
+  scripts\migrate_round1.py:216: print(f'  {k}: {v}')
+  scripts\migrate_round1.py:217: print('🏁 migration تمام شد.')
+  scripts\qbank_import_cli.py:67: print(json.dumps(ocr_available(), ensure_ascii=False, indent=2))
+  scripts\qbank_import_cli.py:72: print(json.dumps(EXAM_SESSIONS, ensure_ascii=False, indent=2))
+  scripts\qbank_import_cli.py:94: print(json.dumps({"ok": False, "code": exc.code, "message": exc.message},
+  scripts\qbank_import_cli.py:98: print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False, indent=2),
+  scripts\qbank_import_cli.py:119: print(json.dumps(summary, ensure_ascii=False, indent=2))
+  scripts\qbank_legacy_archive.py:120: print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+  scripts\qbank_migrate.py:86: print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+  scripts\tools\audit2\m01_markers.py:106: print('SUMMARY:', {k: len(v) for k, v in results.items()})
+  scripts\tools\audit2\m02_callback_matrix.py:139: print(f'built={len(built)} registered={len(registered)} '
+  scripts\tools\audit2\m03_endpoint_matrix.py:157: print(f'endpoints={len(endpoints)} consumed={len(consumed)} '
+  scripts\tools\audit2\m04_settings_dead.py:115: print(f'settings: {len(code_keys)} (ro={len(set(readers)-set(writers))}, '
+  scripts\tools\health\data_health.py:34: print(f'❌ اتصال به دیتابیس ممکن نشد: {exc}')
+  scripts\tools\health\data_health.py:35: print('   MONGODB_URI را تنظیم کنید (مثلاً از vps.env).')
+  scripts\tools\health\data_health.py:81: print('🩺 گزارش سلامت داده — ', end='')
+  scripts\tools\health\data_health.py:83: print('سالم ✓')
+  scripts\tools\health\data_health.py:85: print(f'ℹ️  {info_note} پرداخت تأییدشده بدون مرجع زرین‌پال '
+  scripts\tools\health\data_health.py:88: print(f'{len(problems)} مورد:')
+  scripts\tools\health\data_health.py:91: print(f'  🔸 [{label}] {desc}{c}')
+  scripts\tools\health\data_health.py:93: print(f'ℹ️  {info_note} پرداخت تأییدشده بدون مرجع زرین‌پال (اطلاعاتی)')
+  scripts\tools\health\data_health.py:94: print('\n⚠️ طبق قاعده ماموریت، این اسکریپت چیزی اصلاح نمی‌کند — '
+  scripts\tools\migration\content_forks.py:114: print('⏳ خواندن forkهای فعال…')
+  scripts\tools\migration\content_forks.py:119: print(f'   جلسه-fork: {len(fork_sessions)} · کتاب-fork: {len(fork_books)}')
+  scripts\tools\migration\content_forks.py:196: print('\n📊 گزارش رده‌بندی:')
+  scripts\tools\migration\content_forks.py:197: print(f"   جلسات → A(آرشیو بدون-تغییر): {len(report['sessions']['A'])}"
+  scripts\tools\migration\content_forks.py:201: print(f"   کتاب‌ها → یتیم: {len(report['books']['orphan_detach'])}"
+  scripts\tools\migration\content_forks.py:209: print(f'\n🔍 DRY-RUN — هیچ تغییری اعمال نشد. گزارش: {out}')
+  scripts\tools\migration\content_forks.py:210: print('   برای اعمال: python3 tools/migration/content_forks.py --apply')
+  scripts\tools\migration\content_forks.py:229: print(f'💾 پشتیبان: {bdir}/backup.json ({len(backup["bs_sessions"])} جلسه، '
+  scripts\tools\migration\content_forks.py:273: print(f'   ✅ ایندکس یکتا ساخته شد: {name}')
+  scripts\tools\migration\content_forks.py:276: print(f'   ⚠️ ساخت ایندکس {name} ناموفق: {e}')
+  scripts\tools\migration\content_forks.py:278: print(f'\n✅ اعمال شد: آرشیو {n_archived} جلسه · بومی‌سازی {n_detached} یتیم · '
+  scripts\tools\migration\content_forks.py:281: print('⚠️ ایندکس‌ها (دوباره بعد از رفع تکراری‌ها اجرا کنید):')
+  scripts\tools\migration\content_forks.py:283: print(f'   - {e}')
+  scripts\tools\migration\content_forks_rollback.py:44: print(f'   🧹 ایندکس {name} حذف شد')
+  scripts\tools\migration\content_forks_rollback.py:59: print(f"✅ بازگردانی شد: {restored['bs_sessions']} جلسه، {restored['ref_books']} کتاب "
+  scripts\tools\migration\content_forks_rollback.py:61: print('ℹ️ ایندکس‌های یکتا حذف شدند؛ پس از ریشه‌یابی، migration را دوباره اجرا کنید.')
+  scripts\tools\migration\content_forks_rollback.py:74: print('❌ پشتیبانی پیدا نشد'); sys.exit(2)
+  scripts\tools\migration\content_forks_rollback.py:77: print(f'❌ فایل پیدا نشد: {path}'); sys.exit(2)
+  scripts\tools\migration\educational_groups_and_schedules.py:231: print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+  tools\audit2\m01_markers.py:106: print('SUMMARY:', {k: len(v) for k, v in results.items()})
+  tools\audit2\m02_callback_matrix.py:139: print(f'built={len(built)} registered={len(registered)} '
+  tools\audit2\m03_endpoint_matrix.py:157: print(f'endpoints={len(endpoints)} consumed={len(consumed)} '
+  tools\audit2\m04_settings_dead.py:115: print(f'settings: {len(code_keys)} (ro={len(set(readers)-set(writers))}, '
+  tools\health\data_health.py:32: print(f'❌ اتصال به دیتابیس ممکن نشد: {exc}')
+  tools\health\data_health.py:33: print('   MONGODB_URI را تنظیم کنید (مثلاً از vps.env).')
+  tools\health\data_health.py:79: print('🩺 گزارش سلامت داده — ', end='')
+  tools\health\data_health.py:81: print('سالم ✓')
+  tools\health\data_health.py:83: print(f'ℹ️  {info_note} پرداخت تأییدشده بدون مرجع زرین‌پال '
+  tools\health\data_health.py:86: print(f'{len(problems)} مورد:')
+  tools\health\data_health.py:89: print(f'  🔸 [{label}] {desc}{c}')
+  tools\health\data_health.py:91: print(f'ℹ️  {info_note} پرداخت تأییدشده بدون مرجع زرین‌پال (اطلاعاتی)')
+  tools\health\data_health.py:92: print('\n⚠️ طبق قاعده ماموریت، این اسکریپت چیزی اصلاح نمی‌کند — '
+  tools\migration\content_forks.py:112: print('⏳ خواندن forkهای فعال…')
+  tools\migration\content_forks.py:117: print(f'   جلسه-fork: {len(fork_sessions)} · کتاب-fork: {len(fork_books)}')
+  tools\migration\content_forks.py:194: print('\n📊 گزارش رده‌بندی:')
+  tools\migration\content_forks.py:195: print(f"   جلسات → A(آرشیو بدون-تغییر): {len(report['sessions']['A'])}"
+  tools\migration\content_forks.py:199: print(f"   کتاب‌ها → یتیم: {len(report['books']['orphan_detach'])}"
+  tools\migration\content_forks.py:207: print(f'\n🔍 DRY-RUN — هیچ تغییری اعمال نشد. گزارش: {out}')
+  tools\migration\content_forks.py:208: print('   برای اعمال: python3 tools/migration/content_forks.py --apply')
+  tools\migration\content_forks.py:227: print(f'💾 پشتیبان: {bdir}/backup.json ({len(backup["bs_sessions"])} جلسه، '
+  tools\migration\content_forks.py:271: print(f'   ✅ ایندکس یکتا ساخته شد: {name}')
+  tools\migration\content_forks.py:274: print(f'   ⚠️ ساخت ایندکس {name} ناموفق: {e}')
+  tools\migration\content_forks.py:276: print(f'\n✅ اعمال شد: آرشیو {n_archived} جلسه · بومی‌سازی {n_detached} یتیم · '
+  tools\migration\content_forks.py:279: print('⚠️ ایندکس‌ها (دوباره بعد از رفع تکراری‌ها اجرا کنید):')
+  tools\migration\content_forks.py:281: print(f'   - {e}')
+  tools\migration\content_forks_rollback.py:42: print(f'   🧹 ایندکس {name} حذف شد')
+  tools\migration\content_forks_rollback.py:57: print(f"✅ بازگردانی شد: {restored['bs_sessions']} جلسه، {restored['ref_books']} کتاب "
+  tools\migration\content_forks_rollback.py:59: print('ℹ️ ایندکس‌های یکتا حذف شدند؛ پس از ریشه‌یابی، migration را دوباره اجرا کنید.')
+  tools\migration\content_forks_rollback.py:72: print('❌ پشتیبانی پیدا نشد'); sys.exit(2)
+  tools\migration\content_forks_rollback.py:75: print(f'❌ فایل پیدا نشد: {path}'); sys.exit(2)
+  tools\migration\educational_groups_and_schedules.py:229: print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+
+══ pass-only-func (0) ══
+
+══ commented-block (25) ══
+  backend\api\main.py:701-706 (6 خط)
+  backend\api\main.py:733-739 (7 خط)
+  backend\api\routers\ai.py:967-972 (6 خط)
+  backend\api\routers\web_admin.py:1594-1600 (7 خط)
+  backend\api\routers\web_admin.py:4615-4620 (6 خط)
+  backend\api\routers\web_admin.py:5914-5920 (7 خط)
+  backend\bot\ai_admin.py:282-287 (6 خط)
+  backend\bot\bot.py:36-47 (12 خط)
+  backend\bot\bot.py:1192-1197 (6 خط)
+  backend\bot\bot.py:1404-1409 (6 خط)
+  backend\bot\bot.py:2101-2106 (6 خط)
+  backend\bot\bot.py:2147-2157 (11 خط)
+  backend\bot\bot.py:2173-2180 (8 خط)
+  backend\bot\content_admin.py:2449-2455 (7 خط)
+  backend\bot\message_router.py:28-33 (6 خط)
+  backend\database\content.py:4507-4514 (8 خط)
+  backend\database\finance.py:905-910 (6 خط)
+  backend\database\rbac.py:1677-1682 (6 خط)
+  backend\services\ai_solver.py:874-879 (6 خط)
+  backend\services\ai_solver.py:1723-1729 (7 خط)
+  backend\services\ai_solver.py:2778-2783 (6 خط)
+  backend\services\ai_solver.py:3007-3012 (6 خط)
+  backend\services\ai_solver.py:3614-3619 (6 خط)
+  backend\services\ai_solver.py:3698-3706 (9 خط)
+  backend\services\ring\jobs.py:104-109 (6 خط)
+

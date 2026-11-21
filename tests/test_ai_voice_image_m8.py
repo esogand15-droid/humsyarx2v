@@ -1,0 +1,1234 @@
+# -*- coding: utf-8 -*-
+"""⭐ م8 — تست‌های واحد: پاسخ صوتی (TTS)، مدل‌های تصویرِ زنده،
+سلامت‌سنجی مدل‌ها (تستِ واقعیِ توکن) و مرتب‌سازیِ رایگانِ زنده.
+
+بدون شبکه/Mongo — همه‌ی مسیرهای HTTP با فیک httpx ماک می‌شوند."""
+import os
+import sys
+import unittest
+from unittest import mock
+
+sys.path.insert(0, os.path.dirname(__file__))
+os.environ.setdefault('MONGODB_URI', 'mongodb://127.0.0.1:27017')
+
+import _rtloop
+import ai_solver
+from ai_solver import (
+    _looks_like_image_model, model_free_rank, model_is_free, _voice_reply_plan,
+    merge_models_with_health, list_image_models, probe_models,
+    get_models_health, generate_speech_gemini, get_ai_config,
+    set_api_key_for_provider, add_api_key_for_provider,
+    IMAGE_ASPECT_RATIOS, IMAGE_SIZES, PREBUILT_TTS_VOICES,
+    VOICE_REPLY_MODES, TTS_MODEL_DEFAULT,
+)
+
+K1 = 'AIza_test_key_8888'
+K2 = 'AIza_test_key_9999'
+
+
+class _FakeSettingsDB:
+    def __init__(self):
+        self.settings = {}
+
+    async def get_settings_by_prefix(self, prefix):
+        return {k: v for k, v in self.settings.items() if k.startswith(prefix)}
+
+    async def get_setting(self, key, default=None):
+        return self.settings.get(key, default)
+
+    async def set_setting(self, key, value):
+        self.settings[key] = value
+
+
+class _Resp:
+    def __init__(self, status_code=200, payload=None, text=''):
+        self.status_code = status_code
+        self._payload = payload or {}
+        self.text = text
+
+    def json(self):
+        return self._payload
+
+
+class _ClientCtx:
+    """httpx.AsyncClient ماک — صف پاسخ‌ها."""
+    responses = []
+
+    def __init__(self, *a, **kw):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def get(self, url, headers=None, **kw):
+        item = _ClientCtx.responses.pop(0) if _ClientCtx.responses else (200, {})
+        return _Resp(*item) if isinstance(item, tuple) else _Resp(item)
+
+    async def post(self, url, headers=None, json=None, **kw):
+        _ClientCtx.last_post = (url, headers, json)
+        item = _ClientCtx.responses.pop(0) if _ClientCtx.responses else (200, {})
+        return _Resp(*item) if isinstance(item, tuple) else _Resp(item)
+
+
+class ImageModelDetectionTests(unittest.TestCase):
+    """تشخیص مدل تصویر از نام + رتبه‌ی رایگان."""
+
+    def test_looks_like_image_model(self):
+        for mid in ('gemini-nano-banana-2.1', 'gemini-3.1-flash-lite-image',
+                    'gemini-3-pro-image', 'imagen-4.0-generate-001'):
+            self.assertTrue(_looks_like_image_model(mid), mid)
+        for mid in ('gemini-3.6-flash', 'gemini-3.8-flash-tts',
+                    'text-embedding-2', 'gemma-4-31b-it'):
+            self.assertFalse(_looks_like_image_model(mid), mid)
+
+    def test_free_rank(self):
+        # openrouter :free قطعاً رایگان
+        self.assertEqual(model_free_rank('openrouter', 'x/FLUX.1-schnell:free'), 4)
+        self.assertEqual(model_free_rank('openrouter', 'openai/gpt-5'), 0)
+        # gemini: lite > flash/banana > pro
+        self.assertGreater(model_free_rank('gemini', 'gemini-3.1-flash-lite-image'),
+                           model_free_rank('gemini', 'gemini-nano-banana-2.1'))
+        self.assertGreater(model_free_rank('gemini', 'gemini-nano-banana-2.1'),
+                           model_free_rank('gemini', 'gemini-3-pro-image'))
+        self.assertTrue(model_is_free('gemini', 'gemini-3.1-flash-lite-image'))
+        self.assertFalse(model_is_free('gemini', 'gemini-3-pro-image'))
+
+    def test_catalog_ratios_and_sizes(self):
+        # نسبت‌های پانورامای نانوبانانا 2.1 موجود است
+        for r in ('1:4', '4:1', '1:8', '8:1', '21:9'):
+            self.assertIn(r, IMAGE_ASPECT_RATIOS)
+        self.assertEqual(IMAGE_SIZES, ('1K', '2K', '4K'))
+        # ۳۰ صدای پیش‌ساخته + حالت‌های پاسخ صوتی
+        self.assertEqual(len(PREBUILT_TTS_VOICES), 30)
+        self.assertIn('Sulafat', PREBUILT_TTS_VOICES)
+        self.assertEqual(VOICE_REPLY_MODES, ('off', 'voice', 'all'))
+        self.assertEqual(TTS_MODEL_DEFAULT, 'gemini-3.8-flash-lite-tts')
+
+
+class HealthSortTests(unittest.TestCase):
+    """مرتب‌سازی: زنده > تست‌نشده > مرده، بعد رایگان‌تر، بعد سریع‌تر."""
+
+    def test_sort_alive_free_fast_first(self):
+        models = [
+            {'id': 'gemini-3-pro-slow', 'label': 'A'},        # زنده ولی pro و کُند
+            {'id': 'gemini-3.6-flash-lite-fast', 'label': 'B'},  # زنده + lite + سریع
+            {'id': 'gemini-3.6-flash-dead', 'label': 'C'},    # مرده
+            {'id': 'gemini-3.6-untested', 'label': 'D'},      # تست‌نشده
+        ]
+        health = {'kind': 'chat', 'models': {
+            'gemini-3-pro-slow': {'ok': True, 'ms': 3000},
+            'gemini-3.6-flash-lite-fast': {'ok': True, 'ms': 400},
+            'gemini-3.6-flash-dead': {'ok': False, 'ms': 100},
+        }}
+        out = merge_models_with_health('gemini', models, health)
+        ids = [m['id'] for m in out]
+        # زنده‌ی سریعِ lite اول؛ مرده آخر؛ تست‌نشده وسط
+        self.assertEqual(ids[0], 'gemini-3.6-flash-lite-fast')
+        self.assertEqual(ids[-1], 'gemini-3.6-flash-dead')
+        self.assertIn('gemini-3.6-untested', ids[1:3])
+        # نشان رایگان چسبیده (lite/flash رایگان‌اند؛ pro نه)
+        by_id = {m['id']: m for m in out}
+        self.assertTrue(by_id['gemini-3.6-flash-lite-fast']['free'])
+        self.assertFalse(by_id['gemini-3-pro-slow']['free'])
+
+    def test_no_health_keeps_order(self):
+        models = [{'id': 'a'}, {'id': 'b'}]
+        out = merge_models_with_health('gemini', models, {})
+        self.assertEqual([m['id'] for m in out], ['a', 'b'])
+        self.assertIsNone(out[0]['health_ok'])
+
+
+class ListImageModelsTests(unittest.TestCase):
+    """فهرست زنده از ListModels + fallback کاتالوگ."""
+
+    def setUp(self):
+        _rtloop.adopt()
+        self.fake = _FakeSettingsDB()
+        self._p = mock.patch.object(ai_solver, 'db', self.fake)
+        self._p.start()
+
+    def tearDown(self):
+        self._p.stop()
+
+    def test_live_from_listmodels(self):
+        _ClientCtx.responses = [(200, {'models': [
+            {'name': 'models/gemini-nano-banana-2.1'},
+            {'name': 'models/gemini-3.1-flash-lite-image'},
+            {'name': 'models/gemini-3.6-flash'},          # چت — رد
+            {'name': 'models/gemini-embedding-2'},        # رد
+        ]})]
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _ClientCtx):
+            out = _rtloop.run(list_image_models('gemini', api_key=K1, refresh=True))
+        ids = [m['id'] for m in out['models']]
+        self.assertEqual(ids, ['gemini-nano-banana-2.1', 'gemini-3.1-flash-lite-image'])
+        self.assertFalse(out['fallback'])
+        self.assertTrue(out['models'][1]['free'])    # lite = رایگان
+
+    def test_fallback_catalog_on_error(self):
+        _ClientCtx.responses = [(403, {'error': {'message': 'no access'}})]
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _ClientCtx):
+            out = _rtloop.run(list_image_models('gemini', api_key=K1, refresh=True))
+        self.assertTrue(out['fallback'])
+        self.assertTrue(len(out['models']) >= 2)
+        # مدل‌های مرده‌ی imagen-4 در کاتالوگ روزآمد نیستند
+        self.assertFalse(any('imagen-4' in m['id'] for m in out['models']))
+        # نانوبانانا 2.1 هست
+        self.assertTrue(any(m['id'] == 'gemini-nano-banana-2.1' for m in out['models']))
+
+
+class ProbeTests(unittest.TestCase):
+    """سلامت‌سنجی: پاسخِ ۲۰۰ = زنده؛ خطا = مرده؛ ذخیره در settings."""
+
+    def setUp(self):
+        _rtloop.adopt()
+        ai_solver._KEY_STATE.clear()
+        self.fake = _FakeSettingsDB()
+        self.fake.settings['ai_api_keys'] = '{"gemini": ["%s", "%s"]}' % (K1, K2)
+        self.fake.settings['ai_enabled'] = '1'
+        self._p = mock.patch.object(ai_solver, 'db', self.fake)
+        self._p.start()
+
+    def tearDown(self):
+        self._p.stop()
+        ai_solver._KEY_STATE.clear()
+
+    def test_probe_marks_and_stores(self):
+        _ClientCtx.responses = [
+            (200, {'candidates': [{'content': {'parts': [{'text': '۱'}]}}]}),
+            (429, {'error': {'message': 'quota'}}),
+        ]
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _ClientCtx):
+            out = _rtloop.run(probe_models('gemini', ['gemini-3.6-flash', 'gemini-3.8-flash'],
+                                           kind='chat'))
+        self.assertEqual(out['ok_count'], 1)
+        self.assertTrue(out['results']['gemini-3.6-flash']['ok'])
+        self.assertFalse(out['results']['gemini-3.8-flash']['ok'])
+        self.assertIn('HTTP 429', out['results']['gemini-3.8-flash']['error'])
+        # ذخیره در settings
+        stored = self.fake.settings.get('ai_models_health_gemini')
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored['kind'], 'chat')
+        # خواندن سلامت
+        got = _rtloop.run(get_models_health('gemini'))
+        self.assertEqual(got['kind'], 'chat')
+
+    def test_probe_image_uses_real_generate_content(self):
+        import base64
+        png = base64.b64encode(b'\x89PNGxxxx').decode()
+        _ClientCtx.responses = [
+            (200, {'candidates': [{'content': {'parts': [
+                {'inlineData': {'data': png, 'mimeType': 'image/png'}}]}}]}),
+            (404, {'error': {'message': 'not found'}}),
+        ]
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _ClientCtx):
+            out = _rtloop.run(probe_models('gemini',
+                                           ['gemini-3.1-flash-lite-image', 'imagen-4.0-generate-001'],
+                                           kind='image'))
+        self.assertTrue(out['results']['gemini-3.1-flash-lite-image']['ok'])
+        self.assertGreaterEqual(out['results']['gemini-3.1-flash-lite-image']['ms'], 1)
+        self.assertEqual(out['results']['gemini-3.1-flash-lite-image']['mode'], 'real_image_gen')
+        self.assertFalse(out['results']['imagen-4.0-generate-001']['ok'])
+
+
+class TtsTests(unittest.TestCase):
+    """درخواست TTS: شکل payload طبق مستندات + فال‌بک کلید + خروجی WAV."""
+
+    def setUp(self):
+        _rtloop.adopt()
+        ai_solver._KEY_STATE.clear()
+        self.fake = _FakeSettingsDB()
+        self.fake.settings['ai_api_keys'] = '{"gemini": ["%s", "%s"]}' % (K1, K2)
+        self.fake.settings['ai_enabled'] = '1'
+        self._p = mock.patch.object(ai_solver, 'db', self.fake)
+        self._p.start()
+
+    def tearDown(self):
+        self._p.stop()
+        ai_solver._KEY_STATE.clear()
+
+    def test_tts_request_shape_and_fallback(self):
+        import base64
+        wav = b'RIFFxxxxWAVEfmt '
+        _ClientCtx.responses = [
+            (429, {'error': {'message': 'quota'}}),          # کلید ۱: سهمیه
+            (200, {'candidates': [{'content': {'parts': [
+                {'inlineData': {'data': base64.b64encode(wav).decode(),
+                                'mimeType': 'audio/wav'}}]}}]}),
+        ]
+        seen = []
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _ClientCtx):
+            data, mime = _rtloop.run(generate_speech_gemini(
+                'سلام دنیا', voice='Sulafat'))
+        # کلید دوم موفق شد
+        self.assertEqual(data, wav)
+        self.assertEqual(mime, 'audio/wav')
+        self.assertGreater(ai_solver.key_cooldown_remaining('gemini', K1), 0)
+        # شکل درخواست طبق مستندات 3.8 TTS
+        url, headers, payload = _ClientCtx.last_post
+        self.assertIn('gemini-3.8-flash-lite-tts', url)
+        self.assertIn(':generateContent', url)
+        gc = payload['generationConfig']
+        self.assertEqual(gc['responseModalities'], ['AUDIO'])
+        self.assertEqual(gc['speechConfig']['voiceConfig']['voice'], 'Sulafat')
+        part = payload['contents'][0]['parts'][0]
+        self.assertEqual(part['text'], 'سلام دنیا')
+        self.assertIn('style', part.get('speech_metadata', {}))
+
+    def test_config_voice_fields(self):
+        self.fake.settings['ai_voice_reply'] = 'all'
+        self.fake.settings['ai_tts_voice'] = 'Kore'
+        self.fake.settings['ai_voice_reply_max_chars'] = '300'
+        self.fake.settings['ai_image_size'] = '2K'
+        cfg = _rtloop.run(get_ai_config())
+        self.assertEqual(cfg['voice_reply'], 'all')
+        self.assertEqual(cfg['tts_voice'], 'Kore')
+        self.assertEqual(cfg['tts_model'], 'gemini-3.8-flash-lite-tts')
+        self.assertEqual(cfg['voice_reply_max_chars'], 300)
+        self.assertEqual(cfg['image_size'], '2K')
+
+    def test_config_rejects_bad_values(self):
+        self.fake.settings['ai_voice_reply'] = 'bogus'
+        self.fake.settings['ai_tts_voice'] = 'NotAVoice'
+        self.fake.settings['ai_image_size'] = '9K'
+        cfg = _rtloop.run(get_ai_config())
+        self.assertEqual(cfg['voice_reply'], 'voice')       # پیش‌فرض امن
+        self.assertEqual(cfg['tts_voice'], 'Sulafat')
+        self.assertEqual(cfg['image_size'], '1K')
+
+
+class ImagePayloadTests(unittest.TestCase):
+    """payload تصویر: aspectRatio + imageSize (نانوبانانا 2.1)."""
+
+    def setUp(self):
+        _rtloop.adopt()
+
+    def test_payload_has_image_size(self):
+        import base64
+        png = base64.b64encode(b'\x89PNGxxxx').decode()
+        _ClientCtx.responses = [(200, {'candidates': [{'content': {'parts': [
+            {'inlineData': {'data': png, 'mimeType': 'image/png'}}]}}]})]
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _ClientCtx):
+            res = _rtloop.run(ai_solver._generate_image_gemini(
+                K1, 'gemini-nano-banana-2.1', 'یک نقطه', '16:9', 5, 0, '2K'))
+        _url, _h, payload = _ClientCtx.last_post
+        ic = payload['generationConfig']['imageConfig']
+        self.assertEqual(ic['aspectRatio'], '16:9')
+        self.assertEqual(ic['imageSize'], '2K')
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+class _StreamResp:
+    """پاسخ SSE فیک برای _stream_gemini."""
+    status_code = 200
+
+    async def aiter_lines(self):
+        import json as _json
+        yield 'data: ' + _json.dumps({
+            'candidates': [{'content': {'parts': [{'text': 'سلام، جواب ویس'}]},
+                             'finishReason': 'STOP'}],
+            'usageMetadata': {'totalTokenCount': 12}})
+
+    async def aread(self):
+        return b''
+
+
+class _StreamClient:
+    """httpx.AsyncClient فیک — payload آخرین درخواست را روی کلاس ضبط می‌کند."""
+    payloads = []
+
+    def __init__(self, *a, **kw):
+        pass
+
+    def stream(self, method, url, headers=None, json=None, **kw):
+        _StreamClient.payloads.append({'url': url, 'payload': json})
+        return self
+
+    async def __aenter__(self):
+        return _StreamResp()
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def aclose(self):
+        pass
+
+
+class VoiceToolsFixTests(unittest.TestCase):
+    """🔴 م8.1 — باگِ ویس: code_execution با audio/wav خطای ۴۰۰ می‌داد.
+
+    ریشه: ابزارهای توکار (code_execution/url_context) بی‌قید به همه‌ی
+    درخواست‌ها چسبیده بودند؛ Gemini ورودیِ صوتی را با این ابزارها رد
+    می‌کند. باید با ورودی صوت/ویدیو حذف شوند ولی function declarations
+    بمانند."""
+
+    def setUp(self):
+        _rtloop.adopt()
+        _StreamClient.payloads = []
+        self.fake = _FakeSettingsDB()
+        self.fake.settings['ai_enabled'] = '1'
+        self._p = mock.patch.object(ai_solver, 'db', self.fake)
+        self._p.start()
+
+    def tearDown(self):
+        self._p.stop()
+
+    def _run(self, **kw):
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _StreamClient):
+            async def _collect():
+                out = []
+                async for ev in ai_solver._stream_gemini(
+                        K1, 'gemini-3.6-flash', 'شما هوشیار هستید', **kw):
+                    out.append(ev)
+                return out
+            return _rtloop.run(_collect())
+
+    def test_voice_audio_drops_builtin_tools(self):
+        events = self._run(text='سوال ویس', image_bytes=b'RIFFwav',
+                           image_mime='audio/wav', uid=111)
+        self.assertTrue(any(e['type'] == 'done' for e in events))
+        self.assertEqual(len(_StreamClient.payloads), 1)
+        tools = _StreamClient.payloads[0]['payload']['tools']
+        names = [list(t.keys())[0] for t in tools]
+        # ابزار توکار حذف شد؛ تابع‌های سفارشی ماندند
+        self.assertNotIn('code_execution', names)
+        self.assertNotIn('url_context', names)
+        self.assertIn('function_declarations', names)
+        # فلگِ server-side فقط با ابزار توکار معنا دارد — نباید باشد
+        tc = _StreamClient.payloads[0]['payload'].get('tool_config') or {}
+        self.assertNotIn('include_server_side_tool_invocations', tc)
+        # صوت واقعاً با mime درست رفته
+        part0 = _StreamClient.payloads[0]['payload']['contents'][-1]['parts'][0]
+        self.assertEqual(part0['inline_data']['mime_type'], 'audio/wav')
+
+    def test_video_note_also_drops(self):
+        self._run(text='ویدیونوت', image_bytes=b'\x00\x00\x00\x18ftyp',
+                  image_mime='video/mp4', uid=111)
+        names = [list(t.keys())[0]
+                 for t in _StreamClient.payloads[0]['payload']['tools']]
+        self.assertNotIn('code_execution', names)
+
+    def test_image_keeps_builtin_tools(self):
+        self._run(text='این عکس چیه؟', image_bytes=b'\x89PNGxyz',
+                  image_mime='image/png', uid=111)
+        names = [list(t.keys())[0]
+                 for t in _StreamClient.payloads[0]['payload']['tools']]
+        self.assertIn('code_execution', names)
+        self.assertIn('url_context', names)
+        self.assertIn('function_declarations', names)
+        tc = _StreamClient.payloads[0]['payload'].get('tool_config') or {}
+        self.assertTrue(tc.get('include_server_side_tool_invocations'))
+
+    def test_text_keeps_builtin_tools(self):
+        self._run(text='سلام', uid=111)
+        names = [list(t.keys())[0]
+                 for t in _StreamClient.payloads[0]['payload']['tools']]
+        self.assertIn('code_execution', names)
+
+    def test_mime_400_error_is_not_apikey_error(self):
+        # تور ایمنی: ۴۰۰ِ «mime type» پیام روشن می‌دهد، نه «کلید نامعتبره»
+        try:
+            ai_solver._raise_gemini_status_error(
+                400, '[INVALID_ARGUMENT] The mime type: audio/wav is not '
+                     'supported for code execution.')
+            self.fail('must raise')
+        except ai_solver.AIError as e:
+            self.assertNotIsInstance(e, ai_solver.AIConfigError)
+            self.assertIn('پشتیبانی نمی‌شود', str(e))
+
+
+class VoiceReplyPlanTests(unittest.TestCase):
+    """⭐ م8.2 — ماتریس تصمیمِ پاسخ صوتی (پیش‌فرض: ویس ⇒ فقط ویس)."""
+
+    def _cfg(self, **kw):
+        base = {'voice_reply': 'voice', 'voice_with_text': 'off',
+                'voice_reply_max_chars': 500}
+        base.update(kw)
+        return base
+
+    def test_default_voice_input_is_voice_only(self):
+        # خواسته‌ی صریح کاربر: ویس فرستادی ⇒ فقط ویس، بدون تکرار متن
+        self.assertEqual(_voice_reply_plan(self._cfg(), True, 200), 'voice_only')
+
+    def test_voice_with_text_on_sends_both(self):
+        self.assertEqual(
+            _voice_reply_plan(self._cfg(voice_with_text='on'), True, 200),
+            'text_and_voice')
+
+    def test_long_answer_falls_back_to_text(self):
+        self.assertEqual(
+            _voice_reply_plan(self._cfg(), True, 800), 'text_only')
+
+    def test_text_input_no_voice_in_voice_mode(self):
+        self.assertEqual(_voice_reply_plan(self._cfg(), False, 200), 'off')
+
+    def test_all_mode_text_input_gets_extra_voice(self):
+        self.assertEqual(
+            _voice_reply_plan(self._cfg(voice_reply='all'), False, 200),
+            'text_and_voice')
+
+    def test_all_mode_voice_input_voice_only_by_default(self):
+        # دوباره‌کاری در همه‌ی حالت‌ها ممنوع — حتی حالتِ all با ورودی ویس
+        self.assertEqual(
+            _voice_reply_plan(self._cfg(voice_reply='all'), True, 200),
+            'voice_only')
+
+    def test_off_mode_never_voice(self):
+        self.assertEqual(
+            _voice_reply_plan(self._cfg(voice_reply='off'), True, 200), 'off')
+
+    def test_config_parses_voice_with_text(self):
+        _rtloop.adopt()
+        fake = _FakeSettingsDB()
+        fake.settings['ai_enabled'] = '1'
+        fake.settings['ai_voice_with_text'] = 'on'
+        with mock.patch.object(ai_solver, 'db', fake):
+            cfg = _rtloop.run(get_ai_config())
+        self.assertEqual(cfg['voice_with_text'], 'on')
+        # مقدار نامعتبر → پیش‌فرضِ امن (خاموش = فقط ویس)
+        fake.settings['ai_voice_with_text'] = 'bogus'
+        with mock.patch.object(ai_solver, 'db', fake):
+            cfg2 = _rtloop.run(get_ai_config())
+        self.assertEqual(cfg2['voice_with_text'], 'off')
+
+
+class _Ctx401:
+    """CM استریم با کد وضعیت قابل‌تنظیم."""
+    def __init__(self, resp):
+        self._r = resp
+
+    async def __aenter__(self):
+        return self._r
+
+    async def __aexit__(self, *a):
+        return False
+
+
+class _Resp401:
+    def __init__(self, status, body=b''):
+        self.status_code = status
+        self._body = body
+
+    async def aiter_lines(self):
+        import json as _json
+        yield 'data: ' + _json.dumps({
+            'candidates': [{'content': {'parts': [{'text': 'جواب با کلید دوم'}]},
+                             'finishReason': 'STOP'}],
+            'usageMetadata': {'totalTokenCount': 9}})
+
+    async def aread(self):
+        return self._body
+
+
+class _Client401:
+    """streamGenerateContent: کلید اول 401 سرویس‌اکانت، کلید دوم 200."""
+    def __init__(self, *a, **kw):
+        pass
+
+    def stream(self, method, url, headers=None, json=None, **kw):
+        key = (headers or {}).get('x-goog-api-key')
+        if key == K1:
+            return _Ctx401(_Resp401(
+                401, b'{"error":{"message":"The bound service account is '
+                     b'deleted or disabled. The service account bound to the '
+                     b'API key must be active"}}'))
+        return _Ctx401(_Resp401(200))
+
+    async def aclose(self):
+        pass
+
+
+class _ClientAll401:
+    """همه‌ی کلیدها 401 می‌گیرند."""
+    def __init__(self, *a, **kw):
+        pass
+
+    def stream(self, method, url, headers=None, json=None, **kw):
+        return _Ctx401(_Resp401(
+            401, b'{"error":{"message":"The bound service account is deleted '
+                 b'or disabled"}}'))
+
+    async def aclose(self):
+        pass
+
+
+class KeyFailover401Tests(unittest.TestCase):
+    """⭐ م8.3 — فال‌بک روی 401 (سرویس‌اکانتِ حذف‌شده) باید کلید بعدی را
+    امتحان کند؛ اگر همه شکست خوردند، پیام باید بگوید همه امتحان شدند."""
+
+    def setUp(self):
+        _rtloop.adopt()
+        ai_solver._KEY_STATE.clear()
+        self.fake = _FakeSettingsDB()
+        self.fake.settings['ai_enabled'] = '1'
+        self.fake.settings['ai_provider'] = 'gemini'
+        self.fake.settings['ai_model'] = 'gemini-3.6-flash'
+        self.fake.settings['ai_api_keys'] = '{"gemini": ["%s", "%s"]}' % (K1, K2)
+        self._p = mock.patch.object(ai_solver, 'db', self.fake)
+        self._p.start()
+
+    def tearDown(self):
+        self._p.stop()
+        ai_solver._KEY_STATE.clear()
+
+    def _collect(self):
+        async def _go():
+            out = []
+            async for ev in ai_solver.ask_ai_stream(text='سلام', uid=None):
+                out.append(ev)
+            return out
+        return _rtloop.run(_go())
+
+    def test_401_rotates_to_next_key(self):
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _Client401):
+            events = self._collect()
+        done = [e for e in events if e['type'] == 'done']
+        self.assertEqual(len(done), 1)
+        self.assertEqual(done[0]['answer'], 'جواب با کلید دوم')
+        # کلیدِ خراب cooldown شد؛ کلیدِ سالم علامتِ ok خورد
+        self.assertGreater(ai_solver.key_cooldown_remaining('gemini', K1), 0)
+        self.assertEqual(ai_solver.key_cooldown_remaining('gemini', K2), 0)
+
+    def test_all_keys_401_says_all_tried(self):
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _ClientAll401):
+            with self.assertRaises(ai_solver.AIConfigError) as cm:
+                self._collect()
+        msg = str(cm.exception)
+        self.assertIn('همه‌ی ۲ کلید', msg)
+        self.assertIn('سرویس‌اکانت', msg)
+        # هر دو کلید cooldown شدند
+        self.assertGreater(ai_solver.key_cooldown_remaining('gemini', K1), 0)
+        self.assertGreater(ai_solver.key_cooldown_remaining('gemini', K2), 0)
+
+
+class _PingClient:
+    """httpx فیک برای _chat_ping_gemini — POST را ضبط می‌کند."""
+    responses = []          # [(status, body)]
+    last = None
+
+    def __init__(self, *a, **kw):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def post(self, url, headers=None, json=None, **kw):
+        _PingClient.last = {'url': url, 'headers': headers, 'payload': json}
+        st, body = _PingClient.responses.pop(0) if _PingClient.responses else (200, b'')
+        class _R:
+            status_code = st
+            text = body.decode('utf-8', 'replace')
+        return _R()
+
+
+class RealKeyTestTests(unittest.TestCase):
+    """⭐ م8.3 — تستِ کلیدِ پنل باید تولیدِ واقعی بزند، نه ListModels."""
+
+    def setUp(self):
+        _rtloop.adopt()
+        ai_solver._KEY_STATE.clear()
+        self.fake = _FakeSettingsDB()
+        self.fake.settings['ai_enabled'] = '1'
+        self.fake.settings['ai_model'] = 'gemini-3.6-flash'
+        self._p = mock.patch.object(ai_solver, 'db', self.fake)
+        self._p.start()
+
+    def tearDown(self):
+        self._p.stop()
+        ai_solver._KEY_STATE.clear()
+
+    def test_ping_is_real_generate_content(self):
+        _PingClient.responses = [(200, b'{}')]
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _PingClient):
+            ok, err = _rtloop.run(ai_solver.test_api_key('gemini', K1))
+        self.assertTrue(ok)
+        self.assertEqual(err, '')
+        # همان مسیر چت: generateContent + maxOutputTokens=1 + هدر کلید
+        self.assertIn(':generateContent', _PingClient.last['url'])
+        self.assertIn('gemini-3.6-flash', _PingClient.last['url'])
+        self.assertEqual(
+            _PingClient.last['payload']['generationConfig']['maxOutputTokens'], 1)
+        self.assertEqual(_PingClient.last['headers'].get('x-goog-api-key'), K1)
+
+    def test_dead_service_account_key_reported_clearly(self):
+        _PingClient.responses = [(
+            401, b'{"error":{"message":"The bound service account is deleted '
+                 b'or disabled. The service account bound to the API key must '
+                 b'be active"}}')]
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _PingClient):
+            ok, err = _rtloop.run(ai_solver.test_api_key('gemini', K1))
+        self.assertFalse(ok)
+        self.assertIn('سرویس‌اکانت', err)
+        self.assertIn('aistudio.google.com', err)
+        # کلیدِ مرده cooldown می‌شود تا فال‌بکِ چت از آن رد شود
+        self.assertGreater(ai_solver.key_cooldown_remaining('gemini', K1), 0)
+
+
+class M84GoogleImageFixTests(unittest.TestCase):
+    """⭐ م8.4 — فقط مدل‌های رایگان/رسمی گوگل، حذف imageSize برای flash-lite/2.5-flash،
+    بازتلاش خودکار با ['TEXT', 'IMAGE']، حذف نتایج جعلی 0ms و مهاجرت مدل‌های قدیمی."""
+
+    def setUp(self):
+        _rtloop.adopt()
+        ai_solver._KEY_STATE.clear()
+        self.fake = _FakeSettingsDB()
+        self.fake.settings['ai_enabled'] = '1'
+        self.fake.settings['ai_api_keys'] = '{"gemini": ["%s"], "openrouter": ["sk-or-test-123456"]}' % K1
+        self._p = mock.patch.object(ai_solver, 'db', self.fake)
+        self._p.start()
+
+    def tearDown(self):
+        self._p.stop()
+        ai_solver._KEY_STATE.clear()
+
+    def test_catalog_contains_only_google_models(self):
+        self.assertEqual(ai_solver.DEFAULT_IMAGE_MODEL, 'gemini-3.1-flash-lite-image')
+        ids = [mid for mid, _lbl, _free in ai_solver.IMAGE_MODEL_CATALOG]
+        self.assertIn('gemini-3.1-flash-lite-image', ids)
+        self.assertIn('gemini-2.5-flash-image', ids)
+        self.assertIn('gemini-nano-banana-2.1', ids)
+        for mid in ids:
+            self.assertTrue(mid.startswith('gemini'), f'Non-Google model in catalog: {mid}')
+            self.assertNotIn('/', mid)
+
+    def test_legacy_non_google_model_migrated_to_google_and_gemini_key(self):
+        self.fake.settings['ai_provider'] = 'openrouter'
+        self.fake.settings['ai_image_model'] = 'black-forest-labs/FLUX.1-schnell'
+        cfg = _rtloop.run(get_ai_config())
+        self.assertEqual(cfg['image_model'], 'gemini-3.1-flash-lite-image')
+        self.assertEqual(cfg['image_provider'], 'gemini')
+        self.assertEqual(cfg['image_api_key'], K1)
+
+    def test_flash_lite_omits_image_size_and_retries_400_with_text_image(self):
+        import base64
+        png = base64.b64encode(b'\x89PNGxxxx').decode()
+        _ClientCtx.responses = [
+            (400, {'error': {'message': 'INVALID_ARGUMENT: responseModalities must include TEXT'}},
+             '{"error":{"message":"INVALID_ARGUMENT: responseModalities must include TEXT"}}'),
+            (200, {'candidates': [{'content': {'parts': [
+                {'inlineData': {'data': png, 'mimeType': 'image/png'}}]}}]}),
+        ]
+        with mock.patch.object(ai_solver.httpx, 'AsyncClient', _ClientCtx):
+            res = _rtloop.run(ai_solver._generate_image_gemini(
+                K1, 'gemini-3.1-flash-lite-image', 'یک دایره آبی', '1:1', 5, 0, '2K'))
+        self.assertEqual(res['mime'], 'image/png')
+        _url, _h, last_payload = _ClientCtx.last_post
+        self.assertEqual(last_payload['generationConfig']['responseModalities'], ['TEXT', 'IMAGE'])
+
+    def test_merge_models_strips_fake_0ms_catalog_entries(self):
+        models = [{'id': 'gemini-3.1-flash-lite-image', 'label': 'Lite', 'free': True}]
+        stale_health = {
+            'models': {
+                'gemini-3.1-flash-lite-image': {
+                    'ok': True, 'ms': 0, 'mode': 'catalog', 'tested_at': '2026-10-16T00:00:00Z'
+                }
+            }
+        }
+        merged = merge_models_with_health('gemini', models, stale_health)
+        self.assertIsNone(merged[0]['health_ok'])
+        self.assertIsNone(merged[0]['health_ms'])
+
+        real_health = {
+            'models': {
+                'gemini-3.1-flash-lite-image': {
+                    'ok': True, 'ms': 840, 'mode': 'real_image_gen', 'tested_at': '2026-10-16T00:00:00Z'
+                }
+            }
+        }
+        merged_real = merge_models_with_health('gemini', models, real_health)
+        self.assertTrue(merged_real[0]['health_ok'])
+        self.assertEqual(merged_real[0]['health_ms'], 840)
+
+
+class M9GeminiLiveVoiceTests(unittest.TestCase):
+    """⭐ م9 — تماس صوتی زنده با هوشیار (Gemini Live API / BidiGenerateContent)."""
+
+    def setUp(self):
+        _rtloop.adopt()
+        ai_solver._KEY_STATE.clear()
+        self.fake = _FakeSettingsDB()
+        self.fake.settings['ai_enabled'] = '1'
+        self.fake.settings['ai_api_keys'] = '{"gemini": ["%s"]}' % K1
+        self._p = mock.patch.object(ai_solver, 'db', self.fake)
+        self._p.start()
+
+    def tearDown(self):
+        self._p.stop()
+        ai_solver._KEY_STATE.clear()
+
+    def test_live_catalog_has_all_four_google_models_and_default_3_8_live(self):
+        self.assertEqual(ai_solver.DEFAULT_LIVE_MODEL, 'gemini-3.8-live')
+        ids = [mid for mid, _lbl, _free in ai_solver.LIVE_MODEL_CATALOG]
+        self.assertEqual(ids, [
+            'gemini-3.8-live',
+            'gemini-3.8-live-extended-thinking',
+            'gemini-3.1-flash-live-preview',
+            'gemini-3.5-live-translate-preview',
+        ])
+        cfg = _rtloop.run(get_ai_config())
+        self.assertEqual(cfg['live_model'], 'gemini-3.8-live')
+        self.assertTrue(cfg['live_enabled'])
+
+    def test_build_live_setup_message_for_each_google_live_model(self):
+        # 1) gemini-3.8-live: NON_BLOCKING tools, systemInstruction, NO thinkingConfig
+        s38 = ai_solver.build_live_setup_message(
+            model='gemini-3.8-live',
+            system_prompt='تو هوشیار هستی',
+            voice='Sulafat',
+            thinking_level='high',
+            uid=12345,
+        )['setup']
+        self.assertEqual(s38['model'], 'models/gemini-3.8-live')
+        self.assertNotIn('thinkingConfig', s38['generationConfig'])
+        self.assertIn('systemInstruction', s38)
+        self.assertIn('tools', s38)
+        decls38 = s38['tools'][0]['functionDeclarations']
+        self.assertTrue(all(d.get('behavior') == 'NON_BLOCKING' for d in decls38))
+
+        # 2) gemini-3.8-live-extended-thinking: uppercase LOW/MEDIUM/HIGH thinkingLevel + NON_BLOCKING
+        s38_ext = ai_solver.build_live_setup_message(
+            model='gemini-3.8-live-extended-thinking',
+            system_prompt='تو هوشیار هستی',
+            voice='Kore',
+            thinking_level='minimal',  # minimal must map to LOW on 3.8-extended-thinking
+            uid=12345,
+        )['setup']
+        self.assertEqual(
+            s38_ext['generationConfig']['thinkingConfig'],
+            {'thinkingLevel': 'LOW'},
+        )
+        decls_ext = s38_ext['tools'][0]['functionDeclarations']
+        self.assertTrue(all(d.get('behavior') == 'NON_BLOCKING' for d in decls_ext))
+
+        # 3) gemini-3.1-flash-live-preview: lowercase thinkingLevel, sequential tools (no NON_BLOCKING)
+        s31 = ai_solver.build_live_setup_message(
+            model='gemini-3.1-flash-live-preview',
+            system_prompt='تو هوشیار هستی',
+            voice='Puck',
+            thinking_level='minimal',
+            uid=12345,
+        )['setup']
+        self.assertEqual(
+            s31['generationConfig']['thinkingConfig'],
+            {'thinkingLevel': 'minimal'},
+        )
+        decls31 = s31['tools'][0]['functionDeclarations']
+        self.assertTrue(all('behavior' not in d for d in decls31))
+
+        # 4) gemini-3.5-live-translate-preview: translationConfig, NO tools, NO systemInstruction
+        s35_tr = ai_solver.build_live_setup_message(
+            model='gemini-3.5-live-translate-preview',
+            system_prompt='نباید فرستاده شود',
+            voice='Sulafat',
+            target_language='en',
+            uid=12345,
+        )['setup']
+        self.assertEqual(
+            s35_tr['generationConfig']['translationConfig'],
+            {'targetLanguageCode': 'en', 'echoTargetLanguage': True},
+        )
+        self.assertNotIn('systemInstruction', s35_tr)
+        self.assertNotIn('tools', s35_tr)
+
+    def test_parse_live_server_message_events(self):
+        import json
+        # setupComplete
+        evs = ai_solver.parse_live_server_message(json.dumps({'setupComplete': {}}))
+        self.assertEqual(evs, [{'type': 'ready'}])
+
+        # audio + transcripts + interrupted + turnComplete + interactionStatus
+        srv_msg = {
+            'serverContent': {
+                'modelTurn': {
+                    'parts': [
+                        {'inlineData': {'data': 'UENNMTY=', 'mimeType': 'audio/pcm;rate=24000'}},
+                    ]
+                },
+                'inputTranscription': {'text': 'سلام هوشیار'},
+                'outputTranscription': {'text': 'سلام عزیز، چطور کمکت کنم؟'},
+                'interrupted': True,
+                'turnComplete': True,
+                'interactionStatus': 'IDLE',
+            },
+            'toolCall': {
+                'functionCalls': [
+                    {'id': 'call_1', 'name': 'get_student_schedule', 'args': {}}
+                ]
+            },
+        }
+        parsed = ai_solver.parse_live_server_message(json.dumps(srv_msg))
+        types = [e['type'] for e in parsed]
+        self.assertIn('interrupted', types)
+        self.assertIn('input_transcript', types)
+        self.assertIn('output_transcript', types)
+        self.assertIn('audio', types)
+        self.assertIn('turn_state', types)
+        self.assertIn('tool_call', types)
+
+    def test_connect_gemini_live_failover_and_model_fallback(self):
+        import json
+        import websockets
+
+        sent_setups = []
+
+        class _FakeWs:
+            def __init__(self, key_ok=True, accept_model='models/gemini-3.1-flash-live-preview'):
+                self.key_ok = key_ok
+                self.accept_model = accept_model
+                self.last_model = None
+                self.closed = False
+
+            async def send(self, payload):
+                obj = json.loads(payload)
+                self.last_model = obj.get('setup', {}).get('model')
+                sent_setups.append(obj)
+
+            async def recv(self):
+                if not self.key_ok:
+                    raise Exception('HTTP 401: The bound service account is deleted or disabled')
+                if self.last_model != self.accept_model:
+                    raise Exception(f'1008 policy violation: {self.last_model} is not found for API version v1beta')
+                return json.dumps({'setupComplete': {}})
+
+            async def close(self):
+                self.closed = True
+
+        async def _fake_connect(url, **_kw):
+            if K1 in url:
+                return _FakeWs(key_ok=False)
+            return _FakeWs(key_ok=True, accept_model='models/gemini-3.1-flash-live-preview')
+
+        async def _fake_discover(api_key):
+            if api_key == K1:
+                raise ai_solver.AIConfigError('The bound service account is deleted')
+            return ['gemini-3.1-flash-live-preview']
+
+        setup_msg = ai_solver.build_live_setup_message(
+            model='gemini-3.8-live',
+            system_prompt='تو هوشیار هستی',
+            uid=12345,
+        )
+        # اطمینان از اینکه توابع بدون پارامتر، فیلد parameters خالی ندارند
+        decls = setup_msg['setup']['tools'][0]['functionDeclarations']
+        grades_fn = next(d for d in decls if d['name'] == 'get_my_grades')
+        self.assertNotIn('parameters', grades_fn)
+
+        with mock.patch.object(websockets, 'connect', side_effect=_fake_connect), \
+             mock.patch.object(ai_solver, '_discover_bidi_models_for_key', side_effect=_fake_discover):
+            ws, evs, active_key = _rtloop.run(
+                ai_solver.connect_gemini_live_with_failover(
+                    'gemini-3.8-live', setup_msg, keys=[K1, K2]
+                )
+            )
+        self.assertEqual(active_key, K2)
+        self.assertEqual(getattr(ws, 'live_model', None), 'gemini-3.1-flash-live-preview')
+        self.assertEqual(evs, [{'type': 'ready'}])
+        self.assertGreater(ai_solver.key_cooldown_remaining('gemini', K1), 0)
+
+    def test_tg_group_voice_call_pcm_mixer_and_credentials(self):
+        import struct
+        import tg_group_voice_call as tvc
+
+        # تست میکس دو فریم PCM16 بدون سرریز (Clipping protection)
+        f1 = struct.pack('<hh', 20000, -20000)
+        f2 = struct.pack('<hh', 20000, -20000)
+        mixed = tvc._mix_pcm16_frames([f1, f2])
+        s1, s2 = struct.unpack('<hh', mixed)
+        self.assertEqual(s1, 32767)
+        self.assertEqual(s2, -32768)
+
+        with mock.patch.object(tvc, 'db', self.fake):
+            st = _rtloop.run(tvc.save_vc_credentials(
+                api_id=123456,
+                api_hash='abcdef0123456789abcdef0123456789',
+                session_string='test_pyrogram_session_str',
+                auto_join=True,
+            ))
+            self.assertTrue(st['configured'])
+            self.assertEqual(st['api_id'], 123456)
+            self.assertTrue(st['has_api_hash'])
+            self.assertTrue(st['has_session'])
+            creds = _rtloop.run(tvc.get_vc_credentials())
+            self.assertEqual(creds['api_hash'], 'abcdef0123456789abcdef0123456789')
+            self.assertEqual(creds['session_string'], 'test_pyrogram_session_str')
+
+    def test_tg_group_voice_call_m93_pyrogram_compat_and_2fa(self):
+        import types
+        import tg_group_voice_call as tvc
+
+        # ۱) تست نرمال‌سازی ارقام فارسی و شماره موبایل
+        self.assertEqual(tvc._normalize_phone('۰۹۱۲۳۴۵۶۷۸۹'), '+989123456789')
+        self.assertEqual(tvc._normalize_phone('09123456789'), '+989123456789')
+        self.assertEqual(tvc._normalize_digits('-۱۰۰۱۲۳۴۵۶۷۸۹۰'), '-1001234567890')
+
+        # ۲) تست شیم سازگاری GroupcallForbidden برای جلوگیری از ImportError در PyTgCalls
+        tvc._ensure_pyrogram_compat()
+        try:
+            import pyrogram.errors as pe
+            if hasattr(pe, 'GroupcallForbidden'):
+                delattr(pe, 'GroupcallForbidden')
+            tvc._ensure_pyrogram_compat()
+            self.assertTrue(hasattr(pe, 'GroupcallForbidden'))
+            self.assertTrue(hasattr(pe, 'GroupcallInvalid'))
+        except ImportError:
+            pass
+
+        # ۳) تست حفظ کلاینت در مرحله‌ی اول 2FA (SessionPasswordNeeded) و تکمیل در مرحله‌ی دوم
+        from pyrogram.errors import SessionPasswordNeeded
+
+        class _FakeCli:
+            is_connected = True
+            disconnected = False
+            checked_pw = None
+
+            async def sign_in(self, phone_number, phone_code_hash, phone_code):
+                raise SessionPasswordNeeded()
+
+            async def check_password(self, pw):
+                self.checked_pw = pw
+
+            async def export_session_string(self):
+                return 'exported_2fa_session_string'
+
+            async def get_me(self):
+                return types.SimpleNamespace(id=777, first_name='HumsyarVC', username='humsyar_vc', phone_number='+989120000000')
+
+            async def disconnect(self):
+                self.disconnected = True
+
+        fake_cli = _FakeCli()
+        tvc._login_state.update({
+            'client': fake_cli,
+            'api_id': 123456,
+            'api_hash': 'abcdef0123456789abcdef0123456789',
+            'phone': '+989120000000',
+            'phone_code_hash': 'hash123',
+            'awaiting_2fa': False,
+        })
+
+        with mock.patch.object(tvc, 'db', self.fake):
+            # گام اول: ارسال کد بدون رمز 2FA ← باید needs_2fa=True برگرداند و کلاینت را نبندد
+            r1 = _rtloop.run(tvc.verify_assistant_login(code='۱۲۳۴۵', password=''))
+            self.assertTrue(r1['needs_2fa'])
+            self.assertFalse(fake_cli.disconnected)
+            self.assertIsNotNone(tvc._login_state['client'])
+            self.assertTrue(tvc._login_state['awaiting_2fa'])
+
+            # گام دوم: ارسال رمز 2FA روی همان نشست ← باید موفق شود و session_string را ذخیره کند
+            r2 = _rtloop.run(tvc.verify_assistant_login(code='۱۲۳۴۵', password='my_secret_2fa'))
+            self.assertTrue(r2['ok'])
+            self.assertFalse(r2['needs_2fa'])
+            self.assertEqual(fake_cli.checked_pw, 'my_secret_2fa')
+            self.assertTrue(fake_cli.disconnected)
+            self.assertIsNone(tvc._login_state['client'])
+            creds = _rtloop.run(tvc.get_vc_credentials())
+            self.assertEqual(creds['session_string'], 'exported_2fa_session_string')
+
+    def test_tg_group_voice_call_m94_48khz_10ms_jitter_buffer_and_anti_click(self):
+        import struct
+        import tg_group_voice_call as tvc
+
+        # ۱) تایید ثوابت حیاتی ntgcalls (فریم‌های دقیقاً 10ms = 960 بایت در 48kHz mono)
+        self.assertEqual(tvc.VC_OUT_SAMPLE_RATE, 48000)
+        self.assertEqual(tvc.VC_OUT_CHANNELS, 1)
+        self.assertAlmostEqual(tvc.VC_FRAME_DURATION_SEC, 0.010)
+        self.assertEqual(tvc.VC_FRAME_SAMPLES, 480)
+        self.assertEqual(tvc.VC_FRAME_BYTES, 960)
+
+        # ۲) تست درونیابی خطی پیوسته 24kHz -> 48kHz با حفظ نمونه‌ی مرزی بین چانک‌ها
+        c1_24k = struct.pack('<hhh', 1000, 2000, 3000)
+        up1, prev1 = tvc._upsample_pcm16_24k_to_48k(c1_24k, prev_sample=0)
+        self.assertEqual(prev1, 3000)
+        self.assertEqual(len(up1), 12)  # 6 نمونه در 48kHz
+        self.assertEqual(struct.unpack('<hhhhhh', up1), (500, 1000, 1500, 2000, 2500, 3000))
+
+        c2_24k = struct.pack('<hh', 4000, 5000)
+        up2, prev2 = tvc._upsample_pcm16_24k_to_48k(c2_24k, prev_sample=prev1)
+        self.assertEqual(prev2, 5000)
+        self.assertEqual(struct.unpack('<hhhh', up2), (3500, 4000, 4500, 5000))
+
+        # ۳) تست Jitter Buffer و استخراج فریم‌های 10ms در _GroupLiveSession
+        sess = tvc._GroupLiveSession(
+            chat_id=-100123456,
+            title='گروه تست',
+            model='gemini-3.8-live',
+            voice='Sulafat',
+            google_ws=None,
+            call_py=None,
+        )
+        t0 = 1000.0
+        # وقتی بافر خالی است باید فریم سکوت 10ms (۹۶۰ بایت صفر) برگردد
+        f_idle = sess.pop_next_10ms_frame(now=t0)
+        self.assertEqual(len(f_idle), 960)
+        self.assertEqual(f_idle, b'\x00' * 960)
+
+        # تزریق فقط 20ms صدا در 24kHz (۴۸۰ نمونه = ۹۶۰ بایت -> در 48kHz می‌شود ۱۹۲۰ بایت = ۲ فریم)
+        # چون کمتر از سقف پیش‌بافرینگ (140ms) است و زمان انتظار هم نگذشته، باید هنوز سکوت برگرداند
+        short_24k = struct.pack('<' + 'h' * 480, *([12000] * 480))
+        sess.enqueue_gemini_pcm24k(short_24k)
+        sess.first_buffered_at = t0
+        f_prebuf = sess.pop_next_10ms_frame(now=t0 + 0.020)
+        self.assertEqual(f_prebuf, b'\x00' * 960)
+        self.assertFalse(sess._playout_active)
+
+        # وقتی زمان انتظار Jitter Buffer بگذرد (یا بافر پر شود)، پخش آغاز می‌شود و Fade-In نرم اعمال می‌گردد
+        f_play1 = sess.pop_next_10ms_frame(now=t0 + 0.200)
+        self.assertTrue(sess._playout_active)
+        self.assertEqual(len(f_play1), 960)
+        samples_play1 = struct.unpack('<' + 'h' * 480, f_play1)
+        # نمونه‌ی اول به خاطر Fade-In ملایم باید بسیار کوچک‌تر از ۱۲۰۰۰ باشد و نمونه انتهایی ۱۲۰۰۰ باشد
+        self.assertLess(samples_play1[0], 500)
+        self.assertEqual(samples_play1[-1], 12000)
+
+        # فریم دوم
+        f_play2 = sess.pop_next_10ms_frame(now=t0 + 0.210)
+        self.assertEqual(len(f_play2), 960)
+
+        # فریم سوم (Underrun در انتهای صحبت): به جای پرش ناگهانی از ۱۲۰۰۰ به ۰، فریم Fade-Out نرم تولید می‌شود
+        f_fadeout = sess.pop_next_10ms_frame(now=t0 + 0.220)
+        self.assertEqual(len(f_fadeout), 960)
+        samples_fade = struct.unpack('<' + 'h' * 480, f_fadeout)
+        self.assertGreater(samples_fade[0], 0)
+        self.assertEqual(samples_fade[-1], 0)
+        self.assertFalse(sess._playout_active)
+
+    def test_m95_studio_live_setup_cubic_upsampler_and_adaptive_jitter(self):
+        import array
+        import math
+        import tg_group_voice_call as tvc
+
+        # ۱) بررسی پیکربندی VAD (realtimeInputConfig) و فشرده‌سازی کانتکست (contextWindowCompression)
+        s38 = ai_solver.build_live_setup_message(
+            model='gemini-3.8-live',
+            system_prompt='تو هوشیار هستی',
+            voice='Sulafat',
+        )['setup']
+        self.assertIn('realtimeInputConfig', s38)
+        aad = s38['realtimeInputConfig']['automaticActivityDetection']
+        self.assertEqual(aad['startOfSpeechSensitivity'], 'START_SENSITIVITY_LOW')
+        self.assertEqual(aad['endOfSpeechSensitivity'], 'END_SENSITIVITY_LOW')
+        self.assertEqual(aad['prefixPaddingMs'], 300)
+        self.assertEqual(aad['silenceDurationMs'], 900)
+        self.assertEqual(s38['realtimeInputConfig']['activityHandling'], 'START_OF_ACTIVITY_INTERRUPTS')
+        self.assertEqual(s38['realtimeInputConfig']['turnCoverage'], 'TURN_INCLUDES_ONLY_ACTIVITY')
+        self.assertEqual(s38['contextWindowCompression'], {'slidingWindow': {}})
+
+        # در حالت minimal=True باید فیلدهای حساس حذف شوند تا فال‌بک ایمن باشد
+        min_setup = ai_solver._adapt_setup_for_model({'setup': s38}, 'gemini-3.8-live', minimal=True)['setup']
+        self.assertNotIn('realtimeInputConfig', min_setup)
+        self.assertNotIn('contextWindowCompression', min_setup)
+        self.assertNotIn('tools', min_setup)
+
+        # ۲) تست تطابق بیتی (Bit-Exact) درون‌یاب مکعبی ۴ نقطه‌ای 24kHz -> 48kHz در مرز چانک‌ها
+        sine24k = array.array(
+            'h',
+            [int(18000 * math.sin(2 * math.pi * 1000 * i / 24000)) for i in range(600)],
+        ).tobytes()
+        one_shot, _ = tvc._upsample_pcm16_24k_to_48k_hq(sine24k, None)
+
+        chunks = [sine24k[:114], sine24k[114:390], sine24k[390:392], sine24k[392:]]
+        hist = None
+        multi = bytearray()
+        for c in chunks:
+            part, hist = tvc._upsample_pcm16_24k_to_48k_hq(c, hist)
+            multi.extend(part)
+        self.assertEqual(bytes(multi), one_shot)
+
+        # ۳) تست فیلتر High-Pass 85Hz و محاسبه RMS روی صدای میکروفون گروه
+        dc_buf = array.array('h', [8000] * 320).tobytes()
+        filtered_dc, rms_dc, hp_st = tvc._filter_and_measure_pcm16_16k(dc_buf, (0.0, 0.0))
+        self.assertEqual(len(filtered_dc), len(dc_buf))
+        # در انتهای بافر DC، فیلتر High-Pass مقدار DC را به سمت صفر می‌برد
+        last_sample = int.from_bytes(filtered_dc[-2:], 'little', signed=True)
+        self.assertLess(abs(last_sample), 300)
+        self.assertGreater(rms_dc, 0)
+        self.assertIsInstance(hp_st, tuple)
+
+        # ۴) م9.6 — تست قفل زبان فارسی در ابتدا و انتهای systemInstruction و تشخیص انحراف زبان
+        sys_txt = s38['systemInstruction']['parts'][0]['text']
+        self.assertIn('RESPOND IN PERSIAN', sys_txt)
+        self.assertIn('UNMISTAKABLY', sys_txt)
+        self.assertIn('فقط و فقط زبان فارسی', sys_txt)
+        self.assertIn('هرگز زبان خود را عوض نکنید', sys_txt)
+
+        lock_turn = ai_solver.build_live_language_lock_turn(turn_complete=False)
+        self.assertFalse(lock_turn['clientContent']['turnComplete'])
+        self.assertIn('فارسی', lock_turn['clientContent']['turns'][0]['parts'][0]['text'])
+
+        # متن فارسی (حتی همراه با اصطلاح علمی انگلیسی) نباید انحراف تشخیص داده شود
+        self.assertFalse(ai_solver.is_non_persian_output_drift('سلام عزیزم! برون‌ده قلبی یا Cardiac Output برابر با حجم ضربه‌ای در ضربان قلب است.'))
+        # متن کاملاً انگلیسی، روسی یا هندی باید انحراف تشخیص داده شود
+        self.assertTrue(ai_solver.is_non_persian_output_drift('Hello there! I could not hear you clearly, could you please repeat that?'))
+        self.assertTrue(ai_solver.is_non_persian_output_drift('Привет, я тебя плохо слышу'))
+        self.assertTrue(ai_solver.is_non_persian_output_drift('नमस्ते मैं आपकी कैसे मदद कर सकता हूँ'))
+
+        # ۵) پیام وضعیت فکر کردن باید ثابت و فقط «💭 در حال فکر کردن...» باشد (بدون عبارات رندوم)
+        self.assertEqual(ai_solver.THINKING_MESSAGE, "💭 در حال فکر کردن...")
+        self.assertEqual(ai_solver.THINKING_PHRASES, ["💭 در حال فکر کردن..."])
+        self.assertEqual(ai_solver.STALL_PHRASES, ["💭 در حال فکر کردن..."])
+        self.assertEqual(ai_solver._pick_unused(ai_solver.THINKING_PHRASES, set()), "💭 در حال فکر کردن...")
+
+        # ۶) م9.7 — پالایش زیرنویس زنده (تبدیل آوانگاری هندی/آلمانی «سلام» به فارسی و مسدودسازی متون بیگانه در زیرنویس)
+        self.assertEqual(ai_solver.sanitize_live_persian_transcript("सलाम", is_input=True), "سلام")
+        self.assertEqual(ai_solver.sanitize_live_persian_transcript("सलाम खूबी", is_input=True), "سلام خوبی")
+        self.assertEqual(ai_solver.sanitize_live_persian_transcript("Hallo!", is_input=True), "سلام")
+        self.assertEqual(ai_solver.sanitize_live_persian_transcript("Alarm", is_input=True), "سلام")
+        self.assertEqual(ai_solver.sanitize_live_persian_transcript("Salam chetori", is_input=True), "سلام چطوری")
+        self.assertEqual(ai_solver.sanitize_live_persian_transcript("سلام सलाम خوبی", is_input=True), "سلام خوبی")
+        # جملات نامرتبط آلمانی یا هندی نباید در زیرنویس خام نمایش داده شوند
+        self.assertEqual(ai_solver.sanitize_live_persian_transcript("Wie geht es dir heute?", is_input=True), "")
+        self.assertEqual(ai_solver.sanitize_live_persian_transcript("मैं आपकी कैसे मदद कर सकता हूँ", is_input=True), "")
+
+    def test_voice_system_prompt_separation_and_friendly_persona(self):
+        # ۱) پرامپت ویس باید مستقل از پرامپت متنی باشد و پرامپت متنی دست‌نخورده بماند
+        self.assertNotEqual(ai_solver.DEFAULT_VOICE_PROMPT, ai_solver.DEFAULT_PROMPT)
+        self.assertIn("گزینه‌ی X صحیح است", ai_solver.DEFAULT_PROMPT)
+        self.assertNotIn("گزینه‌ی X صحیح است", ai_solver.DEFAULT_VOICE_PROMPT)
+
+        # ۲) الزامات لحن صمیمی، محاوره‌ای، احساسات کامل، ممنوعیت کلمات کتابی، قوانین TTS و ۱۰ مثال Few-Shot
+        vp = ai_solver.DEFAULT_VOICE_PROMPT
+        for phrase in ("چطوری؟", "آره دیگه", "وای نه!", "راستش...", "خب بذار ببینم", "آره حتماً، بذار بگم برات"):
+            self.assertIn(phrase, vp)
+        for forbidden_rule in ("لذا", "بنابراین", "در خصوص", "می‌بایست", "مقتضی است", "ایشان", "جهت"):
+            self.assertIn(forbidden_rule, vp)
+        for ex_idx in range(1, 11):
+            self.assertIn(f"مثال {ex_idx}".translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")), vp)
+        self.assertIn("بد (ممنوع):", vp)
+        self.assertIn("خوب:", vp)
+        self.assertIn("مارک‌داون", vp)
+        self.assertIn("ایموجی", vp)
+        self.assertIn("هوش مصنوعی‌ام", vp)
+
+        # ۳) بررسی استفاده پیش‌فرض از DEFAULT_VOICE_PROMPT و temperature=0.85 در build_live_setup_message
+        setup_default = ai_solver.build_live_setup_message(model="gemini-3.8-live")["setup"]
+        self.assertEqual(setup_default["generationConfig"]["temperature"], 0.85)
+        sys_instruction = setup_default["systemInstruction"]["parts"][0]["text"]
+        self.assertIn("مثال ۱۰", sys_instruction)
+        self.assertIn("آره حتماً، بذار بگم برات", sys_instruction)
+
+        # ۴) بررسی خواندن و ذخیره مستقل voice_system_prompt در get_ai_config
+        cfg = _rtloop.run(ai_solver.get_ai_config())
+        self.assertEqual(cfg["system_prompt"], ai_solver.DEFAULT_PROMPT)
+        self.assertEqual(cfg["voice_system_prompt"], ai_solver.DEFAULT_VOICE_PROMPT)
+        self.assertEqual(cfg["default_voice_system_prompt"], ai_solver.DEFAULT_VOICE_PROMPT)
+        self.assertEqual(cfg["live_temperature"], 0.85)
+
+
+
+
+
+
+
+
+
+
+
+

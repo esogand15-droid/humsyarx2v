@@ -1,0 +1,17 @@
+[Unit]
+Description=HumsYar Telegram Bot Service
+After=network.target humsyar-api.service docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/humsyarx
+Environment=PYTHONPATH=/opt/humsyarx:/opt/humsyarx/backend
+EnvironmentFile=/opt/humsyarx/.env
+ExecStart=/opt/humsyarx/.venv/bin/python -u bot.py
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

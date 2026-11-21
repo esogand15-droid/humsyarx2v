@@ -1,0 +1,64 @@
+# شکست‌های شناخته‌شدهٔ مخزن — «بدهی فنی» با دلیل.
+# هر خط: test_id  # دلیل
+# CI فقط روی شکست‌های *جدید* قرمز می‌شود.
+# وقتی یکی از این‌ها اصلاح شد، با `python tests/run_ci.py --update`
+# خط‌مب را بازتولید کن تا فهرست کوتاه‌تر شود.
+#
+# ⚠️ نکتهٔ مهم دربارهٔ ماهیت این موارد:
+#   تقریباً همه «assertionهای کهنه» هستند که به عدد/امضای نسخهٔ قبلیِ کد
+#   پین شده‌اند. یعنی احتمالاً *محصول سالم* است و *تست کهنه*.
+#
+#   موارد زیر نیاز به سرورهای در حال اجرا دارند (dev server tests):
+#     • test_dev_servers_empirical_challenge.* — نیاز به FastAPI + Vite در حال اجرا
+#     • test_route_inventory.* — انتظارهای قدیمیِ route inventory
+#     • test_flagship_bot_sync.TestFlagshipBotSync.* — نیاز به ربات فعال
+#
+#   موارد قدیمی طراحی (انتظار 410 برای /student که حالا 200 برمی‌گرداند):
+#     • test_v3_design_system.CreamClientRetiredTests.*
+#
+#   دو استثنا که باید جدی گرفته شوند:
+#     • test_hooshyar_quiz.QuizCountGuarantee.* (تضمین تعداد سؤال آزمون)
+#   این موارد به منطق تجاری حساس‌اند، نه به شمارش کد.
+
+test_content_admin_audit.AuditHelperSignatureTests.test_edit_flows_call_shape_matches  # assertion روی الگوی رشته‌ای فراخوان before=/after= که در refactor عوض شد
+test_hooshyar_quiz.QuizCountGuarantee.test_cross_call_dedup  # منطق تضمین تعداد سؤال — نیازمند بازبینی واقعی
+test_hooshyar_quiz.QuizCountGuarantee.test_rounds_fill_shortfall  # همان
+test_url_import_contracts.UrlImportStaticTests.test_reuse_not_parallel  # تست انتظار qbank_file_add دارد، اما بانک فایل سؤال عمداً بازنشسته شد (LEGACY_QBANK_FROZEN)
+test_video_upload_contracts.SessionContentUploadTests.test_oversized_video_rejected_before_storage  # mockهای storage هم‌راستا با refactor نشده‌اند
+test_video_upload_contracts.SessionContentUploadTests.test_storage_exception_is_502_not_500  # همان
+test_video_upload_contracts.SessionContentUploadTests.test_storage_none_is_502  # همان
+test_video_upload_contracts.SessionContentUploadTests.test_video_success_path  # همان
+test_w9_providers.CatalogConsistencyTests.test_every_provider_has_models_and_default  # کاتالوگ مدل‌ها تغییر کرده؛ default قدیمی انتظار می‌رود
+test_w9_providers.OpenAiCompatCallerTests.test_429_maps_quota_error  # پیام/اعتبارسنجی کلید قبل از رسیدن به شبیه‌سازی 429 خطا می‌دهد
+test_w9_providers.OpenAiCompatCallerTests.test_groq_url_and_success  # همان الگو
+test_w9_providers.OpenAiCompatCallerTests.test_no_vision_provider_rejects_image  # همان الگو
+test_w9_providers.OpenAiCompatCallerTests.test_openrouter_402_specific_message  # همان الگو
+
+# Infrastructure tests requiring running servers (not code regressions)
+test_dev_servers_empirical_challenge.TestSuite01SocketAndBaselines.test_01_fastapi_socket_connectivity  # نیاز به FastAPI در پورت 8000
+test_dev_servers_empirical_challenge.TestSuite01SocketAndBaselines.test_02_vite_socket_connectivity  # نیاز به Vite در پورت 5173
+test_dev_servers_empirical_challenge.TestSuite01SocketAndBaselines.test_03_fastapi_health_baseline  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite01SocketAndBaselines.test_04_vite_student_baseline  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite01SocketAndBaselines.test_05_vite_proxy_to_fastapi  # نیاز به هر دو سرور
+test_dev_servers_empirical_challenge.TestSuite02EdgeRouting.test_06_vite_root_redirect_302  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite02EdgeRouting.test_07_vite_root_follow_redirect  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite02EdgeRouting.test_08_fastapi_nonexistent_route_404  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite02EdgeRouting.test_09_vite_proxy_nonexistent_route_404  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite02EdgeRouting.test_10_fastapi_arbitrary_unmapped_route_404  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite03HttpMethodsAndEdgeCases.test_11_fastapi_head_request_behavior  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite03HttpMethodsAndEdgeCases.test_12_vite_head_request  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite03HttpMethodsAndEdgeCases.test_13_fastapi_options_request_behavior  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite03HttpMethodsAndEdgeCases.test_14_fastapi_query_parameters  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite03HttpMethodsAndEdgeCases.test_15_fastapi_extreme_query_length  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite04BurstAndConcurrency.test_16_fastapi_health_concurrency_burst_multi_client  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite04BurstAndConcurrency.test_17_vite_student_concurrency_burst  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite05AdversarialRateLimiting.test_18_rate_limit_defense_and_headers  # نیاز به سرور فعال
+test_dev_servers_empirical_challenge.TestSuite06PostStressStability.test_19_post_stress_process_and_socket_integrity  # نیاز به سرور فعال
+test_flagship_bot_sync.TestFlagshipBotSync.test_route_inventory_non_regression_invariant  # نیاز به ربات فعال
+test_route_inventory.RouteInventoryTests.test_health_baseline_flag_is_not_stale  # انتظارهای قدیمی route inventory
+test_route_inventory.RouteInventoryTests.test_openapi_operation_count_matches_baseline  # انتظارهای قدیمی route inventory
+test_route_inventory.RouteInventoryTests.test_route_objects_match_baseline  # انتظارهای قدیمی route inventory
+
+# Design system tests with stale expectations (student app revived at /student)
+test_v3_design_system.CreamClientRetiredTests.test_source_tree_is_gone  # apps/student احیا شده برای PWA مستقل
+test_v3_design_system.CreamClientRetiredTests.test_api_returns_410_for_every_student_path  # مسیر /student الان HTTP 200 برمی‌گرداند

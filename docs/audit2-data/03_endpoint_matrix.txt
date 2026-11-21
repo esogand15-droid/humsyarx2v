@@ -1,0 +1,13 @@
+endpointها: 0 | مصرف‌شده: 0 | بدون مصرف: 0 (alias هم‌ارز: 0 | یتیم: 0)
+wrapperهای webadmin/api.js: 350 | بی‌استفاده در صفحات: 5
+
+════ یتیم — هیچ مصرف‌کننده و هیچ هم‌ارزی (0) ════
+
+════ alias احتمالی — هم‌ارزِ مصرف‌شده وجود دارد (0) ════
+
+════ wrapperهای webadmin/api.js که هیچ صفحه‌ای صدا نمی‌زند ════
+  api.aiModelsHealth → /api/web-admin/ai/models/health/${pid}
+  api.caForkSession → /api/content/basic-science/sessions/${sid}/fork?intake=${encodeURIComponent(intake)}
+  api.caListCourseImportStaging → /api/web-admin/schedule/course-selection/staging
+  api.dlqDiscard → /api/web-admin/system/dlq/discard
+  api.usersBackfillEducationalGroups → /api/web-admin/users/backfill-educational-groups

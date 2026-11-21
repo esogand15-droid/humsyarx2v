@@ -1,0 +1,103 @@
+کلیدهای یکتا در کد پایتون: 69 (خوانده: 62, نوشته: 47)
+
+══ فقط خوانده می‌شود — نویسنده‌ای در کد ندارد ══
+  __warmup__  ← backend\database\core.py
+  audit_log_alert_count  ← backend\bot\bot.py
+  audit_retention_days  ← backend\services\audit.py
+  gift_enabled  ← backend\api\routers\subscription.py, backend\bot\subscription.py
+  gift_rate_max  ← backend\api\routers\subscription.py
+  gift_rate_window_h  ← backend\api\routers\subscription.py
+  log_group_admin  ← backend\api\routers\admin_panel.py, backend\api\routers\registration.py, backend\bot\admin.py, backend\bot\bot.py
+  log_group_content  ← backend\api\routers\admin_panel.py, backend\bot\admin.py
+  qbank_ai_daily_limit  ← backend\services\question_bank\ai_practice.py
+  qbank_ai_topic_daily_limit  ← backend\services\question_bank\ai_practice.py
+  qbank_weak_accuracy_pct  ← backend\services\question_bank\service.py
+  qbank_weak_min_attempts  ← backend\services\question_bank\service.py
+  recon_window_days  ← backend\api\routers\web_admin.py
+  report_rate_max  ← backend\database\content.py
+  report_rate_window_min  ← backend\database\content.py
+  string_key  ← backend\core\settings.py
+  ticket_stale_hours  ← backend\bot\bot.py
+  topup_max  ← backend\api\routers\subscription.py, backend\bot\subscription.py
+  topup_min  ← backend\api\routers\subscription.py, backend\bot\subscription.py
+  trial_days  ← backend\database\finance.py
+  trial_enabled  ← backend\database\finance.py
+  url_import_max_mb  ← backend\services\url_import_service.py
+
+══ نوشته می‌شود ولی هیچ خواننده‌ای ندارد ══
+  ai_api_key  ← backend\services\ai_solver.py
+  ai_api_keys  ← backend\services\ai_solver.py
+  audit_retention_last_deleted  ← backend\bot\bot.py
+  audit_retention_last_run  ← backend\bot\bot.py
+  grades_term_backfill  ← backend\database\core.py
+  index_status  ← backend\database\core.py
+  required_channels  ← backend\database\core.py
+
+══ در UI پنل نیست (تنظیم فقط از env/دیتابیس مستقیم) ══
+  __warmup__
+  ai_api_key
+  ai_api_keys
+  ai_personas_meta
+  audit_log_alert_count
+  audit_retention_days
+  audit_retention_last_deleted
+  audit_retention_last_run
+  auto_backup_consec_fail
+  auto_backup_enabled
+  auto_backup_history
+  auto_backup_hour
+  auto_backup_last_run
+  course_selection_reminder_second_days
+  course_selection_reminder_second_enabled
+  current_academic_term
+  donation_enabled
+  donation_link
+  dun_cfg
+  file_naming_migration_done
+  gift_enabled
+  gift_rate_max
+  gift_rate_window_h
+  grades_term_backfill
+  index_status
+  log_group_admin
+  log_group_content
+  maintenance_mode
+  maintenance_text
+  notif_default_apply_mode
+  notif_defaults
+  poll_channel_id
+  qbank_ai_daily_limit
+  qbank_ai_topic_daily_limit
+  qbank_weak_accuracy_pct
+  qbank_weak_min_attempts
+  recon_window_days
+  ref_cfg
+  ref_notif_migration_done
+  report_rate_max
+  report_rate_window_min
+  require_student_id
+  required_channels
+  resource_notif_interval_hours
+  resource_notif_last_error
+  resource_notif_last_sent
+  ring.x
+  ring_disable_mode
+  string_key
+  subscription_card_number
+  subscription_card_owner
+  term_exams_end_date
+  ticket_stale_hours
+  topup_max
+  topup_min
+  trial_days
+  trial_enabled
+  url_import_max_mb
+  wallet_alert_cooldown_hours
+  wallet_alert_enabled
+  wallet_alert_last_at
+  wallet_alert_last_hash
+  wallet_alert_muted_until
+  zarinpal_callback_url
+  zarinpal_enabled
+  zarinpal_merchant_id
+  zarinpal_sandbox

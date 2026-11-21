@@ -1,0 +1,812 @@
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+
+import { Icon } from '../../icons';
+import { apiCall } from '../../lib/api';
+import { fa } from '../../lib/library';
+import { bookmarks, generateUUID, ink, type Scope, type StickyNote } from '../../lib/ink';
+import { InkLayer, type InkApi, type InkStatus } from './InkLayer';
+import { INK_COLORS, InkToolbar, type ReaderTool } from './InkToolbar';
+import { NotebookPanel } from './NotebookPanel';
+import { StickyNoteOverlay } from './StickyNoteOverlay';
+import { ThumbnailDrawer } from './ThumbnailDrawer';
+import { TextLayer } from './components/TextLayer';
+
+import './components/TextLayer.css';
+
+export interface PageDimension {
+  page: number;
+  width: number;
+  height: number;
+  aspect_ratio: number;
+  url: string;
+  thumbnail_url?: string;
+}
+
+export interface DocumentManifest {
+  file_id: string;
+  scope: Scope;
+  title: string;
+  total_pages: number;
+  page_dimensions: PageDimension[];
+  encryption_mode?: string;
+  watermark_user_id?: number;
+}
+
+export interface ProtectedReaderViewProps {
+  scope: Scope;
+  id: string;
+  url?: string;
+  startPage?: number;
+  onProgress: (page: number, total: number) => void;
+  onExpired?: () => Promise<string | null>;
+  onToggleSplitWorkspace?: () => void;
+  isAiOpen?: boolean;
+}
+
+export async function fetchDocumentManifest(scope: Scope, id: string): Promise<DocumentManifest> {
+  try {
+    return await apiCall<DocumentManifest>(`/reader/manifest/${scope}/${encodeURIComponent(id)}`);
+  } catch {
+    return await apiCall<DocumentManifest>(`/manifest/${scope}/${encodeURIComponent(id)}`);
+  }
+}
+
+/**
+ * نمایشگر پرچم‌دار جزوات و اسناد هامزیار (GoodNotes-Grade Protected Reader).
+ *
+ * قابلیت‌ها:
+ * ۱) رندر سمت سرور صفحات WebP با واترمارک پویا و بدون نشت بایت‌های خام.
+ * ۲) بدون محدودیت عرض مصنوعی (آنلاک تا ۱۴۰۰ پیکسل برای بوم عریض تبلت و دسکتاپ).
+ * ۳) پالت غنی شامل قلم، مداد گرافیتی، هایلایترهای پاستلی/نئون و ابزار کمند (Lasso).
+ * ۴) اسلایدر پیوسته ضخامت با دایره پیش‌نمایش پویا.
+ * ۵) یادداشت‌های چسبان متصل به حاشیه با قابلیت سنجاق شدن و کشیدن.
+ * ۶) حالت تمرکز و بدون حواس‌پرتی (Focus Fullscreen Mode) با کلید F.
+ * ۷) کشوی پیش‌نمایش صفحات و نشان‌شده‌ها (Thumbnail & Bookmark Drawer) با کلید T.
+ * ۸) وارون‌ساز هوشمند کنتراست شب (Obsidian Navy Night Contrast Inverter).
+ */
+export function ProtectedReaderView({
+  scope,
+  id,
+  startPage = 1,
+  onProgress,
+  onExpired,
+  onToggleSplitWorkspace,
+  isAiOpen = false,
+}: ProtectedReaderViewProps) {
+  const [manifest, setManifest] = useState<DocumentManifest | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [currentPage, setCurrentPage] = useState(startPage || 1);
+  const [zoom, setZoom] = useState(1.0); // 0.6 to 2.0
+  const [baseWidth, setBaseWidth] = useState(720);
+
+  // لایه ابزارهای نوت‌برداری
+  const [tool, setTool] = useState<ReaderTool>(null);
+  const [color, setColor] = useState(INK_COLORS[1]);
+  const [strokeWidth, setStrokeWidth] = useState(0.0035);
+  const [status, setStatus] = useState<InkStatus>('idle');
+  const [inkCount, setInkCount] = useState(0);
+  const [history, setHistory] = useState({ undo: 0, redo: 0 });
+  const [eraserMode, setEraserMode] = useState<'stroke' | 'partial'>('stroke');
+  const [eraseHighlighterOnly, setEraseHighlighterOnly] = useState(false);
+  const [shapeSnap, setShapeSnap] = useState(false);
+  const [stylusOnly, setStylusOnly] = useState(false);
+
+  // یادداشت‌های چسبان و نشان‌ها
+  const [pageNotes, setPageNotes] = useState<Map<number, StickyNote[]>>(new Map());
+  const [bookmarkedPages, setBookmarkedPages] = useState<number[]>(() => bookmarks.get(scope, id));
+
+  // حالت‌های نمایشی
+  const [focusMode, setFocusMode] = useState(false);
+  const [invertContrast, setInvertContrast] = useState(false);
+  const [thumbnailDrawerOpen, setThumbnailDrawerOpen] = useState(false);
+  const [notebookOpen, setNotebookOpen] = useState(false);
+  const [notebookKey, setNotebookKey] = useState(0);
+
+  // Text layer state
+  const [textContents] = useState<Map<number, any>>(new Map());
+  const [searchQuery] = useState('');
+  const [searchMatches] = useState<number[]>([]);
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const inkApis = useRef<Map<number, InkApi>>(new Map());
+  const progressRef = useRef(onProgress);
+  progressRef.current = onProgress;
+  const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  // ── لنگرگاه هوشمند زوم (Zoom Anchor Preservation) ──
+  // جلوگیری از جهش صفحه به اول جزوه هنگام بزرگ‌نمایی
+  const zoomAnchorRef = useRef<{ page: number; ratio: number } | null>(null);
+  const isZoomingRef = useRef(false);
+  const zoomResetTimerRef = useRef<number | null>(null);
+
+  const captureZoomAnchor = useCallback(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const targetPage = currentPage;
+    const pageEl = pageRefs.current.get(targetPage);
+    if (pageEl) {
+      const scrollerRect = scroller.getBoundingClientRect();
+      const pageRect = pageEl.getBoundingClientRect();
+      const relativeTop = scrollerRect.top - pageRect.top;
+      const ratio = Math.max(0, Math.min(1, relativeTop / Math.max(1, pageEl.offsetHeight)));
+      zoomAnchorRef.current = { page: targetPage, ratio };
+    } else {
+      zoomAnchorRef.current = { page: targetPage, ratio: 0 };
+    }
+    isZoomingRef.current = true;
+    if (zoomResetTimerRef.current) window.clearTimeout(zoomResetTimerRef.current);
+    zoomResetTimerRef.current = window.setTimeout(() => {
+      isZoomingRef.current = false;
+    }, 350);
+  }, [currentPage]);
+
+  useLayoutEffect(() => {
+    const anchor = zoomAnchorRef.current;
+    if (!anchor) return;
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+
+    const frame = requestAnimationFrame(() => {
+      const pageEl = pageRefs.current.get(anchor.page);
+      if (pageEl && scroller) {
+        const newPageTop = pageEl.offsetTop;
+        const newScrollTop = Math.max(0, newPageTop + anchor.ratio * pageEl.offsetHeight);
+        scroller.scrollTop = newScrollTop;
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [zoom]);
+
+  // ── کنترل بزرگ‌نمایی چندلمسی طبیعی با دو انگشت (2-Finger Multi-Touch Pinch to Zoom) ──
+  const touchDistRef = useRef<number | null>(null);
+  const touchStartZoomRef = useRef<number>(1.0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const p1 = e.touches[0];
+      const p2 = e.touches[1];
+      touchDistRef.current = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
+      touchStartZoomRef.current = zoom;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && touchDistRef.current !== null) {
+      const p1 = e.touches[0];
+      const p2 = e.touches[1];
+      const curDist = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
+      if (touchDistRef.current > 10) {
+        captureZoomAnchor();
+        const factor = curDist / touchDistRef.current;
+        const nextZoom = Math.min(2.5, Math.max(0.6, Math.round(touchStartZoomRef.current * factor * 100) / 100));
+        setZoom(nextZoom);
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      touchDistRef.current = null;
+    }
+  };
+
+  // پشتیبانی از ترک‌پد Precision ویندوز و ماوس (Windows Touchpad Pinch-to-Zoom & Ctrl+Wheel)
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        captureZoomAnchor();
+        // ضریب حساسیت نرم و بهینه برای تاچ‌پد ویندوز و موس با محدودسازی شیب
+        const delta = -e.deltaY * 0.006;
+        const clampedDelta = Math.max(-0.25, Math.min(0.25, delta));
+        setZoom((z) => Math.min(2.5, Math.max(0.6, Math.round((z + clampedDelta) * 100) / 100)));
+      }
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, [captureZoomAnchor]);
+
+  // کنترل پیوسته بزرگ‌نمایی چندلمسی مستقیم روی بوم (2-Finger Multi-Touch Canvas Pinch)
+  const handlePinchZoom = useCallback((factor: number) => {
+    captureZoomAnchor();
+    setZoom((z) => Math.min(2.5, Math.max(0.6, Math.round(z * factor * 100) / 100)));
+  }, [captureZoomAnchor]);
+
+  // دریافت مانیفست
+  const loadManifest = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await fetchDocumentManifest(scope, id);
+      setManifest(data);
+      if (data.total_pages > 0) {
+        const initialPage = Math.min(Math.max(1, startPage || 1), data.total_pages);
+        setCurrentPage(initialPage);
+      }
+      setLoading(false);
+    } catch {
+      if (onExpired) {
+        try {
+          const fresh = await onExpired();
+          if (fresh) {
+            const data = await fetchDocumentManifest(scope, id);
+            setManifest(data);
+            setLoading(false);
+            return;
+          }
+        } catch {
+          /* خطا در پایین نمایش داده می‌شود */
+        }
+      }
+      setLoading(false);
+      setError('بارگذاری اطلاعات سند با خطا مواجه شد. لطفاً دوباره تلاش کنید.');
+    }
+  }, [scope, id, startPage, onExpired]);
+
+  useEffect(() => {
+    void loadManifest();
+  }, [loadManifest]);
+
+  // دریافت یادداشت‌های چسبان برای صفحه فعال
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await ink.page(scope, id, currentPage);
+        if (!cancelled && res.notes && res.notes.length > 0) {
+          setPageNotes((prev) => {
+            const m = new Map(prev);
+            m.set(currentPage, res.notes);
+            return m;
+          });
+        }
+      } catch {
+        // silent fallback
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [scope, id, currentPage]);
+
+  // اندازه‌گیری عرض محفظه بدون کلمپ مصنوعی (پشتیبانی تا ۱۴۰۰ پیکسل در نمایشگرهای عریض و آیپد)
+  useEffect(() => {
+    const updateWidth = () => {
+      const el = scrollRef.current || containerRef.current;
+      if (el) {
+        const available = Math.max(300, el.clientWidth - 32);
+        setBaseWidth(Math.min(available, 1400));
+      }
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, [notebookOpen]);
+
+  // پرش به صفحه با اسکرول نرم
+  const scrollToPage = useCallback((p: number) => {
+    const el = pageRefs.current.get(p);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    setCurrentPage(p);
+    if (manifest) {
+      progressRef.current(p, manifest.total_pages);
+    }
+  }, [manifest]);
+
+  // کلیدهای میانبر صفحه‌کلید
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+
+      const total = manifest?.total_pages || 1;
+      if (e.key === 'ArrowLeft' || e.key === 'PageDown') {
+        scrollToPage(Math.min(total, currentPage + 1));
+      }
+      if (e.key === 'ArrowRight' || e.key === 'PageUp') {
+        scrollToPage(Math.max(1, currentPage - 1));
+      }
+      if (e.key === '+' || e.key === '=') {
+        captureZoomAnchor();
+        setZoom((z) => Math.min(2.0, Math.round((z + 0.1) * 10) / 10));
+      }
+      if (e.key === '-') {
+        captureZoomAnchor();
+        setZoom((z) => Math.max(0.6, Math.round((z - 0.1) * 10) / 10));
+      }
+      if (e.key === 'f' || e.key === 'F') {
+        setFocusMode((v) => !v);
+      }
+      if (e.key === 't' || e.key === 'T') {
+        setThumbnailDrawerOpen((v) => !v);
+      }
+      if (e.key === '\\') {
+        onToggleSplitWorkspace?.();
+      }
+      if (e.key === 'p' || e.key === 'P') setTool((t) => (t === 'pen' ? null : 'pen'));
+      if (e.key === 'b' || e.key === 'B') setTool((t) => (t === 'ballpoint' ? null : 'ballpoint'));
+      if (e.key === 'o' || e.key === 'O') setTool((t) => (t === 'fountain' ? null : 'fountain'));
+      if (e.key === 's' || e.key === 'S') setShapeSnap((v) => !v);
+      if (e.key === 'x' || e.key === 'X') setEraserMode((m) => (m === 'stroke' ? 'partial' : 'stroke'));
+      if (e.key === 'h' || e.key === 'H') setTool((t) => (t === 'highlighter' ? null : 'highlighter'));
+      if (e.key === 'e' || e.key === 'E') setTool((t) => (t === 'eraser' ? null : 'eraser'));
+      if (e.key === 'l' || e.key === 'L') setTool((t) => (t === 'lasso' ? null : 'lasso'));
+      if (e.key === 'Escape') {
+        if (focusMode) setFocusMode(false);
+        else if (thumbnailDrawerOpen) setThumbnailDrawerOpen(false);
+        else setTool(null);
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        const api = inkApis.current.get(currentPage);
+        if (e.shiftKey) api?.redo();
+        else api?.undo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [currentPage, manifest, scrollToPage, focusMode, thumbnailDrawerOpen, onToggleSplitWorkspace]);
+
+  // افزودن یادداشت چسبان به صفحهٔ جاری
+  const handleAddStickyNote = () => {
+    const currentList = pageNotes.get(currentPage) || [];
+    const newNote: StickyNote = {
+      note_id: generateUUID(),
+      page: currentPage,
+      x: 0.82,
+      y: 0.15,
+      text: '',
+      color: 'yellow',
+      collapsed: false,
+      created_at: new Date().toISOString(),
+    };
+    const nextList = [...currentList, newNote];
+    const nextMap = new Map(pageNotes);
+    nextMap.set(currentPage, nextList);
+    setPageNotes(nextMap);
+    void ink.save(scope, id, currentPage, undefined, nextList);
+  };
+
+  const handleUpdatePageNotes = (page: number, updatedNotes: StickyNote[]) => {
+    const nextMap = new Map(pageNotes);
+    nextMap.set(page, updatedNotes);
+    setPageNotes(nextMap);
+    void ink.save(scope, id, page, undefined, updatedNotes);
+  };
+
+  const handleToggleBookmark = (p: number) => {
+    bookmarks.toggle(scope, id, p);
+    setBookmarkedPages(bookmarks.get(scope, id));
+  };
+
+  // Text layer handlers
+  const handleTextSelection = useCallback((text: string, _rects: DOMRect[]) => {
+    if (text.trim()) {
+      // Could show floating toolbar for copy, highlight, etc.
+      console.log('Text selected:', text);
+    }
+  }, []);
+
+  const handleAnchorAnnotation = useCallback((pageX: number, pageY: number, text: string) => {
+    // Called when user wants to anchor an annotation to specific text
+    console.log('Anchor annotation at:', pageX, pageY, text);
+  }, []);
+
+  const activeInkApi = inkApis.current.get(currentPage);
+
+  return (
+    <div
+      className={`reader reader--ink ${focusMode ? 'reader-focus-mode' : ''}`}
+      ref={containerRef}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+    >
+      {loading && (
+        <div className="reader__center" aria-busy="true">
+          <span className="small">در حال آماده‌سازی سند امن…</span>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="reader__center">
+          <Icon name="i-arch" size={30} />
+          <p className="small mt-8" style={{ maxWidth: 320 }}>
+            {error}
+          </p>
+          <button type="button" className="btn btn--quiet mt-12" onClick={() => void loadManifest()}>
+            تلاش مجدد
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && manifest && (
+        <div className="reader__stage">
+          <div
+            className="reader__canvas"
+            ref={scrollRef}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+          >
+            <div
+              className="reader__scroll-track"
+              style={{
+                width: `${Math.floor(baseWidth * zoom)}px`,
+                margin: '0 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}
+            >
+              {manifest.page_dimensions.map((dim) => {
+                const targetW = Math.floor(baseWidth * zoom);
+                const targetH = Math.floor(targetW / (dim.aspect_ratio || 0.7071));
+
+                return (
+                  <VirtualPageContainer
+                    key={dim.page}
+                    page={dim.page}
+                    width={targetW}
+                    height={targetH}
+                    url={dim.url}
+                    scope={scope}
+                    id={id}
+                    tool={tool}
+                    color={color}
+                    strokeWidth={strokeWidth}
+                    invertContrast={invertContrast}
+                    notes={pageNotes.get(dim.page) || []}
+                    onUpdateNotes={(n) => handleUpdatePageNotes(dim.page, n)}
+                    isCurrent={dim.page === currentPage}
+                    onVisible={(p) => {
+                      if (isZoomingRef.current) return;
+                      setCurrentPage(p);
+                      progressRef.current(p, manifest.total_pages);
+                    }}
+                    onRegisterRef={(el) => {
+                      if (el) pageRefs.current.set(dim.page, el);
+                      else pageRefs.current.delete(dim.page);
+                    }}
+                    onRegisterInkApi={(api) => {
+                      if (api) inkApis.current.set(dim.page, api);
+                      else inkApis.current.delete(dim.page);
+                    }}
+                    onInkStatus={setStatus}
+                    onInkCount={setInkCount}
+                    onInkHistory={setHistory}
+                    onInkChanged={() => setNotebookKey((k) => k + 1)}
+                    eraserMode={eraserMode}
+                    eraseHighlighterOnly={eraseHighlighterOnly}
+                    shapeSnap={shapeSnap}
+                    stylusOnly={stylusOnly}
+                    onPinchZoom={handlePinchZoom}
+                    // Text layer props
+                    textContent={textContents.get(dim.page) || null}
+                    viewport={manifest.page_dimensions.find(d => d.page === dim.page) || null}
+                    searchQuery={searchQuery}
+                    searchMatches={searchMatches}
+                    onTextSelection={handleTextSelection}
+                    onAnchorAnnotation={handleAnchorAnnotation}
+                    enableTextSelection={true}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          <NotebookPanel
+            scope={scope}
+            id={id}
+            page={currentPage}
+            open={notebookOpen}
+            onClose={() => setNotebookOpen(false)}
+            onJump={(p) => {
+              scrollToPage(p);
+              if (window.innerWidth < 900) setNotebookOpen(false);
+            }}
+            refreshKey={notebookKey}
+          />
+        </div>
+      )}
+
+      {/* نوار ابزار حاشیه‌نویسی شناور به سبک GoodNotes / آیپد */}
+      {!loading && !error && manifest && !focusMode && (
+        <InkToolbar
+          tool={tool}
+          setTool={setTool}
+          color={color}
+          setColor={setColor}
+          strokeWidth={strokeWidth}
+          setStrokeWidth={setStrokeWidth}
+          undo={() => activeInkApi?.undo()}
+          redo={() => activeInkApi?.redo()}
+          clear={() => activeInkApi?.clear()}
+          count={inkCount}
+          status={status}
+          canUndo={history.undo > 0}
+          canRedo={history.redo > 0}
+          onOpenNotebook={() => setNotebookOpen((v) => !v)}
+          onAddStickyNote={handleAddStickyNote}
+          onToggleFocus={() => setFocusMode(true)}
+          onOpenThumbnails={() => setThumbnailDrawerOpen(true)}
+          onToggleInvert={() => setInvertContrast((v) => !v)}
+          inverted={invertContrast}
+          eraserMode={eraserMode}
+          setEraserMode={setEraserMode}
+          eraseHighlighterOnly={eraseHighlighterOnly}
+          setEraseHighlighterOnly={setEraseHighlighterOnly}
+          shapeSnap={shapeSnap}
+          setShapeSnap={setShapeSnap}
+          stylusOnly={stylusOnly}
+          setStylusOnly={setStylusOnly}
+          currentPage={currentPage}
+          totalPages={manifest.total_pages}
+          onPrevPage={() => scrollToPage(Math.max(1, currentPage - 1))}
+          onNextPage={() => scrollToPage(Math.min(manifest.total_pages, currentPage + 1))}
+          onToggleAi={onToggleSplitWorkspace}
+          isAiOpen={isAiOpen}
+        />
+      )}
+
+      {/* المان‌های حالت تمرکز تمام‌صفحه */}
+      {focusMode && manifest && (
+        <>
+          <div className="focus-counter-badge num">
+            صفحه {fa(currentPage)} از {fa(manifest.total_pages)}
+          </div>
+          <button
+            type="button"
+            className="focus-restore-trigger"
+            onClick={() => setFocusMode(false)}
+            aria-label="خروج از حالت تمرکز"
+            title="خروج از حالت تمرکز (Esc)"
+          >
+            ✕
+          </button>
+        </>
+      )}
+
+      {/* کشوی پیش‌نمایش صفحات و نشان‌شده‌ها */}
+      <ThumbnailDrawer
+        open={thumbnailDrawerOpen}
+        onClose={() => setThumbnailDrawerOpen(false)}
+        manifest={manifest}
+        currentPage={currentPage}
+        onJump={scrollToPage}
+        scope={scope}
+        id={id}
+        bookmarkedPages={bookmarkedPages}
+        onToggleBookmark={handleToggleBookmark}
+      />
+    </div>
+  );
+}
+
+interface VirtualPageContainerProps {
+  page: number;
+  width: number;
+  height: number;
+  url: string;
+  scope: Scope;
+  id: string;
+  tool: ReaderTool;
+  color: string;
+  strokeWidth: number;
+  invertContrast: boolean;
+  notes: StickyNote[];
+  onUpdateNotes: (notes: StickyNote[]) => void;
+  isCurrent: boolean;
+  onVisible: (page: number) => void;
+  onRegisterRef: (el: HTMLDivElement | null) => void;
+  onRegisterInkApi: (api: InkApi | null) => void;
+  onInkStatus: (status: InkStatus) => void;
+  onInkCount: (n: number) => void;
+  onInkHistory: (h: { undo: number; redo: number }) => void;
+  onInkChanged: () => void;
+  eraserMode?: 'stroke' | 'partial';
+  eraseHighlighterOnly?: boolean;
+  shapeSnap?: boolean;
+  stylusOnly?: boolean;
+  onPinchZoom?: (factor: number) => void;
+  // Text layer props
+  textContent?: any;
+  viewport?: any;
+  searchQuery?: string;
+  searchMatches?: number[];
+  onTextSelection?: (text: string, rects: DOMRect[]) => void;
+  onAnchorAnnotation?: (pageX: number, pageY: number, text: string) => void;
+  enableTextSelection?: boolean;
+  textLayerRef?: React.RefObject<any>;
+}
+
+function VirtualPageContainer({
+  page,
+  width,
+  height,
+  url,
+  scope,
+  id,
+  tool,
+  color,
+  strokeWidth,
+  invertContrast,
+  notes,
+  onUpdateNotes,
+  isCurrent,
+  onVisible,
+  onRegisterRef,
+  onRegisterInkApi,
+  onInkStatus,
+  onInkCount,
+  onInkHistory,
+  onInkChanged,
+  eraserMode = 'stroke',
+  eraseHighlighterOnly = false,
+  shapeSnap = false,
+  stylusOnly = false,
+  onPinchZoom,
+  // Text layer props
+  textContent,
+  viewport,
+  searchQuery,
+  searchMatches,
+  onTextSelection,
+  onAnchorAnnotation,
+  enableTextSelection = true,
+  textLayerRef,
+}: VirtualPageContainerProps) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [isNearViewport, setIsNearViewport] = useState(page <= 2);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const textLayerRefInternal = useRef<any>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    onRegisterRef(el);
+
+    // ناظر پنجره‌بندی (Windowing): بارگذاری با فاصله ۶۰۰ پیکسل قبل از دید
+    const windowingObs = new IntersectionObserver(
+      ([entry]) => {
+        setIsNearViewport(entry.isIntersecting);
+      },
+      { rootMargin: '600px 0px 600px 0px' },
+    );
+
+    // ناظر صفحه فعال: כאשר که صفحه از خط دید مرکزی عبور می‌کند
+    const activeObs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          onVisible(page);
+        }
+      },
+      { threshold: 0.15 },
+    );
+
+    windowingObs.observe(el);
+    activeObs.observe(el);
+
+    return () => {
+      windowingObs.disconnect();
+      activeObs.disconnect();
+      onRegisterRef(null);
+    };
+  }, [page, onVisible, onRegisterRef]);
+
+  // Expose text layer ref methods
+  useEffect(() => {
+    if (textLayerRef && textLayerRefInternal.current) {
+      (textLayerRef as any).current = textLayerRefInternal.current;
+    }
+  }, [textLayerRef]);
+
+  return (
+    <div
+      ref={ref}
+      className={`pdf-page${isCurrent ? ' is-active' : ''}`}
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+        position: 'relative',
+        margin: '0 auto 16px',
+        backgroundColor: invertContrast ? '#121620' : '#ffffff',
+        borderRadius: '6px',
+        boxShadow: 'var(--sh-1, 0 1px 3px rgba(0,0,0,0.12))',
+        border: '1px solid var(--line, #e2e8f0)',
+        overflow: 'hidden',
+      }}
+    >
+      {isNearViewport ? (
+        <>
+          <img
+            src={url}
+            alt={`صفحهٔ ${fa(page)}`}
+            className={`reader__page ${invertContrast ? 'reader__page--inverted' : ''}`}
+            style={{
+              width: `${width}px`,
+              height: `${height}px`,
+              display: 'block',
+              objectFit: 'contain',
+              userSelect: 'none',
+              pointerEvents: 'none',
+              opacity: imgLoaded ? 1 : 0.85,
+              transition: 'opacity 0.15s ease-in',
+            }}
+            loading="lazy"
+            draggable={false}
+            onLoad={() => setImgLoaded(true)}
+          />
+
+          {/* Text Layer - Semantic text overlay for selection, search, copy */}
+          {textContent && viewport && (
+            <TextLayer
+              ref={textLayerRefInternal}
+              pageNumber={page}
+              viewport={viewport}
+              textContent={textContent}
+              searchQuery={searchQuery}
+              searchMatches={searchMatches}
+              onSelectionChange={onTextSelection}
+              onAnchorAnnotation={onAnchorAnnotation}
+              enableSelection={enableTextSelection}
+              className="virtual-page__text-layer"
+              renderScale={1}
+            />
+          )}
+
+          {/* لایه یادداشت‌های چسبان */}
+          <StickyNoteOverlay
+            page={page}
+            width={width}
+            height={height}
+            notes={notes}
+            onUpdateNotes={onUpdateNotes}
+          />
+
+          {/* لایه حاشیه‌نویسی دیجیتال */}
+          <InkLayer
+            ref={onRegisterInkApi}
+            scope={scope}
+            id={id}
+            page={page}
+            width={width}
+            height={height}
+            tool={tool}
+            color={color}
+            strokeWidth={strokeWidth}
+            onCount={onInkCount}
+            onHistory={onInkHistory}
+            onStatus={onInkStatus}
+            onChanged={onInkChanged}
+            eraserMode={eraserMode}
+            eraseHighlighterOnly={eraseHighlighterOnly}
+            shapeSnap={shapeSnap}
+            stylusOnly={stylusOnly}
+            onPinchZoom={onPinchZoom}
+          />
+        </>
+      ) : (
+        <div
+          className="page-placeholder"
+          style={{
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'var(--paper-2, #f8fafc)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--ink-3, #94a3b8)',
+            fontSize: '12px',
+          }}
+        >
+          صفحهٔ {fa(page)}
+        </div>
+      )}
+    </div>
+  );
+}

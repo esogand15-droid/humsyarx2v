@@ -1,0 +1,90 @@
+"""Operator CLI for guarded, reversible Question Bank migration."""
+import argparse
+import asyncio
+import json
+import os
+import sys
+from pathlib import Path
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description="HUMSYAR Question Bank migration (dry-run by default)")
+    parser.add_argument("action", choices=["inspect", "schema", "progress", "rollback", "rollback-progress",
+                                     "inspect-w1", "migrate-w1", "index-w1", "index-w3"])
+    parser.add_argument("--apply", action="store_true", help="Apply guarded writes; default is read-only")
+    parser.add_argument("--output", help="Write inspection JSON")
+    parser.add_argument("--inspection-file", help="Previously reviewed inspect JSON; required for schema --apply")
+    parser.add_argument("--backup-manifest", help="Existing full-backup manifest; required for schema --apply")
+    parser.add_argument("--migration", default="question_bank_v2_schema_1")
+    parser.add_argument("--limit", type=int, help="Optional safety cap (schema default 100k; progress 1m)")
+    parser.add_argument("--confirmed-backup-count", type=int)
+    return parser
+
+
+async def main(args=None):
+    if args is None:
+        args = build_parser().parse_args()
+    from database import db
+    from question_bank.migration import (
+        ensure_qbank_w1_indexes, inspect_qbank_w1, inspect_questions,
+        migrate_qbank_w1, migrate_questions, backfill_progress, rollback_questions,
+        rollback_progress,
+    )
+    from question_bank.images import ensure_qbank_w3_indexes
+    if args.action == "inspect":
+        result = await inspect_questions(db)
+        if args.output:
+            path = Path(args.output); path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            result["report_file"] = str(path)
+    elif args.action == "schema":
+        expected = None
+        if args.apply:
+            if not args.inspection_file or not args.backup_manifest:
+                raise RuntimeError("--inspection-file and --backup-manifest are required with --apply")
+            inspection = json.loads(Path(args.inspection_file).read_text(encoding="utf-8"))
+            expected = int(inspection["total"])
+            if not Path(args.backup_manifest).is_file():
+                raise RuntimeError("backup manifest does not exist")
+        result = await migrate_questions(db, apply=args.apply, expected_total=expected,
+                                         limit=args.limit or 100000)
+    elif args.action == "inspect-w1":
+        result = await inspect_qbank_w1(db)
+        if args.output:
+            path = Path(args.output); path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            result["report_file"] = str(path)
+    elif args.action == "migrate-w1":
+        expected = None
+        if args.apply:
+            if not args.inspection_file or not args.backup_manifest:
+                raise RuntimeError("--inspection-file and --backup-manifest are required with --apply")
+            inspection = json.loads(Path(args.inspection_file).read_text(encoding="utf-8"))
+            expected = int(inspection["total"])
+            if not Path(args.backup_manifest).is_file():
+                raise RuntimeError("backup manifest does not exist")
+        result = await migrate_qbank_w1(db, apply=args.apply, expected_total=expected,
+                                        limit=args.limit or 100000)
+    elif args.action == "index-w1":
+        result = await ensure_qbank_w1_indexes(db)
+    elif args.action == "index-w3":
+        result = await ensure_qbank_w3_indexes(db)
+    elif args.action == "progress":
+        result = await backfill_progress(db, apply=args.apply, limit=args.limit or 1000000)
+    elif args.action == "rollback":
+        result = await rollback_questions(
+            db, migration=args.migration, apply=args.apply,
+            expected_count=args.confirmed_backup_count if args.apply else None)
+    else:
+        result = await rollback_progress(
+            db, apply=args.apply,
+            expected_count=args.confirmed_backup_count if args.apply else None)
+    print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

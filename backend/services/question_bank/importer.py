@@ -1,0 +1,759 @@
+"""Versioned, preview-first, idempotent JSON ingestion for owner admins."""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import uuid
+from collections import Counter, defaultdict
+from pathlib import Path
+from typing import Any, Mapping
+
+from bson import ObjectId
+from pymongo import UpdateOne
+
+from time_utils import utc_now_iso
+from .contracts import (
+    EXAM_TRACK_DEFAULT, EXAM_YEAR_MAX, EXAM_YEAR_MIN,
+    QuestionDomainError, canonical_content_source, canonical_difficulty,
+    canonical_exam_session, clean_text, default_exam_bucket_topic,
+    normalize_basic_science_lesson,
+    normalized_question_text, question_content_hash, validate_question_payload,
+)
+from .service import QuestionBankService
+
+IMPORT_SCHEMA_VERSION = "1.0"
+PROMPT_PATH = Path(__file__).with_name("prompts") / "qbank_import_v1.txt"
+
+_YEAR_RE = re.compile(r"(1[3-4]\d{2})")
+_FA_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
+_DENTISTRY_KEYWORDS = ("دندان", "dentistry", "dental")
+
+
+def infer_exam_year_from_filename(file_name: str) -> str | None:
+    """🌊 QBANK-W1 — سال از نام فایل؛ آخرین ۴رقمیِ دربازه می‌برد (سال معمولاً پسوند است)."""
+    text = clean_text(file_name).translate(_FA_DIGITS)
+    candidates = [m for m in _YEAR_RE.findall(text) if EXAM_YEAR_MIN <= m <= EXAM_YEAR_MAX]
+    return candidates[-1] if candidates else None
+
+
+def infer_exam_track_from_filename(file_name: str) -> str:
+    """🌊 QBANK-W1/§۱۵.۲ — رشته از نام فایل؛ پیش‌فرض پزشکی."""
+    lowered = clean_text(file_name).lower()
+    return "dentistry" if any(k in lowered for k in _DENTISTRY_KEYWORDS) else EXAM_TRACK_DEFAULT
+
+
+def infer_exam_session_from_filename(file_name: str) -> str | None:
+    """🌊 QBANK-W5 — نوبت آزمون از نام فایل/مسیر؛ data-driven، بدون hard-code سال."""
+    from .exam_meta import infer_exam_session_from_filename as _infer
+    return _infer(file_name)
+
+
+class QuestionImportService:
+    def __init__(self, database):
+        self.db = database
+        self.qbank = QuestionBankService(database)
+
+    async def taxonomy_reference(self) -> str:
+        """🌊 QBANK-W2/§۶.۳ — مرجع نام‌های دقیق درس/مبحث، خودکار از دیتابیس.
+
+        جایگزین «چسباندن دستی جدول موج ۰» به پرامپت: همیشه با bs_lessons/
+        bs_sessions هم‌راستاست و نرخ unmatched را کم می‌کند. دیتابیس خالی
+        → رشته خالی (پرامپت بدون ضمیمه سرو می‌شود).
+        """
+        lessons = await self.db.bs_lessons.find({}).sort([("term", 1), ("order", 1)]).to_list(1000)
+        if not lessons:
+            return ""
+        lesson_ids = [str(x.get("_id")) for x in lessons]
+        sessions = await self.db.bs_sessions.find(
+            {"lesson_id": {"$in": lesson_ids}}).sort("number", 1).to_list(5000)
+        topics: dict[str, list[str]] = {}
+        for session in sessions:
+            topics.setdefault(str(session.get("lesson_id") or ""), []).append(
+                clean_text(session.get("topic")))
+        lines = ["", "",
+                 "── مرجع نام‌های دقیق درس/مبحث (خودکار از دیتابیس؛ نام‌ها را عیناً کپی کنید) ──"]
+        for lesson in lessons:
+            lines.append(f"[{clean_text(lesson.get('term')) or 'بی‌ترم'}] درس: {clean_text(lesson.get('name'))}")
+            for topic in topics.get(str(lesson.get("_id")), []):
+                lines.append(f"  - مبحث: {topic}")
+        return "\n".join(lines)
+
+    async def prompt(self) -> dict:
+        base = PROMPT_PATH.read_text(encoding="utf-8")
+        return {"schema_version": IMPORT_SCHEMA_VERSION,
+                "prompt": base + await self.taxonomy_reference()}
+
+    @staticmethod
+    def parse(raw: bytes, file_name: str) -> tuple[dict, str]:
+        if not raw or len(raw) > 15 * 1024 * 1024:
+            raise QuestionDomainError("invalid_import_size", "فایل JSON خالی یا بیش از ۱۵ مگابایت است", 413)
+        fingerprint = hashlib.sha256(raw).hexdigest()
+        try:
+            data = json.loads(raw.decode("utf-8-sig"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise QuestionDomainError("malformed_json", "ساختار فایل JSON معتبر نیست") from exc
+        if not isinstance(data, dict) or data.get("schema_version") != IMPORT_SCHEMA_VERSION:
+            raise QuestionDomainError("unsupported_schema", f"schema_version باید {IMPORT_SCHEMA_VERSION} باشد")
+        if not isinstance(data.get("questions"), list) or not data["questions"]:
+            raise QuestionDomainError("empty_questions", "فایل هیچ سؤال قابل بررسی ندارد")
+        if len(data["questions"]) > 5000:
+            raise QuestionDomainError("too_many_questions", "حداکثر ۵۰۰۰ سؤال در هر job مجاز است", 413)
+        source = data.get("source") if isinstance(data.get("source"), dict) else {}
+        source.setdefault("file_name", file_name)
+        data["source"] = source
+        return data, fingerprint
+
+    async def _classification_context(self, raw_items: list[Any], *, include_duplicates: bool = True,
+                                      file_year: str | None = None, file_session: str | None = None) -> dict:
+        """Bulk-prefetch taxonomy and optional duplicate candidates.
+
+        🌊 QBANK-W6 — archive import auto-provisions the 15 basic-science
+        subject lessons + one exam-bucket topic (e.g. شهریور ۱۴۰۴). It does
+        NOT require content-admin lecture sessions under منابع.
+        """
+        taxonomies: dict = {}
+        topic_ids: set = set()
+        # Cache ensure calls per (lesson, bucket-topic)
+        ensured: dict[tuple[str, str], dict] = {}
+
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            lesson_name = normalize_basic_science_lesson(item.get("lesson"))
+            row_session = None
+            if item.get("exam_session") not in (None, ""):
+                try:
+                    row_session = canonical_exam_session(item.get("exam_session"), strict=False)
+                except QuestionDomainError:
+                    row_session = None
+            exam_session = row_session or file_session
+            exam_year = clean_text(item.get("exam_year")) or file_year
+            topic_name = default_exam_bucket_topic(
+                exam_session=exam_session, exam_year=exam_year, topic=item.get("topic"),
+            )
+            # Stable key used later in _classify
+            key = (lesson_name, topic_name)
+            if key in taxonomies:
+                continue
+            if not lesson_name:
+                taxonomies[key] = {"state": "unmatched", "candidates": [],
+                                   "taxonomy": None, "reason": "lesson_empty"}
+                continue
+            cache_key = key
+            if cache_key not in ensured:
+                try:
+                    ensured[cache_key] = await self.qbank.ensure_taxonomy_for_import(
+                        lesson=lesson_name, topic=topic_name,
+                        exam_year=exam_year, exam_session=exam_session,
+                        auto_create=True,
+                    )
+                except QuestionDomainError as exc:
+                    taxonomies[key] = {
+                        "state": "ambiguous" if str(exc.code).startswith("ambiguous") else "unmatched",
+                        "candidates": (exc.details or {}).get("matches", []),
+                        "taxonomy": None,
+                        "reason": exc.message,
+                    }
+                    continue
+            taxonomy = ensured[cache_key]
+            taxonomies[key] = {"state": "matched", "taxonomy": taxonomy, "candidates": []}
+            if taxonomy.get("topic_id"):
+                topic_ids.add(taxonomy["topic_id"])
+
+        if not include_duplicates:
+            return {"taxonomies": taxonomies, "exact": {}, "candidates": {}}
+
+        hashes = set()
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            try:
+                normalized = validate_question_payload({"question": item.get("question"), "options": item.get("options"),
+                    "correct_answer": item.get("correct_option"), "explanation": item.get("explanation"),
+                    "difficulty": item.get("difficulty") or "medium"})
+                hashes.add(normalized["content_hash"])
+            except QuestionDomainError:
+                pass
+        exact_docs = await self.db.questions.find(
+            {"content_hash": {"$in": list(hashes)}},
+            {"content_hash": 1, "question": 1, "correct_answer": 1}).to_list(max(1, len(hashes)))
+        exact_by_hash = {x.get("content_hash"): x for x in exact_docs}
+
+        candidates_by_topic = defaultdict(list)
+        if topic_ids:
+            pipeline = [
+                {"$match": {"topic_id": {"$in": list(topic_ids)}}},
+                {"$setWindowFields": {"partitionBy": "$topic_id", "sortBy": {"created_at": -1},
+                                      "output": {"_topic_rank": {"$documentNumber": {}}}}},
+                {"$match": {"_topic_rank": {"$lte": 80}}},
+                {"$project": {"question": 1, "correct_answer": 1, "options": 1, "topic_id": 1}},
+            ]
+            docs = await self.db.questions.aggregate(pipeline, allowDiskUse=True).to_list(min(100000, len(topic_ids) * 80))
+            for document in docs:
+                candidates_by_topic[str(document.get("topic_id") or "")].append(document)
+        return {"taxonomies": taxonomies, "exact": exact_by_hash, "candidates": candidates_by_topic}
+
+    async def create_preview(self, *, admin: Mapping, raw: bytes, file_name: str,
+                             job_content_source: str | None = None) -> dict:
+        await self.qbank.permissions.authorize_import(admin)
+        data, fingerprint = self.parse(raw, file_name)
+        job_source = canonical_content_source(job_content_source) if job_content_source not in (None, "") else None
+        file_year = infer_exam_year_from_filename(file_name)
+        file_track = infer_exam_track_from_filename(file_name)
+        # 🌊 QBANK-W5 — نوبت: از source JSON (اگر extractor گذاشته) یا نام فایل.
+        src_meta = data.get("source") if isinstance(data.get("source"), dict) else {}
+        exam_meta = data.get("exam") if isinstance(data.get("exam"), dict) else {}
+        file_session = (
+            canonical_exam_session(src_meta.get("exam_session") or exam_meta.get("session"), strict=False)
+            or infer_exam_session_from_filename(file_name)
+            or infer_exam_session_from_filename(str(src_meta.get("title") or ""))
+        )
+        if not file_year:
+            file_year = clean_text(src_meta.get("exam_year") or exam_meta.get("year")) or file_year
+            if file_year:
+                try:
+                    from .contracts import canonical_exam_year
+                    file_year = canonical_exam_year(file_year, strict=False)
+                except Exception:
+                    pass
+        admin_id = int(admin.get("id") or 0)
+        previous = await self.db.question_import_jobs.find_one(
+            {"admin_id": admin_id, "fingerprint": fingerprint})
+        if previous and previous.get("status") not in {"cancelled", "failed"}:
+            return await self.preview(str(previous["_id"]))
+        now = utc_now_iso(); job_id = str(previous["_id"]) if previous else uuid.uuid4().hex[:20]
+        job = {"_id": job_id, "job_id": job_id, "admin_id": admin_id,
+               "file_name": clean_text(file_name, 240), "schema_version": IMPORT_SCHEMA_VERSION,
+               "fingerprint": fingerprint, "source": data.get("source") or {},
+               "exam": exam_meta or {},
+               "job_content_source": job_source,
+               "inferred_exam_year": file_year, "inferred_exam_track": file_track,
+               "inferred_exam_session": file_session,
+               "status": "validating", "started_at": now, "created_at": (previous or {}).get("created_at", now),
+               "finished_at": None, "counts": {}, "mapping": {}, "error": None}
+        if previous:
+            await self.db.question_import_items.delete_many({"job_id": job_id})
+            await self.db.question_import_jobs.replace_one({"_id": job_id}, job)
+        else:
+            await self.db.question_import_jobs.insert_one(job)
+        try:
+            context = await self._classification_context(
+                data["questions"], file_year=file_year, file_session=file_session,
+            )
+            items = []
+            for index, raw_item in enumerate(data["questions"]):
+                items.append(await self._classify(job_id, index, raw_item, data.get("source") or {}, admin_id,
+                                                  context=context, job_content_source=job_source,
+                                                  file_year=file_year, file_track=file_track,
+                                                  file_session=file_session))
+        except Exception as exc:
+            await self.db.question_import_jobs.update_one(
+                {"_id": job_id}, {"$set": {"status": "failed", "finished_at": utc_now_iso(),
+                                           "error": "validation_failed"}})
+            if isinstance(exc, QuestionDomainError):
+                raise
+            raise QuestionDomainError("import_validation_failed",
+                                      "اعتبارسنجی فایل کامل نشد؛ بدون ثبت سؤال دوباره تلاش کنید", 503) from exc
+        seen_external = {}
+        seen_hash = {}
+        for item in items:
+            external = item["external_id"]
+            if external in seen_external:
+                item["classification"] = "error"
+                item["errors"].append(f"external_id تکراری با ردیف {seen_external[external]}")
+                item["external_id"] = f"{external}#ROW-{item['row']}"
+            else:
+                seen_external[external] = item["row"]
+            normalized = item.get("normalized") or {}
+            content_hash = normalized.get("content_hash")
+            if content_hash and content_hash in seen_hash and item["classification"] not in {"error", "unmatched", "ambiguous"}:
+                first = seen_hash[content_hash]
+                answer_conflict = first["correct_answer"] != normalized.get("correct_answer")
+                item["classification"] = "conflict" if answer_conflict else "exact_duplicate"
+                item["duplicate"] = {"external_id": first["external_id"], "question": normalized.get("question", ""),
+                                     "ratio": 1.0, "within_file": True, "answer_conflict": answer_conflict}
+            elif content_hash:
+                seen_hash[content_hash] = {"external_id": item["external_id"],
+                                           "correct_answer": normalized.get("correct_answer")}
+        if items:
+            try:
+                await self.db.question_import_items.insert_many(items, ordered=False)
+            except Exception as exc:
+                await self.db.question_import_jobs.update_one(
+                    {"_id": job_id}, {"$set": {"status": "failed", "finished_at": utc_now_iso(),
+                                               "error": "preview_persistence_failed"}})
+                raise QuestionDomainError("import_preview_failed",
+                                          "ذخیره پیش‌نمایش انجام نشد و هیچ سؤالی وارد بانک نشد", 503) from exc
+        counts = Counter(x["classification"] for x in items)
+        totals = {"total": len(items), "ready": counts["ready"],
+                  "pending_images": counts["ready_pending_image"], "errors": counts["error"],
+                  "unmatched": counts["unmatched"], "ambiguous": counts["ambiguous"],
+                  "exact_duplicates": counts["exact_duplicate"],
+                  "probable_duplicates": counts["probable_duplicate"],
+                  "conflicts": counts["conflict"],
+                  "needs_review": counts["needs_review"],
+                  "imported": 0, "skipped": 0}
+        await self.db.question_import_jobs.update_one({"_id": job_id},
+            {"$set": {"status": "preview_ready", "counts": totals, "validated_at": utc_now_iso()}})
+        return await self.preview(job_id)
+
+    async def _classify(self, job_id: str, index: int, raw: Any, source: Mapping, admin_id: int,
+                        context: Mapping | None = None,
+                        job_content_source: str | None = None,
+                        file_year: str | None = None, file_track: str | None = None,
+                        file_session: str | None = None) -> dict:
+        item = raw if isinstance(raw, dict) else {}
+        external_id = clean_text(item.get("external_id")) or f"ROW-{index + 1:04d}"
+        errors = [clean_text(x, 500) for x in (item.get("errors") or []) if clean_text(x)]
+        image = item.get("image") if isinstance(item.get("image"), Mapping) else {}
+        # 🌊 QBANK-W3/§۷.۲ — sidecar archive images are optional at import time.
+        # 🌊 QBANK-W6 — do NOT force ready_pending_image merely because the OCR
+        # extractor set image.required; text+options+answer are enough for bot use.
+        # Only mark pending when explicit telegram file_id / storage is still needed
+        # AND a real image payload is expected without text-only mode.
+        needs_image = False
+        confidence = item.get("confidence") if isinstance(item.get("confidence"), Mapping) else {}
+        thresholds = {"question": 0.75, "options": 0.75, "answer": 0.70, "classification": 0.60}
+        for key, threshold in thresholds.items():
+            value = confidence.get(key)
+            if value is not None:
+                try:
+                    if float(value) < threshold:
+                        errors.append(f"اطمینان {key} کمتر از حد مجاز است")
+                except (TypeError, ValueError):
+                    errors.append(f"confidence.{key} معتبر نیست")
+        # 🌊 QBANK-W1 — اولویت سال: ردیف > نام فایل > نامشخص؛ اولویت منبع: ردیف > سطح job.
+        row_year = item.get("exam_year")
+        exam_year = row_year if row_year not in (None, "") else file_year
+        if row_year not in (None, ""):
+            year_confidence = "extracted"
+        elif file_year:
+            year_confidence = "inferred_from_filename"
+        else:
+            year_confidence = "unknown"
+        row_source = item.get("content_source")
+        content_source = row_source if row_source not in (None, "") else job_content_source
+        # 🌊 QBANK-W2/§۶.۱ — خوداظهاری مدل درباره سال؛ فقط ممیزی، tolerant.
+        row_year_source = item.get("exam_year_source")
+        exam_year_source = row_year_source if row_year_source in ("explicit_in_text", "not_found") else None
+        # 🌊 QBANK-W2/§۶.۴ — نشانی تصویر برای اتصال دستی در موج ۳.
+        image_ref = None
+        if image.get("required"):
+            image_ref = {"page": image.get("page") or item.get("page"),
+                         "position": clean_text(image.get("position")) or None}
+        normalized = None
+        answer_missing = False
+        try:
+            # 🌊 QBANK-W5 — ابتدا سخت‌گیرانه؛ اگر فقط پاسخ غایب بود، با
+            # allow_missing_answer دوباره تلاش می‌کنیم تا stem/options سالم
+            # به‌عنوان needs_review وارد صف ادمین شوند (هرگز پاسخ جعلی نیست).
+            normalized = validate_question_payload({
+                "question": item.get("question"), "options": item.get("options"),
+                "correct_answer": item.get("correct_option"),
+                "explanation": item.get("explanation"),
+                "difficulty": item.get("difficulty") or "medium",
+                "exam_year": exam_year,
+                "exam_year_confidence": year_confidence,
+                "content_source": content_source,
+            })
+        except QuestionDomainError as first_exc:
+            raw_correct = item.get("correct_option", item.get("correct_answer"))
+            if raw_correct in (None, "") and first_exc.code == "invalid_correct_option":
+                try:
+                    normalized = validate_question_payload({
+                        "question": item.get("question"), "options": item.get("options"),
+                        "correct_answer": None,
+                        "explanation": item.get("explanation"),
+                        "difficulty": item.get("difficulty") or "medium",
+                        "exam_year": exam_year,
+                        "exam_year_confidence": year_confidence,
+                        "content_source": content_source,
+                    }, allow_missing_answer=True)
+                    answer_missing = True
+                    errors.append("پاسخ صحیح در منبع یافت نشد — needs_review")
+                except QuestionDomainError as exc:
+                    errors.append(exc.message)
+            else:
+                errors.append(first_exc.message)
+        taxonomy = None; taxonomy_state = "unmatched"; taxonomy_candidates = []
+        # 🌊 QBANK-W6 — keys use normalized lesson + exam-bucket topic
+        lesson_key = normalize_basic_science_lesson(item.get("lesson"))
+        row_session_for_tax = None
+        if item.get("exam_session") not in (None, ""):
+            try:
+                row_session_for_tax = canonical_exam_session(item.get("exam_session"), strict=False)
+            except QuestionDomainError:
+                row_session_for_tax = None
+        exam_session_for_tax = row_session_for_tax or file_session
+        exam_year_for_tax = clean_text(item.get("exam_year")) or file_year
+        topic_key = default_exam_bucket_topic(
+            exam_session=exam_session_for_tax, exam_year=exam_year_for_tax, topic=item.get("topic"),
+        )
+        if context is not None:
+            tax_info = (context.get("taxonomies") or {}).get(
+                (lesson_key, topic_key), {"state": "unmatched"})
+            taxonomy_state = tax_info.get("state", "unmatched")
+            taxonomy = tax_info.get("taxonomy")
+            taxonomy_candidates = tax_info.get("candidates") or []
+            # Fallback ensure if bulk miss (should be rare)
+            if taxonomy_state != "matched" and lesson_key:
+                try:
+                    taxonomy = await self.qbank.ensure_taxonomy_for_import(
+                        lesson=lesson_key, topic=topic_key,
+                        exam_year=exam_year_for_tax, exam_session=exam_session_for_tax,
+                        auto_create=True,
+                    )
+                    taxonomy_state = "matched"
+                    taxonomy_candidates = []
+                except QuestionDomainError as exc:
+                    taxonomy_state = "ambiguous" if str(exc.code).startswith("ambiguous") else "unmatched"
+                    taxonomy_candidates = (exc.details or {}).get("matches", [])
+        else:
+            try:
+                taxonomy = await self.qbank.ensure_taxonomy_for_import(
+                    lesson=lesson_key or item.get("lesson"),
+                    topic=topic_key or item.get("topic"),
+                    exam_year=exam_year_for_tax, exam_session=exam_session_for_tax,
+                    auto_create=True,
+                )
+                taxonomy_state = "matched"
+            except QuestionDomainError as exc:
+                taxonomy_state = "ambiguous" if str(exc.code).startswith("ambiguous") else "unmatched"
+                taxonomy_candidates = (exc.details or {}).get("matches", [])
+        # Missing-answer rows stay reviewable (not hard error) when stem/options OK.
+        soft_only = bool(normalized) and answer_missing and all(
+            ("needs_review" in e) or ("پاسخ صحیح" in e) or e.startswith("اطمینان answer")
+            or e.startswith("confidence_answer") for e in errors
+        ) if errors else False
+        # Drop confidence-answer noise from hard-error path when answer intentionally null.
+        if answer_missing:
+            errors = [e for e in errors if not (
+                e.startswith("اطمینان answer") or "confidence_answer" in e
+            )] or errors
+        # Soft markers (missing answer) never block structural classification alone.
+        soft_markers = ("پاسخ صحیح", "needs_review")
+        hard_errors = [
+            e for e in errors
+            if not any(m in e for m in soft_markers)
+        ]
+        classification = "error" if hard_errors or normalized is None else taxonomy_state
+        if normalized and not hard_errors and answer_missing:
+            # taxonomy may still be unmatched; that state wins for mapping UI
+            if taxonomy_state == "matched":
+                classification = "needs_review"
+            else:
+                classification = taxonomy_state
+        elif normalized and not hard_errors and errors and taxonomy_state == "matched":
+            # low-confidence etc. without structural failure
+            if any("اطمینان" in e or "confidence" in e for e in errors):
+                classification = "needs_review"
+        duplicate = None
+        if normalized and taxonomy and not hard_errors and classification not in {"needs_review"}:
+            year_scope = {"exam_year": normalized["exam_year"]} if normalized.get("exam_year") else {}
+            if context is not None:
+                exact = (context.get("exact") or {}).get(normalized["content_hash"])
+                if exact and year_scope and exact.get("exam_year") != normalized["exam_year"]:
+                    exact = await self.db.questions.find_one(
+                        {"content_hash": normalized["content_hash"], **year_scope},
+                        {"content_hash": 1, "question": 1, "correct_answer": 1})
+            else:
+                exact = await self.db.questions.find_one(
+                    {"content_hash": normalized["content_hash"], **year_scope},
+                    {"content_hash": 1, "question": 1, "correct_answer": 1})
+            if exact:
+                same_answer = int(exact.get("correct_answer", -1)) == normalized["correct_answer"]
+                classification = "exact_duplicate" if same_answer else "conflict"
+                duplicate = {"id": str(exact["_id"]), "question": exact.get("question", ""),
+                             "ratio": 1.0, "answer_conflict": not same_answer}
+            else:
+                if context is not None:
+                    candidates = list((context.get("candidates") or {}).get(taxonomy["topic_id"], []))
+                else:
+                    candidates = await self.db.questions.find({
+                        "$or": [{"topic_id": taxonomy["topic_id"]},
+                                 {"topic_id": {"$exists": False}, "lesson": taxonomy["lesson"], "topic": taxonomy["topic"]}]
+                    }, {"question": 1, "correct_answer": 1, "options": 1}).sort("created_at", -1).limit(80).to_list(80)
+                import difflib
+                target = normalized_question_text(normalized["question"])
+                best = None
+                for candidate in candidates:
+                    ratio = difflib.SequenceMatcher(None, target, normalized_question_text(candidate.get("question"))).ratio()
+                    if ratio >= 0.82 and (best is None or ratio > best["ratio"]):
+                        best = {"id": str(candidate["_id"]), "question": candidate.get("question", ""), "ratio": round(ratio, 3)}
+                if best:
+                    same_answer = int((next((x for x in candidates if str(x.get("_id")) == best["id"]), {}) or {}).get("correct_answer", -1)) == normalized["correct_answer"]
+                    classification = "probable_duplicate" if same_answer else "conflict"
+                    duplicate = best
+                elif taxonomy_state == "matched":
+                    if answer_missing:
+                        classification = "needs_review"
+                    else:
+                        classification = "ready_pending_image" if needs_image else "ready"
+        if classification in {"ready", "ready_pending_image"} and answer_missing:
+            classification = "needs_review"
+        exam_track = file_track or EXAM_TRACK_DEFAULT
+        # 🌊 QBANK-W5 — نوبت در سطح ردیف (از extractor) یا job.
+        row_session = canonical_exam_session(item.get("exam_session"), strict=False) if item.get("exam_session") not in (None, "") else None
+        exam_session = row_session or file_session
+        exam_session_label = clean_text(item.get("exam_session_label")) or None
+        if exam_session and not exam_session_label:
+            from .exam_meta import session_label as _session_label
+            exam_session_label = _session_label(exam_session, (normalized or {}).get("exam_year") or file_year)
+        if normalized is not None:
+            normalized = dict(normalized)
+            if exam_session:
+                normalized["exam_session"] = exam_session
+            if exam_session_label:
+                normalized["exam_session_label"] = exam_session_label
+        return {"job_id": job_id, "row": index + 1, "external_id": external_id,
+                "source_page": item.get("page"), "raw": item, "normalized": normalized,
+                "exam_track": exam_track, "exam_year_source": exam_year_source,
+                "exam_session": exam_session, "exam_session_label": exam_session_label,
+                "image_ref": image_ref,
+                "needs_image": needs_image,
+                "taxonomy": taxonomy, "taxonomy_state": taxonomy_state,
+                "taxonomy_candidates": taxonomy_candidates, "classification": classification,
+                "errors": errors, "duplicate": duplicate, "decision": None,
+                "admin_id": admin_id, "source": dict(source), "created_at": utc_now_iso()}
+
+    async def preview(self, job_id: str) -> dict:
+        job = await self.db.question_import_jobs.find_one({"_id": job_id})
+        if not job:
+            raise QuestionDomainError("import_job_not_found", "job درون‌ریزی پیدا نشد", 404)
+        breakdown = await self.db.question_import_items.aggregate([
+            {"$match": {"job_id": job_id}},
+            {"$group": {"_id": {"lesson": "$taxonomy.lesson", "topic": "$taxonomy.topic",
+                                  "classification": "$classification"}, "count": {"$sum": 1}}},
+        ]).to_list(10000)
+        lessons = defaultdict(lambda: {"count": 0, "topics": Counter()})
+        for row in breakdown:
+            key = row.get("_id") or {}; lesson = key.get("lesson") or "نامشخص"; topic = key.get("topic") or "نامشخص"
+            count = int(row.get("count") or 0); lessons[lesson]["count"] += count; lessons[lesson]["topics"][topic] += count
+        facets = await self.db.question_import_items.aggregate([
+            {"$match": {"job_id": job_id}},
+            {"$facet": {
+                "years": [{"$group": {"_id": "$normalized.exam_year", "count": {"$sum": 1}}},
+                          {"$sort": {"_id": 1}}],
+                "sources": [{"$group": {"_id": "$normalized.content_source", "count": {"$sum": 1}}},
+                            {"$sort": {"count": -1}}],
+                "confidence": [{"$group": {"_id": "$normalized.exam_year_confidence", "count": {"$sum": 1}}},
+                               {"$sort": {"count": -1}}],
+            }},
+        ]).to_list(1)
+        facet = (facets[0] if facets else {}) or {}
+        years = [{"year": r.get("_id"), "count": int(r.get("count") or 0)} for r in facet.get("years", [])]
+        sources = [{"source": r.get("_id"), "count": int(r.get("count") or 0)} for r in facet.get("sources", [])]
+        confidence = [{"level": r.get("_id"), "count": int(r.get("count") or 0)} for r in facet.get("confidence", [])]
+        return {"job_id": job_id, "status": job.get("status"), "file_name": job.get("file_name"),
+                "schema_version": job.get("schema_version"), "counts": job.get("counts") or {},
+                "job_content_source": job.get("job_content_source"),
+                "inferred_exam_year": job.get("inferred_exam_year"),
+                "inferred_exam_track": job.get("inferred_exam_track"),
+                "inferred_exam_session": job.get("inferred_exam_session"),
+                "exam": job.get("exam") or {},
+                "years": years, "sources": sources, "year_confidence": confidence,
+                "source": job.get("source") or {}, "started_at": job.get("started_at"),
+                "finished_at": job.get("finished_at"),
+                "classification": [{"lesson": lesson, "count": value["count"],
+                                    "topics": [{"topic": topic, "count": count} for topic, count in value["topics"].most_common()]}
+                                   for lesson, value in sorted(lessons.items())]}
+
+    async def list_items(self, job_id: str, *, classification: str | None = None,
+                         skip: int = 0, limit: int = 50) -> dict:
+        query = {"job_id": job_id}
+        if classification:
+            query["classification"] = classification
+        total = await self.db.question_import_items.count_documents(query)
+        docs = await self.db.question_import_items.find(query).sort("row", 1).skip(skip).limit(limit).to_list(limit)
+        for doc in docs:
+            doc["id"] = str(doc.pop("_id"))
+        return {"items": docs, "total": total, "skip": skip, "limit": limit}
+
+    async def map_item(self, *, job_id: str, item_id: str,
+                       lesson_id: str, topic_id: str) -> dict:
+        if not await self.db.question_import_jobs.find_one({"_id": job_id, "status": "preview_ready"}, {"_id": 1}):
+            raise QuestionDomainError("import_not_ready", "job برای نگاشت آماده نیست", 409)
+        if not ObjectId.is_valid(item_id):
+            raise QuestionDomainError("invalid_import_item", "ردیف import معتبر نیست")
+        taxonomy = await self.qbank.resolve_taxonomy(lesson_id=lesson_id, topic_id=topic_id, visible_intakes=None)
+        item = await self.db.question_import_items.find_one({"_id": ObjectId(item_id), "job_id": job_id})
+        if not item:
+            raise QuestionDomainError("import_item_not_found", "ردیف پیدا نشد", 404)
+        classification = item.get("classification")
+        duplicate = item.get("duplicate")
+        if item.get("normalized") and not item.get("errors"):
+            duplicate_result = await self.qbank.duplicate_candidates(
+                taxonomy=taxonomy, question=item["normalized"]["question"],
+                content_hash=item["normalized"]["content_hash"],
+                correct_answer=item["normalized"]["correct_answer"],
+                intakes=[taxonomy.get("intake", ""), ""],
+                exam_year=item["normalized"].get("exam_year"))
+            if duplicate_result["conflict"]:
+                classification = "conflict"; duplicate = duplicate_result["conflict"][0]
+            elif duplicate_result["exact"]:
+                classification = "exact_duplicate"; duplicate = duplicate_result["exact"][0]
+            elif duplicate_result["probable"]:
+                classification = "probable_duplicate"; duplicate = duplicate_result["probable"][0]
+            else:
+                missing = (item.get("normalized") or {}).get("correct_answer") is None or (
+                    (item.get("normalized") or {}).get("answer_missing")
+                )
+                if missing:
+                    classification = "needs_review"
+                else:
+                    classification = ("ready_pending_image" if item.get("needs_image") else "ready")
+                duplicate = None
+        await self.db.question_import_items.update_one({"_id": item["_id"]},
+            {"$set": {"taxonomy": taxonomy, "taxonomy_state": "matched", "classification": classification,
+                      "duplicate": duplicate, "decision": None, "mapped_at": utc_now_iso()}})
+        await self.recount(job_id)
+        return {"ok": True, "classification": classification, "taxonomy": taxonomy}
+
+    async def set_decision(self, *, job_id: str, item_id: str, decision: str) -> dict:
+        if not await self.db.question_import_jobs.find_one({"_id": job_id, "status": "preview_ready"}, {"_id": 1}):
+            raise QuestionDomainError("import_not_ready", "job برای تصمیم آماده نیست", 409)
+        if decision not in {"import", "skip"} or not ObjectId.is_valid(item_id):
+            raise QuestionDomainError("invalid_import_decision", "تصمیم import معتبر نیست")
+        item = await self.db.question_import_items.find_one({"_id": ObjectId(item_id), "job_id": job_id})
+        if not item:
+            raise QuestionDomainError("import_item_not_found", "ردیف پیدا نشد", 404)
+        if decision == "import" and item.get("classification") in {"error", "unmatched", "ambiguous", "exact_duplicate"}:
+            raise QuestionDomainError("unsafe_import_decision", "این ردیف پیش از رفع خطا قابل import نیست", 409)
+        # needs_review is intentionally importable → lands as pending for admin edit.
+        await self.db.question_import_items.update_one({"_id": item["_id"]}, {"$set": {"decision": decision}})
+        return {"ok": True}
+
+    async def recount(self, job_id: str) -> dict:
+        rows = await self.db.question_import_items.aggregate([
+            {"$match": {"job_id": job_id}}, {"$group": {"_id": "$classification", "count": {"$sum": 1}}}
+        ]).to_list(20)
+        c = {x["_id"]: int(x["count"]) for x in rows}; total = sum(c.values())
+        counts = {"total": total, "ready": c.get("ready", 0),
+                  "pending_images": c.get("ready_pending_image", 0), "errors": c.get("error", 0),
+                  "unmatched": c.get("unmatched", 0), "ambiguous": c.get("ambiguous", 0),
+                  "exact_duplicates": c.get("exact_duplicate", 0),
+                  "probable_duplicates": c.get("probable_duplicate", 0), "conflicts": c.get("conflict", 0),
+                  "needs_review": c.get("needs_review", 0)}
+        await self.db.question_import_jobs.update_one({"_id": job_id}, {"$set": {"counts": counts}})
+        return counts
+
+    async def confirm(self, *, job_id: str, admin: Mapping) -> dict:
+        await self.qbank.permissions.authorize_import(admin)
+        job = await self.db.question_import_jobs.find_one({"_id": job_id, "admin_id": int(admin.get("id") or 0)})
+        if not job:
+            raise QuestionDomainError("import_job_not_found", "job درون‌ریزی پیدا نشد", 404)
+        if job.get("status") == "completed":
+            return {"ok": True, **(job.get("result") or {}), "idempotent": True}
+        if job.get("status") != "preview_ready":
+            raise QuestionDomainError("import_not_ready", "پیش‌نمایش برای تأیید آماده نیست", 409)
+        claimed = await self.db.question_import_jobs.update_one({"_id": job_id, "status": "preview_ready"},
+                                                                {"$set": {"status": "importing", "import_started_at": utc_now_iso()}})
+        if claimed.modified_count != 1:
+            raise QuestionDomainError("import_in_progress", "درون‌ریزی هم‌زمان در حال اجراست", 409)
+        candidate_query = {"job_id": job_id, "$or": [
+            {"classification": {"$in": ["ready", "ready_pending_image"]}},
+            {"classification": {"$in": ["probable_duplicate", "conflict", "needs_review"]}, "decision": "import"},
+        ]}
+        candidates = await self.db.question_import_items.find(candidate_query).sort("row", 1).to_list(5000)
+        imported = skipped = failed = 0; errors = []
+        prepared = []
+        for item in candidates:
+            identity = hashlib.sha256(
+                f"{job['fingerprint']}:{item['external_id']}:{item['normalized']['content_hash']}".encode()).hexdigest()
+            now = utc_now_iso(); taxonomy = item["taxonomy"]; normalized = dict(item["normalized"])
+            exam_session = item.get("exam_session") or normalized.get("exam_session")
+            exam_session_label = item.get("exam_session_label") or normalized.get("exam_session_label")
+            answer_missing = normalized.get("correct_answer") is None or normalized.pop("answer_missing", False)
+            # 🌊 QBANK-W5 — بدون پاسخ قطعی هرگز approved/eligible نمی‌شود.
+            if answer_missing or item.get("classification") == "needs_review":
+                q_status, q_approved = "pending", False
+                review_reason = "درون‌ریزی با نیاز به بازبینی (پاسخ/OCR)"
+                history_to = "pending"
+            else:
+                q_status, q_approved = "approved", True
+                review_reason = "درون‌ریزی تأییدشده توسط مالک"
+                history_to = "approved"
+            document = {**normalized, **taxonomy, "intake": taxonomy.get("intake", ""),
+                        "status": q_status, "approved": q_approved,
+                        "source": "ai_admin_import", "creator_type": "admin",
+                        "exam_session": exam_session,
+                        "exam_session_label": exam_session_label,
+                        "provenance": {"source": "ai_admin_import", "creator_type": "admin",
+                                       "created_by": int(admin.get("id") or 0),
+                                       "exam_track": item.get("exam_track") or EXAM_TRACK_DEFAULT,
+                                       "exam_session": exam_session,
+                                       "exam_session_label": exam_session_label,
+                                       "exam_id": (job.get("exam") or {}).get("exam_id") or (job.get("source") or {}).get("exam_id"),
+                                       "import": {"job_id": job_id, "schema_version": IMPORT_SCHEMA_VERSION,
+                                                  "file_name": job.get("file_name"),
+                                                  "source_page": item.get("source_page"),
+                                                  "external_id": item.get("external_id"),
+                                                  "needs_review": bool(answer_missing)}},
+                        "creator_id": int(admin.get("id") or 0),
+                        "creator_name": self.db.display_name_of(admin.get("_db") or admin),
+                        "import_job_id": job_id, "import_identity": identity,
+                        "source_file_name": job.get("file_name"), "source_page": item.get("source_page"),
+                        "external_question_id": item.get("external_id"),
+                        "created_at": now, "updated_at": now,
+                        "reviewed_at": now if q_approved else None,
+                        "reviewed_by": int(admin.get("id") or 0) if q_approved else None,
+                        "review_reason": review_reason,
+                        "version": 1, "review_history": [{"from": None, "to": history_to,
+                            "by": int(admin.get("id") or 0), "at": now, "reason": review_reason}],
+                        "attempt_count": 0, "correct_count": 0}
+            if answer_missing:
+                document["correct_answer"] = None
+            # 🌊 QBANK-W6 — archive OCR may reference a source PNG path, but that
+            # is NOT a Telegram pending upload. Only mark pending when the
+            # classification explicitly says ready_pending_image.
+            if item.get("classification") == "ready_pending_image":
+                raw_image = ((item.get("raw") or {}).get("image") or {}
+                             if isinstance((item.get("raw") or {}).get("image"), Mapping) else {})
+                document["image"] = {"has_image": True, "pending_upload": True,
+                                     "storage_ref": None,
+                                     "alt_text": clean_text(raw_image.get("description")) or None}
+                document["image_ref"] = item.get("image_ref")
+            prepared.append((item, identity, document))
+
+        # Bounded bulk upserts replace the old per-row find+insert+update N+1 path.
+        for offset in range(0, len(prepared), 500):
+            batch = prepared[offset:offset + 500]
+            operations = [UpdateOne({"import_identity": identity}, {"$setOnInsert": document}, upsert=True)
+                          for _, identity, document in batch]
+            try:
+                write = await self.db.questions.bulk_write(operations, ordered=False)
+                inserted_indexes = set((write.upserted_ids or {}).keys())
+                inserted_item_ids = [item["_id"] for index, (item, _, _) in enumerate(batch)
+                                     if index in inserted_indexes]
+                imported += len(inserted_item_ids)
+                skipped += len(batch) - len(inserted_item_ids)
+                if inserted_item_ids:
+                    await self.db.question_import_items.update_many(
+                        {"_id": {"$in": inserted_item_ids}},
+                        {"$set": {"imported": True, "imported_at": utc_now_iso()}})
+            except Exception:
+                # Rare batch-level failure is isolated and reported without raw DB errors.
+                failed += len(batch)
+                errors.extend({"external_id": item.get("external_id"), "error": "bulk_insert_failed"}
+                              for item, _, _ in batch)
+        total_items = await self.db.question_import_items.count_documents({"job_id": job_id})
+        # Every row is accounted for exactly once: inserted, failed insertion,
+        # or intentionally skipped (validation/taxonomy/duplicate/decision/idempotency).
+        skipped = max(skipped, total_items - imported - failed)
+        result = {"imported": imported, "skipped": skipped, "failed": failed, "errors": errors[:100]}
+        # Failed batches return to preview_ready so the owner can retry safely;
+        # import_identity upserts make already inserted rows idempotent.
+        status = "completed" if not failed else "preview_ready"
+        await self.db.question_import_jobs.update_one({"_id": job_id},
+            {"$set": {"status": status, "finished_at": utc_now_iso(), "result": result,
+                      "counts.imported": imported, "counts.skipped": skipped, "counts.failed": failed}})
+        return {"ok": not failed, **result, "idempotent": False}
+
+    async def cancel(self, *, job_id: str, admin_id: int) -> dict:
+        result = await self.db.question_import_jobs.update_one(
+            {"_id": job_id, "admin_id": int(admin_id), "status": {"$in": ["validating", "preview_ready"]}},
+            {"$set": {"status": "cancelled", "finished_at": utc_now_iso()}})
+        if not result.modified_count:
+            raise QuestionDomainError("import_not_cancellable", "این job قابل لغو نیست", 409)
+        return {"ok": True, "status": "cancelled"}

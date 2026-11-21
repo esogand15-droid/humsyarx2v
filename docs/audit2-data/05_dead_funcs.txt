@@ -1,0 +1,623 @@
+توابع تعریف‌شده: 3140 | صفر ارجاع: 620
+(نویز: هندلرهای PTB از طریق رشته ارجاع می‌شوند و شمرده شده‌اند؛ توابع دکوریتوردار = احتمالاً ثبت‌شده از طریق دکوریتور)
+
+  __dir__  ← admin.py, ai_admin.py, ai_solver.py, api\__init__.py, api\api_counters.py, api\auth.py, api\level.py, api\main.py, api\rate_limit.py, api\routers\__init__.py, api\routers\academic_admin.py, api\routers\admin_panel.py, api\routers\ai.py, api\routers\ai_management.py, api\routers\client_errors.py, api\routers\content_admin.py, api\routers\dashboard.py, api\routers\faq.py, api\routers\global_search.py, api\routers\grades.py, api\routers\me_bridge.py, api\routers\notifications.py, api\routers\payment_gateway.py, api\routers\profile.py, api\routers\questions.py, api\routers\rbac.py, api\routers\references.py, api\routers\referral.py, api\routers\registration.py, api\routers\reports.py, api\routers\resources.py, api\routers\ring_admin.py, api\routers\schedule.py, api\routers\subscription.py, api\routers\subscription_management.py, api\routers\tickets.py, api\routers\url_import.py, api\routers\web_admin.py, api\routers\web_auth.py, api\routers\web_exam.py, api\routers\web_ink.py, api\routers\web_library.py, api\routers\web_login.py, api\routers\web_reader.py, api\routers\web_student.py, api\serialize.py, api\telegram_send.py, api\user_metrics.py, api\web_login_core.py, audit.py, backend\api\routers\web_auth.py, backend\core\__init__.py, backup.py, basic_science.py, bot.py, bot_heartbeat.py, broadcast_service.py, build_single.py, content_admin.py, core\__init__.py, core\access.py, core\audit.py, core\content_scope.py, core\errors.py, core\features.py, core\pagination.py, core\rbac.py, core\settings.py, dashboard.py, database.py, db\__init__.py, db\ai_quiz.py, db\content.py, db\core.py, db\finance.py, db\migrations.py, db\prestige.py, db\rbac.py, db\referral.py, db\ring.py, db\wallet.py, discount_campaign.py, dunning.py, excel_report.py, faq.py, grade_utils.py, grades.py, growth_rules.py, hooshyar_quiz.py, http_client.py, message_router.py, migrate_round1.py, notifications.py, payments\__init__.py, payments\zarinpal.py, profile.py, qbank\__init__.py, qbank\answer_key.py, qbank\builder.py, qbank\cover.py, qbank\explanations.py, qbank\fonts_rtl.py, qbank\query.py, qbank\question_card.py, qbank\styles.py, qbank_import_cli.py, qbank_legacy_archive.py, qbank_migrate.py, question_bank\__init__.py, question_bank\ai_practice.py, question_bank\archive_extract.py, question_bank\archive_importer.py, question_bank\contracts.py, question_bank\exam.py, question_bank\exam_meta.py, question_bank\images.py, question_bank\importer.py, question_bank\migration.py, question_bank\ocr_pipeline.py, question_bank\permissions.py, question_bank\service.py, questions.py, references.py, referral.py, reports.py, request_context.py, resources.py, ring\__init__.py, ring\analytics.py, ring\handlers.py, ring\jobs.py, ring\keyboards.py, ring\matcher.py, ring\models.py, ring\moderation.py, ring\notify.py, ring\relay.py, ring\service.py, ring\settings.py, ring\state.py, ring\texts.py, schedule.py, schedule_pdf.py, search.py, start.py, stats.py, subscription.py, subscription_admin.py, telegram_file_rename_service.py, tg_group_voice_call.py, ticket.py, time_audit.py, time_utils.py, url_import_service.py, utils.py, utils_crypto.py, utils_file_naming.py
+  __getattr__  ← admin.py, ai_admin.py, ai_solver.py, api\__init__.py, api\api_counters.py, api\auth.py, api\level.py, api\main.py, api\rate_limit.py, api\routers\__init__.py, api\routers\academic_admin.py, api\routers\admin_panel.py, api\routers\ai.py, api\routers\ai_management.py, api\routers\client_errors.py, api\routers\content_admin.py, api\routers\dashboard.py, api\routers\faq.py, api\routers\global_search.py, api\routers\grades.py, api\routers\me_bridge.py, api\routers\notifications.py, api\routers\payment_gateway.py, api\routers\profile.py, api\routers\questions.py, api\routers\rbac.py, api\routers\references.py, api\routers\referral.py, api\routers\registration.py, api\routers\reports.py, api\routers\resources.py, api\routers\ring_admin.py, api\routers\schedule.py, api\routers\subscription.py, api\routers\subscription_management.py, api\routers\tickets.py, api\routers\url_import.py, api\routers\web_admin.py, api\routers\web_auth.py, api\routers\web_exam.py, api\routers\web_ink.py, api\routers\web_library.py, api\routers\web_login.py, api\routers\web_reader.py, api\routers\web_student.py, api\serialize.py, api\telegram_send.py, api\user_metrics.py, api\web_login_core.py, audit.py, backend\api\routers\web_auth.py, backend\core\__init__.py, backup.py, basic_science.py, bot.py, bot_heartbeat.py, broadcast_service.py, build_single.py, content_admin.py, core\__init__.py, core\access.py, core\audit.py, core\content_scope.py, core\errors.py, core\features.py, core\pagination.py, core\rbac.py, core\settings.py, dashboard.py, database.py, db\__init__.py, db\ai_quiz.py, db\content.py, db\core.py, db\finance.py, db\migrations.py, db\prestige.py, db\rbac.py, db\referral.py, db\ring.py, db\wallet.py, discount_campaign.py, dunning.py, excel_report.py, faq.py, grade_utils.py, grades.py, growth_rules.py, hooshyar_quiz.py, http_client.py, message_router.py, migrate_round1.py, notifications.py, payments\__init__.py, payments\zarinpal.py, profile.py, qbank\__init__.py, qbank\answer_key.py, qbank\builder.py, qbank\cover.py, qbank\explanations.py, qbank\fonts_rtl.py, qbank\query.py, qbank\question_card.py, qbank\styles.py, qbank_import_cli.py, qbank_legacy_archive.py, qbank_migrate.py, question_bank\__init__.py, question_bank\ai_practice.py, question_bank\archive_extract.py, question_bank\archive_importer.py, question_bank\contracts.py, question_bank\exam.py, question_bank\exam_meta.py, question_bank\images.py, question_bank\importer.py, question_bank\migration.py, question_bank\ocr_pipeline.py, question_bank\permissions.py, question_bank\service.py, questions.py, references.py, referral.py, reports.py, request_context.py, resources.py, ring\__init__.py, ring\analytics.py, ring\handlers.py, ring\jobs.py, ring\keyboards.py, ring\matcher.py, ring\models.py, ring\moderation.py, ring\notify.py, ring\relay.py, ring\service.py, ring\settings.py, ring\state.py, ring\texts.py, schedule.py, schedule_pdf.py, search.py, start.py, stats.py, subscription.py, subscription_admin.py, telegram_file_rename_service.py, tg_group_voice_call.py, ticket.py, time_audit.py, time_utils.py, url_import_service.py, utils.py, utils_crypto.py, utils_file_naming.py
+  get_admin_user  ← backend\api\auth.py
+  _api_not_found [decorated]  ← backend\api\main.py
+  _bound_range_header [decorated]  ← backend\api\main.py
+  _ma_not_built [decorated]  ← backend\api\main.py
+  _pwa_not_built [decorated]  ← backend\api\main.py
+  _root [decorated]  ← backend\api\main.py
+  _spa_cache_headers [decorated]  ← backend\api\main.py
+  _w1_rate_limit [decorated]  ← backend\api\main.py
+  _wa2_security_headers [decorated]  ← backend\api\main.py
+  _wa_not_built [decorated]  ← backend\api\main.py
+  health_deep [decorated]  ← backend\api\main.py
+  health_ready [decorated]  ← backend\api\main.py
+  request_context_and_safe_errors [decorated]  ← backend\api\main.py
+  flexible_schedule_change [decorated]  ← backend\api\routers\academic_admin.py
+  flexible_schedule_list [decorated]  ← backend\api\routers\academic_admin.py
+  schedule_create [decorated]  ← backend\api\routers\academic_admin.py
+  schedule_delete [decorated]  ← backend\api\routers\academic_admin.py
+  schedule_update [decorated]  ← backend\api\routers\academic_admin.py
+  grades_find_student [decorated]  ← backend\api\routers\academic_admin.py, backend\api\routers\content_admin.py
+  add_intake_ep [decorated]  ← backend\api\routers\admin_panel.py
+  analytics_admin [decorated]  ← backend\api\routers\admin_panel.py
+  audit_health [decorated]  ← backend\api\routers\admin_panel.py
+  block_user_ep [decorated]  ← backend\api\routers\admin_panel.py
+  bot_settings_get [decorated]  ← backend\api\routers\admin_panel.py
+  channel_lock_list [decorated]  ← backend\api\routers\admin_panel.py
+  content_admins_list [decorated]  ← backend\api\routers\admin_panel.py
+  delete_intake_ep [decorated]  ← backend\api\routers\admin_panel.py
+  delete_user_ep [decorated]  ← backend\api\routers\admin_panel.py
+  dm_user_ep [decorated]  ← backend\api\routers\admin_panel.py
+  intakes_list [decorated]  ← backend\api\routers\admin_panel.py
+  list_users [decorated]  ← backend\api\routers\admin_panel.py
+  students_list [decorated]  ← backend\api\routers\admin_panel.py
+  test_log_group [decorated]  ← backend\api\routers\admin_panel.py
+  toggle_intake_ep [decorated]  ← backend\api\routers\admin_panel.py
+  unblock_user_ep [decorated]  ← backend\api\routers\admin_panel.py
+  ask_media [decorated]  ← backend\api\routers\ai.py
+  clear_history [decorated]  ← backend\api\routers\ai.py
+  conversation_messages [decorated]  ← backend\api\routers\ai.py
+  create_conversation [decorated]  ← backend\api\routers\ai.py
+  delete_conversation [decorated]  ← backend\api\routers\ai.py
+  duplicate_conversation [decorated]  ← backend\api\routers\ai.py
+  generate_image_ep [decorated]  ← backend\api\routers\ai.py
+  get_live_config_ep [decorated]  ← backend\api\routers\ai.py
+  list_conversations [decorated]  ← backend\api\routers\ai.py
+  live_voice_ws_ep [decorated]  ← backend\api\routers\ai.py
+  update_conversation [decorated]  ← backend\api\routers\ai.py
+  upload_reference [decorated]  ← backend\api\routers\ai.py
+  vault_delete [decorated]  ← backend\api\routers\ai_management.py
+  vault_key_add [decorated]  ← backend\api\routers\ai_management.py
+  vault_key_delete [decorated]  ← backend\api\routers\ai_management.py
+  vault_keys_list [decorated]  ← backend\api\routers\ai_management.py
+  vault_keys_test [decorated]  ← backend\api\routers\ai_management.py
+  vault_set [decorated]  ← backend\api\routers\ai_management.py
+  vault_status [decorated]  ← backend\api\routers\ai_management.py
+  report_client_error [decorated]  ← backend\api\routers\client_errors.py
+  bs_add_content_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_add_lesson_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_add_session_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_content_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_del_content_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_del_lesson_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_del_session_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_edit_lesson_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_edit_session_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_fork_session_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_move_lesson_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_rename_content_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_sessions_ep [decorated]  ← backend\api\routers\content_admin.py
+  bs_terms [decorated]  ← backend\api\routers\content_admin.py
+  bs_unfork_session_ep [decorated]  ← backend\api\routers\content_admin.py
+  bulk_grades [decorated]  ← backend\api\routers\content_admin.py
+  del_grade [decorated]  ← backend\api\routers\content_admin.py
+  edit_grade [decorated]  ← backend\api\routers\content_admin.py
+  faq_list [decorated]  ← backend\api\routers\content_admin.py
+  qbank_file_detail [decorated]  ← backend\api\routers\content_admin.py
+  qbank_file_remove [decorated]  ← backend\api\routers\content_admin.py
+  qbank_file_upload [decorated]  ← backend\api\routers\content_admin.py
+  qbank_files_list [decorated]  ← backend\api\routers\content_admin.py
+  ref_add_book_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_add_file_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_add_subject_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_books_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_del_book_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_del_file_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_del_subject_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_edit_book_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_edit_subject_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_files_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_fork_book_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_move_subject_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_rename_file_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_reorder_book_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_reorder_subject_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_subjects_ep [decorated]  ← backend\api\routers\content_admin.py
+  ref_unfork_book_ep [decorated]  ← backend\api\routers\content_admin.py
+  feed_react_ep [decorated]  ← backend\api\routers\dashboard.py
+  get_dashboard [decorated]  ← backend\api\routers\dashboard.py
+  get_feed [decorated]  ← backend\api\routers\dashboard.py
+  get_faq [decorated]  ← backend\api\routers\faq.py
+  get_grades [decorated]  ← backend\api\routers\grades.py
+  set_weekly_goal [decorated]  ← backend\api\routers\me_bridge.py
+  weekly_goal [decorated]  ← backend\api\routers\me_bridge.py
+  continue_reading [decorated]  ← backend\api\routers\me_bridge.py, backend\api\routers\web_reader.py
+  delete_inbox [decorated]  ← backend\api\routers\notifications.py
+  get_inbox [decorated]  ← backend\api\routers\notifications.py
+  get_settings [decorated]  ← backend\api\routers\notifications.py
+  get_unread_count [decorated]  ← backend\api\routers\notifications.py
+  mark_read [decorated]  ← backend\api\routers\notifications.py
+  pin_one [decorated]  ← backend\api\routers\notifications.py
+  toggle_all [decorated]  ← backend\api\routers\notifications.py
+  put_zarinpal_cfg [decorated]  ← backend\api\routers\payment_gateway.py
+  test_zarinpal_cfg [decorated]  ← backend\api\routers\payment_gateway.py
+  donation_config [decorated]  ← backend\api\routers\profile.py
+  get_badges [decorated]  ← backend\api\routers\profile.py
+  get_intakes [decorated]  ← backend\api\routers\profile.py
+  get_prestige [decorated]  ← backend\api\routers\profile.py
+  get_prestige_badges [decorated]  ← backend\api\routers\profile.py
+  get_prestige_history [decorated]  ← backend\api\routers\profile.py
+  get_prestige_public [decorated]  ← backend\api\routers\profile.py
+  get_profile [decorated]  ← backend\api\routers\profile.py
+  patch_prestige_privacy [decorated]  ← backend\api\routers\profile.py
+  put_prestige_showcase [decorated]  ← backend\api\routers\profile.py
+  update_educational_group [decorated]  ← backend\api\routers\profile.py
+  update_group [decorated]  ← backend\api\routers\profile.py
+  update_intake [decorated]  ← backend\api\routers\profile.py
+  update_name [decorated]  ← backend\api\routers\profile.py
+  update_nickname [decorated]  ← backend\api\routers\profile.py
+  update_privacy [decorated]  ← backend\api\routers\profile.py
+  update_student_id [decorated]  ← backend\api\routers\profile.py
+  abandon_exam [decorated]  ← backend\api\routers\questions.py
+  active_exam [decorated]  ← backend\api\routers\questions.py
+  answer_ai_practice [decorated]  ← backend\api\routers\questions.py
+  delete_my_design [decorated]  ← backend\api\routers\questions.py
+  design [decorated]  ← backend\api\routers\questions.py
+  exam_pdf [decorated]  ← backend\api\routers\questions.py
+  generate_ai_practice [decorated]  ← backend\api\routers\questions.py
+  my_designs [decorated]  ← backend\api\routers\questions.py
+  preview_exam [decorated]  ← backend\api\routers\questions.py
+  propose_ai_practice [decorated]  ← backend\api\routers\questions.py
+  question_filters [decorated]  ← backend\api\routers\questions.py
+  resubmit_my_design [decorated]  ← backend\api\routers\questions.py
+  start_exam [decorated]  ← backend\api\routers\questions.py
+  stats_by_lesson [decorated]  ← backend\api\routers\questions.py
+  update_my_design [decorated]  ← backend\api\routers\questions.py
+  list_permissions [decorated]  ← backend\api\routers\rbac.py
+  role_holders [decorated]  ← backend\api\routers\rbac.py
+  download [decorated]  ← backend\api\routers\references.py, backend\api\routers\resources.py
+  register_via_miniapp [decorated]  ← backend\api\routers\registration.py
+  registration_status [decorated]  ← backend\api\routers\registration.py
+  suggest_edu_group_for_name [decorated]  ← backend\api\routers\registration.py
+  create_report [decorated]  ← backend\api\routers\reports.py
+  my_reports [decorated]  ← backend\api\routers\reports.py
+  debug_match [decorated]  ← backend\api\routers\ring_admin.py
+  disable_all [decorated]  ← backend\api\routers\ring_admin.py
+  force_match [decorated]  ← backend\api\routers\ring_admin.py
+  metrics [decorated]  ← backend\api\routers\ring_admin.py
+  profile_detail [decorated]  ← backend\api\routers\ring_admin.py
+  profile_pause [decorated]  ← backend\api\routers\ring_admin.py
+  profile_resume [decorated]  ← backend\api\routers\ring_admin.py
+  purge_evidence [decorated]  ← backend\api\routers\ring_admin.py
+  queue_remove [decorated]  ← backend\api\routers\ring_admin.py
+  reconcile [decorated]  ← backend\api\routers\ring_admin.py
+  report_detail [decorated]  ← backend\api\routers\ring_admin.py
+  report_review [decorated]  ← backend\api\routers\ring_admin.py
+  rules_get [decorated]  ← backend\api\routers\ring_admin.py
+  rules_post [decorated]  ← backend\api\routers\ring_admin.py
+  session_detail [decorated]  ← backend\api\routers\ring_admin.py
+  session_repair [decorated]  ← backend\api\routers\ring_admin.py
+  settings_get [decorated]  ← backend\api\routers\ring_admin.py
+  settings_post [decorated]  ← backend\api\routers\ring_admin.py
+  state_get [decorated]  ← backend\api\routers\ring_admin.py
+  state_post [decorated]  ← backend\api\routers\ring_admin.py
+  unban [decorated]  ← backend\api\routers\ring_admin.py
+  get_conflicts [decorated]  ← backend\api\routers\schedule.py
+  get_course_selections_ep [decorated]  ← backend\api\routers\schedule.py
+  get_exams [decorated]  ← backend\api\routers\schedule.py
+  get_ical [decorated]  ← backend\api\routers\schedule.py
+  get_schedule [decorated]  ← backend\api\routers\schedule.py
+  save_course_selections_ep [decorated]  ← backend\api\routers\schedule.py
+  _wallet_purchase_result  ← backend\api\routers\subscription.py
+  buy_wallet [decorated]  ← backend\api\routers\subscription.py
+  family_code_ep [decorated]  ← backend\api\routers\subscription.py
+  family_overview_ep [decorated]  ← backend\api\routers\subscription.py
+  family_redeem_ep [decorated]  ← backend\api\routers\subscription.py
+  family_remove_ep [decorated]  ← backend\api\routers\subscription.py
+  feature_event_ep [decorated]  ← backend\api\routers\subscription.py
+  gateway_status [decorated]  ← backend\api\routers\subscription.py
+  get_status [decorated]  ← backend\api\routers\subscription.py
+  gift_history [decorated]  ← backend\api\routers\subscription.py
+  gift_recipients [decorated]  ← backend\api\routers\subscription.py
+  trial_claim_ep [decorated]  ← backend\api\routers\subscription.py
+  trial_status_ep [decorated]  ← backend\api\routers\subscription.py
+  validate_discount [decorated]  ← backend\api\routers\subscription.py
+  wallet_status [decorated]  ← backend\api\routers\subscription.py
+  zarinpal_callback [decorated]  ← backend\api\routers\subscription.py
+  zarinpal_request_ep [decorated]  ← backend\api\routers\subscription.py
+  zarinpal_topup_ep [decorated]  ← backend\api\routers\subscription.py
+  zarinpal_verify_ep [decorated]  ← backend\api\routers\subscription.py
+  cancel_gift [decorated]  ← backend\api\routers\subscription_management.py
+  family_add_admin [decorated]  ← backend\api\routers\subscription_management.py
+  family_overview_admin [decorated]  ← backend\api\routers\subscription_management.py
+  family_remove_admin [decorated]  ← backend\api\routers\subscription_management.py
+  list_gifts [decorated]  ← backend\api\routers\subscription_management.py
+  retry_gift_notify [decorated]  ← backend\api\routers\subscription_management.py
+  create_ticket [decorated]  ← backend\api\routers\tickets.py
+  get_ticket [decorated]  ← backend\api\routers\tickets.py
+  list_tickets [decorated]  ← backend\api\routers\tickets.py
+  unread_count [decorated]  ← backend\api\routers\tickets.py
+  cancel_job [decorated]  ← backend\api\routers\url_import.py
+  create_job [decorated]  ← backend\api\routers\url_import.py
+  job_detail [decorated]  ← backend\api\routers\url_import.py
+  list_jobs [decorated]  ← backend\api\routers\url_import.py
+  retry_job [decorated]  ← backend\api\routers\url_import.py
+  attention_dismiss [decorated]  ← backend\api\routers\web_admin.py
+  attention_restore [decorated]  ← backend\api\routers\web_admin.py
+  content_history [decorated]  ← backend\api\routers\web_admin.py
+  content_item_reorder [decorated]  ← backend\api\routers\web_admin.py
+  content_items_bulk [decorated]  ← backend\api\routers\web_admin.py
+  content_lesson_reorder [decorated]  ← backend\api\routers\web_admin.py
+  content_session_reorder [decorated]  ← backend\api\routers\web_admin.py
+  content_sessions_bulk [decorated]  ← backend\api\routers\web_admin.py
+  content_tree [decorated]  ← backend\api\routers\web_admin.py
+  dashboard_bundle [decorated]  ← backend\api\routers\web_admin.py
+  exams_create [decorated]  ← backend\api\routers\web_admin.py
+  exams_delete [decorated]  ← backend\api\routers\web_admin.py
+  exams_list [decorated]  ← backend\api\routers\web_admin.py
+  exams_stats [decorated]  ← backend\api\routers\web_admin.py
+  exams_update [decorated]  ← backend\api\routers\web_admin.py
+  export_audit_csv [decorated]  ← backend\api\routers\web_admin.py
+  export_questions_csv [decorated]  ← backend\api\routers\web_admin.py
+  global_quick_search [decorated]  ← backend\api\routers\web_admin.py
+  identity_policy_get [decorated]  ← backend\api\routers\web_admin.py
+  identity_policy_update [decorated]  ← backend\api\routers\web_admin.py
+  notif_run_detail [decorated]  ← backend\api\routers\web_admin.py
+  object_history [decorated]  ← backend\api\routers\web_admin.py
+  question_import_cancel [decorated]  ← backend\api\routers\web_admin.py
+  question_import_confirm [decorated]  ← backend\api\routers\web_admin.py
+  question_import_decision [decorated]  ← backend\api\routers\web_admin.py
+  question_import_mapping [decorated]  ← backend\api\routers\web_admin.py
+  question_import_preview [decorated]  ← backend\api\routers\web_admin.py
+  question_import_prompt [decorated]  ← backend\api\routers\web_admin.py
+  question_import_upload [decorated]  ← backend\api\routers\web_admin.py
+  questions_bulk [decorated]  ← backend\api\routers\web_admin.py
+  questions_export_pdf [decorated]  ← backend\api\routers\web_admin.py
+  saved_filter_touch [decorated]  ← backend\api\routers\web_admin.py
+  saved_filters_add [decorated]  ← backend\api\routers\web_admin.py
+  saved_filters_del [decorated]  ← backend\api\routers\web_admin.py
+  saved_filters_list [decorated]  ← backend\api\routers\web_admin.py
+  saved_filters_update [decorated]  ← backend\api\routers\web_admin.py
+  settings_center [decorated]  ← backend\api\routers\web_admin.py
+  settings_center_patch [decorated]  ← backend\api\routers\web_admin.py
+  user_360 [decorated]  ← backend\api\routers\web_admin.py
+  user_relation_list [decorated]  ← backend\api\routers\web_admin.py
+  users_bulk [decorated]  ← backend\api\routers\web_admin.py
+  users_bulk_preview [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_api_key_rotate [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_ban [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_banned [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_broadcast_draft [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_config [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_config_update [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_image_config_update [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_image_generate [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_image_models [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_key_add [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_key_delete [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_keys_list [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_keys_test [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_live_config_update [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_live_models [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_models [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_models_health [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_models_probe [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_persona_activate [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_persona_create [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_persona_delete [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_personas [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_reports [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_reports_export [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_reset_quota [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_stats [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_test [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_tts_voices [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_user_profile [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_user_profile_clear [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_users [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_vc_assistant_join [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_vc_assistant_leave [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_vc_assistant_save [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_vc_assistant_send_code [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_vc_assistant_status [decorated]  ← backend\api\routers\web_admin.py
+  wa_ai_vc_assistant_verify_code [decorated]  ← backend\api\routers\web_admin.py
+  wa_alert_center [decorated]  ← backend\api\routers\web_admin.py
+  wa_analytics [decorated]  ← backend\api\routers\web_admin.py
+  wa_attach_image [decorated]  ← backend\api\routers\web_admin.py
+  wa_audit_logs [decorated]  ← backend\api\routers\web_admin.py
+  wa_audit_undo [decorated]  ← backend\api\routers\web_admin.py
+  wa_backup_request [decorated]  ← backend\api\routers\web_admin.py
+  wa_backup_settings [decorated]  ← backend\api\routers\web_admin.py
+  wa_backup_settings_patch [decorated]  ← backend\api\routers\web_admin.py
+  wa_blacklist [decorated]  ← backend\api\routers\web_admin.py
+  wa_broadcast_campaign_detail [decorated]  ← backend\api\routers\web_admin.py
+  wa_broadcast_campaign_retry [decorated]  ← backend\api\routers\web_admin.py
+  wa_broadcast_cancel [decorated]  ← backend\api\routers\web_admin.py
+  wa_broadcast_history [decorated]  ← backend\api\routers\web_admin.py
+  wa_broadcast_media_upload [decorated]  ← backend\api\routers\web_admin.py
+  wa_broadcast_options [decorated]  ← backend\api\routers\web_admin.py
+  wa_broadcast_preview [decorated]  ← backend\api\routers\web_admin.py
+  wa_broadcast_scheduled [decorated]  ← backend\api\routers\web_admin.py
+  wa_broadcast_send [decorated]  ← backend\api\routers\web_admin.py
+  wa_broadcast_test [decorated]  ← backend\api\routers\web_admin.py
+  wa_bulk_match_images [decorated]  ← backend\api\routers\web_admin.py
+  wa_canned_add [decorated]  ← backend\api\routers\web_admin.py
+  wa_canned_delete [decorated]  ← backend\api\routers\web_admin.py
+  wa_canned_list [decorated]  ← backend\api\routers\web_admin.py
+  wa_canned_update [decorated]  ← backend\api\routers\web_admin.py
+  wa_cleanup_schedule_anomalies [decorated]  ← backend\api\routers\web_admin.py
+  wa_content_impact [decorated]  ← backend\api\routers\web_admin.py
+  wa_content_report_stats [decorated]  ← backend\api\routers\web_admin.py
+  wa_content_report_status [decorated]  ← backend\api\routers\web_admin.py
+  wa_content_reports [decorated]  ← backend\api\routers\web_admin.py
+  wa_correlation_chain [decorated]  ← backend\api\routers\web_admin.py
+  wa_course_selection_stats [decorated]  ← backend\api\routers\web_admin.py
+  wa_data_quality [decorated]  ← backend\api\routers\web_admin.py
+  wa_data_quality_attach [decorated]  ← backend\api\routers\web_admin.py
+  wa_data_quality_fix [decorated]  ← backend\api\routers\web_admin.py
+  wa_data_quality_items [decorated]  ← backend\api\routers\web_admin.py
+  wa_data_quality_parents [decorated]  ← backend\api\routers\web_admin.py
+  wa_data_quality_remove [decorated]  ← backend\api\routers\web_admin.py
+  wa_data_quality_repair [decorated]  ← backend\api\routers\web_admin.py
+  wa_delete_course_offering [decorated]  ← backend\api\routers\web_admin.py
+  wa_detach_image [decorated]  ← backend\api\routers\web_admin.py
+  wa_dlq_discard [decorated]  ← backend\api\routers\web_admin.py
+  wa_dlq_list [decorated]  ← backend\api\routers\web_admin.py
+  wa_dlq_requeue [decorated]  ← backend\api\routers\web_admin.py
+  wa_export_excel [decorated]  ← backend\api\routers\web_admin.py
+  wa_export_payments_csv [decorated]  ← backend\api\routers\web_admin.py
+  wa_export_wallet_csv [decorated]  ← backend\api\routers\web_admin.py
+  wa_feature_rollback [decorated]  ← backend\api\routers\web_admin.py
+  wa_feature_update [decorated]  ← backend\api\routers\web_admin.py
+  wa_features_list [decorated]  ← backend\api\routers\web_admin.py
+  wa_force_resources [decorated]  ← backend\api\routers\web_admin.py
+  wa_get_course_import_staging [decorated]  ← backend\api\routers\web_admin.py
+  wa_grade_delete [decorated]  ← backend\api\routers\web_admin.py
+  wa_grade_update [decorated]  ← backend\api\routers\web_admin.py
+  wa_grades_bulk [decorated]  ← backend\api\routers\web_admin.py
+  wa_grades_find_student [decorated]  ← backend\api\routers\web_admin.py
+  wa_grades_intakes [decorated]  ← backend\api\routers\web_admin.py
+  wa_grades_lesson_term [decorated]  ← backend\api\routers\web_admin.py
+  wa_grades_recent [decorated]  ← backend\api\routers\web_admin.py
+  wa_grades_term_options [decorated]  ← backend\api\routers\web_admin.py
+  wa_growth_config [decorated]  ← backend\api\routers\web_admin.py
+  wa_growth_config_update [decorated]  ← backend\api\routers\web_admin.py
+  wa_growth_referrals [decorated]  ← backend\api\routers\web_admin.py
+  wa_growth_review [decorated]  ← backend\api\routers\web_admin.py
+  wa_growth_stats [decorated]  ← backend\api\routers\web_admin.py
+  wa_insights [decorated]  ← backend\api\routers\web_admin.py
+  wa_intakes_picker [decorated]  ← backend\api\routers\web_admin.py
+  wa_list_course_import_staging [decorated]  ← backend\api\routers\web_admin.py
+  wa_log_groups_test [decorated]  ← backend\api\routers\web_admin.py
+  wa_my_work [decorated]  ← backend\api\routers\web_admin.py
+  wa_notif_settings [decorated]  ← backend\api\routers\web_admin.py
+  wa_notif_settings_update [decorated]  ← backend\api\routers\web_admin.py
+  wa_object_summary [decorated]  ← backend\api\routers\web_admin.py
+  wa_payment_trace [decorated]  ← backend\api\routers\web_admin.py
+  wa_pending_images [decorated]  ← backend\api\routers\web_admin.py
+  wa_poll_channel [decorated]  ← backend\api\routers\web_admin.py
+  wa_poll_create [decorated]  ← backend\api\routers\web_admin.py
+  wa_poll_status [decorated]  ← backend\api\routers\web_admin.py
+  wa_prestige_backfill [decorated]  ← backend\api\routers\web_admin.py
+  wa_prestige_config [decorated]  ← backend\api\routers\web_admin.py
+  wa_prestige_config_update [decorated]  ← backend\api\routers\web_admin.py
+  wa_publish_course_import_staging [decorated]  ← backend\api\routers\web_admin.py
+  wa_question_360 [decorated]  ← backend\api\routers\web_admin.py
+  wa_question_approve [decorated]  ← backend\api\routers\web_admin.py
+  wa_question_create [decorated]  ← backend\api\routers\web_admin.py
+  wa_question_delete [decorated]  ← backend\api\routers\web_admin.py
+  wa_question_intakes [decorated]  ← backend\api\routers\web_admin.py
+  wa_question_needs_changes [decorated]  ← backend\api\routers\web_admin.py
+  wa_question_patch [decorated]  ← backend\api\routers\web_admin.py
+  wa_question_reject [decorated]  ← backend\api\routers\web_admin.py
+  wa_question_reports [decorated]  ← backend\api\routers\web_admin.py
+  wa_question_taxonomy [decorated]  ← backend\api\routers\web_admin.py
+  wa_questions_health [decorated]  ← backend\api\routers\web_admin.py
+  wa_questions_import [decorated]  ← backend\api\routers\web_admin.py
+  wa_questions_pending [decorated]  ← backend\api\routers\web_admin.py
+  wa_rbac_intakes [decorated]  ← backend\api\routers\web_admin.py
+  wa_rbac_roles_picker [decorated]  ← backend\api\routers\web_admin.py
+  wa_reconcile_activate [decorated]  ← backend\api\routers\web_admin.py
+  wa_reconcile_finalize_topup [decorated]  ← backend\api\routers\web_admin.py
+  wa_reported_questions [decorated]  ← backend\api\routers\web_admin.py
+  wa_restore_confirm [decorated]  ← backend\api\routers\web_admin.py
+  wa_restore_validate [decorated]  ← backend\api\routers\web_admin.py
+  wa_rollback_course_import_staging [decorated]  ← backend\api\routers\web_admin.py
+  wa_scan_course_selection_images [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_bulk_delete [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_bulk_delete_post [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_create [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_delete [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_exams_scan [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_exams_scan_confirm [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_flex_change [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_list [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_templates_bulk [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_templates_clear_alias [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_templates_delete [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_templates_generate [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_templates_list [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_templates_scan [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_templates_scan_confirm [decorated]  ← backend\api\routers\web_admin.py
+  wa_schedule_update [decorated]  ← backend\api\routers\web_admin.py
+  wa_security_session_revoke [decorated]  ← backend\api\routers\web_admin.py
+  wa_security_sessions [decorated]  ← backend\api\routers\web_admin.py
+  wa_send_course_selection_reminder [decorated]  ← backend\api\routers\web_admin.py
+  wa_student_preview [decorated]  ← backend\api\routers\web_admin.py
+  wa_student_preview_files [decorated]  ← backend\api\routers\web_admin.py
+  wa_student_preview_lessons [decorated]  ← backend\api\routers\web_admin.py
+  wa_student_preview_sessions [decorated]  ← backend\api\routers\web_admin.py
+  wa_student_preview_students [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_card [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_decision [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_discount_add [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_discount_broadcast [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_discount_broadcast_cancel [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_discount_broadcast_status [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_discount_broadcasts [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_discount_delete [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_discount_preview [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_discount_stats [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_discount_toggle [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_discounts [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_family [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_family_add [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_family_remove [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_finance [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_grant [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_grant_bulk [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_overview [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_payments [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_plan_add [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_plan_delete [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_plan_toggle [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_plan_update [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_receipt [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_reconcile [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_refund [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_revoke [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_send_receipt [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_settings [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_subscriber_detail [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_subscribers [decorated]  ← backend\api\routers\web_admin.py
+  wa_subscription_user_search [decorated]  ← backend\api\routers\web_admin.py
+  wa_system_client_errors [decorated]  ← backend\api\routers\web_admin.py
+  wa_system_jobs [decorated]  ← backend\api\routers\web_admin.py
+  wa_system_observability [decorated]  ← backend\api\routers\web_admin.py
+  wa_system_status [decorated]  ← backend\api\routers\web_admin.py
+  wa_system_time_standard [decorated]  ← backend\api\routers\web_admin.py
+  wa_ticket_assignees [decorated]  ← backend\api\routers\web_admin.py
+  wa_ticket_close [decorated]  ← backend\api\routers\web_admin.py
+  wa_ticket_detail [decorated]  ← backend\api\routers\web_admin.py
+  wa_ticket_meta [decorated]  ← backend\api\routers\web_admin.py
+  wa_ticket_note [decorated]  ← backend\api\routers\web_admin.py
+  wa_ticket_reopen [decorated]  ← backend\api\routers\web_admin.py
+  wa_ticket_reply [decorated]  ← backend\api\routers\web_admin.py
+  wa_tickets_analytics [decorated]  ← backend\api\routers\web_admin.py
+  wa_tickets_list [decorated]  ← backend\api\routers\web_admin.py
+  wa_update_course_import_staging_item [decorated]  ← backend\api\routers\web_admin.py
+  wa_update_term_config [decorated]  ← backend\api\routers\web_admin.py
+  wa_upsert_course_offering [decorated]  ← backend\api\routers\web_admin.py
+  wa_user_patch [decorated]  ← backend\api\routers\web_admin.py
+  wa_users_backfill_educational_groups [decorated]  ← backend\api\routers\web_admin.py
+  wa_users_scan_blocked [decorated]  ← backend\api\routers\web_admin.py
+  wa_users_scan_blocked_status [decorated]  ← backend\api\routers\web_admin.py
+  wa_wallet_adjust [decorated]  ← backend\api\routers\web_admin.py
+  wa_wallet_detail [decorated]  ← backend\api\routers\web_admin.py
+  wa_wallet_recredit [decorated]  ← backend\api\routers\web_admin.py
+  wa_wallet_resync [decorated]  ← backend\api\routers\web_admin.py
+  wa_wallet_tx_resolve [decorated]  ← backend\api\routers\web_admin.py
+  wa_wallets [decorated]  ← backend\api\routers\web_admin.py
+  wallet_alert_settings_patch [decorated]  ← backend\api\routers\web_admin.py
+  logout [decorated]  ← backend\api\routers\web_admin.py, backend\api\routers\web_login.py
+  request_code [decorated]  ← backend\api\routers\web_admin.py, backend\api\routers\web_login.py
+  verify_code [decorated]  ← backend\api\routers\web_admin.py, backend\api\routers\web_login.py
+  mock_abandon [decorated]  ← backend\api\routers\web_exam.py
+  mock_active [decorated]  ← backend\api\routers\web_exam.py
+  mock_answer [decorated]  ← backend\api\routers\web_exam.py
+  mock_history [decorated]  ← backend\api\routers\web_exam.py
+  mock_next [decorated]  ← backend\api\routers\web_exam.py
+  mock_preview [decorated]  ← backend\api\routers\web_exam.py
+  mock_review [decorated]  ← backend\api\routers\web_exam.py
+  mock_session [decorated]  ← backend\api\routers\web_exam.py
+  mock_start [decorated]  ← backend\api\routers\web_exam.py
+  _doc_prefix  ← backend\api\routers\web_ink.py
+  _limit [decorated]  ← backend\api\routers\web_ink.py
+  _points_ok [decorated]  ← backend\api\routers\web_ink.py
+  _tool_ok [decorated]  ← backend\api\routers\web_ink.py
+  delete_page [decorated]  ← backend\api\routers\web_ink.py
+  get_page [decorated]  ← backend\api\routers\web_ink.py
+  put_page [decorated]  ← backend\api\routers\web_ink.py
+  library_book_files [decorated]  ← backend\api\routers\web_library.py
+  library_books [decorated]  ← backend\api\routers\web_library.py
+  library_files [decorated]  ← backend\api\routers\web_library.py
+  library_lessons [decorated]  ← backend\api\routers\web_library.py
+  library_search [decorated]  ← backend\api\routers\web_library.py
+  library_sessions [decorated]  ← backend\api\routers\web_library.py
+  library_state [decorated]  ← backend\api\routers\web_library.py
+  library_subjects [decorated]  ← backend\api\routers\web_library.py
+  library_terms [decorated]  ← backend\api\routers\web_library.py
+  session_state [decorated]  ← backend\api\routers\web_login.py
+  get_progress [decorated]  ← backend\api\routers\web_reader.py
+  put_progress [decorated]  ← backend\api\routers\web_reader.py
+  view_url [decorated]  ← backend\api\routers\web_reader.py
+  _student_spa_retired [decorated]  ← backend\api\routers\web_student.py
+  auth_config [decorated]  ← backend\api\routers\web_student.py
+  auth_logout [decorated]  ← backend\api\routers\web_student.py
+  auth_session [decorated]  ← backend\api\routers\web_student.py
+  auth_start [decorated]  ← backend\api\routers\web_student.py
+  auth_verify [decorated]  ← backend\api\routers\web_student.py
+  reupload_with_new_filename  ← backend\api\telegram_send.py
+  mask_identifier  ← backend\api\web_login_core.py
+  show_my_grades_msg  ← backend\bot\grades.py
+  show_reports_main  ← backend\bot\reports.py
+  resources_callback  ← backend\bot\resources.py
+  upload_file_handler  ← backend\bot\resources.py
+  upload_metadata_handler  ← backend\bot\resources.py
+  _jalali_to_gregorian  ← backend\bot\schedule.py
+  _on_incoming_voice [decorated]  ← backend\bot\tg_group_voice_call.py
+  _upsample_pcm16_24k_to_48k  ← backend\bot\tg_group_voice_call.py
+  back_btn  ← backend\bot\utils.py
+  confirm_keyboard  ← backend\bot\utils.py
+  get_audit_db_health  ← backend\bot\utils.py
+  get_audit_delivery_health  ← backend\bot\utils.py
+  paginate  ← backend\bot\utils.py
+  has_access_bool  ← backend\core\access.py
+  require_access  ← backend\core\access.py
+  perm_any  ← backend\core\rbac.py
+  format_relative_fa  ← backend\core\time_utils.py
+  format_table_datetime  ← backend\core\time_utils.py
+  jalali_day_bounds_utc  ← backend\core\time_utils.py
+  parse_user_datetime  ← backend\core\time_utils.py
+  start_of_year_tehran  ← backend\core\time_utils.py
+  mask_secret  ← backend\core\utils_crypto.py
+  quiz_requeue_question  ← backend\database\ai_quiz.py
+  _resolve_display_name  ← backend\database\content.py
+  bs_logical_id [decorated]  ← backend\database\content.py
+  bs_update_content_filename  ← backend\database\content.py
+  count_qbank_questions  ← backend\database\content.py
+  faq_get_categories  ← backend\database\content.py
+  get_qbank_chapters  ← backend\database\content.py
+  get_qbank_difficulties  ← backend\database\content.py
+  get_qbank_lessons  ← backend\database\content.py
+  get_qbank_topics  ← backend\database\content.py
+  qbank_file_add  ← backend\database\content.py
+  qbank_file_mark_downloaded  ← backend\database\content.py
+  build_class_educational_group_query [decorated]  ← backend\database\core.py
+  get_all_settings  ← backend\database\core.py
+  get_audit_by_event_id  ← backend\database\core.py
+  get_audit_stats  ← backend\database\core.py
+  get_logs_by_correlation  ← backend\database\core.py
+  get_notif_run_message  ← backend\database\core.py
+  search_audit_logs  ← backend\database\core.py
+  search_logs_by_tag  ← backend\database\core.py
+  ticket_archived_replies  ← backend\database\core.py
+  sub_payment_list_cursor  ← backend\database\finance.py
+  sub_payment_mark_zarinpal_pending  ← backend\database\finance.py
+  prestige_weekly_close_state  ← backend\database\prestige.py
+  check_permission  ← backend\database\rbac.py
+  expire_due_roles  ← backend\database\rbac.py
+  get_effective_permissions  ← backend\database\rbac.py
+  list_available_roles  ← backend\database\rbac.py
+  list_role_assignments  ← backend\database\rbac.py
+  list_users_by_role  ← backend\database\rbac.py
+  revoke_role  ← backend\database\rbac.py
+  role_edit_lockout_risk  ← backend\database\rbac.py
+  seed_system_roles  ← backend\database\rbac.py
+  ring_profile_touch  ← backend\database\ring.py
+  ring_queue_taken_by_other  ← backend\database\ring.py
+  ring_report_duplicate  ← backend\database\ring.py
+  ring_session_notify_state  ← backend\database\ring.py
+  _api_base_async  ← backend\integrations\zarinpal.py
+  _is_mock_async  ← backend\integrations\zarinpal.py
+  _call_openrouter  ← backend\services\ai_solver.py
+  _pick_unused  ← backend\services\ai_solver.py
+  record_key_success  ← backend\services\ai_solver.py
+  _snapshot_collection_iter  ← backend\services\backup.py
+  broadcast_semaphore  ← backend\services\http_client.py
+  fetch_exam_questions  ← backend\services\qbank\query.py
+  __str__  ← backend\services\question_bank\contracts.py
+  apply_exam_metadata_to_question_row  ← backend\services\question_bank\exam_meta.py
+  can_receive_review  ← backend\services\question_bank\permissions.py
+  __hash__  ← backend\services\ring\handlers.py
+  _row  ← backend\services\ring\keyboards.py
+  kb_reveal_ask  ← backend\services\ring\keyboards.py
+  hard_ok  ← backend\services\ring\matcher.py
+  reason_sev  ← backend\services\ring\models.py
+  block_explicit  ← backend\services\ring\moderation.py
+  user_report_history  ← backend\services\ring\moderation.py
+  send_to_peer_of  ← backend\services\ring\notify.py
+  buffer_drop  ← backend\services\ring\relay.py
+  ensure_profile  ← backend\services\ring\service.py
+  resume_search  ← backend\services\ring\service.py
+  stop_timer  ← backend\services\ring\service.py
+  flag_stale  ← backend\services\ring\settings.py
+  maintenance_sync  ← backend\services\ring\settings.py
+  set_flag_sync  ← backend\services\ring\settings.py
+  detach_session  ← backend\services\ring\state.py
+  _age  ← backend\services\ring\texts.py
+  controls_note  ← backend\services\ring\texts.py
+  help_ring  ← backend\services\ring\texts.py
+  privacy_intro  ← backend\services\ring\texts.py
+  profile_saved  ← backend\services\ring\texts.py
+  queue_empty  ← backend\services\ring\texts.py
+  queue_status_line  ← backend\services\ring\texts.py
+  queue_waiting  ← backend\services\ring\texts.py
+  rating_ask  ← backend\services\ring\texts.py
+  still_waiting  ← backend\services\ring\texts.py
+  detect_media_type  ← backend\services\utils_file_naming.py
+  should_reupload_as_document  ← backend\services\utils_file_naming.py

@@ -1,0 +1,209 @@
+{
+  "timestamp": "2026-11-09T12:05:57Z",
+  "harness": "Socket & Runtime Stability Empirical Challenger",
+  "verdict": "APPROVE",
+  "pre_stress_checks": {
+    "vite_listening": true,
+    "vite_desc": "Listening on 127.0.0.1:5173 (OwningProcess PID 384)",
+    "fastapi_listening": true,
+    "fastapi_desc": "Listening on 127.0.0.1:8000 (OwningProcess PID 22944)",
+    "vite_http_status": 200,
+    "vite_http_bytes": 1902,
+    "vite_latency_ms": 43.42,
+    "fastapi_http_status": 200,
+    "fastapi_http_bytes": 95,
+    "fastapi_latency_ms": 17.55,
+    "fastapi_log_initial_lines": 1239,
+    "vite_log_initial_lines": 5
+  },
+  "stress_results": {
+    "vite": {
+      "rapid_connect_close": {
+        "iterations": 100,
+        "successes": 100,
+        "failures": 0,
+        "stats_ms": {
+          "count": 100,
+          "min": 0.23,
+          "mean": 12.03,
+          "p50": 12.1,
+          "p95": 22.94,
+          "max": 24.53
+        },
+        "errors": []
+      },
+      "abrupt_rst": {
+        "iterations": 50,
+        "successes": 50,
+        "failures": 0,
+        "stats_ms": {
+          "count": 50,
+          "min": 0.29,
+          "mean": 14.8,
+          "p50": 10.73,
+          "p95": 25.51,
+          "max": 25.94
+        },
+        "errors": []
+      },
+      "concurrent_burst": {
+        "total_connections": 100,
+        "workers": 20,
+        "successes": 100,
+        "failures": 0,
+        "total_time_ms": 63.1,
+        "stats_ms": {
+          "count": 100,
+          "min": 0.14,
+          "mean": 0.54,
+          "p50": 0.21,
+          "p95": 0.75,
+          "max": 24.95
+        },
+        "errors": []
+      },
+      "partial_abort": {
+        "iterations": 25,
+        "successes": 25,
+        "failures": 0,
+        "stats_ms": {
+          "count": 25,
+          "min": 5.65,
+          "mean": 23.96,
+          "p50": 25.69,
+          "p95": 30.14,
+          "max": 30.8
+        },
+        "errors": []
+      }
+    },
+    "fastapi": {
+      "rapid_connect_close": {
+        "iterations": 100,
+        "successes": 100,
+        "failures": 0,
+        "stats_ms": {
+          "count": 100,
+          "min": 0.24,
+          "mean": 11.77,
+          "p50": 11.97,
+          "p95": 24.24,
+          "max": 25.29
+        },
+        "errors": []
+      },
+      "abrupt_rst": {
+        "iterations": 50,
+        "successes": 50,
+        "failures": 0,
+        "stats_ms": {
+          "count": 50,
+          "min": 0.19,
+          "mean": 14.14,
+          "p50": 10.51,
+          "p95": 25.56,
+          "max": 26.08
+        },
+        "errors": []
+      },
+      "concurrent_burst": {
+        "total_connections": 100,
+        "workers": 20,
+        "successes": 100,
+        "failures": 0,
+        "total_time_ms": 45.91,
+        "stats_ms": {
+          "count": 100,
+          "min": 0.13,
+          "mean": 0.87,
+          "p50": 0.21,
+          "p95": 5.59,
+          "max": 20.0
+        },
+        "errors": []
+      },
+      "partial_abort": {
+        "iterations": 25,
+        "successes": 25,
+        "failures": 0,
+        "stats_ms": {
+          "count": 25,
+          "min": 5.72,
+          "mean": 24.41,
+          "p50": 25.82,
+          "p95": 29.42,
+          "max": 30.91
+        },
+        "errors": []
+      }
+    }
+  },
+  "post_stress_checks": {
+    "vite_listening": true,
+    "vite_desc": "Listening on 127.0.0.1:5173 (OwningProcess PID 384)",
+    "fastapi_listening": true,
+    "fastapi_desc": "Listening on 127.0.0.1:8000 (OwningProcess PID 22944)",
+    "vite_statuses": [
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200
+    ],
+    "vite_stats_ms": {
+      "count": 10,
+      "min": 2.01,
+      "mean": 16.45,
+      "p50": 12.32,
+      "p95": 27.15,
+      "max": 27.15
+    },
+    "fastapi_statuses": [
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200
+    ],
+    "fastapi_stats_ms": {
+      "count": 10,
+      "min": 3.18,
+      "mean": 13.31,
+      "p50": 14.11,
+      "p95": 27.52,
+      "max": 27.52
+    }
+  },
+  "log_integrity": {
+    "fastapi": {
+      "log_name": "fastapi.log",
+      "total_lines": 1249,
+      "has_tracebacks": false,
+      "traceback_snippets": [],
+      "fatal_count": 0,
+      "fatal_snippets": [],
+      "unhandled_exceptions_count": 0,
+      "unhandled_snippets": []
+    },
+    "vite": {
+      "log_name": "vite-student.log",
+      "total_lines": 5,
+      "has_tracebacks": false,
+      "traceback_snippets": [],
+      "fatal_count": 0,
+      "fatal_snippets": [],
+      "unhandled_exceptions_count": 0,
+      "unhandled_snippets": []
+    }
+  }
+}

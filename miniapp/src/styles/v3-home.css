@@ -1,0 +1,396 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   HumsYar v3 — Home blocks (prototype-aligned)
+   ═══════════════════════════════════════════════════════════════════════
+   فقط کلاس‌های پیشوند v3- اینجا هستند تا globals.css دست‌نخورده بماند
+   (کمترین ریسک برای ۵۰۰۰ خط استایل موجود). رنگ‌ها همه از توکن‌ها
+   می‌آیند تا تغییر پالت در tokens.css کل اپ را هم‌زمان به‌روز کند.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── ۱) سلام + هویت تحصیلی (بدون کارت، مثل پروتوتایپ) ── */
+.v3-greet {
+  padding: 4px 2px 2px;
+  margin-bottom: 2px;
+}
+
+.v3-greet__title {
+  margin: 0;
+  font-size: var(--fs-h1, 23px);
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--tx);
+  line-height: 1.35;
+}
+
+.v3-greet__meta {
+  margin: 5px 0 0;
+  color: var(--txm);
+  font-size: var(--fs-meta, 11.5px);
+  line-height: 1.8;
+}
+
+.v3-greet__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.v3-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--r-pill, 999px);
+  border: 1px solid var(--bd);
+  background: var(--surf);
+  color: var(--tx2);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.v3-chip--brand {
+  color: var(--t-acc, #6FA8FF);
+  border-color: rgba(61, 134, 255, 0.28);
+  background: rgba(61, 134, 255, 0.12);
+}
+
+.v3-chip--gold {
+  color: var(--warn);
+  border-color: rgba(242, 178, 75, 0.28);
+  background: rgba(242, 178, 75, 0.12);
+}
+
+/* ── ۲) آزمون بعدی + شمارش روز ── */
+.v3-exam {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: var(--r-lg, 16px);
+  border: 1px solid var(--bd);
+  background: var(--surf);
+  color: var(--tx);
+  text-align: right;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s var(--ease-out, ease), background 0.15s ease;
+}
+
+.v3-exam:active {
+  transform: scale(0.985);
+}
+
+.v3-exam__count {
+  display: grid;
+  place-items: center;
+  gap: 0;
+  min-width: 58px;
+  padding: 7px 6px;
+  border-radius: var(--r-md, 12px);
+  background: var(--soft-acc);
+  color: var(--t-acc);
+  line-height: 1.15;
+}
+
+.v3-exam__num {
+  font-size: 20px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-exam__unit {
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.v3-exam--danger .v3-exam__count {
+  background: var(--soft-err-2, rgba(255, 107, 122, 0.12));
+  color: var(--err);
+}
+
+.v3-exam--warn .v3-exam__count {
+  background: var(--soft-warn-2, rgba(242, 178, 75, 0.13));
+  color: var(--warn);
+}
+
+.v3-exam--ok .v3-exam__count {
+  background: rgba(47, 208, 154, 0.13);
+  color: var(--ok);
+}
+
+.v3-exam--danger {
+  border-color: rgba(255, 107, 122, 0.26);
+}
+
+.v3-exam__body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.v3-exam__label {
+  color: var(--txm);
+  font-size: 10.5px;
+}
+
+.v3-exam__title {
+  font-size: var(--fs-md, 13.5px);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v3-exam__date {
+  color: var(--txm);
+  font-size: 10.5px;
+}
+
+.v3-exam__icon {
+  color: var(--txm);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+/* ── ۳) شبکهٔ ۲×۲ کارهای سریع ── */
+.v3-quick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.v3-quick__tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 11px;
+  border-radius: var(--r-lg, 16px);
+  border: 1px solid var(--bd);
+  background: var(--surf);
+  color: var(--tx);
+  text-align: right;
+  cursor: pointer;
+  min-height: 62px;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s var(--ease-out, ease);
+}
+
+.v3-quick__tile:active {
+  transform: scale(0.975);
+}
+
+.v3-quick__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 11px;
+  background: rgba(61, 134, 255, 0.12);
+  color: var(--t-acc, #6FA8FF);
+}
+
+.v3-quick__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.v3-quick__title {
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.v3-quick__desc {
+  color: var(--txm);
+  font-size: 10.5px;
+  line-height: 1.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* در نمایشگرهای خیلی باریک (۳۲۰px) عنوان‌ها می‌شکنند */
+@media (max-width: 340px) {
+  .v3-quick__tile {
+    gap: 8px;
+    padding: 10px 9px;
+  }
+
+  .v3-quick__icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .v3-quick__desc {
+    display: none;
+  }
+}
+
+
+/* ── کارت «ادامهٔ مطالعه» ── */
+.v3-continue {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 11px 12px 12px;
+  border-radius: var(--r-lg, 16px);
+  border: 1px solid var(--hym-border-default);
+  background: linear-gradient(150deg, rgba(61, 134, 255, .13), var(--hym-bg-surface) 62%);
+  color: var(--tx);
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.v3-continue__top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--txm);
+}
+
+.v3-continue__pct {
+  margin-inline-start: auto;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--hym-text-link);
+}
+
+.v3-continue__title {
+  font-size: 13px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v3-continue__meta {
+  font-size: 10.5px;
+  color: var(--tx3);
+}
+
+.v3-continue__bar {
+  display: block;
+  height: 4px;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: rgba(120, 155, 210, .16);
+  overflow: hidden;
+}
+
+.v3-continue__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3D86FF, #2ADAD7);
+}
+
+/* ── کارت «هدف هفتگی» ── */
+.v3-goal {
+  display: grid;
+  gap: 7px;
+  padding: 11px 12px;
+  border-radius: var(--r-lg, 16px);
+  border: 1px solid var(--hym-border-default);
+  background: var(--hym-bg-surface);
+}
+
+.v3-goal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.v3-goal__edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  border: 1px solid var(--hym-border-default);
+  background: transparent;
+  color: var(--tx2);
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.v3-goal__nums {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.v3-goal__nums b {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--hym-text-link);
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-goal__nums span {
+  font-size: 11px;
+  color: var(--tx2);
+}
+
+.v3-goal__nums i {
+  margin-inline-start: auto;
+  font-style: normal;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--hym-accent-default);
+}
+
+.v3-goal__dots {
+  display: flex;
+  gap: 4px;
+}
+
+.v3-goal__dots span {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(120, 155, 210, .16);
+}
+
+.v3-goal__dots span.is-on {
+  background: linear-gradient(90deg, #3D86FF, #2ADAD7);
+}
+
+.v3-goal__foot {
+  font-size: 10px;
+  color: var(--tx3);
+}
+
+/* ── شیت تنظیم هدف ── */
+.v3-goalpick {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.v3-goalpick button {
+  padding: 9px 0;
+  border-radius: 9px;
+  border: 1px solid var(--hym-border-default);
+  background: var(--hym-bg-surface-raised);
+  color: var(--tx2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.v3-goalpick button.is-on {
+  border-color: var(--hym-brand-default);
+  background: var(--hym-brand-subtle);
+  color: var(--hym-text-link);
+}

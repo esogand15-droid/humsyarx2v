@@ -1,0 +1,18 @@
+[Unit]
+Description=HumsYar FastAPI Backend & SPA Web Server
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/humsyarx
+Environment=PYTHONPATH=/opt/humsyarx:/opt/humsyarx/backend
+Environment=PORT=8005
+EnvironmentFile=/opt/humsyarx/.env
+ExecStart=/opt/humsyarx/.venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 8005 --proxy-headers --forwarded-allow-ips "*"
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
