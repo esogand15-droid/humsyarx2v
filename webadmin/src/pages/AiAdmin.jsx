@@ -1977,6 +1977,34 @@ function AiConfig({ cfg, me, onSaved }) {
               <option value="auto">auto</option>
               <option value="high">high</option>
             </select></label>
+          {/* 🎙 دستیار جزوه‌نویس چندرسانه‌ای کلاسی (Lecture Scribe) */}
+          <div className="panel" style={{ padding: 12, marginTop: 12, border: '1px solid var(--border)', borderRadius: 8, gridColumn: '1 / -1' }}>
+            <b style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <span>🎙 دستیار جزوه‌نویس چندرسانه‌ای کلاسی (ویس + اسلاید به PDF)</span>
+              <Switch checked={f.lecture_scribe_enabled !== false}
+                      onChange={v => set('lecture_scribe_enabled', v)} />
+            </b>
+            <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <label className="fld"><span>سهمیه روزانه هر دانشجو (تعداد جلسه/روز)</span>
+                <input className="inp" type="number" min="0" max="100"
+                       value={f.lecture_daily_quota ?? 5}
+                       onChange={e => set('lecture_daily_quota', parseInt(e.target.value) || 0)} />
+              </label>
+              <label className="fld"><span>مدل چندرسانه‌ای استخراج جزوه</span>
+                <select className="inp" style={{ direction: 'ltr' }}
+                        value={f.lecture_model || 'gemini-2.5-flash'}
+                        onChange={e => set('lecture_model', e.target.value)}>
+                  <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash (پیشنهادی، سریع و دقیق)</option>
+                  <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro (استدلال سنگین و بالینی)</option>
+                  <option value="gemini-2.0-flash-exp">🧪 Gemini 2.0 Flash Exp (رایگان)</option>
+                  <option value="gemini-3.6-flash">🌟 Gemini 3.6 Flash</option>
+                </select>
+              </label>
+            </div>
+            <div className="muted" style={{ fontSize: 'var(--fs-caption)', marginTop: 6 }}>
+              💡 فایل‌های صوتی تا ۲ ساعت و اسلایدهای کلاسی همزمان روی Gemini Files API آپلود شده و جزوه کامل آکادمیک با فونت فارسی وزیر، مرواریدهای بالینی و دام‌های تستی آزمون پره‌انترنی تدوین می‌گردد.
+            </div>
+          </div>
           {/* ⭐ م8 — پاسخ صوتی (TTS فارسی — gemini-3.8-flash-lite-tts) */}
           <label className="fld"><span>🎤 پاسخ صوتی هوشیار (فارسی)</span>
             <select className="inp" value={f.voice_reply || 'voice'} onChange={e => set('voice_reply', e.target.value)}>

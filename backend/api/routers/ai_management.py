@@ -125,6 +125,11 @@ class ConfigUpdate(BaseModel):
     live_temperature: float | None = Field(default=None, ge=0.1, le=1.5)
     voice_system_prompt: str | None = Field(default=None, max_length=20000)
 
+    # 🎙 دستیار جزوه‌نویس چندرسانه‌ای (Lecture Scribe)
+    lecture_scribe_enabled: bool | None = None
+    lecture_daily_quota: int | None = Field(default=None, ge=0, le=100)
+    lecture_model: str | None = Field(default=None, max_length=150)
+
     thinking: str = Field(
         pattern="^(auto|high)$"
     )
@@ -288,6 +293,14 @@ async def config(
 
         "live_temperature":
             value.get("live_temperature", 0.85),
+
+        # 🎙 دستیار جزوه‌نویس چندرسانه‌ای کلاسی (Lecture Scribe)
+        "lecture_scribe_enabled":
+            value.get("lecture_scribe_enabled", True),
+        "lecture_daily_quota":
+            value.get("lecture_daily_quota", 5),
+        "lecture_model":
+            value.get("lecture_model", "gemini-2.5-flash"),
     }
 
 
@@ -326,6 +339,10 @@ async def update_config(
         "live_max_session_sec",
         "live_target_language",
         "live_temperature",
+        # 🎙 دستیار جزوه‌نویس چندرسانه‌ای کلاسی (Lecture Scribe)
+        "lecture_scribe_enabled",
+        "lecture_daily_quota",
+        "lecture_model",
     )
 
     for key in editable_fields:

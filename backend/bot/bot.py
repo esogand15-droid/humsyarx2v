@@ -117,6 +117,9 @@ from hooshyar_quiz import (                                     # 📚 آزمو�
     quiz_housekeeping_job, quiz_retention_job,
     set_application as _quiz_set_application,
 )
+from lecture_scribe import (                                    # 🎙 دستیار جزوه‌نویس چندرسانه‌ای
+    handle_lecture_callback, show_lecture_scribe_intro, handle_lecture_file_input,
+)
 from ai_solver import (                                          # 🤖 هوشیار
     handle_ai_text, handle_ai_media, handle_ai_image_prompt,
     ai_user_callback, show_ai_live_card,
@@ -1578,6 +1581,18 @@ async def unified_file_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         if await quiz_upload_hook(update, context):
             return
 
+    # 🎙 هوشیار — دستیار جزوه‌نویس چندرسانه‌ای (Lecture Scribe)
+    if context.user_data.get('mode') in ('lecture_scribe', 'lecture_scribe_attach') and (
+        update.message.voice or update.message.audio or update.message.video or
+        (update.message.document and (
+            update.message.document.mime_type == 'application/pdf' or
+            (update.message.document.file_name or '').lower().endswith('.pdf') or
+            (update.message.document.mime_type or '').startswith('audio/')
+        ))
+    ):
+        from lecture_scribe import handle_lecture_file_input
+        return await handle_lecture_file_input(update, context)
+
     # 🤖 هوشیار — عکس/PDF/صدا در حالت «پرسش از AI»
     # ⚠️ قابلیتِ جدید: قبلاً فقط عکس پشتیبانی می‌شد؛ حالا PDF (جزوه/برگه‌ی
     # اسکن‌شده) و پیامِ صوتی/فایلِ صوتی (سوالِ گفتاری) هم قبول می‌شه —
@@ -2314,6 +2329,7 @@ def build_application() -> Application:
         (ai_user_callback,            r'^aiu:'),  # 🤖 هوشیار — دکمه‌های زیر جواب (گفتگوی جدید/گزارش)
         (referral_callback,           r'^ref:'),   # 🌱 W13 — دعوت دوستان
         (quiz_callback,               r'^quiz:'),  # 📚 آزمون‌ساز از PDF
+        (handle_lecture_callback,     r'^ls:'),    # 🎙 دستیار جزوه‌نویس چندرسانه‌ای
         (dunning_click,               r'^dun:'),   # 💳 W14 — ادامه‌ی پرداخت نیمه‌تمام
     ]
     for handler, pattern in cbs:
@@ -2357,6 +2373,8 @@ def build_application() -> Application:
     app.add_handler(CommandHandler(['code', 'webcode', 'web', 'login'], code_cmd_handler, filters=filters.ChatType.PRIVATE))
     # 🎙 م9 — دستور /live و /voicechat برای شروع ویس‌چت زنده با هوشیار (در گروه و چت خصوصی)
     app.add_handler(CommandHandler(['live', 'voicechat'], show_ai_live_card))
+    # 🎙 دستیار جزوه‌نویس چندرسانه‌ای
+    app.add_handler(CommandHandler(['scribe', 'jozveh', 'lecture'], show_lecture_scribe_intro, filters=filters.ChatType.PRIVATE))
     # 📞 م9.2 — ورود و خروج مستقیم هوشیار به ویس‌چت گروه تلگرام (Group Voice Chat)
     app.add_handler(CommandHandler(['joinlive', 'vcjoin'], join_live_vc_cmd))
     app.add_handler(CommandHandler(['leavelive', 'vcleave'], leave_live_vc_cmd))

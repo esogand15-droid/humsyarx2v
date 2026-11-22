@@ -4928,6 +4928,43 @@ class DBCore:
             used = 0
         return False, used, limit
 
+    async def lecture_consume_quota(self, uid: int, daily_limit: int, today: str) -> tuple:
+        """سهمیه روزانه تولید جزوه چندرسانه‌ای کلاسی (Lecture Scribe) برای هر کاربر."""
+        uid = int(uid)
+        limit = int(daily_limit or 0)
+        if uid == int(os.getenv('ADMIN_ID', '0')) or limit <= 0:
+            result = await self.users.update_one(
+                {'user_id': uid},
+                [{'$set': {
+                    'lecture_usage_date': today,
+                    'lecture_total_usage': {'$add': [{'$ifNull': ['$lecture_total_usage', 0]}, 1]},
+                }}],
+            )
+            return bool(result.matched_count), 0, 0
+
+        from pymongo import ReturnDocument
+        result = await self.users.find_one_and_update(
+            {'user_id': uid, '$or': [
+                {'lecture_usage_date': today, 'lecture_usage_count': {'$lt': limit}},
+                {'lecture_usage_date': {'$ne': today}},
+            ]},
+            [{'$set': {
+                'lecture_usage_count': {'$cond': [
+                    {'$eq': ['$lecture_usage_date', today]},
+                    {'$add': [{'$ifNull': ['$lecture_usage_count', 0]}, 1]}, 1]},
+                'lecture_usage_date': today,
+                'lecture_total_usage': {'$add': [{'$ifNull': ['$lecture_total_usage', 0]}, 1]},
+            }}],
+            return_document=ReturnDocument.AFTER,
+        )
+        if result:
+            return True, int(result.get('lecture_usage_count', 0) or 0), limit
+        current = await self.users.find_one({'user_id': uid}, {'lecture_usage_date': 1, 'lecture_usage_count': 1})
+        used = int((current or {}).get('lecture_usage_count', 0) or 0)
+        if (current or {}).get('lecture_usage_date') != today:
+            used = 0
+        return False, used, limit
+
 
     async def ai_inc_tokens(self, uid: int, tokens: int) -> None:
         """

@@ -6916,6 +6916,10 @@ class WaAiConfigUpdate(BaseModel):
     live_target_language: Optional[str] = Field(default=None, max_length=10)
     live_temperature: Optional[float] = Field(default=None, ge=0.1, le=1.5)
     voice_system_prompt: Optional[str] = Field(default=None, max_length=20000)
+    # 🎙 دستیار جزوه‌نویس چندرسانه‌ای (Lecture Scribe)
+    lecture_scribe_enabled: Optional[bool] = None
+    lecture_daily_quota: Optional[int] = Field(default=None, ge=0, le=100)
+    lecture_model: Optional[str] = Field(default=None, max_length=150)
 
 
 class WaAiImageConfigUpdate(BaseModel):
@@ -6939,6 +6943,10 @@ class WaAiLiveConfigUpdate(BaseModel):
     live_target_language: Optional[str] = Field(default=None, max_length=10)
     live_temperature: Optional[float] = Field(default=None, ge=0.1, le=1.5)
     voice_system_prompt: Optional[str] = Field(default=None, max_length=20000)
+    # 🎙 دستیار جزوه‌نویس چندرسانه‌ای (Lecture Scribe)
+    lecture_scribe_enabled: Optional[bool] = None
+    lecture_daily_quota: Optional[int] = Field(default=None, ge=0, le=100)
+    lecture_model: Optional[str] = Field(default=None, max_length=150)
 
 
 class WaAiKeyAdd(BaseModel):
@@ -7011,6 +7019,8 @@ async def wa_ai_config_update(
         "image_provider", "image_model", "image_daily_limit", "image_size",
         "voice_reply", "voice_with_text", "tts_voice", "tts_model",
         "voice_reply_max_chars",
+        # 🎙 دستیار جزوه‌نویس چندرسانه‌ای
+        "lecture_scribe_enabled", "lecture_daily_quota", "lecture_model",
     )
     try:
         await _audit(user["id"], "به‌روزرسانی تنظیمات هوشیار", severity="HIGH",

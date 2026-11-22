@@ -214,6 +214,7 @@ async def show_ai_main(query):
         [InlineKeyboardButton("🧩 انتخاب مدل", callback_data='ai:pick_model')],
         [InlineKeyboardButton("🎨 انتخاب مدل تصویر", callback_data='ai:pick_image_model')],
         [InlineKeyboardButton("🎤 پاسخ صوتی هوشیار (TTS فارسی)", callback_data='ai:voice')],
+        [InlineKeyboardButton("🎙 جزوه‌نویس کلاسی (تنظیمات سهمیه/مدل)", callback_data='ai:scribe')],
         [InlineKeyboardButton("👥 محدودیت روزانه هر کاربر", callback_data='ai:set_limit')],
         [InlineKeyboardButton("🧠 عمقِ استدلال (Thinking)", callback_data='ai:toggle_thinking')],
         [InlineKeyboardButton("💬 ویرایش دستور سیستمی", callback_data='ai:set_prompt')],
@@ -311,6 +312,73 @@ async def ai_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await show_ai_main(query)
         return
+
+    if action == 'scribe':
+        cfg = await get_ai_config()
+        scribe_on = cfg.get('lecture_scribe_enabled', True)
+        quota = cfg.get('lecture_daily_quota', 5)
+        model = cfg.get('lecture_model', 'gemini-2.5-flash')
+
+        text = (
+            "🎙 <b>تنظیمات دستیار جزوه‌نویس چندرسانه‌ای کلاسی (Lecture Scribe)</b>\n"
+            "━━━━━━━━━━━━━━━━\n"
+            f"📊 وضعیت قابلیت: <b>{'فعال ✅' if scribe_on else 'غیرفعال ⬜'}</b>\n"
+            f"👥 سهمیه روزانه هر دانشجو: <b>{quota} جلسه / روز</b>\n"
+            f"🧠 مدل چندرسانه‌ای استخراج جزوه: <code>{model}</code>\n\n"
+            "<i>دانشجویان می‌توانند ویس‌های کلاس را همراه با اسلایدهای PDF ارسال کنند تا هوشیار با تطبیق خط‌به‌خط، جزوه دانشگاهی استاندارد PDF با فونت وزیر و کادرهای دام تستی پره‌انترنی/دستیاری و مرواریدهای بالینی تولید کند.</i>"
+        )
+        toggle_txt = "🔴 غیرفعال کردن جزوه‌نویس" if scribe_on else "🟢 فعال کردن جزوه‌نویس"
+        kb = [
+            [InlineKeyboardButton(toggle_txt, callback_data='ai:scribe_toggle')],
+            [InlineKeyboardButton("🔢 تغییر سهمیه روزانه هر دانشجو", callback_data='ai:scribe_quota')],
+            [InlineKeyboardButton("🧩 انتخاب مدل چندرسانه‌ای", callback_data='ai:scribe_model')],
+            [InlineKeyboardButton("🔙 بازگشت به مدیریت هوشیار", callback_data='ai:main')],
+        ]
+        await query.edit_message_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(kb))
+        return
+
+    if action == 'scribe_toggle':
+        cfg = await get_ai_config()
+        new_val = not cfg.get('lecture_scribe_enabled', True)
+        await set_ai_setting('lecture_scribe_enabled', new_val)
+        await query.answer("✅ جزوه‌نویس فعال شد" if new_val else "✅ جزوه‌نویس غیرفعال شد", show_alert=True)
+        query.data = 'ai:scribe'
+        return await ai_admin_callback(update, context)
+
+    if action == 'scribe_quota':
+        context.user_data['mode'] = 'ai_scribe_quota'
+        kb = [[InlineKeyboardButton("❌ لغو", callback_data='ai:scribe')]]
+        await query.edit_message_text(
+            "🔢 <b>تنظیم سهمیه روزانه جزوه‌نویسی هر دانشجو</b>\n\n"
+            "لطفاً یک عدد بین ۰ تا ۱۰۰ ارسال کنید (عدد ۰ = بدون محدودیت):\n"
+            "پیش‌فرض: ۵ جلسه در روز.",
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(kb)
+        )
+        return
+
+    if action == 'scribe_model':
+        kb = [
+            [InlineKeyboardButton("⚡ Gemini 2.5 Flash (پیشنهادی)", callback_data='ai:set_scribe_model:gemini-2.5-flash')],
+            [InlineKeyboardButton("🧠 Gemini 2.5 Pro (استدلال سنگین)", callback_data='ai:set_scribe_model:gemini-2.5-pro')],
+            [InlineKeyboardButton("🧪 Gemini 2.0 Flash Exp (رایگان)", callback_data='ai:set_scribe_model:gemini-2.0-flash-exp')],
+            [InlineKeyboardButton("🌟 Gemini 3.6 Flash", callback_data='ai:set_scribe_model:gemini-3.6-flash')],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data='ai:scribe')],
+        ]
+        await query.edit_message_text(
+            "🧩 <b>انتخاب مدل چندرسانه‌ای برای استخراج جزوه</b>\n\n"
+            "مدل‌های Google Gemini توانایی شنیدن مستقیم تا ۲ ساعت فایل صوتی و اسلایدهای کلاسی را دارند.",
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(kb)
+        )
+        return
+
+    if action == 'set_scribe_model':
+        m = parts[2] if len(parts) > 2 else 'gemini-2.5-flash'
+        await set_ai_setting('lecture_model', m)
+        await query.answer(f"✅ مدل جزوه‌نویس روی {m} تنظیم شد.", show_alert=True)
+        query.data = 'ai:scribe'
+        return await ai_admin_callback(update, context)
 
     if action == 'pick_provider':
         kb = [[InlineKeyboardButton(label, callback_data=f'ai:set_provider:{key}')]
@@ -1003,6 +1071,18 @@ async def ai_admin_text_handler(update: Update, context: ContextTypes.DEFAULT_TY
         await set_ai_setting('daily_limit', int(text))
         await update.message.reply_text(
             f"✅ محدودیت روزانه روی {text if int(text) else 'نامحدود'} تنظیم شد."
+        )
+        return
+
+    if mode == 'ai_scribe_quota':
+        if not text.isdigit():
+            await update.message.reply_text("⚠️ لطفاً یک عدد ارسال کنید (مثلاً 5 یا 0 برای نامحدود).")
+            return
+        context.user_data.pop('mode', None)
+        quota_val = int(text)
+        await set_ai_setting('lecture_daily_quota', quota_val)
+        await update.message.reply_text(
+            f"✅ سهمیه روزانه جزوه‌نویس کلاسی روی {quota_val if quota_val else 'نامحدود'} جلسه در روز تنظیم شد."
         )
         return
 

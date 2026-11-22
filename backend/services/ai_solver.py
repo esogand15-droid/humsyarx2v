@@ -1488,6 +1488,10 @@ async def get_ai_config() -> dict:
         'live_max_session_sec': live_max_session_sec,
         'live_target_language': live_target_language,
         'live_temperature':     live_temperature,
+        # 🎙 دستیار جزوه‌نویس چندرسانه‌ای هوشمند (Lecture Scribe)
+        'lecture_scribe_enabled': str(raw.get('ai_lecture_scribe_enabled', '1')) not in ('0', 'false', 'False', ''),
+        'lecture_daily_quota': int(raw.get('ai_lecture_daily_quota', 5) or 5),
+        'lecture_model': (raw.get('ai_lecture_model') or 'gemini-2.5-flash').strip() or 'gemini-2.5-flash',
     }
 
 
@@ -3367,6 +3371,14 @@ async def check_and_consume_quota(uid: int) -> tuple:
     return await db.ai_consume_quota(uid, limit, today)
 
 
+async def check_and_consume_lecture_quota(uid: int) -> tuple:
+    """سهمیه روزانه تولید جزوه چندرسانه‌ای کلاسی (Lecture Scribe) برای هر کاربر."""
+    cfg = await get_ai_config()
+    limit = int(cfg.get('lecture_daily_quota', 5) or 5)
+    today = today_tehran().isoformat()
+    return await db.lecture_consume_quota(uid, limit, today)
+
+
 async def record_token_usage(uid: int, tokens: int) -> None:
     """بعد از دریافت جواب صدا زده می‌شه؛ توکن مصرفی رو (امروز + کل) اضافه می‌کنه."""
     if not tokens:
@@ -3409,9 +3421,14 @@ async def show_ai_intro(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     from utils import webapp_url as _wa_url
     _live_url = _wa_url('/ai/live')
-    _kb_rows = [[
-        InlineKeyboardButton("📚 آزمون‌ساز از PDF", callback_data='quiz:main'),
-    ]]
+    _kb_rows = [
+        [
+            InlineKeyboardButton("🎙 جزوه‌نویس چندرسانه‌ای (ویس + اسلاید)", callback_data='ls:intro'),
+        ],
+        [
+            InlineKeyboardButton("📚 آزمون‌ساز از PDF", callback_data='quiz:main'),
+        ],
+    ]
     if cfg.get('image_enabled'):
         _kb_rows.append([InlineKeyboardButton("🎨 ساخت تصویر", callback_data='aiu:imgstart')])
     if cfg.get('live_enabled', True):
