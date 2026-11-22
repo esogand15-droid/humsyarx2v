@@ -501,6 +501,17 @@ export function LoginScreen() {
             <span>✈️</span>
             <span>هنوز کد دانشجویی ندارید؟ عضویت رایگان در ربات تلگرام هامزیار</span>
           </a>
+
+          {/* کلید راهنمای نصب PWA مشابه روبیکا */}
+          <button
+            type="button"
+            className="login-install-banner-btn"
+            onClick={() => navigate('/install')}
+          >
+            <span className="pwa-icon">📲</span>
+            <span>راهنمای نصب وب‌اپلیکیشن (آیفون، اندروید، ویندوز)</span>
+            <span className="pwa-arrow">←</span>
+          </button>
         </div>
       </div>
     </div>

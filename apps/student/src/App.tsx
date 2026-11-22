@@ -32,6 +32,7 @@ import { GradesScreen } from './screens/GradesScreen';
 import { SubscriptionScreen } from './screens/SubscriptionScreen';
 import { NotificationsScreen } from './screens/NotificationsScreen';
 import { TicketsScreen } from './screens/TicketsScreen';
+import { InstallGuideScreen } from './screens/InstallGuideScreen';
 import { useSession } from './lib/session';
 import { InstallPrompt, ShowAddToHome } from './components/InstallPrompt';
 
@@ -57,7 +58,7 @@ function Gate({ children }: { children: React.ReactNode }) {
 }
 
 /** صفحه‌های مرجع طراحی: بدون گارد، تا در بازبینی P0/P1 قابل دیدن باشند. */
-const PUBLIC_PATHS = ['/system', '/states'];
+const PUBLIC_PATHS = ['/system', '/states', '/install'];
 
 /** پوسته بر اساس وضعیت واقعی نشست: تب‌بار فقط وقتی معنا دارد که
     کاربر وارد و تأییدشده باشد و در صفحه‌های مرجع نباشد. */
@@ -93,6 +94,7 @@ export function App() {
         />
         <Route path="/system" element={<SystemScreen />} />
         <Route path="/states" element={<StatesScreen />} />
+        <Route path="/install" element={<InstallGuideScreen />} />
         <Route
           path="/"
           element={

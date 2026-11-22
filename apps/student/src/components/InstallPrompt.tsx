@@ -5,6 +5,7 @@
    - حالت standalone: هیچ چیزی نمایش داده نمی‌شود (کاربر برنامهٔ نصب‌شده را باز کرده). */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly prompt: () => Promise<void>;
@@ -29,6 +30,7 @@ function isIOS(): boolean {
  * ShowAddToHome — راهنمای iOS: یک بار در هر نشست، در پایین صفحه با انیمیشن.
  */
 export function ShowAddToHome() {
+  const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -58,9 +60,30 @@ export function ShowAddToHome() {
           <li>روی دکمهٔ <strong>اشتراک‌گذاری</strong> (Share — مربع با فلش رو به بالا) بزنید.</li>
           <li>گزینهٔ <strong>Add to Home Screen</strong> را انتخاب کنید.</li>
         </ol>
-        <button type="button" className="install-prompt__close" onClick={dismiss} aria-label="بستن راهنما">
-          فهمیدم
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+          <button
+            type="button"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--cyan, #38BDF8)',
+              textDecoration: 'underline',
+              fontSize: '12px',
+              cursor: 'pointer',
+              padding: 0,
+              fontFamily: 'inherit',
+            }}
+            onClick={() => {
+              dismiss();
+              navigate('/install');
+            }}
+          >
+            مشاهده راهنمای تصویری کامل
+          </button>
+          <button type="button" className="install-prompt__close" onClick={dismiss} aria-label="بستن راهنما">
+            فهمیدم
+          </button>
+        </div>
       </div>
     </div>
   );
