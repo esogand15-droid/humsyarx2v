@@ -877,6 +877,7 @@ def _mount_static(prefix: str, directory: str, name: str) -> bool:
 
 _FONTS_MOUNTED = _mount_static("/fonts", os.path.join(_PUBLIC_DIR, "fonts"), "shared-fonts")
 _ICONS_MOUNTED = _mount_static("/icons", os.path.join(_PUBLIC_DIR, "icons"), "shared-icons")
+_BRAND_MOUNTED = _mount_static("/brand", os.path.join(_PUBLIC_DIR, "brand"), "shared-brand")
 
 # ── دارایی‌های لندینگ (هم /landing-assets و هم /app/landing-assets برای اطمینان) ────
 _LANDING_ASSETS_MOUNTED = _mount_static(
@@ -962,6 +963,42 @@ async def _root():
     if os.path.isfile(_LANDING_INDEX):
         return FileResponse(_LANDING_INDEX, media_type="text/html")
     return RedirectResponse(url="/app/", status_code=307)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def _favicon_ico():
+    from fastapi.responses import FileResponse, Response
+    fav = os.path.join(_PUBLIC_DIR, "icons", "favicon-64.png")
+    if os.path.isfile(fav):
+        return FileResponse(fav, media_type="image/png")
+    return Response(status_code=204)
+
+
+@app.get("/favicon-64.png", include_in_schema=False)
+async def _favicon_64():
+    from fastapi.responses import FileResponse, Response
+    fav = os.path.join(_PUBLIC_DIR, "icons", "favicon-64.png")
+    if os.path.isfile(fav):
+        return FileResponse(fav, media_type="image/png")
+    return Response(status_code=204)
+
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+async def _manifest():
+    from fastapi.responses import FileResponse, Response
+    mf = os.path.join(_PUBLIC_DIR, "manifest.webmanifest")
+    if os.path.isfile(mf):
+        return FileResponse(mf, media_type="application/manifest+json")
+    return Response(status_code=204)
+
+
+@app.get("/sw.js", include_in_schema=False)
+async def _sw():
+    from fastapi.responses import FileResponse, Response
+    sw_file = os.path.join(_PUBLIC_DIR, "sw.js")
+    if os.path.isfile(sw_file):
+        return FileResponse(sw_file, media_type="application/javascript")
+    return Response(status_code=204)
 
 
 # ──────────────────────────────────────────────────────────

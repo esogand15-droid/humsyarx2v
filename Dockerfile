@@ -167,7 +167,7 @@ RUN set -eu; \
     id humsyar >/dev/null                  || { echo "Dockerfile selfcheck: کاربر humsyar ساخته نشده"; exit 1; }; \
     /entrypoint.sh /bin/true >/dev/null     # entrypoint را واقعاً اجرا می‌کند (shebang/CRLF/set -e)
 
-EXPOSE 8000
+EXPOSE 8000 3000
 
 # startCommand در railway.json همین است؛ اینجا هم به‌عنوان پیش‌فرض
 # می‌گذاریم تا `docker run` خالی (بدون config) همان رفتار را داشته باشد.

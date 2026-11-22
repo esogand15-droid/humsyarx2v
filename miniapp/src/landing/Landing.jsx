@@ -453,9 +453,9 @@ export default function Landing() {
                 <div className="lp-hero__emblem-frame">
                   <img
                     className="lp-hero__emblem-img"
-                    src="/brand/hero-emblem.jpg"
+                    src="/icons/hero-emblem.jpg"
                     onError={(e) => {
-                      e.currentTarget.src = '/icons/hero-emblem.jpg';
+                      e.currentTarget.src = '/brand/hero-emblem.jpg';
                     }}
                     alt="نشان رسمی زیست‌بوم آموزش پزشکی هوشمند هامزیار"
                     width="320"
