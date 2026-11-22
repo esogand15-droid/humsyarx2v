@@ -13,6 +13,7 @@ import os, io, asyncio, logging, time
 from datetime import datetime
 from utils import esc as escape   # 🛡 AUDIT-A6 —escape مرکزی
 from telegram import InputMediaPhoto, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from bot_modern_ui import ButtonGridBuilder
 from telegram.ext import ContextTypes, ConversationHandler
 from database import db
 from utils import send_audit_log, fmt_jalali_dt
@@ -1141,8 +1142,9 @@ async def _answer_personal_ai(query, context, uid, ai_question_id, selected):
         await query.answer(exc.message, show_alert=True)
         return
     await query.edit_message_text(
-        f"{'✅ درست' if result['is_correct'] else '❌ نادرست'}\n\nپاسخ صحیح: گزینه {result['correct_answer'] + 1}\n"
-        f"💡 {_h(result.get('explanation') or '—')}\n\nاین سؤال شخصی است و هنوز در بانک مشترک نیست.",
+        f"{'✅ درست' if result['is_correct'] else '❌ نادرست'}\n\nپاسخ صحیح: گزینه {result['correct_answer'] + 1}\n\n"
+        f"💡 <b>تحلیل و پاسخ تشریحی:</b>\n<blockquote expandable>{_h(result.get('explanation') or '—')}</blockquote>\n\n"
+        "این سؤال شخصی است و هنوز در بانک مشترک نیست.",
         parse_mode='HTML', reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📤 پیشنهاد به بانک مشترک", callback_data=f"questions:ai_personal_propose:{ai_question_id}")],
             [InlineKeyboardButton("🤖 سؤال شخصی دیگر", callback_data='questions:ai_fallback')],
@@ -1215,7 +1217,7 @@ async def handle_question_answer(update: Update, context: ContextTypes.DEFAULT_T
     text = (f"{icon} <b>{'صحیح!' if is_correct else 'اشتباه!'}</b>\n\n"
             f"{_h(q_doc['question'])}\n\n{options_text}")
     if expl:
-        text += f"\n💡 <b>توضیح:</b> {_h(expl)}"
+        text += f"\n💡 <b>تحلیل و پاسخ تشریحی:</b>\n<blockquote expandable>{_h(expl)}</blockquote>"
 
     # 👑 Prestige: خط XP درون همین پیام (بازخورد تعاملی — اعلان جداگانه‌ی جدیدی نیست)
     if _ps_ev and not _ps_ev.get('ignored'):
@@ -1241,12 +1243,28 @@ async def handle_question_answer(update: Update, context: ContextTypes.DEFAULT_T
     mode    = quiz.get('mode', 'free')
     back_cb = 'questions:custom_exam' if mode == 'custom' else 'questions:practice'
 
-    keyboard = [[
+    grid = ButtonGridBuilder()
+    letters = ['🅐', '🅑', '🅒', '🅓']
+    for i, opt in enumerate(opts[:4]):
+        if i == correct_idx:
+            status_text = f"✅ {opt}"
+            reason = "پاسخ صحیح همین گزینه است."
+        elif i == sel:
+            status_text = f"❌ {opt}"
+            reason = "گزینه انتخابی شما نادرست بود."
+        else:
+            status_text = f"{letters[i]} {opt}"
+            reason = "این سؤال قبلاً پاسخ داده شده است."
+        if len(status_text) > 35:
+            status_text = status_text[:34] + "…"
+        grid.add_disabled(status_text, reason=reason)
+
+    grid.add_split(
         InlineKeyboardButton("➡️ سوال بعدی", callback_data='questions:next'),
         InlineKeyboardButton("🏠 منو",        callback_data='questions:main')
-    ]]
+    )
     await query.edit_message_text(text, parse_mode='HTML',
-                                  reply_markup=InlineKeyboardMarkup(keyboard))
+                                  reply_markup=grid.build())
 
 
 # ══════════════════════════════════════════════════════════
@@ -1527,7 +1545,7 @@ async def handle_create_question_steps(update: Update, context: ContextTypes.DEF
         context.user_data['create_step'] = 'preview'
         await update.message.reply_text(
             f"👁 <b>پیش‌نمایش سؤال</b>\n📚 {_h(q.get('lesson'))} — {_h(q.get('topic'))}\n"
-            f"━━━━━━━━━━━━━━━━\n❓ {_h(q.get('question'))}\n\n{preview}\n\n💡 {_h(q.get('explanation') or 'بدون تحلیل')}",
+            f"━━━━━━━━━━━━━━━━\n❓ {_h(q.get('question'))}\n\n{preview}\n\n💡 <b>تحلیل تشریحی:</b>\n<blockquote expandable>{_h(q.get('explanation') or 'بدون تحلیل')}</blockquote>",
             parse_mode='HTML', reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("✅ ارسال برای بررسی", callback_data='questions:submit_question')],
                 [InlineKeyboardButton("❌ لغو", callback_data='questions:main')]]))
@@ -1847,7 +1865,7 @@ async def _ca_question_view(query, uid: int, qid: str, context=None):
         f"━━━━━━━━━━━━━━━━\n"
         f"❓ <b>{_h(q.get('question',''))}</b>\n\n"
         f"{opts_text}\n\n"
-        f"📝 <b>توضیح:</b> {_h(q.get('explanation','') or '—')}\n\n"
+        f"📝 <b>توضیح:</b>\n<blockquote expandable>{_h(q.get('explanation','') or '—')}</blockquote>\n\n"
         f"📈 آمار: {q.get('attempt_count',0)} بار — {q.get('correct_count',0)} صحیح"
     )
 
@@ -1864,6 +1882,7 @@ async def _ca_question_view(query, uid: int, qid: str, context=None):
         if not is_own:
             keyboard.append([InlineKeyboardButton("✅ تأیید", callback_data=f'questions:ca_q_approve:{qid}')])
         else:
+            keyboard.append([InlineKeyboardButton("🔒 تأیید (سؤال خودتان است)", callback_data='btn_disabled:سازنده سؤال نمی‌تواند سؤال خود را تأیید کند.')])
             text += ("\n\n<i>ℹ️ این سؤال را خودت ثبت کرده‌ای، پس تأییدش "
                      "باید توسط بازبین دیگری انجام شود.</i>")
         if await db.has_permission(uid, 'questions.reject'):

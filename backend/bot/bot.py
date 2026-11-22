@@ -2123,6 +2123,32 @@ async def route_resources(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ══════════════════════════════════════════════════
+#  هندلرهای Modern Bot API UI (دکمه‌های غیرفعال و توقف استریم)
+# ══════════════════════════════════════════════════
+
+async def handle_disabled_button_tap(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Global handler for taps on disabled buttons with lock indicators."""
+    query = update.callback_query
+    data = query.data or ""
+    parts = data.split(':', 1)
+    reason = parts[1] if len(parts) > 1 and parts[1].strip() else "این گزینه در حال حاضر غیرفعال است."
+    await query.answer(text=reason, show_alert=True)
+
+
+async def handle_ai_stream_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Global handler for AI streaming cancellation requests."""
+    from ai_solver import request_stop_ai_stream
+    query = update.callback_query
+    await query.answer("🛑 تولید پاسخ متوقف شد.", show_alert=False)
+    data = query.data or ""
+    parts = data.split(':')  # aiu:stop:<chat_id>:<msg_id>
+    if len(parts) >= 4:
+        request_stop_ai_stream(f"{parts[2]}:{parts[3]}")
+    elif len(parts) >= 3:
+        request_stop_ai_stream(parts[2])
+
+
+# ══════════════════════════════════════════════════
 #  ساخت Application
 # ══════════════════════════════════════════════════
 
@@ -2240,6 +2266,9 @@ def build_application() -> Application:
 
     # ── Callback handlers — ترتیب مهم: specific قبل از general ──
     cbs = [
+        # Modern Bot API UI handlers
+        (handle_disabled_button_tap,  r'^btn_disabled:'),
+        (handle_ai_stream_stop,       r'^aiu:stop:'),
         # ورود وب و تأیید تلگرام
         (web_auth_callback,        r'^web_auth:'),
         # پروفایل

@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from bot_modern_ui import CompactTableBuilder
 from database import db
 from utils import fmt_jalali_dt, safe_send, send_audit_log
 from time_utils import today_tehran
@@ -357,10 +358,18 @@ async def _build_my_grades_text(uid: int, term: str | None = None) -> str:
         avg = grp["avg"]
         lines.append(f"\n🎓 <b>{head}</b> · {grp['total']} نمره"
                      + (f" · میانگین <b>{avg}/20</b>" if avg is not None else ""))
+        table_rows = []
         for g in grp["grades"]:
-            lines.append(f"   📚 {g.get('lesson') or '—'} — {g.get('exam_title') or '—'}"
-                         f"\n      🎯 <b>{g.get('score') if g.get('score') is not None else '—'}/20</b>"
-                         f"  |  {fmt_jalali_dt(g.get('exam_date',''), with_time=False)}")
+            score_str = f"{g.get('score')}/20" if g.get('score') is not None else "—"
+            lesson_str = g.get('lesson') or '—'
+            date_str = fmt_jalali_dt(g.get('exam_date', ''), with_time=False) or "—"
+            table_rows.append([lesson_str, score_str, date_str])
+        if table_rows:
+            lines.append(CompactTableBuilder.render(
+                headers=["درس", "نمره", "تاریخ"],
+                rows=table_rows,
+                max_col_widths=[14, 8, 10],
+            ))
     overall = summarize_grades(grades)
     if not term and overall["avg"] is not None:
         lines.append(f"\n━━━━━━━━━━━━━━━━\n📈 میانگین کل: <b>{overall['avg']}/20</b>"

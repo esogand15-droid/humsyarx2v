@@ -19,6 +19,7 @@ import random
 import asyncio
 import logging
 import unicodedata
+from typing import Optional, Dict, Any, List
 from utils import esc as _esc   # 🛡 AUDIT-A6 —escape مرکزی (پارامتر quote حفظ است)
 from collections import deque, OrderedDict
 from datetime import datetime
@@ -3611,6 +3612,42 @@ def _pick_unused(pool: list, used: set) -> str:
 
 
 # ══════════════════════════════════════════════════
+#  ثبت‌نام و مدیریت جریان‌های استریمینگ فعال هوشیار (Active AI Streams)
+# ══════════════════════════════════════════════════
+
+_ACTIVE_AI_STREAMS: dict[str, asyncio.Event] = {}
+
+def register_ai_stream(stream_key: str, stop_event: asyncio.Event) -> None:
+    """Register an active AI streaming cancellation event."""
+    _ACTIVE_AI_STREAMS[str(stream_key)] = stop_event
+
+def unregister_ai_stream(stream_key: str) -> None:
+    """Unregister an AI stream when completed or cancelled."""
+    _ACTIVE_AI_STREAMS.pop(str(stream_key), None)
+
+def get_active_ai_stream(stream_key: str) -> Optional[asyncio.Event]:
+    """Retrieve the cancellation event for an active AI stream."""
+    return _ACTIVE_AI_STREAMS.get(str(stream_key))
+
+def request_stop_ai_stream(stream_key: str) -> bool:
+    """Signal cancellation for an active AI stream.
+
+    Matches by exact key ('chat_id:msg_id') or suffix (e.g. msg_id).
+    Returns True if an active stream was signaled.
+    """
+    skey = str(stream_key)
+    ev = _ACTIVE_AI_STREAMS.get(skey)
+    if ev is not None:
+        ev.set()
+        return True
+    for k, v in list(_ACTIVE_AI_STREAMS.items()):
+        if k == skey or k.endswith(f":{skey}"):
+            v.set()
+            return True
+    return False
+
+
+# ══════════════════════════════════════════════════
 #  تبدیل Markdown سبکِ خروجیِ مدل (**bold**, `code`, لیست‌ها، #تیتر) به
 #  HTML قابل‌نمایش در تلگرام. ⚠️ فیکس باگ: قبلاً متنِ خامِ AI بدون هیچ
 #  parse_mode ای فرستاده می‌شد، برای همین کاراکترهای «**» و امثالش عیناً
@@ -3623,11 +3660,20 @@ def _md_to_telegram_html(text: str) -> str:
     if not text:
         return text
     out = _esc(text, quote=False)                                      # 1) امن‌سازی HTML
-    out = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', out, flags=re.S)       # 2) **bold**
-    out = re.sub(r'(?m)^#{1,6}\s*(.+)$', r'<b>\1</b>', out)             # 3) # تیتر → بولد
-    out = re.sub(r'`([^`\n]+?)`', r'<code>\1</code>', out)              # 4) `code`
-    out = re.sub(r'(?m)^[*\-]\s+', '• ', out)                          # 5) لیست * یا - → •
-    out = re.sub(r'(?<!\w)_(?!_)(.+?)(?<!_)_(?!\w)', r'<i>\1</i>', out)  # 6) _italic_
+
+    # 2) نقل‌قول‌های تاشو (Collapsible/Expandable Blockquotes)
+    def _replace_blockquote(match: re.Match) -> str:
+        inner = match.group(0)
+        cleaned_lines = [re.sub(r'^(?:&gt;|>)\s?', '', line) for line in inner.strip().splitlines()]
+        return f"<blockquote expandable>{chr(10).join(cleaned_lines)}</blockquote>"
+
+    out = re.sub(r'(?m)(?:^(?:&gt;|>)[^\n]*(?:\n|$))+', _replace_blockquote, out)
+
+    out = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', out, flags=re.S)       # 3) **bold**
+    out = re.sub(r'(?m)^#{1,6}\s*(.+)$', r'<b>\1</b>', out)             # 4) # تیتر → بولد
+    out = re.sub(r'`([^`\n]+?)`', r'<code>\1</code>', out)              # 5) `code`
+    out = re.sub(r'(?m)^[*\-]\s+', '• ', out)                          # 6) لیست * یا - → •
+    out = re.sub(r'(?<!\w)_(?!_)(.+?)(?<!_)_(?!\w)', r'<i>\1</i>', out)  # 7) _italic_
     return out
 
 
@@ -3662,6 +3708,18 @@ async def _answer_with_live_edit(update: Update, context: ContextTypes.DEFAULT_T
     chat_id = update.effective_chat.id
     thinking_msg = await context.bot.send_message(chat_id, THINKING_MESSAGE)
 
+    # 🛑 Modern Bot API UI: Active stream registry & stop button attachment
+    stream_key = f"{chat_id}:{thinking_msg.message_id}"
+    stream_stop_event = asyncio.Event()
+    register_ai_stream(stream_key, stream_stop_event)
+    stop_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🛑 توقف پاسخ", callback_data=f"aiu:stop:{chat_id}:{thinking_msg.message_id}")]
+    ])
+    try:
+        await thinking_msg.edit_reply_markup(reply_markup=stop_markup)
+    except Exception:
+        pass
+
     # ⭐ م8.2 — «فقط ویس» (پیش‌فرضِ voice): ورودیِ ویس + «متنِ همراه»
     # خاموش → متنِ جواب استریم نمی‌شود؛ بعد از اتمام فقط ویس می‌رود
     # (اگر TTS شکست خورد یا جواب بلند بود، متن تحویل می‌شود — کاربر
@@ -3688,6 +3746,8 @@ async def _answer_with_live_edit(update: Update, context: ContextTypes.DEFAULT_T
 
     try:
         async for event in stream_gen:
+            if stream_stop_event.is_set():
+                break
             if event['type'] == 'delta':
                 buffer.append(event['text'])
                 if _voice_only:
@@ -3712,7 +3772,9 @@ async def _answer_with_live_edit(update: Update, context: ContextTypes.DEFAULT_T
                     display = raw_partial[:3480] + "…" if len(raw_partial) > 3480 else raw_partial
                     try:
                         await thinking_msg.edit_text(
-                            f"🤖 {_md_to_telegram_html(display)} ▌", parse_mode='HTML',
+                            f"🤖 {_md_to_telegram_html(display)} ▌",
+                            parse_mode='HTML',
+                            reply_markup=stop_markup,
                         )
                     except Exception:
                         pass   # مثلاً «message not modified» یا محدودیتِ نرخ — بی‌خیالش شو، دورِ بعد دوباره امتحان می‌شه
@@ -3721,6 +3783,10 @@ async def _answer_with_live_edit(update: Update, context: ContextTypes.DEFAULT_T
             elif event['type'] == 'done':
                 answer_text = event['answer']
                 tokens = event['tokens']
+
+        if stream_stop_event.is_set():
+            accumulated = ''.join(buffer).strip()
+            answer_text = accumulated + ("\n\n<i>(پاسخ توسط کاربر متوقف شد)</i>" if accumulated else "<i>(پاسخ توسط کاربر متوقف شد)</i>")
 
         raw_answer = answer_text or ''
         # ⚠️ برشِ طولِ پیام روی متنِ خام (نه HTML) انجام می‌شه تا هیچ‌وقت
@@ -3760,6 +3826,7 @@ async def _answer_with_live_edit(update: Update, context: ContextTypes.DEFAULT_T
         logger.exception("AI error")
         final_text = "⚠️ مشکلی در ارتباط با سرویس هوش مصنوعی پیش اومد، دوباره امتحان کن."
     finally:
+        unregister_ai_stream(stream_key)
         stop_event.set()
         pinger.cancel()
         try:
@@ -5710,6 +5777,13 @@ async def ai_user_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid    = update.effective_user.id
     parts  = query.data.split(':')
     action = parts[1] if len(parts) > 1 else ''
+
+    if action == 'stop':
+        # aiu:stop:<chat_id>:<msg_id>
+        skey = f"{parts[2]}:{parts[3]}" if len(parts) >= 4 else (parts[2] if len(parts) >= 3 else "")
+        request_stop_ai_stream(skey)
+        await query.answer("🛑 تولید پاسخ متوقف شد.", show_alert=False)
+        return
 
     if action == 'newchat':
         await _clear_memory(uid)

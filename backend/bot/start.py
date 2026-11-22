@@ -5,6 +5,7 @@ import os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
+from bot_modern_ui import ButtonGridBuilder
 from database import db
 from utils import (
     main_keyboard, admin_keyboard, content_admin_keyboard, get_keyboard_for_user,
@@ -55,21 +56,24 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     context.user_data['pending_ref'] = _rcode
         except Exception:
             pass
+        guidelines = (
+            "📚 منابع و جزوات درسی\n"
+            "🧪 بانک سوال و تمرین هوشمند\n"
+            "📅 برنامه کلاس‌ها و امتحانات\n"
+            "🎫 پشتیبانی و پاسخ سریع"
+        )
+        builder = ButtonGridBuilder()
+        builder.add_hero("✅ شروع ثبت‌نام", callback_data='register:start')
         await update.message.reply_text(
             f"🩺 <b>به ربات آموزشی پزشکی خوش آمدید!</b>\n\n"
             f"سلام <b>{first_name}</b> عزیز 👋\n\n"
             "این ربات به شما کمک می‌کند:\n"
-            "📚 منابع و جزوات درسی\n"
-            "🧪 بانک سوال و تمرین هوشمند\n"
-            "📅 برنامه کلاس‌ها و امتحانات\n"
-            "🎫 پشتیبانی و پاسخ سریع\n\n"
+            f"<blockquote expandable>{guidelines}</blockquote>\n\n"
             "━━━━━━━━━━━━━━━━\n"
             "برای شروع، ابتدا ثبت‌نام کنید.\n"
             "فقط <b>۲ مرحله</b> ساده! 🚀",
             parse_mode='HTML',
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("✅ شروع ثبت‌نام", callback_data='register:start')
-            ]])
+            reply_markup=builder.build()
         )
         return REGISTER
 
@@ -253,9 +257,15 @@ async def _proceed_to_intake(update, context, group: str):
     if not intakes:
         return await _after_intake_step(update, context, uid, name, group, '', username, query=query)
 
-    keyboard = [[InlineKeyboardButton(i['label'], callback_data=f'register:intake:{i["code"]}')]
-                for i in intakes]
-    keyboard.append([InlineKeyboardButton("❌ انصراف", callback_data='register:cancel')])
+    builder = ButtonGridBuilder()
+    for i in intakes:
+        if i.get('is_full') or i.get('disabled'):
+            builder.add_disabled(i['label'], reason="ظرفیت این دوره تکمیل شده است.")
+        else:
+            builder.add_hero(i['label'], callback_data=f'register:intake:{i["code"]}')
+    builder.add_hero("❌ انصراف", callback_data='register:cancel')
+    keyboard = builder.build()
+
     edu_lbl = 'آقایان' if context.user_data.get('reg_edu_group') == 'male' else 'بانوان'
     await query.edit_message_text(
         f"✅ <b>گروه {group} ({edu_lbl}) انتخاب شد</b>\n\n"
@@ -263,7 +273,7 @@ async def _proceed_to_intake(update, context, group: str):
         "📝 <b>مرحله ۳ — ورودی تحصیلی</b>\n\n"
         "📅 ورودی خود را انتخاب کنید:",
         parse_mode='HTML',
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=keyboard
     )
     return STEP_INTAKE
 
