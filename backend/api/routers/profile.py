@@ -63,6 +63,14 @@ async def get_profile(user=Depends(get_current_user)):
     tickets = raw_tickets if isinstance(raw_tickets, list) else []
     edu_info = db.extract_user_educational_group_info(db_user)
 
+    web_code = _text(db_user.get("web_login_code"))
+    if not web_code:
+        try:
+            from backend.core import student_code as sc
+            web_code = await sc.get_or_create_user_code(db, uid)
+        except Exception:
+            web_code = ""
+
     return {
         "user": {
             "name": _text(db_user.get("name")),
@@ -80,6 +88,7 @@ async def get_profile(user=Depends(get_current_user)):
             "course_selection_term": _text(db_user.get("course_selection_term")),
             "course_selection_updated_at": _text(db_user.get("course_selection_updated_at")),
             "student_id": _text(db_user.get("student_id")),
+            "web_login_code": web_code,
             "role": _role_for(uid, db_user),
             "telegram_id": uid,
             # 🛡 RBAC-W1 (افزایشی): کلیدهای نقش + union مجوزها —

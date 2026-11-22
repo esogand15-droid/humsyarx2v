@@ -1257,6 +1257,43 @@ export default function Profile() {
           <Glyph value="✎" />
                   </button>
 
+                  {user.web_login_code && (
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 'var(--fs-cap)',
+                        color: 'var(--txm)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <span>کد اختصاصی وب‌اپ:</span>
+                      <code
+                        style={{
+                          background: 'rgba(56, 189, 248, 0.12)',
+                          color: '#38bdf8',
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          letterSpacing: 1,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          fontFamily: 'monospace',
+                          userSelect: 'all',
+                        }}
+                        onClick={() => {
+                          if (navigator.clipboard) {
+                            navigator.clipboard.writeText(user.web_login_code);
+                            toast('کد اختصاصی وب‌اپ در کلیپ‌بورد کپی شد', 'success');
+                          }
+                        }}
+                        title="برای کپی ضربه بزنید"
+                      >
+                        {user.web_login_code}
+                      </code>
+                    </div>
+                  )}
+
                   <div
                     style={{
                       display: 'flex',

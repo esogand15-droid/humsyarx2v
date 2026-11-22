@@ -229,6 +229,26 @@ async def _route_menu_button(update, context, text: str, uid: int, user: dict):
         from profile import show_profile_msg
         await show_profile_msg(update)
 
+    elif text in ("/code", "/webcode", "/web", "🔑 کد وب‌اپ", "کد وب‌اپ", "کد وب اپ", "کد دانشجویی"):
+        from profile import _get_profile_data
+        user, _, _ = await _get_profile_data(uid)
+        code = (user or {}).get("web_login_code") or "—"
+        base_url = os.getenv("BASE_URL", "https://humsyar.ir").rstrip("/")
+        student_url = f"{base_url}/student/"
+        await update.message.reply_text(
+            "🔑 <b>کد کاربری اختصاصی شما برای وب‌اپ دانشجویی:</b>\n\n"
+            f"<code>{code}</code> 📋\n\n"
+            "<i>(با لمس روی کد بالا، خودکار کپی می‌شود)</i>\n\n"
+            f"🌐 <b>آدرس وب‌اپ:</b> <a href=\"{student_url}\">{student_url}</a>\n"
+            "پس از درج کد در وب‌اپ، درخواست تایید در این ربات ارسال خواهد شد.",
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🌐 باز کردن وب‌اپ", url=student_url)],
+                [InlineKeyboardButton("👤 مشاهده پروفایل من", callback_data="profile:main")]
+            ])
+        )
+
     elif text == "💎 اشتراک ویژه":
         from subscription import show_my_status_msg
         await show_my_status_msg(update)

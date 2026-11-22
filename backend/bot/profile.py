@@ -32,6 +32,7 @@ def _profile_text(user: dict, stats: dict, open_tickets: int, sub_line: str = ''
     uname     = f"@{user['username']}" if user.get('username') else '—'
     sid       = user.get('student_id', '') or '—'
     intake    = user.get('intake', '') or 'ثبت نشده'
+    web_code  = user.get('web_login_code') or '—'
 
     # 🏷 Identity v1 — لقب + حریم نمایش نام واقعی (سینک با مینی‌اپ)
     nick      = (user.get('nickname') or '').strip()
@@ -60,6 +61,7 @@ def _profile_text(user: dict, stats: dict, open_tickets: int, sub_line: str = ''
         f"🏷 <b>لقب:</b>  {nick_line}\n"
         f"👁 <b>نمایش عمومی:</b>  {priv_line}\n"
         f"🎓 <b>شماره دانشجویی:</b>  {sid}\n"
+        f"🔑 <b>کد کاربری وب‌اپ (۸ رقمی):</b>  <code>{web_code}</code> 📋\n"
         f"📅 <b>ورودی:</b>  {intake}\n"
         f"👥 <b>گروه:</b>  گروه {eff_group}{grp_note}\n"
         f"🚻 <b>گروه آموزشی:</b>  {edu_label}\n"
@@ -68,6 +70,7 @@ def _profile_text(user: dict, stats: dict, open_tickets: int, sub_line: str = ''
         f"📅 <b>ثبت‌نام:</b>  {reg_date}\n"
         + (f"{sub_line}" if sub_line else "") +
         "\n"
+        "<i>💡 با لمس روی کد کاربری بالا، در کلیپ‌بورد کپی می‌شود و می‌توانید در وب‌اپ وارد نمایید.</i>\n\n"
         "━━━━━━━━━━━━━━━━\n"
         "📊 <b>آمار تحصیلی</b>\n\n"
         f"🧪 سوال پاسخ داده: <b>{stats.get('total_answers', 0)}</b>\n"
@@ -88,7 +91,13 @@ async def _profile_keyboard(user: dict = None) -> InlineKeyboardMarkup:
     priv_btn  = InlineKeyboardButton(
         "🔒 پنهان‌سازی نام واقعی" if show_real else "👁 نمایش نام واقعی",
         callback_data='profile:toggle_privacy')
+    base_url = os.getenv("BASE_URL", "https://humsyar.ir").rstrip("/")
+    student_url = f"{base_url}/student/"
     rows = [
+        [
+            InlineKeyboardButton("🌐 ورود به وب‌اپ دانشجویی", url=student_url),
+            InlineKeyboardButton("🔑 راهنمای کد وب‌اپ", callback_data='profile:web_code'),
+        ],
         [
             InlineKeyboardButton("✏️ ویرایش نام",          callback_data='profile:edit_name'),
             InlineKeyboardButton("🎓 ویرایش شماره دانشجویی", callback_data='profile:edit_sid'),
@@ -134,6 +143,16 @@ async def _profile_keyboard(user: dict = None) -> InlineKeyboardMarkup:
 
 async def _get_profile_data(uid: int) -> tuple:
     user    = await db.get_user(uid)
+    if user:
+        from backend.core import student_code as sc
+        code = user.get('web_login_code')
+        if not code or not sc.is_valid_code_format(code):
+            try:
+                code = await sc.get_or_create_user_code(db, uid)
+            except Exception as e:
+                logger.warning("Error getting/creating student code for %s: %s", uid, e)
+        if code:
+            user['web_login_code'] = sc.format_code(code)
     stats   = await db.user_stats(uid)
     tickets = await db.ticket_get_user(uid)
     open_t  = sum(1 for t in tickets if t.get('status') == 'open')
@@ -156,6 +175,52 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not user:
             await query.edit_message_text("❌ کاربر پیدا نشد.")
             return
+        from subscription import sub_status_line
+        sub_line = await sub_status_line(uid)
+        await query.edit_message_text(
+            _profile_text(user, stats, open_t, sub_line),
+            parse_mode='HTML',
+            reply_markup=await _profile_keyboard(user)
+        )
+
+    # ── 🔑 راهنما و کد اختصاصی ورود به وب‌اپ ──
+    elif action == 'web_code':
+        user, _, _ = await _get_profile_data(uid)
+        code = (user or {}).get('web_login_code') or '—'
+        base_url = os.getenv("BASE_URL", "https://humsyar.ir").rstrip("/")
+        student_url = f"{base_url}/student/"
+        text = (
+            "🔑 <b>کد کاربری اختصاصی شما برای وب‌اپ دانشجویی</b>\n"
+            "━━━━━━━━━━━━━━━━\n\n"
+            f"کد ورود: <code>{code}</code> 📋\n\n"
+            "<i>(با لمس روی کد بالا، خودکار در حافظه گوشی کپی می‌شود)</i>\n\n"
+            "💡 <b>مراحل ورود به وب‌اپ:</b>\n"
+            f"۱. ابتدا وارد آدرس وب‌اپ شوید: <a href=\"{student_url}\">{student_url}</a>\n"
+            "۲. کد ۸ کاراکتری بالا را در کادر ورودی وارد کنید.\n"
+            "۳. دکمه «درخواست تایید ورود از ربات تلگرام» را بزنید.\n"
+            "۴. پیام تایید فوری در همین ربات ظاهر می‌شود و با زدن «✅ تأیید ورود»، وب‌اپ باز خواهد شد."
+        )
+        buttons = [
+            [InlineKeyboardButton("🌐 باز کردن وب‌اپ دانشجویی", url=student_url)],
+            [InlineKeyboardButton("🔄 بازتولید کد جدید (تغییر کد)", callback_data='profile:regen_code')],
+            [InlineKeyboardButton("🔙 بازگشت به پروفایل من", callback_data='profile:main')],
+        ]
+        await query.edit_message_text(
+            text, parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(buttons),
+            disable_web_page_preview=True
+        )
+
+    elif action == 'regen_code':
+        from backend.core import student_code as sc
+        for _ in range(10):
+            cand = sc.format_code(sc.generate_raw_code(), prefix=True)
+            collision = await db.users.find_one({"web_login_code": cand})
+            if not collision:
+                await db.users.update_one({"user_id": uid}, {"$set": {"web_login_code": cand}})
+                break
+        await query.answer("✅ کد وب‌اپ شما با موفقیت تغییر کرد.", show_alert=True)
+        user, stats, open_t = await _get_profile_data(uid)
         from subscription import sub_status_line
         sub_line = await sub_status_line(uid)
         await query.edit_message_text(

@@ -2295,6 +2295,29 @@ def build_application() -> Application:
     #    (هر دو برقرارند: Update.ALL_TYPES در webhook و polling).
     app.add_handler(PollAnswerHandler(quiz_poll_answer_handler))
 
+    async def code_cmd_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        from profile import _get_profile_data
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        uid = update.effective_user.id
+        user, _, _ = await _get_profile_data(uid)
+        code = (user or {}).get("web_login_code") or "—"
+        base_url = os.getenv("BASE_URL", "https://humsyar.ir").rstrip("/")
+        student_url = f"{base_url}/student/"
+        await update.message.reply_text(
+            "🔑 <b>کد کاربری اختصاصی شما برای وب‌اپ دانشجویی:</b>\n\n"
+            f"<code>{code}</code> 📋\n\n"
+            "<i>(با لمس روی کد بالا، خودکار در حافظه کپی می‌شود)</i>\n\n"
+            f"🌐 <b>آدرس وب‌اپ:</b> <a href=\"{student_url}\">{student_url}</a>\n"
+            "پس از درج کد در وب‌اپ، درخواست تایید ورود در همین ربات برای شما ارسال می‌شود.",
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🌐 باز کردن وب‌اپ", url=student_url)],
+                [InlineKeyboardButton("👤 مشاهده پروفایل من", callback_data="profile:main")]
+            ])
+        )
+
+
     # 🧠 FIX معماری: /cancel قبلاً فقط داخل state های حذف‌شده
     # (CA_WAITING_FILE/TEXT، PROFILE_EDIT_WAITING، TICKET_WAITING/
     # REPLY_WAITING) و در fallbacks خودِ conv در دسترس بود. حالا که آن
@@ -2302,6 +2325,7 @@ def build_application() -> Application:
     # تا همچنان بتواند ca_mode/ticket_mode/profile_edit/creating_question
     # را با همان تابع قبلی (cancel_handler) پاک کند.
     app.add_handler(CommandHandler('cancel', cancel_handler, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler(['code', 'webcode', 'web', 'login'], code_cmd_handler, filters=filters.ChatType.PRIVATE))
     # 🎙 م9 — دستور /live و /voicechat برای شروع ویس‌چت زنده با هوشیار (در گروه و چت خصوصی)
     app.add_handler(CommandHandler(['live', 'voicechat'], show_ai_live_card))
     # 📞 م9.2 — ورود و خروج مستقیم هوشیار به ویس‌چت گروه تلگرام (Group Voice Chat)
