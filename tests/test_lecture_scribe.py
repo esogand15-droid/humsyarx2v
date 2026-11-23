@@ -366,3 +366,68 @@ def test_gemini_vault_key_failover_on_429():
 
     asyncio.run(_run())
 
+
+def test_parse_json_from_text_resilience():
+    """تست استخراج مقاوم JSON خروجی هوش مصنوعی با تگ‌های Markdown و متن‌های حاشیه‌ای"""
+    from backend.services.lecture_scribe import _parse_json_from_text
+
+    # حالت ۱: JSON استاندارد با تگ markdown
+    sample1 = '```json\n{"title": "قلب", "subject": "پزشکی"}\n```'
+    parsed1 = _parse_json_from_text(sample1)
+    assert parsed1["title"] == "قلب"
+    assert parsed1["subject"] == "پزشکی"
+
+    # حالت ۲: متن توضیحی قبل و بعد از JSON
+    sample2 = 'این خلاصه جلسه است:\n```json\n{"title": "نورولوژی", "topics": [{"title": "سکته مغزی"}]}\n```\nامیدوارم مفید باشد.'
+    parsed2 = _parse_json_from_text(sample2)
+    assert parsed2["title"] == "نورولوژی"
+    assert len(parsed2["topics"]) == 1
+
+
+def test_smart_media_routing_and_callback():
+    """تست پاسخ به دکمه‌های تشخیص هوشمند خودکار صوت (Option 1)"""
+    import asyncio
+
+    async def _run():
+        mock_update = MagicMock()
+        mock_update.effective_user.id = 77777
+
+        # شبیه‌سازی کلیک روی دکمه ls:smart_scribe
+        query_mock = MagicMock()
+        query_mock.data = "ls:smart_scribe"
+        query_mock.answer = AsyncMock()
+        query_mock.delete_message = AsyncMock()
+        mock_update.callback_query = query_mock
+
+        pending_msg = MagicMock()
+        pending_msg.voice = None
+        pending_msg.audio = None
+        pending_msg.video = None
+        pending_msg.video_note = None
+        pending_msg.caption = ""
+
+        doc_mock = MagicMock()
+        doc_mock.file_name = "جلسه_استاد.m4a"
+        doc_mock.mime_type = "audio/mp4"
+        doc_mock.file_size = 12000000
+        doc_mock.file_id = "doc_m4a_777"
+        doc_mock.get_file = AsyncMock(return_value=MagicMock())
+        pending_msg.document = doc_mock
+        pending_msg.reply_text = AsyncMock()
+
+        mock_context = MagicMock()
+        mock_context.user_data = {
+            'pending_smart_media_msg': pending_msg
+        }
+
+        await handle_lecture_callback(mock_update, mock_context)
+
+        assert query_mock.answer.called
+        assert query_mock.delete_message.called
+        assert mock_context.user_data.get('mode') == 'lecture_scribe'
+        session_id = mock_context.user_data.get('lecture_session_id')
+        assert session_id in _LECTURE_SESSIONS
+
+    asyncio.run(_run())
+
+

@@ -17,6 +17,7 @@ import re
 import json
 import uuid
 import time
+import base64
 import asyncio
 import logging
 import tempfile
@@ -38,13 +39,20 @@ def expandable_quote(text: str) -> str:
 
 
 def _parse_json_from_text(raw: str) -> dict:
-    """استخراج و تمیزکاری JSON از پاسخ هوش مصنوعی (حذف تگ‌های احتمالی markdown)"""
+    """استخراج و تمیزکاری JSON از پاسخ هوش مصنوعی (حذف تگ‌های markdown و استخراج شیء JSON)"""
     clean = (raw or '').strip()
     if clean.startswith("```"):
         clean = re.sub(r"^```(?:json)?\s*", "", clean, flags=re.IGNORECASE)
         clean = re.sub(r"\s*```$", "", clean)
     clean = clean.strip()
-    return json.loads(clean)
+    try:
+        return json.loads(clean)
+    except json.JSONDecodeError:
+        # در صورت وجود متن حاشیه‌ای قبل یا بعد از پاسخ مدل، استخراج شیء JSON بین اولین { و آخرین }
+        m = re.search(r'(\{[\s\S]*\})', clean)
+        if m:
+            return json.loads(m.group(1))
+        raise
 
 
 # فرمت‌های معتبر رسانه‌ای برای دریافت و تحلیل
@@ -501,6 +509,45 @@ async def handle_lecture_callback(update: Update, context: ContextTypes.DEFAULT_
         from ai_solver import show_ai_intro
         return await show_ai_intro(update, context)
 
+    # دکمه‌های تشخیص هوشمند خودکار صوت
+    if data == 'ls:smart_scribe':
+        await query.answer()
+        context.user_data['mode'] = 'lecture_scribe'
+        pending_msg = context.user_data.pop('pending_smart_media_msg', None)
+        try:
+            await query.delete_message()
+        except Exception:
+            pass
+        if pending_msg:
+            # کپی پیام جهت ارسال به هندلر جزوه‌نویس
+            update.message = pending_msg
+            return await handle_lecture_file_input(update, context)
+        return await show_lecture_scribe_intro(update, context)
+
+    if data == 'ls:smart_ai':
+        await query.answer()
+        context.user_data['mode'] = 'ai_query'
+        pending_msg = context.user_data.pop('pending_smart_media_msg', None)
+        try:
+            await query.delete_message()
+        except Exception:
+            pass
+        if pending_msg:
+            update.message = pending_msg
+            from ai_solver import handle_ai_media
+            return await handle_ai_media(update, context)
+        from ai_solver import show_ai_intro
+        return await show_ai_intro(update, context)
+
+    if data == 'ls:smart_cancel':
+        context.user_data.pop('pending_smart_media_msg', None)
+        await query.answer("عملیات لغو شد.")
+        try:
+            await query.delete_message()
+        except Exception:
+            pass
+        return
+
     parts = data.split(':')
     action = parts[1] if len(parts) > 1 else ''
     session_id = parts[2] if len(parts) > 2 else ''
@@ -644,10 +691,11 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
                 "لطفاً کلیدهای Google AI Studio را در پنل ادمین ثبت فرمایید."
             )
 
-        # مرحله ۳: تعریف مدل‌های برتر و رایگان گوگل به صورت آبشاری (Cascade Fallback)
-        preferred_model = (cfg.get('lecture_model') or 'gemini-2.5-flash').strip()
+        # مرحله ۳: تعریف مدل‌های برتر و فعال گوگل به صورت آبشاری (Cascade Fallback)
+        from ai_solver import _no_thinking
+        preferred_model = (cfg.get('lecture_model') or 'gemini-3.6-flash').strip()
         candidate_models = [preferred_model]
-        for m in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro']:
+        for m in ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-pro', 'gemini-2.0-flash-exp']:
             if m not in candidate_models:
                 candidate_models.append(m)
 
@@ -672,52 +720,60 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
 
         # مرحله ۴: اجرای پایپ‌لاین آپلود و تحلیل تحت فال‌بک خودکار کلیدهای Vault
         async def _process_with_gemini_key(key: str) -> dict:
-            uploaded_audio_info = None
-            uploaded_doc_info = None
-
-            if audio_bytes:
-                await status_msg.edit_text(
-                    "🧠 <b>در حال بارگذاری صوت جلسه در پردازشگر ابری گوگل...</b>",
-                    parse_mode='HTML'
-                )
-                fi = await _gemini_upload_file(key, audio_bytes, audio_mime, 'lecture_recording.mp3')
-                uploaded_audio_info = await _gemini_wait_file_active(key, fi, timeout=180)
-
-            if pdf_bytes:
-                await status_msg.edit_text(
-                    "📑 <b>در حال بارگذاری اسلایدها در پردازشگر ابری گوگل...</b>",
-                    parse_mode='HTML'
-                )
-                fi = await _gemini_upload_file(key, pdf_bytes, 'application/pdf', 'lecture_slides.pdf')
-                uploaded_doc_info = await _gemini_wait_file_active(key, fi, timeout=180)
-
             parts = []
-            if uploaded_audio_info and uploaded_audio_info.get('uri'):
-                parts.append({
-                    'file_data': {
-                        'file_uri': uploaded_audio_info['uri'],
-                        'mime_type': uploaded_audio_info.get('mimeType') or audio_mime
-                    }
-                })
-            if uploaded_doc_info and uploaded_doc_info.get('uri'):
-                parts.append({
-                    'file_data': {
-                        'file_uri': uploaded_doc_info['uri'],
-                        'mime_type': 'application/pdf'
-                    }
-                })
-            parts.append({'text': user_prompt_text})
 
-            payload = {
-                'system_instruction': {'parts': [{'text': system_prompt}]},
-                'contents': [{'role': 'user', 'parts': parts}],
-                'generationConfig': {
-                    'responseMimeType': 'application/json',
-                    'responseSchema': LECTURE_DIGEST_SCHEMA,
-                    'maxOutputTokens': 8192,
-                    'temperature': 0.2,
-                }
-            }
+            # ۱. ارسال صوت: برای فایل‌های سبک (<15MB) به صورت inline_data (فوق‌سریع و بدون خطای Files API)
+            # برای فایل‌های سنگین‌تر با Files API
+            if audio_bytes:
+                if len(audio_bytes) < 15 * 1024 * 1024:
+                    b64_audio = base64.b64encode(audio_bytes).decode('utf-8')
+                    parts.append({
+                        'inline_data': {
+                            'mime_type': 'audio/mp3',
+                            'data': b64_audio
+                        }
+                    })
+                else:
+                    await status_msg.edit_text(
+                        "🧠 <b>در حال بارگذاری صوت طولانی جلسه در پردازشگر ابری گوگل...</b>",
+                        parse_mode='HTML'
+                    )
+                    fi = await _gemini_upload_file(key, audio_bytes, audio_mime or 'audio/mp3', 'lecture_recording.mp3')
+                    uploaded_audio = await _gemini_wait_file_active(key, fi, timeout=180)
+                    if uploaded_audio and uploaded_audio.get('uri'):
+                        parts.append({
+                            'file_data': {
+                                'file_uri': uploaded_audio['uri'],
+                                'mime_type': uploaded_audio.get('mimeType') or 'audio/mp3'
+                            }
+                        })
+
+            # ۲. ارسال اسلایدها (PDF)
+            if pdf_bytes:
+                if len(pdf_bytes) < 10 * 1024 * 1024:
+                    b64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+                    parts.append({
+                        'inline_data': {
+                            'mime_type': 'application/pdf',
+                            'data': b64_pdf
+                        }
+                    })
+                else:
+                    await status_msg.edit_text(
+                        "📑 <b>در حال بارگذاری اسلایدهای حجیم در پردازشگر ابری گوگل...</b>",
+                        parse_mode='HTML'
+                    )
+                    fi = await _gemini_upload_file(key, pdf_bytes, 'application/pdf', 'lecture_slides.pdf')
+                    uploaded_doc = await _gemini_wait_file_active(key, fi, timeout=180)
+                    if uploaded_doc and uploaded_doc.get('uri'):
+                        parts.append({
+                            'file_data': {
+                                'file_uri': uploaded_doc['uri'],
+                                'mime_type': 'application/pdf'
+                            }
+                        })
+
+            parts.append({'text': user_prompt_text})
 
             last_model_error = None
             for model_cand in candidate_models:
@@ -728,8 +784,31 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_cand}:generateContent"
                 headers = {'Content-Type': 'application/json', 'x-goog-api-key': key}
 
+                # غیرفعال‌سازی تفکر اضافه (thinkingBudget: 0) جهت سازگاری کامل با responseSchema
+                gen_cfg = _no_thinking({
+                    'responseMimeType': 'application/json',
+                    'responseSchema': LECTURE_DIGEST_SCHEMA,
+                    'maxOutputTokens': 8192,
+                    'temperature': 0.2,
+                }, model=model_cand)
+
+                payload = {
+                    'system_instruction': {'parts': [{'text': system_prompt}]},
+                    'contents': [{'role': 'user', 'parts': parts}],
+                    'generationConfig': gen_cfg
+                }
+
                 async with httpx.AsyncClient(timeout=240) as client:
                     res = await client.post(url, headers=headers, json=payload)
+
+                # خودترمیمی در صورت خطای ۴۰۰ مرتبط با ساختار اسکیما: ارسال مجدد بدون schema
+                if res.status_code == 400 and ('schema' in res.text.lower() or 'argument' in res.text.lower()):
+                    logger.warning("مدل %s با اسکیما خطای ۴۰۰ داد؛ تلاش مجدد بدون responseSchema...", model_cand)
+                    fallback_cfg = {k: v for k, v in gen_cfg.items() if k != 'responseSchema'}
+                    fallback_payload = dict(payload)
+                    fallback_payload['generationConfig'] = fallback_cfg
+                    async with httpx.AsyncClient(timeout=240) as client:
+                        res = await client.post(url, headers=headers, json=fallback_payload)
 
                 if res.status_code == 200:
                     try:
@@ -751,7 +830,7 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
                     logger.warning("کلید Gemini با کد %d نامعتبر است → سوییچ خودکار به کلید بعدی...", res.status_code)
                     _raise_gemini_status_error(res.status_code, res.text)
 
-                # اگر مدل در دسترس نبود (۴۰۴ یا خطای مدل) به مدل بعدی همین کلید سوئیچ شود
+                # اگر مدل در دسترس نبود (۴۰۴ یا ۵۰۳ یا خطای مدل) به مدل بعدی همین کلید سوئیچ شود
                 if res.status_code in (404, 503) or (res.status_code == 400 and ('not found' in res.text.lower() or 'not supported' in res.text.lower())):
                     logger.warning("مدل %s با کد %d پاسخ نداد؛ سوئیچ به مدل بعدی در زنجیره فال‌بک...", model_cand, res.status_code)
                     last_model_error = RuntimeError(f"Model {model_cand} returned {res.status_code}")

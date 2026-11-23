@@ -91,6 +91,7 @@ RUN for i in 1 2 3; do apt-get update && break || sleep 8; done \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
       curl \
+      ffmpeg \
       libjpeg62-turbo \
       zlib1g \
       libfreetype6 \

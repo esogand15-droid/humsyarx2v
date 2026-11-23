@@ -1581,30 +1581,89 @@ async def unified_file_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         if await quiz_upload_hook(update, context):
             return
 
-    # 🎙 هوشیار — دستیار جزوه‌نویس چندرسانه‌ای (Lecture Scribe)
-    if context.user_data.get('mode') in ('lecture_scribe', 'lecture_scribe_attach') and (
-        update.message.voice or update.message.audio or update.message.video or
-        (update.message.document and (
-            update.message.document.mime_type == 'application/pdf' or
-            (update.message.document.file_name or '').lower().endswith('.pdf') or
-            (update.message.document.mime_type or '').startswith('audio/')
-        ))
-    ):
+    # 🎙 هوشیار — دستیار جزوه‌نویس چندرسانه‌ای و تحلیل هوشمند صوت
+    _AUDIO_EXTS = ('.m4a', '.aac', '.mp3', '.wav', '.ogg', '.opus', '.flac', '.amr', '.wma', '.aiff', '.m4b')
+    _VIDEO_EXTS = ('.mp4', '.mkv', '.mov', '.avi', '.webm', '.3gp', '.wmv', '.flv')
+
+    msg = update.message
+    is_media_file = False
+    media_display_name = ''
+    media_icon = '🎙'
+
+    if msg.voice:
+        is_media_file = True
+        media_display_name = f"ویس ({msg.voice.duration} ثانیه)"
+        media_icon = '🎙'
+    elif msg.audio:
+        is_media_file = True
+        media_display_name = msg.audio.file_name or "فایل صوتی"
+        media_icon = '🎧'
+    elif msg.video:
+        is_media_file = True
+        media_display_name = msg.video.file_name or "ویدیو کلاسی"
+        media_icon = '🎬'
+    elif getattr(msg, 'video_note', None):
+        is_media_file = True
+        media_display_name = f"پیام تصویری ({getattr(msg.video_note, 'duration', 0)} ثانیه)"
+        media_icon = '📹'
+    elif msg.document:
+        doc_fn = (msg.document.file_name or '').lower()
+        doc_mt = (msg.document.mime_type or '').lower()
+        if doc_fn.endswith(_AUDIO_EXTS) or doc_mt.startswith('audio/'):
+            is_media_file = True
+            media_display_name = msg.document.file_name or "فایل صوتی"
+            media_icon = '🎧'
+        elif doc_fn.endswith(_VIDEO_EXTS) or doc_mt.startswith('video/'):
+            is_media_file = True
+            media_display_name = msg.document.file_name or "ویدیو کلاسی"
+            media_icon = '🎬'
+
+    is_pdf_file = bool(msg.document and (
+        msg.document.mime_type == 'application/pdf' or
+        (msg.document.file_name or '').lower().endswith('.pdf')
+    ))
+
+    # الف) اگر کاربر در سشن اختصاصی جزوه‌نویس است
+    if context.user_data.get('mode') in ('lecture_scribe', 'lecture_scribe_attach') and (is_media_file or is_pdf_file):
         from lecture_scribe import handle_lecture_file_input
         return await handle_lecture_file_input(update, context)
 
-    # 🤖 هوشیار — عکس/PDF/صدا در حالت «پرسش از AI»
-    # ⚠️ قابلیتِ جدید: قبلاً فقط عکس پشتیبانی می‌شد؛ حالا PDF (جزوه/برگه‌ی
-    # اسکن‌شده) و پیامِ صوتی/فایلِ صوتی (سوالِ گفتاری) هم قبول می‌شه —
-    # جزئیاتِ تشخیصِ نوع و اعتبارسنجی داخلِ خودِ handle_ai_media است.
+    # ب) اگر عکس در حالت پرسش از هوش مصنوعی است
     if context.user_data.get('mode') == 'ai_query' and (
-        update.message.photo or update.message.voice or update.message.audio or
-        (update.message.document and (
-            (update.message.document.mime_type or '').startswith('image/') or
-            update.message.document.mime_type == 'application/pdf'
-        ))
+        msg.photo or (msg.document and (msg.document.mime_type or '').startswith('image/'))
     ):
         return await handle_ai_media(update, context)
+
+    # ج) اگر PDF در حالت پرسش عادی هوشیار است
+    if context.user_data.get('mode') == 'ai_query' and is_pdf_file:
+        return await handle_ai_media(update, context)
+
+    # د) تشخیص هوشمند خودکار: با ارسال هر فایل صوتی (m4a, mp3, voice) یا ویدیو در هر کجای ربات
+    if is_media_file:
+        context.user_data['pending_smart_media_msg'] = msg
+        raw_size = getattr(msg.voice or msg.audio or msg.video or msg.document, 'file_size', 0)
+        size_num = int(raw_size) if isinstance(raw_size, (int, float)) else 0
+        size_str = f"{size_num / (1024*1024):.1f} MB" if size_num >= 1024*1024 else f"{size_num // 1024} KB"
+
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📄 تدوین جزوه کامل دانشگاهی PDF", callback_data="ls:smart_scribe"),
+            ],
+            [
+                InlineKeyboardButton("🤖 تحلیل صوتی و پاسخ به سوال توسط هوشیار", callback_data="ls:smart_ai"),
+            ],
+            [
+                InlineKeyboardButton("❌ انصراف", callback_data="ls:smart_cancel"),
+            ]
+        ])
+
+        text = (
+            f"🎙 <b>هوشیار فایل صوتی/تصویری شما را دریافت کرد:</b>\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"📁 <b>فایل:</b> {media_icon} <code>{media_display_name}</code> ({size_str})\n\n"
+            f"❓ <b>مایلید چه پردازشی روی این فایل انجام شود؟</b>"
+        )
+        return await msg.reply_text(text, parse_mode='HTML', reply_markup=kb)
 
     # ۱. بکاپ restore
     if uid == ADMIN_ID and context.user_data.get('backup_mode') == 'waiting_restore':
