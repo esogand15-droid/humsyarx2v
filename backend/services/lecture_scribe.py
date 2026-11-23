@@ -17,6 +17,7 @@ import re
 import json
 import uuid
 import time
+import html
 import base64
 import asyncio
 import logging
@@ -25,6 +26,7 @@ import shutil
 from typing import Optional, Dict, Any, Tuple
 
 import httpx
+import telegram
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -55,6 +57,89 @@ def _parse_json_from_text(raw: str) -> dict:
         raise
 
 
+# مدل‌های تأییدشده و معتبر گوگل برای جلوگیری از خطای مدل‌های خیالی
+VERIFIED_MODEL_CASCADE = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-2.5-pro',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+]
+
+HALLUCINATED_MODELS = [
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
+]
+
+
+def resolve_gemini_api_keys(cfg: dict | None = None) -> list[str]:
+    """Canonical resolver for Gemini API keys across MongoDB Vault and Environment Variables.
+
+    Order of precedence:
+      1. DB Vault keys ('gemini' provider list from vault_multi or api_key_list or api_key)
+      2. GEMINI_API_KEYS (comma, semicolon, or newline delimited)
+      3. GEMINI_API_KEY
+      4. GOOGLE_API_KEY
+    All keys are sanitized, trimmed, deduplicated, and passed through ordered_keys.
+    """
+    raw_keys: list[str] = []
+    if cfg:
+        vault_multi = cfg.get('vault_multi') or {}
+        raw_keys.extend(vault_multi.get('gemini') or [])
+        if not raw_keys and cfg.get('provider') == 'gemini':
+            raw_keys.extend(cfg.get('api_key_list') or [])
+        if not raw_keys and cfg.get('api_key'):
+            raw_keys.append(cfg['api_key'])
+
+    for env_k in ['GEMINI_API_KEYS', 'GEMINI_API_KEY', 'GOOGLE_API_KEY']:
+        env_val = os.getenv(env_k)
+        if env_val:
+            for part in re.split(r"[,;\s]+", env_val.strip()):
+                cleaned = part.strip()
+                if cleaned:
+                    raw_keys.append(cleaned)
+
+    from backend.services.ai_solver import sanitize_api_key, ordered_keys
+    seen = set()
+    deduped: list[str] = []
+    for k in raw_keys:
+        clean = sanitize_api_key(k) if k else ""
+        if clean and clean not in seen:
+            seen.add(clean)
+            deduped.append(clean)
+    return ordered_keys('gemini', deduped)
+
+
+def resolve_candidate_models(cfg: dict | None = None) -> list[str]:
+    """Canonical resolver for candidate Gemini models adhering to verified production hierarchy.
+
+    Eliminates hallucinated models (gemini-3.6-flash, gemini-3.5-flash-lite)
+    and establishes high-throughput cascade starting with gemini-2.5-flash.
+    """
+    hallucinated = set(HALLUCINATED_MODELS)
+    preferred = ((cfg.get('lecture_model') if cfg else '') or 'gemini-2.5-flash').strip()
+
+    models: list[str] = []
+    if preferred and preferred not in hallucinated:
+        models.append(preferred)
+
+    for m in VERIFIED_MODEL_CASCADE:
+        if m not in models:
+            models.append(m)
+    return models
+
+
+def auto_repair_generation_config(gen_cfg: dict) -> dict:
+    """Auto-repairs generationConfig on HTTP 400 schema/argument mismatch.
+
+    Strips responseSchema and thinkingConfig while preserving responseMimeType='application/json'.
+    """
+    return {
+        k: v for k, v in (gen_cfg or {}).items()
+        if k not in ('responseSchema', 'thinkingConfig')
+    }
+
+
 # فرمت‌های معتبر رسانه‌ای برای دریافت و تحلیل
 AUDIO_EXTENSIONS = {'.m4a', '.aac', '.mp3', '.wav', '.ogg', '.opus', '.flac', '.amr', '.wma', '.aiff', '.m4b'}
 VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.mov', '.avi', '.webm', '.3gp', '.wmv', '.flv'}
@@ -72,16 +157,70 @@ def _get_ffmpeg_path() -> Optional[str]:
     return shutil.which('ffmpeg')
 
 
+async def transcode_audio_file(
+    input_path: str,
+    output_path: Optional[str] = None,
+    bitrate: str = "32k",
+    sample_rate: str = "16000",
+    timeout: int = 300,
+) -> str:
+    """
+    تبدیل استریم دیسک-به-دیسک با ffmpeg:
+    ورودی رسانه روی دیسک را به فایل سبک ۱۶ کیلوهرتز تک‌کاناله MP3 با بیت‌ریت ۳۲ کیلوبیت تبدیل می‌کند (~۷۶٪ فشرده‌سازی گفتار).
+    """
+    ffmpeg_exe = _get_ffmpeg_path()
+    if not output_path:
+        fd, output_path = tempfile.mkstemp(suffix=".mp3", prefix="transcoded_")
+        os.close(fd)
+
+    if not ffmpeg_exe:
+        logger.warning("ابزار ffmpeg در سیستم یافت نشد؛ مسیر ورودی دست‌نخورده استفاده می‌شود: %s", input_path)
+        return input_path
+
+    cmd = [
+        ffmpeg_exe, '-y',
+        '-i', input_path,
+        '-vn',              # حذف ویدیوی اضافه در صورت وجود
+        '-ar', str(sample_rate),  # فرکانس ۱۶۰۰۰ هرتز بهینه برای پردازش صوتی هوش مصنوعی
+        '-ac', '1',          # تک‌کاناله مونو
+        '-b:a', str(bitrate),# بیت‌ریت ۳۲ کیلوبیت برای کیفیت صدای شفاف و حجم سبک
+        '-f', 'mp3',
+        output_path,
+    ]
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+
+        if proc.returncode != 0 or not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+            logger.warning(
+                "خطا در تبدیل دیسک با ffmpeg (کد خروج %s): %s",
+                proc.returncode,
+                (stderr or b'')[:300].decode('utf-8', errors='ignore'),
+            )
+            return input_path
+
+        return output_path
+    except Exception as exc:
+        logger.warning("استثنا حین تبدیل فایل با ffmpeg: %s", exc)
+        return input_path
+
+
 async def transcode_media_to_optimized_audio(
-    media_bytes: bytes, original_name: str = ''
+    media_bytes: bytes, original_name: str = '', bitrate: str = "32k"
 ) -> Tuple[bytes, str, str]:
     """
     تبدیل هوشمند انواع فرمت‌های صوتی و ویدیویی (m4a, aac, mp4, mkv, ogg, wav, flac, wma, ...)
-    به فایل صوتی سبک استاندارد MP3 (تک‌کاناله ۱۶ کیلوهرتز ۴۸ کیلوبیت).
-    - مصرف حجم را تا ۷۵٪ کاهش می‌دهد (مثلاً ۵۳ مگابایت به ۱۰ مگابایت)
+    به فایل صوتی سبک استاندارد MP3 (تک‌کاناله ۱۶ کیلوهرتز ۳۲ کیلوبیت).
+    - مصرف حجم را تا ۷۶٪ کاهش می‌دهد (مثلاً ۵۳ مگابایت به ۱۰ مگابایت)
     - استریم‌های ویدیویی اضافه را حذف می‌کند (-vn)
     - آپلود سریع بدون قطعی و تایم‌اوت را تضمین می‌کند
     - سازگاری ۱۰۰٪ با Google Gemini Files API بدون خطای MIME Type ایجاد می‌کند
+    - نسخه سازگار برای بایت‌های درون حافظه و حفظ سازگاری تست‌های واحد.
     """
     ffmpeg_exe = _get_ffmpeg_path()
     ext = os.path.splitext(original_name.lower())[1] if original_name else '.m4a'
@@ -93,68 +232,38 @@ async def transcode_media_to_optimized_audio(
         safe_mime = 'audio/mp4' if ext in ('.m4a', '.mp4') else ('audio/aac' if ext == '.aac' else 'audio/mpeg')
         return media_bytes, safe_mime, original_name or 'lecture.mp3'
 
-    tmp_in = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
-    tmp_out = tempfile.NamedTemporaryFile(suffix='.mp3', delete=False)
-
-    try:
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp_in:
         tmp_in.write(media_bytes)
-        tmp_in.flush()
-        tmp_in.close()
-        tmp_out.close()
+        in_path = tmp_in.name
 
-        cmd = [
-            ffmpeg_exe, '-y',
-            '-i', tmp_in.name,
-            '-vn',              # حذف ویدیوی اضافه در صورت وجود
-            '-ar', '16000',      # فرکانس نمونه‌برداری بهینه گفتار
-            '-ac', '1',          # تک‌کاناله مونو
-            '-b:a', '48k',       # بیت‌ریت ۴۸ کیلوبیت برای کیفیت صدای شفاف و حجم سبک
-            '-f', 'mp3',
-            tmp_out.name
-        ]
+    out_path = None
+    try:
+        out_path = await transcode_audio_file(in_path, bitrate=bitrate)
+        if out_path and os.path.exists(out_path) and out_path != in_path and os.path.getsize(out_path) > 0:
+            with open(out_path, 'rb') as f:
+                optimized_bytes = f.read()
 
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=180)
-
-        if proc.returncode != 0 or not os.path.exists(tmp_out.name) or os.path.getsize(tmp_out.name) == 0:
-            logger.warning(
-                "خطا در تبدیل صدا با ffmpeg: %s (کد خروج %s)",
-                (stderr or b'')[:300].decode('utf-8', errors='ignore'),
-                proc.returncode
+            logger.info(
+                "تبدیل موفق رسانه کلاسی: حجم اولیه %d بایت → بهینه %d بایت (کاهش %.1f%%)",
+                len(media_bytes),
+                len(optimized_bytes),
+                (1.0 - (len(optimized_bytes) / max(len(media_bytes), 1))) * 100.0
             )
-            safe_mime = 'audio/mp4' if ext in ('.m4a', '.mp4') else 'audio/mpeg'
-            return media_bytes, safe_mime, original_name or 'lecture.mp3'
+            return optimized_bytes, 'audio/mp3', 'optimized_lecture.mp3'
 
-        with open(tmp_out.name, 'rb') as f:
-            optimized_bytes = f.read()
-
-        logger.info(
-            "تبدیل موفق رسانه کلاسی: حجم اولیه %d بایت → بهینه %d بایت (کاهش %.1f%%)",
-            len(media_bytes),
-            len(optimized_bytes),
-            (1.0 - (len(optimized_bytes) / max(len(media_bytes), 1))) * 100.0
-        )
-        return optimized_bytes, 'audio/mp3', 'optimized_lecture.mp3'
-
+        safe_mime = 'audio/mp4' if ext in ('.m4a', '.mp4') else 'audio/mpeg'
+        return media_bytes, safe_mime, original_name or 'lecture.mp3'
     except Exception:
         logger.exception("استثنا در فرآیند تبدیل رسانه کلاسی با ffmpeg")
         safe_mime = 'audio/mp4' if ext in ('.m4a', '.mp4') else 'audio/mpeg'
         return media_bytes, safe_mime, original_name or 'lecture.mp3'
     finally:
-        try:
-            if os.path.exists(tmp_in.name):
-                os.remove(tmp_in.name)
-        except Exception:
-            pass
-        try:
-            if os.path.exists(tmp_out.name):
-                os.remove(tmp_out.name)
-        except Exception:
-            pass
+        for p in (in_path, out_path):
+            if p and os.path.exists(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
 
 
 logger = logging.getLogger(__name__)
@@ -418,15 +527,18 @@ async def handle_lecture_file_input(update: Update, context: ContextTypes.DEFAUL
         _LECTURE_SESSIONS[session_id] = current_session
         context.user_data['lecture_session_id'] = session_id
 
-    # افزودن فایل جدید به سشن
-    tg_file = await file_obj.get_file()
+    # افزودن فایل جدید به سشن (بدون فراخوانی شبکه تلگرام جهت جلوگیری از خطای سقف ۲۰ مگابایت)
+    file_size_num = getattr(file_obj, 'file_size', None) or getattr(file_obj, 'file_size_bytes', None) or 0
     file_info = {
         'kind': kind,
         'mime': mime,
         'name': name,
         'tg_file_id': file_obj.file_id,
-        'tg_file_path': getattr(tg_file, 'file_path', None),
-        'file_size': getattr(file_obj, 'file_size', 0),
+        'file_unique_id': getattr(file_obj, 'file_unique_id', None),
+        'tg_file_path': None,
+        'file_size': file_size_num,
+        'chat_id': msg.chat_id,
+        'message_id': msg.message_id,
         'caption': (msg.caption or '').strip(),
     }
     current_session['files'].append(file_info)
@@ -587,103 +699,181 @@ async def handle_lecture_callback(update: Update, context: ContextTypes.DEFAULT_
         return await run_lecture_processing(update, context, session_id)
 
 
-async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str):
-    """اجرای پایپ‌لاین کامل پردازش چندرسانه‌ای با Gemini و تولید PDF"""
-    uid = update.effective_user.id
-    query = update.callback_query
-    msg = query.message if query else update.effective_message
-
-    session = _LECTURE_SESSIONS.get(session_id)
-    if not session or not session.get('files'):
-        await msg.reply_text("⚠️ اطلاعات این جلسه یافت نشد یا منقضی شده است. لطفاً فایل‌ها را مجدداً ارسال فرمایید.")
-        return
-
-    # ۱. بررسی سهمیه روزانه کاربر
-    from ai_solver import check_and_consume_lecture_quota, ai_claim_inflight, ai_release_inflight, get_ai_config
-    cfg = await get_ai_config()
-
-    allowed, used, limit = await check_and_consume_lecture_quota(uid)
-    if not allowed:
-        await msg.reply_text(
-            f"⛔️ <b>سقف روزانهٔ تولید جزوه پایان یافته است ({used}/{limit}).</b>\n"
-            "فردا مجدداً می‌توانید برای کلاس‌های جدید جزوه تولید کنید.",
-            parse_mode='HTML'
+def format_persian_lecture_error(exc: Exception) -> str:
+    """Format reassuring Persian error message mapped to error category."""
+    from backend.services.ai_solver import AIQuotaError
+    err_str = str(exc).lower() if exc else ""
+    if isinstance(exc, AIQuotaError) or "429" in err_str or "quota" in err_str or "سقف" in str(exc):
+        return (
+            "⚠️ <b>تکمیل موقت ظرفیت پردازش هوش مصنوعی</b>\n\n"
+            "دانشجوی گرامی، به دلیل ترافیک بسیار بالای سرورهای هوش مصنوعی، امکان تکمیل پردازش این فایل در حال حاضر میسر نشد.\n\n"
+            "✅ <b>سهمیه شما محفوظ ماند:</b> سهمیه روزانه شما برای این جلسه کسر نگردیده و کاملاً محفوظ است.\n"
+            "لطفاً چند دقیقه دیگر مجدداً تلاش فرمایید یا فایل خود را در ساعتی خلوت‌تر ارسال فرمایید."
         )
-        return
-
-    # ۲. قفل درخواست همزمان
-    if not await ai_claim_inflight(uid):
-        await msg.reply_text("⏳ لطفاً تا اتمام پردازش درخواست فعلی خود صبر فرمایید.")
-        return
-
-    # پیام اولیه پیشرفت
-    status_msg = await msg.reply_text(
-        "⏳ <b>در حال دانلود و آماده‌سازی فایل‌های جلسه...</b>\n"
-        "لطفاً صبور باشید؛ پردازش صوت‌های طولانی ممکن است ۱ الی ۲ دقیقه طول بکشد.",
-        parse_mode='HTML'
+    if isinstance(exc, (httpx.TimeoutException, httpx.ConnectError, asyncio.TimeoutError)) or "timeout" in err_str or "connect" in err_str:
+        return (
+            "⏱ <b>خطای وقفه در ارتباط شبکه (Timeout)</b>\n\n"
+            "ارتباط با سرور پردازش ابری به دلیل حجم بالای محتوا یا اختلال لحظه‌ای شبکه اینترنت قطع شد.\n\n"
+            "✅ <b>سهمیه شما بازگردانده شد:</b> این عملیات ناموفق بود و سهمیه روزانه شما به طور خودکار بازگردانی شد.\n"
+            "پیشنهاد می‌شود از پایداری ارتباط اطمینان حاصل فرموده و مجدداً فایل خود را ارسال نمایید."
+        )
+    if isinstance(exc, (json.JSONDecodeError, ValueError)) or "audio" in err_str or "صوت" in str(exc) or "codec" in err_str:
+        return (
+            "🎙 <b>اشکال در تحلیل و پردازش محتوای جلسه</b>\n\n"
+            "فایل صوتی ارسال‌شده فاقد وضوح کافی گفتار است، مخدوش بوده و یا ساختار علمی جلسه کلاسی از آن قابل استخراج نبود.\n\n"
+            "✅ <b>سهمیه شما کسر نگردید:</b> هیچ سهمیه‌ای برای این درخواست از حساب شما کسر نشد.\n"
+            "لطفاً مطمئن شوید فایل حاوی صدای واضح تدریس استاد با فرمت معتبر صوتی (مانند MP3 یا M4A) است و مجدداً امتحان فرمایید."
+        )
+    return (
+        "⚠️ <b>بروز خطای غیرمنتظره در تولید جزوه</b>\n\n"
+        "متأسفانه در حین پردازش نهایی و تدوین جزوه اختلالی رخ داد و تکمیل فایل با مشکل مواجه شد.\n\n"
+        "✅ <b>سهمیه شما بازگردانده شد:</b> یک واحد سهمیه مصرف‌شده به حساب شما برگشت داده شد.\n"
+        "تیم فنی از بروز این خطا مطلع شد. لطفاً چند لحظه بعد مجدداً فایل خود را ارسال فرمایید."
     )
 
+
+
+async def run_lecture_processing_worker(
+    bot: telegram.Bot,
+    chat_id: int,
+    uid: int,
+    session: Optional[dict] = None,
+    status_msg_id: int = 0,
+    status_updater: Optional[Any] = None,
+    session_id: Optional[str] = None,
+    file_info: Optional[Any] = None,
+    **kwargs,
+) -> bool:
+    """
+    پردازش کامل و ایزوله جلسه درسی در پس‌زمینه (Worker Queue):
+    - دانلود مستقیم روی دیسک با telegram_downloader (بدون محدودیت ۲۰ مگابایت)
+    - تبدیل استریم دیسک-به-دیسک با transcode_audio_file
+    - ارسال به مدل‌های چندرسانه‌ای هوش مصنوعی با چرخش خودکار کلیدها و مدل‌ها
+    - تولید سند آکادمیک PDF با سربرگ هامزیار و تحویل در چت کاربر
+    - مدیریت خطای اتمیک: استرداد تضمینی سهمیه و آزادسازی قفل در finally
+    """
+    from ai_solver import (
+        ai_claim_inflight, ai_release_inflight, refund_lecture_quota, get_ai_config,
+        sanitize_api_key, ordered_keys, run_with_key_failover,
+        _gemini_upload_file, _gemini_wait_file_active,
+        _extract_gemini_text, _raise_gemini_status_error,
+        AIConfigError, AIQuotaError, AIError, _no_thinking
+    )
+    from backend.services.telegram_downloader import download_telegram_media
+
+    async def _update_status(text: str, force: bool = False):
+        if status_updater:
+            if callable(status_updater):
+                await status_updater(text, force=force)
+            elif hasattr(status_updater, 'update'):
+                await status_updater.update(text, force=force)
+        elif bot and chat_id and status_msg_id:
+            try:
+                await bot.edit_message_text(chat_id=chat_id, message_id=status_msg_id, text=text, parse_mode='HTML')
+            except Exception:
+                pass
+
+    # بازیابی اطلاعات سشن
+    if session is None:
+        if session_id and session_id in _LECTURE_SESSIONS:
+            session = _LECTURE_SESSIONS[session_id]
+        elif isinstance(file_info, dict) and 'files' in file_info:
+            session = file_info
+        elif isinstance(file_info, dict):
+            session = {'session_id': session_id or f'ls_{uid}', 'user_id': uid, 'files': [file_info]}
+        elif isinstance(file_info, list):
+            session = {'session_id': session_id or f'ls_{uid}', 'user_id': uid, 'files': file_info}
+        else:
+            session = {}
+
+    sess_id = session.get('session_id') or session_id or f"ls_{uid}_{uuid.uuid4().hex[:6]}"
+    files = session.get('files', [])
+    if not files and isinstance(file_info, dict):
+        files = [file_info]
+        session['files'] = files
+
+    if not files:
+        await _update_status("⚠️ اطلاعات فایل‌های جلسه یافت نشد یا منقضی شده است.", force=True)
+        return False
+
+    job_temp_dir = tempfile.mkdtemp(prefix=f"lecture_{sess_id}_")
+
+    # اخذ قفل اجرای همزمان (در صورتی که قبلاً توسط run_lecture_processing ثبت نشده باشد)
+    from ai_solver import ai_is_inflight, _busy_users
+    if uid not in _busy_users and not await ai_is_inflight(uid):
+        if not await ai_claim_inflight(uid):
+            await _update_status("⏳ لطفاً تا اتمام پردازش درخواست فعلی خود صبر فرمایید.", force=True)
+            return False
+
+    quota_consumed = kwargs.get('quota_consumed', True)
+
     try:
-        # مرحله ۱: دانلود فایل‌ها از سرور تلگرام و تبدیل بهینه
-        files = session['files']
-        audio_file_info = next((f for f in files if f['kind'] in ('audio', 'video')), None)
-        pdf_file_info = next((f for f in files if f['kind'] == 'pdf'), None)
+        cfg = await get_ai_config()
+
+        # مرحله ۱: دانلود فایل‌ها از سرور تلگرام به صورت دیسک-به-دیسک
+        audio_file_info = next((f for f in files if f.get('kind') in ('audio', 'video')), None)
+        pdf_file_info = next((f for f in files if f.get('kind') == 'pdf'), None)
 
         audio_bytes = None
         audio_mime = None
         pdf_bytes = None
 
         if audio_file_info:
-            await status_msg.edit_text(
-                "📥 <b>در حال دریافت فایل صوتی/تصویری از تلگرام...</b>\n"
-                f"📁 <code>{audio_file_info['name']}</code>",
-                parse_mode='HTML'
+            file_name = audio_file_info.get('name') or 'lecture_media.m4a'
+            await _update_status(
+                f"📥 <b>در حال دریافت فایل صوتی/تصویری از تلگرام...</b>\n📁 <code>{file_name}</code>",
+                force=True
             )
-            tg_f = await context.bot.get_file(audio_file_info['tg_file_id'])
-            raw_audio = bytes(await tg_f.download_as_bytearray())
+            raw_audio_path = os.path.join(job_temp_dir, f"raw_{file_name}")
+            await download_telegram_media(
+                bot=bot,
+                chat_id=audio_file_info.get('chat_id') or chat_id,
+                message_id=audio_file_info.get('message_id') or status_msg_id,
+                file_id=audio_file_info['tg_file_id'],
+                file_size=audio_file_info.get('file_size', 0),
+                dest_path=raw_audio_path,
+            )
 
-            # فشرده‌سازی و تبدیل هوشمند انواع فرمت‌های صوتی/تصویری به MP3 استاندارد تک‌کاناله
-            await status_msg.edit_text(
+            await _update_status(
                 "⚡️ <b>در حال بهینه‌سازی صوت و فشرده‌سازی برای پردازش فوق‌سریع هوش مصنوعی...</b>",
-                parse_mode='HTML'
+                force=True
             )
-            audio_bytes, audio_mime, _ = await transcode_media_to_optimized_audio(
-                raw_audio, audio_file_info['name']
+            out_mp3_path = os.path.join(job_temp_dir, "optimized_lecture.mp3")
+            optimized_path = await transcode_audio_file(
+                input_path=raw_audio_path,
+                output_path=out_mp3_path,
+                bitrate="32k",
             )
+            if os.path.exists(optimized_path) and os.path.getsize(optimized_path) > 0:
+                with open(optimized_path, 'rb') as f:
+                    audio_bytes = f.read()
+                audio_mime = 'audio/mp3'
+            elif os.path.exists(raw_audio_path):
+                with open(raw_audio_path, 'rb') as f:
+                    audio_bytes = f.read()
+                audio_mime = audio_file_info.get('mime') or 'audio/mp3'
 
         if pdf_file_info:
-            await status_msg.edit_text(
-                "📄 <b>در حال دانلود اسلایدهای جلسه (PDF)...</b>\n"
-                f"📁 <code>{pdf_file_info['name']}</code>",
-                parse_mode='HTML'
+            pdf_name = pdf_file_info.get('name') or 'lecture_slides.pdf'
+            await _update_status(
+                f"📄 <b>در حال دانلود اسلایدهای جلسه (PDF)...</b>\n📁 <code>{pdf_name}</code>",
+                force=True
             )
-            tg_doc = await context.bot.get_file(pdf_file_info['tg_file_id'])
-            pdf_bytes = bytes(await tg_doc.download_as_bytearray())
+            raw_pdf_path = os.path.join(job_temp_dir, f"slides_{pdf_name}")
+            await download_telegram_media(
+                bot=bot,
+                chat_id=pdf_file_info.get('chat_id') or chat_id,
+                message_id=pdf_file_info.get('message_id') or status_msg_id,
+                file_id=pdf_file_info['tg_file_id'],
+                file_size=pdf_file_info.get('file_size', 0),
+                dest_path=raw_pdf_path,
+            )
+            if os.path.exists(raw_pdf_path):
+                with open(raw_pdf_path, 'rb') as f:
+                    pdf_bytes = f.read()
 
-        # مرحله ۲: استخراج کلیدهای Gemini از Vault پنل وب‌ادمین و راه‌اندازی چرخش خودکار
-        from ai_solver import (
-            sanitize_api_key, ordered_keys, run_with_key_failover,
-            _gemini_upload_file, _gemini_wait_file_active,
-            _extract_gemini_text, _raise_gemini_status_error,
-            AIConfigError, AIQuotaError, AIError, refund_lecture_quota
-        )
-
-        vault_multi = cfg.get('vault_multi') or {}
-        gemini_keys = list(vault_multi.get('gemini') or [])
-        if not gemini_keys and cfg.get('provider') == 'gemini':
-            gemini_keys = list(cfg.get('api_key_list') or [])
-        if not gemini_keys and cfg.get('api_key'):
-            gemini_keys = [cfg['api_key']]
-
-        gemini_keys = [sanitize_api_key(k) for k in gemini_keys if k and sanitize_api_key(k)]
-        # حذف کلیدهای تکراری با حفظ ترتیب
-        seen = set()
-        unique_keys = []
-        for k in gemini_keys:
-            if k not in seen:
-                seen.add(k)
-                unique_keys.append(k)
-        gemini_keys = ordered_keys('gemini', unique_keys)
+        # مرحله ۲: استخراج کلیدهای Gemini و پالایش ترتیب
+        gemini_keys = resolve_gemini_api_keys(cfg)
 
         if not gemini_keys:
             raise AIConfigError(
@@ -691,13 +881,8 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
                 "لطفاً کلیدهای Google AI Studio را در پنل ادمین ثبت فرمایید."
             )
 
-        # مرحله ۳: تعریف مدل‌های برتر و فعال گوگل به صورت آبشاری (Cascade Fallback)
-        from ai_solver import _no_thinking
-        preferred_model = (cfg.get('lecture_model') or 'gemini-3.6-flash').strip()
-        candidate_models = [preferred_model]
-        for m in ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-pro', 'gemini-2.0-flash-exp']:
-            if m not in candidate_models:
-                candidate_models.append(m)
+        # مرحله ۳: تعریف مدل‌های معتبر گوگل به صورت آبشاری (Cascade Fallback)
+        candidate_models = resolve_candidate_models(cfg)
 
         system_prompt = (
             "شما یک دستیار ارشد بالینی هوشیار (HamsYar AI) و استاد مجرب تدوین محتوای آموزش پزشکی دانشگاهی هستید.\n"
@@ -718,12 +903,10 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
         if session.get('user_notes'):
             user_prompt_text += f"\nیادداشت دانشجو: {session['user_notes']}"
 
-        # مرحله ۴: اجرای پایپ‌لاین آپلود و تحلیل تحت فال‌بک خودکار کلیدهای Vault
+        # مرحله ۴: اجرای پایپ‌لاین تحلیل با فال‌بک کلیدها
         async def _process_with_gemini_key(key: str) -> dict:
             parts = []
 
-            # ۱. ارسال صوت: برای فایل‌های سبک (<15MB) به صورت inline_data (فوق‌سریع و بدون خطای Files API)
-            # برای فایل‌های سنگین‌تر با Files API
             if audio_bytes:
                 if len(audio_bytes) < 15 * 1024 * 1024:
                     b64_audio = base64.b64encode(audio_bytes).decode('utf-8')
@@ -734,9 +917,9 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
                         }
                     })
                 else:
-                    await status_msg.edit_text(
+                    await _update_status(
                         "🧠 <b>در حال بارگذاری صوت طولانی جلسه در پردازشگر ابری گوگل...</b>",
-                        parse_mode='HTML'
+                        force=True
                     )
                     fi = await _gemini_upload_file(key, audio_bytes, audio_mime or 'audio/mp3', 'lecture_recording.mp3')
                     uploaded_audio = await _gemini_wait_file_active(key, fi, timeout=180)
@@ -748,7 +931,6 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
                             }
                         })
 
-            # ۲. ارسال اسلایدها (PDF)
             if pdf_bytes:
                 if len(pdf_bytes) < 10 * 1024 * 1024:
                     b64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
@@ -759,9 +941,9 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
                         }
                     })
                 else:
-                    await status_msg.edit_text(
+                    await _update_status(
                         "📑 <b>در حال بارگذاری اسلایدهای حجیم در پردازشگر ابری گوگل...</b>",
-                        parse_mode='HTML'
+                        force=True
                     )
                     fi = await _gemini_upload_file(key, pdf_bytes, 'application/pdf', 'lecture_slides.pdf')
                     uploaded_doc = await _gemini_wait_file_active(key, fi, timeout=180)
@@ -777,14 +959,13 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
 
             last_model_error = None
             for model_cand in candidate_models:
-                await status_msg.edit_text(
+                await _update_status(
                     f"🎧 <b>در حال شنیدن دقیق صوت و نگارش جزوه با هوش چندرسانه‌ای ({model_cand})...</b>",
-                    parse_mode='HTML'
+                    force=False
                 )
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_cand}:generateContent"
                 headers = {'Content-Type': 'application/json', 'x-goog-api-key': key}
 
-                # غیرفعال‌سازی تفکر اضافه (thinkingBudget: 0) جهت سازگاری کامل با responseSchema
                 gen_cfg = _no_thinking({
                     'responseMimeType': 'application/json',
                     'responseSchema': LECTURE_DIGEST_SCHEMA,
@@ -801,10 +982,9 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
                 async with httpx.AsyncClient(timeout=240) as client:
                     res = await client.post(url, headers=headers, json=payload)
 
-                # خودترمیمی در صورت خطای ۴۰۰ مرتبط با ساختار اسکیما: ارسال مجدد بدون schema
                 if res.status_code == 400 and ('schema' in res.text.lower() or 'argument' in res.text.lower()):
-                    logger.warning("مدل %s با اسکیما خطای ۴۰۰ داد؛ تلاش مجدد بدون responseSchema...", model_cand)
-                    fallback_cfg = {k: v for k, v in gen_cfg.items() if k != 'responseSchema'}
+                    logger.warning("مدل %s با اسکیما خطای ۴۰۰ داد؛ تلاش مجدد بدون responseSchema و thinkingConfig...", model_cand)
+                    fallback_cfg = auto_repair_generation_config(gen_cfg)
                     fallback_payload = dict(payload)
                     fallback_payload['generationConfig'] = fallback_cfg
                     async with httpx.AsyncClient(timeout=240) as client:
@@ -820,23 +1000,19 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
                         last_model_error = parse_err
                         continue
 
-                # اگر سهمیه کلید تمام شده باشد (کد 429)، فوراً استثنا ایجاد می‌شود تا کلید بعدی از Vault امتحان شود
                 if res.status_code == 429:
                     logger.warning("کلید Gemini به سقف درخواست (429) رسید → سوییچ خودکار به کلید بعدی Vault...")
                     _raise_gemini_status_error(429, res.text)
 
-                # اگر کلید نامعتبر یا بدون دسترسی بود (۴۰۱ یا ۴۰۳)
                 if res.status_code in (401, 403):
                     logger.warning("کلید Gemini با کد %d نامعتبر است → سوییچ خودکار به کلید بعدی...", res.status_code)
                     _raise_gemini_status_error(res.status_code, res.text)
 
-                # اگر مدل در دسترس نبود (۴۰۴ یا ۵۰۳ یا خطای مدل) به مدل بعدی همین کلید سوئیچ شود
-                if res.status_code in (404, 503) or (res.status_code == 400 and ('not found' in res.text.lower() or 'not supported' in res.text.lower())):
+                if res.status_code in (404, 503) or (res.status_code == 400 and ('not found' in res.text.lower() or 'not supported' in res.text.lower() or 'argument' in res.text.lower() or 'schema' in res.text.lower())):
                     logger.warning("مدل %s با کد %d پاسخ نداد؛ سوئیچ به مدل بعدی در زنجیره فال‌بک...", model_cand, res.status_code)
                     last_model_error = RuntimeError(f"Model {model_cand} returned {res.status_code}")
                     continue
 
-                # سایر خطاهای گوگل
                 _raise_gemini_status_error(res.status_code, res.text)
 
             if last_model_error:
@@ -848,30 +1024,42 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
         )
 
         # مرحله ۵: تدوین سند آکادمیک PDF با فونت فارسی وزیر
-        await status_msg.edit_text(
+        await _update_status(
             "📑 <b>در حال صفحه‌آرایی و تدوین PDF جزوه با سربرگ هامزیار و فونت اختصاصی وزیر...</b>",
-            parse_mode='HTML'
+            force=True
         )
 
         from lecture_notes_pdf import generate_lecture_pdf
         pdf_buffer = await asyncio.to_thread(generate_lecture_pdf, digest)
 
-        # مرحله ۶: ارسال خروجی نهایی به کاربر در تلگرام
+        # مرحله ۶: ارسال خروجی نهایی به کاربر در تلگرام با پاکسازی HTML
         title = digest.get('title') or 'جزوه کلاسی'
         subject = digest.get('subject') or 'علوم پزشکی'
         professor = digest.get('professor') or 'هیات علمی'
         session_name = digest.get('session') or 'جلسه کلاسی'
-        exec_summary = digest.get('executive_summary') or ''
+        exec_summary = (digest.get('executive_summary') or '').strip()
         pearls = digest.get('clinical_pearls') or []
         traps = digest.get('exam_traps') or []
         qna = digest.get('qna_list') or []
         comp_tbl = digest.get('comparison_table') or {}
 
+        # پاکسازی کاراکترهای خطرناک HTML (<, >, &) برای جلوگیری از خطای تلگرام
+        safe_title = html.escape(title)
+        safe_subject = html.escape(subject)
+        safe_professor = html.escape(professor)
+        safe_session_name = html.escape(session_name)
+        safe_tbl_title = html.escape(comp_tbl.get('title') or 'دارد')
+
+        # کنترل سقف طول متن خلاصه برای رعایت محدودیت ۴۰۹۶ کاراکتری پیام تلگرام
+        safe_exec_summary = html.escape(exec_summary)
+        if len(safe_exec_summary) > 2000:
+            safe_exec_summary = safe_exec_summary[:1950] + "..."
+
         summary_content = (
-            f"<b>🎯 خلاصه اجرایی و اهداف جلسه:</b>\n{exec_summary}\n\n"
+            f"<b>🎯 خلاصه اجرایی و اهداف جلسه:</b>\n{safe_exec_summary}\n\n"
             f"<b>💎 مرواریدهای بالینی:</b> {len(pearls)} نکته کلیدی\n"
             f"<b>🚨 دام‌های تستی پره‌انترنی و دستیاری:</b> {len(traps)} نکته دامی\n"
-            f"<b>📊 جدول مقایسه‌ای:</b> {comp_tbl.get('title') or 'دارد'}\n"
+            f"<b>📊 جدول مقایسه‌ای:</b> {safe_tbl_title}\n"
             f"<b>❓ پرسش و پاسخ‌های تثبیت یادگیری:</b> {len(qna)} سوال"
         )
         quoted_block = expandable_quote(summary_content)
@@ -879,9 +1067,9 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
         caption_msg = (
             f"🎓 <b>جزوه جامع کلاسی تدوین شد!</b>\n"
             f"━━━━━━━━━━━━━━━━\n"
-            f"📌 <b>عنوان:</b> {title}\n"
-            f"📚 <b>درس:</b> {subject} • <b>جلسه:</b> {session_name}\n"
-            f"👨‍🏫 <b>استاد:</b> {professor}\n\n"
+            f"📌 <b>عنوان:</b> {safe_title}\n"
+            f"📚 <b>درس:</b> {safe_subject} • <b>جلسه:</b> {safe_session_name}\n"
+            f"👨‍🏫 <b>استاد:</b> {safe_professor}\n\n"
             f"{quoted_block}\n\n"
             "📥 <i>فایل کامل جزوه با کیفیت بالا و فونت اختصاصی فارسی پیوست گردید:</i>"
         )
@@ -889,41 +1077,127 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
         safe_name = re.sub(r'[\/:*?"<>| ]+', '_', title)[:40].strip('_') or 'Lecture'
         filename = f"HamsYar_{safe_name}.pdf"
 
-        # پاک کردن پیام وضعیت
-        try:
-            await status_msg.delete()
-        except Exception:
-            pass
+        # پاک کردن پیام وضعیت در صورت امکان
+        if status_msg_id and bot and chat_id:
+            try:
+                await bot.delete_message(chat_id=chat_id, message_id=status_msg_id)
+            except Exception:
+                pass
 
-        # ارسال پیام خلاصه
-        await msg.reply_text(caption_msg, parse_mode='HTML')
+        # ارسال پیام خلاصه با فال‌بک متن ساده
+        if bot and chat_id:
+            try:
+                await bot.send_message(chat_id=chat_id, text=caption_msg, parse_mode='HTML')
+            except Exception as html_err:
+                logger.warning("خطا در ارسال HTML پیام خلاصه تلگرام، ارسال به صورت متن خام: %s", html_err)
+                plain_caption = re.sub(r'<[^>]+>', '', caption_msg)
+                await bot.send_message(chat_id=chat_id, text=plain_caption)
 
-        # ارسال فایل PDF
-        pdf_buffer.seek(0)
-        await context.bot.send_document(
-            chat_id=msg.chat_id,
-            document=pdf_buffer,
-            filename=filename,
-            caption=f"📄 {title} — {subject}"
-        )
+            # ارسال فایل PDF با retry مکانیزم و ریست مطمئن بافر
+            doc_sent = False
+            last_doc_err = None
+            for attempt in range(3):
+                try:
+                    pdf_buffer.seek(0)
+                    await bot.send_document(
+                        chat_id=chat_id,
+                        document=pdf_buffer,
+                        filename=filename,
+                        caption=f"📄 {title} — {subject}",
+                        read_timeout=60,
+                        write_timeout=60,
+                    )
+                    doc_sent = True
+                    break
+                except Exception as send_err:
+                    last_doc_err = send_err
+                    logger.warning("تلاش %d برای ارسال سند PDF ناموفق بود: %s", attempt + 1, send_err)
+                    await asyncio.sleep(1.5)
+
+            if not doc_sent:
+                raise last_doc_err or Exception("عدم موفقیت در ارسال سند PDF تلگرام پس از ۳ تلاش")
 
         # پاکسازی سشن
-        _LECTURE_SESSIONS.pop(session_id, None)
-        context.user_data.pop('lecture_session_id', None)
-        context.user_data['mode'] = 'ai_query'
+        _LECTURE_SESSIONS.pop(sess_id, None)
+        return True
 
     except Exception as exc:
-        logger.exception("خطا در پردازش جزوه چندرسانه‌ای: %s", exc)
+        logger.exception("خطا در پردازش جزوه چندرسانه‌ای در صف پس‌زمینه: %s", exc)
         try:
             from ai_solver import refund_lecture_quota
             await refund_lecture_quota(uid)
         except Exception:
             pass
-        await msg.reply_text(
+        await _update_status(
             "⚠️ <b>متأسفانه در فرآیند تحلیل یا تولید جزوه خطایی رخ داد.</b>\n"
             "سهمیهٔ مصرف‌شده برای این جلسه برگردانده شد و کسر نگردید. لطفاً دوباره امتحان فرمایید.",
-            parse_mode='HTML'
+            force=True
         )
+        return False
 
     finally:
-        await ai_release_inflight(uid)
+        try:
+            from ai_solver import ai_release_inflight
+            await ai_release_inflight(uid)
+        except Exception:
+            pass
+        _LECTURE_SESSIONS.pop(sess_id, None)
+        if job_temp_dir and os.path.exists(job_temp_dir):
+            shutil.rmtree(job_temp_dir, ignore_errors=True)
+
+
+async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str):
+    """اجرای پایپ‌لاین پردازش چندرسانه‌ای با ارسال فوری و غیرمسدودکننده به صف LectureWorkerQueue (<200ms)"""
+    uid = update.effective_user.id
+    query = update.callback_query
+    msg = query.message if query else update.effective_message
+
+    session = _LECTURE_SESSIONS.get(session_id)
+    if not session or not session.get('files'):
+        await msg.reply_text("⚠️ اطلاعات این جلسه یافت نشد یا منقضی شده است. لطفاً فایل‌ها را مجدداً ارسال فرمایید.")
+        return
+
+    # ۱. بررسی سهمیه روزانه کاربر
+    from ai_solver import check_and_consume_lecture_quota, refund_lecture_quota
+    allowed, used, limit = await check_and_consume_lecture_quota(uid)
+    if not allowed:
+        await msg.reply_text(
+            f"⛔️ <b>سقف روزانهٔ تولید جزوه پایان یافته است ({used}/{limit}).</b>\n"
+            "فردا مجدداً می‌توانید برای کلاس‌های جدید جزوه تولید کنید.",
+            parse_mode='HTML'
+        )
+        return
+
+    # ۲. ثبت پیام وضعیت اولیه
+    status_msg = await msg.reply_text(
+        "⏳ <b>درخواست شما در صف پردازش قرار گرفت...</b>\n"
+        "به محض شروع، مراحل پیشرفت در همین پیام به‌روزرسانی خواهد شد.",
+        parse_mode='HTML'
+    )
+
+    # ۳. ارسال به صف پس‌زمینه LectureWorkerQueue (<200ms)
+    from backend.services.lecture_worker import get_lecture_worker_queue
+    worker = get_lecture_worker_queue()
+    enqueued = await worker.enqueue_job(
+        chat_id=msg.chat_id,
+        user_id=uid,
+        session_id=session_id,
+        file_info=session,
+        status_message_id=status_msg.message_id,
+        bot=context.bot,
+        quota_consumed=True,
+    )
+
+    if not enqueued:
+        await refund_lecture_quota(uid)
+        await status_msg.edit_text(
+            "⚠️ <b>صف پردازش در حال حاضر تکمیل است.</b>\n"
+            "سهمیه شما محفوظ ماند و کسر نگردید. لطفاً چند دقیقه دیگر مجدداً تلاش فرمایید.",
+            parse_mode='HTML'
+        )
+        return
+
+    # پاکسازی وضعیت سشن از user_data تا کاربر معطل نماند
+    context.user_data.pop('lecture_session_id', None)
+    context.user_data['mode'] = 'ai_query'
+

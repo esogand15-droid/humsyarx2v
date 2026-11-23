@@ -76,6 +76,9 @@ class NumberedCanvas(canvas.Canvas):
         self._startPage()
 
     def save(self):
+        # Flush current open page if content was drawn on it
+        if len(self._code) > 0:
+            self.showPage()
         num_pages = len(self._saved_page_states)
         for state in self._saved_page_states:
             self.__dict__.update(state)
@@ -155,6 +158,34 @@ def _draw_watermark(c):
     c.setFillAlpha(1)
 
 
+def format_duration(val) -> str:
+    """فرمت‌بندی مدت زمان جلسه (ثانیه، رشته فارسی یا خالی) به صورت متنی تمیز"""
+    if not val:
+        return 'مشخص نشده'
+    if isinstance(val, (int, float)):
+        sec = int(val)
+    elif isinstance(val, str) and val.strip().isdigit():
+        sec = int(val.strip())
+    else:
+        return fa_digits(str(val).strip())
+
+    if sec <= 0:
+        return 'مشخص نشده'
+    if sec < 60:
+        return fa_digits(f"{sec} ثانیه")
+    h = sec // 3600
+    m = (sec % 3600) // 60
+    s = sec % 60
+    if h > 0:
+        if m > 0:
+            return fa_digits(f"{h} ساعت و {m} دقیقه")
+        return fa_digits(f"{h} ساعت")
+    else:
+        if s > 0 and m < 5:
+            return fa_digits(f"{m} دقیقه و {s} ثانیه")
+        return fa_digits(f"{m} دقیقه")
+
+
 def _draw_cover(c, digest: dict):
     """ترسیم صفحه جلد شیک و آکادمیک"""
     _draw_top_brand_bar(c)
@@ -205,7 +236,7 @@ def _draw_cover(c, digest: dict):
 
     # کارت مشخصات جلسه (Metadata Box)
     y -= 10 * mm
-    card_h = 44 * mm
+    card_h = 50 * mm
     card_y = y - card_h
     c.setFillColor(CARD_BG_SOFT)
     c.setStrokeColor(CARD_BORDER_SOFT)
@@ -220,11 +251,13 @@ def _draw_cover(c, digest: dict):
     c.setFont(BOLD, 9.5)
     c.drawRightString(PAGE_W - MARGIN - 4 * mm, card_y + card_h - 5.5 * mm, rtl("📋 شناسنامه و مشخصات جلسه درسی"))
 
+    dur_str = format_duration(digest.get('duration'))
     # آیتم‌های جدول مشخصات
     fields = [
         ("عنوان جلسه:", digest.get('title') or 'مبحث کلاسی'),
         ("دپارتمان / درس:", digest.get('subject') or 'علوم بالینی و پایه'),
         ("استاد مدرس:", digest.get('professor') or 'هیات علمی دپارتمان'),
+        ("مدت زمان جلسه:", dur_str),
         ("جلسه و تاریخ:", f"{digest.get('session') or 'جلسه کلاسی'} — {fa_digits(digest.get('date') or '۱۴۰۵')}"),
         ("منبع تدوین:", "تطبیق همزمان ویس جلسه با اسلایدهای درسی توسط دستیار هوشیار"),
     ]
@@ -241,7 +274,7 @@ def _draw_cover(c, digest: dict):
         if len(clean_val) > 65:
             clean_val = clean_val[:62] + "..."
         c.drawRightString(PAGE_W - MARGIN - 38 * mm, row_y, rtl(clean_val))
-        row_y -= 6.2 * mm
+        row_y -= 6.0 * mm
 
     # بخش چکیده اجرایی (Executive Summary) در صورت وجود
     summary = digest.get('executive_summary', '').strip()
@@ -341,7 +374,7 @@ def _draw_callout_box(c, y: float, title: str, text: str, is_exam_trap: bool = F
 
 
 def _draw_table(c, y: float, table_data: dict, subject: str, title: str) -> float:
-    """ترسیم جدول مقایسه‌ای تمیز با سطرهای راه‌راه"""
+    """ترسیم جدول مقایسه‌ای پویا با سطرهای خودتنظیم‌شونده و جلوگیری از همپوشانی ستون‌ها"""
     headers = table_data.get('headers') or []
     rows = table_data.get('rows') or []
     tbl_title = table_data.get('title') or 'جدول مقایسه‌ای و جمع‌بندی نکات'
@@ -350,67 +383,107 @@ def _draw_table(c, y: float, table_data: dict, subject: str, title: str) -> floa
 
     num_cols = len(headers)
     col_w = CONTENT_W / num_cols
-    row_h = 8.5 * mm
-    header_h = 9 * mm
+    # انتخاب اندازه فونت بر اساس تعداد ستون‌ها
+    fs = 7.5 if num_cols >= 5 else 8.0
+    line_h = 3.5 * mm if num_cols >= 5 else 3.8 * mm
+    pad_x = 2.5 * mm
+    pad_y = 3.5 * mm
+    min_row_h = 8.5 * mm
 
-    # عنوان بالای جدول
+    # ۱. آماده‌سازی و محاسبه ارتفاع هدر جدول
+    header_cell_lines = []
+    for h in headers:
+        hl = wrap_rtl(str(h), BOLD, 8.5, col_w - 4 * mm)
+        header_cell_lines.append(hl if hl else [rtl(str(h))])
+    max_hdr_lines = max((len(hl) for hl in header_cell_lines), default=1)
+    header_h = max(9.0 * mm, max_hdr_lines * line_h + pad_y)
+
+    def _draw_tbl_header(cur_y: float) -> float:
+        """رسم هدر جدول (با امکان تکرار در صورت شکست صفحه)"""
+        c.setFillColor(TABLE_HEAD_BG)
+        c.roundRect(MARGIN, cur_y - header_h, CONTENT_W, header_h, 2 * mm, fill=1, stroke=0)
+        c.setFont(BOLD, 8.5)
+        c.setFillColor(WHITE)
+        hdr_start_y = cur_y - 2.0 * mm - 2.5 * mm
+        for i, hlines in enumerate(header_cell_lines):
+            cell_center_x = PAGE_W - MARGIN - (i * col_w) - (col_w / 2)
+            cur_hy = hdr_start_y
+            for hline in hlines:
+                c.drawCentredString(cell_center_x, cur_hy, hline)
+                cur_hy -= line_h
+        return cur_y - header_h
+
+    # ۲. پیش‌پردازش و رپینگ متن تمام سلول‌ها جهت محاسبه دقیق ارتفاع هر سطر
+    wrapped_rows = []
+    for r_idx, row in enumerate(rows):
+        row_cell_lines = []
+        raw_vals = []
+        for i in range(num_cols):
+            val = str(row[i]).strip() if i < len(row) else ''
+            raw_vals.append(val)
+            wlines = wrap_rtl(val, REGULAR, fs, col_w - 2 * pad_x)
+            row_cell_lines.append(wlines if wlines else [''])
+        max_lines = max((len(cl) for cl in row_cell_lines), default=1)
+        row_h = max(min_row_h, max_lines * line_h + pad_y)
+        wrapped_rows.append((row_cell_lines, raw_vals, row_h))
+
+    # ۳. بررسی شکست صفحه قبل از شروع رسم جدول (تیتر + هدر + حداقل یک سطر داده)
+    first_row_h = wrapped_rows[0][2] if wrapped_rows else min_row_h
+    tbl_title_h = 6.0 * mm
+    if y - (tbl_title_h + header_h + first_row_h) < MIN_Y and len(rows) > 0:
+        c.showPage()
+        _draw_content_header(c, subject, title)
+        _draw_watermark(c)
+        y = PAGE_H - _TOP_BAR_H - 18 * mm
+
+    # رسم تیتر جدول
     c.setFont(BOLD, 10.5)
     c.setFillColor(NAVY)
     c.drawRightString(PAGE_W - MARGIN, y, rtl(f"📊 {tbl_title}"))
-    y -= 4.5 * mm
+    y -= 5 * mm
 
-    # بررسی شکست صفحه قبل از شروع جدول
-    total_needed = header_h + len(rows) * row_h
-    if y - total_needed < MIN_Y and len(rows) > 1:
-        # اگر کل جدول جا نمی‌شود اما حداقل هدر و ۱ سطر جا نمی‌شود، برو صفحه بعد
-        if y - (header_h + row_h * 2) < MIN_Y:
-            c.showPage()
-            _draw_content_header(c, subject, title)
-            _draw_watermark(c)
-            y = PAGE_H - _TOP_BAR_H - 18 * mm
+    # رسم هدر اولیه جدول
+    y = _draw_tbl_header(y)
 
-    # هدر جدول
-    c.setFillColor(TABLE_HEAD_BG)
-    c.roundRect(MARGIN, y - header_h, CONTENT_W, header_h, 2 * mm, fill=1, stroke=0)
-
-    c.setFont(BOLD, 8.5)
-    c.setFillColor(WHITE)
-    for i, h in enumerate(headers):
-        cell_center_x = PAGE_W - MARGIN - (i * col_w) - (col_w / 2)
-        c.drawCentredString(cell_center_x, y - header_h + 3 * mm, rtl(str(h)))
-
-    y -= header_h
-
-    # سطرهای داده
-    c.setFont(REGULAR, 8)
-    for r_idx, row in enumerate(rows):
+    # ۴. رسم سطرهای داده با کنترل هوشمند شکست صفحه
+    for r_idx, (row_cell_lines, raw_vals, row_h) in enumerate(wrapped_rows):
         if y - row_h < MIN_Y:
             c.showPage()
             _draw_content_header(c, subject, title)
             _draw_watermark(c)
             y = PAGE_H - _TOP_BAR_H - 18 * mm
-            # بازرسم هدر در صفحه جدید
-            c.setFillColor(TABLE_HEAD_BG)
-            c.roundRect(MARGIN, y - header_h, CONTENT_W, header_h, 2 * mm, fill=1, stroke=0)
-            c.setFont(BOLD, 8.5)
-            c.setFillColor(WHITE)
-            for i, h in enumerate(headers):
-                cell_center_x = PAGE_W - MARGIN - (i * col_w) - (col_w / 2)
-                c.drawCentredString(cell_center_x, y - header_h + 3 * mm, rtl(str(h)))
-            y -= header_h
+            # تکرار هدر جدول در بالای صفحه جدید
+            y = _draw_tbl_header(y)
 
-        # رنگ سطر متناوب
+        # پس‌زمینه راه‌راه متناوب
         bg = TABLE_ZEBRA_BG if r_idx % 2 == 1 else WHITE
         c.setFillColor(bg)
         c.setStrokeColor(CARD_BORDER_SOFT)
         c.setLineWidth(0.5)
         c.rect(MARGIN, y - row_h, CONTENT_W, row_h, fill=1, stroke=1)
 
+        # ترسیم خطوط عمودی جداکننده ستون‌ها
+        for ci in range(1, num_cols):
+            cx = PAGE_W - MARGIN - (ci * col_w)
+            c.line(cx, y, cx, y - row_h)
+
+        # رسم متن داخل سلول‌ها
+        c.setFont(REGULAR, fs)
         c.setFillColor(TEXT_PRIMARY)
-        c.setFont(REGULAR, 8)
-        for i, val in enumerate(row[:num_cols]):
-            cell_center_x = PAGE_W - MARGIN - (i * col_w) - (col_w / 2)
-            c.drawCentredString(cell_center_x, y - row_h + 2.8 * mm, rtl(str(val)))
+        start_y = y - 2.0 * mm - 2.4 * mm
+        for i, clines in enumerate(row_cell_lines):
+            cell_right_x = PAGE_W - MARGIN - (i * col_w)
+            cell_center_x = cell_right_x - (col_w / 2)
+            raw_v = raw_vals[i]
+            cur_line_y = start_y
+            for line in clines:
+                # اگر سلول تک‌خطی و کوتاه است، در مرکز ستون رسم شود
+                if len(clines) == 1 and text_width(raw_v, REGULAR, fs) < (col_w * 0.65):
+                    c.drawCentredString(cell_center_x, cur_line_y, line)
+                else:
+                    # برای متن‌های بلند یا چندخطی، راست‌چین با حاشیه مناسب
+                    c.drawRightString(cell_right_x - pad_x, cur_line_y, line)
+                cur_line_y -= line_h
 
         y -= row_h
 
@@ -526,7 +599,9 @@ def generate_lecture_pdf(digest: dict) -> io.BytesIO:
         y = _draw_section_banner(c, y, "مرواریدهای بالینی و نکات تجربی استاد", "💎", TEAL_DEEP, WHITE)
 
         for i, pearl in enumerate(clinical_pearls, 1):
-            check_page_break(20 * mm)
+            pearl_lines = wrap_rtl(pearl, REGULAR, 9, CONTENT_W - 14 * mm)
+            box_h = 11 * mm + max(1, len(pearl_lines)) * 4.6 * mm
+            check_page_break(box_h + 3.5 * mm)
             y = _draw_callout_box(
                 c, y,
                 title=f"مروارید بالینی {fa_digits(i)}",
@@ -541,7 +616,9 @@ def generate_lecture_pdf(digest: dict) -> io.BytesIO:
         y = _draw_section_banner(c, y, "دام‌های تستی آزمون‌های پره‌انترنی و پذیرش دستیاری", "🚨", TRAP_ACCENT, WHITE)
 
         for i, trap in enumerate(exam_traps, 1):
-            check_page_break(20 * mm)
+            trap_lines = wrap_rtl(trap, REGULAR, 9, CONTENT_W - 14 * mm)
+            box_h = 11 * mm + max(1, len(trap_lines)) * 4.6 * mm
+            check_page_break(box_h + 3.5 * mm)
             y = _draw_callout_box(
                 c, y,
                 title=f"نکته دامی آزمون {fa_digits(i)}",
@@ -610,6 +687,7 @@ def generate_lecture_pdf(digest: dict) -> io.BytesIO:
 
             y = by - 3.5 * mm
 
+    c.showPage()
     c.save()
     buf.seek(0)
     return buf

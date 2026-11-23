@@ -115,9 +115,7 @@ def api_key_problem(key: str) -> str | None:
 #  پیش‌فرض‌ها — فقط وقتی استفاده می‌شن که ادمین هنوز چیزی ست نکرده
 # ══════════════════════════════════════════════════
 DEFAULT_MODELS = {
-    # ⭐ م8 (چنج‌لاگ ۲۰۲۶-۰۹-۱۸): دسترسیِ مدل‌های 2.5 برای پروژه‌های جدید
-    # محدود شده؛ توصیه‌ی گوگل: 3.5-flash-lite (سریع/ارزان) یا 3.8-flash.
-    'gemini':     'gemini-3.6-flash',
+    'gemini':     'gemini-2.5-flash',
     'openrouter': 'google/gemma-4-31b-it:free',
     'groq':       'llama-3.3-70b-versatile',
     'cerebras':   'llama-3.3-70b',
@@ -186,14 +184,11 @@ PROVIDERS = {
 # (شناسه‌ی مدل, برچسب فارسی, رایگان؟) — منبع: https://freellm.net/models/?free=1 (299 مدل رایگان، 239 تأیید Live 2026-09-08)
 MODEL_CATALOG = {
     'gemini': [
-        ('gemini-3.6-flash',      '🌟 Gemini 3.6 Flash (جدیدترین، پیشنهادی)', False),
-        ('gemini-3.5-flash',      '🆕 Gemini 3.5 Flash (قوی، استدلال سنگین)', False),
-        ('gemini-3.5-flash-lite', '🆕 Gemini 3.5 Flash-Lite (سریع/ارزان)', False),
-        ('gemini-2.5-flash',      '⚡ Gemini 2.5 Flash (پایدار)', True),
-        ('gemini-flash-latest',   '🔄 Gemini Flash Latest', True),
-        ('gemini-2.5-flash-lite', '💨 Gemini 2.5 Flash-Lite (سبک‌تر)', True),
-        ('gemini-2.5-pro',        '🧠 Gemini 2.5 Pro (دقیق‌تر)', False),
-        ('gemini-2.0-flash-exp',  '🧪 Gemini 2.0 Flash Exp (رایگان)', True),
+        ('gemini-2.5-flash',      '⚡ Gemini 2.5 Flash (پیشنهادی، پایدار)', True),
+        ('gemini-2.0-flash',      '🚀 Gemini 2.0 Flash (سریع، GA)', True),
+        ('gemini-2.5-pro',        '🧠 Gemini 2.5 Pro (استدلال سنگین)', False),
+        ('gemini-1.5-flash',      '📦 Gemini 1.5 Flash (پشتیبان)', True),
+        ('gemini-1.5-pro',        '🔬 Gemini 1.5 Pro (پشتیبان دقیق)', False),
     ],
     'openrouter': [
         # FreeLLM top free models aggregated under OpenRouter OpenAI-compatible API
@@ -1343,6 +1338,44 @@ def _load_vault(raw: dict) -> dict:
     return normalized
 
 
+def resolve_gemini_api_keys(cfg: dict | None = None) -> list[str]:
+    r"""Canonical resolver for Gemini API keys across MongoDB Vault and Environment Variables.
+
+    Order of precedence:
+      1. DB Vault keys ('gemini' provider list from vault_multi or api_key_list or api_key)
+      2. GEMINI_API_KEYS (split on [,;\s]+ handling commas, semicolons, tabs, newlines, spaces)
+      3. GEMINI_API_KEY
+      4. GOOGLE_API_KEY
+    All keys are sanitized with sanitize_api_key, trimmed, deduplicated preserving priority,
+    and sorted via ordered_keys('gemini', deduped).
+    """
+    raw_keys: list[str] = []
+    if cfg:
+        vault_multi = cfg.get('vault_multi') or {}
+        raw_keys.extend(vault_multi.get('gemini') or [])
+        if not raw_keys and cfg.get('provider') == 'gemini':
+            raw_keys.extend(cfg.get('api_key_list') or [])
+        if not raw_keys and cfg.get('api_key'):
+            raw_keys.append(cfg['api_key'])
+
+    for env_k in ['GEMINI_API_KEYS', 'GEMINI_API_KEY', 'GOOGLE_API_KEY']:
+        env_val = os.getenv(env_k)
+        if env_val:
+            for part in re.split(r"[,;\s]+", env_val.strip()):
+                cleaned = part.strip()
+                if cleaned:
+                    raw_keys.append(cleaned)
+
+    seen = set()
+    deduped: list[str] = []
+    for k in raw_keys:
+        clean = sanitize_api_key(k) if k else ""
+        if clean and clean not in seen:
+            seen.add(clean)
+            deduped.append(clean)
+    return ordered_keys('gemini', deduped)
+
+
 async def get_ai_config() -> dict:
     raw = await db.get_settings_by_prefix('ai_')
     provider = (raw.get('ai_provider', 'gemini') or 'gemini').strip() or 'gemini'
@@ -1361,6 +1394,11 @@ async def get_ai_config() -> dict:
     vault = {pid: [k for k in (sanitize_api_key(x) for x in lst) if k]
              for pid, lst in vault.items()}
     vault = {pid: lst for pid, lst in vault.items() if lst}
+    # Incorporate environment Gemini keys into vault['gemini'] and api_key
+    env_gemini = resolve_gemini_api_keys({'vault_multi': vault, 'provider': provider})
+    if env_gemini:
+        vault['gemini'] = env_gemini
+
     model = raw.get('ai_model') or DEFAULT_MODELS.get(provider, DEFAULT_MODEL)
     detected = _detect_provider_for_model(model)
     if detected and detected != provider and detected in vault and vault.get(detected):
@@ -2179,6 +2217,8 @@ async def _gemini_wait_file_active(api_key: str, file_info: dict,
         except Exception:
             pass   # خطای موقتِ شبکه — نظرسنجی ادامه می‌یابد
     file_info['state'] = state
+    if state == 'FAILED':
+        raise AIError(f"فایل روی سرور گوگل پردازش نشد و به وضعیت FAILED رفت: {file_info.get('error') or name}")
     return file_info
 
 
@@ -2858,24 +2898,22 @@ def _sanitize_tg_html(text: str) -> str:
 
 
 def _no_thinking(cfg: dict, model: str = '') -> dict:
-    """تفکرِ داخلی را کم می‌کند تا maxOutputTokens صرفِ متنِ پاسخ شود.
+    """تفکرِ داخلی را کم یا خاموش می‌کند تا maxOutputTokens صرفِ متنِ پاسخ شود.
 
-    🔴 مدل‌آگاه (مستندات رسمی گوگل):
-    • Gemini 3+ فقط thinkingLevel دارد؛ thinkingBudget منسوخ است و
-      «می‌تواند خطای متناوب 400 INVALID_ARGUMENT بدهد» و روی مدل‌های
-      جدید قطعاً 400 می‌شود ⇒ thinkingLevel: 'low' (کمترین سطحِ
-      پشتیبانی‌شده در همه‌ی مدل‌های 3).
-    • Gemini 2.5 و قدیمی‌تر ⇒ thinkingBudget: 0 (خاموشِ کامل).
-    برای ارائه‌دهنده‌های غیر Gemini بی‌اثر است (کلید ناشناخته در
-    payload آن‌ها به‌کار نمی‌رود).
+    مدل‌آگاه:
+    • Gemini 3+: thinkingLevel: 'low'
+    • Gemini 2.5 و مدل‌های دارای تفکر (مانند 2.5-flash, 2.5-pro): thinkingBudget: 0
+    • مدل‌های استاندارد فاقد تفکر (مانند 2.0-flash, 1.5-flash, 1.5-pro): هیچ thinkingConfig ارسال نمی‌شود
+      تا از خطای 400 INVALID_ARGUMENT (Unknown field: 'thinkingConfig') جلوگیری شود.
     """
     cfg = dict(cfg)
-    # gemini-3 و هر نسل بعدی (طبق اعلان گوگل، روی مدل‌های جدید
-    # thinkingBudget قطعاً 400 INVALID_ARGUMENT می‌شود)
-    if re.match(r'gemini-[3-9]', (model or '').strip().lower()):
+    m = (model or '').strip().lower()
+    if re.match(r'gemini-[3-9]', m):
         cfg['thinkingConfig'] = {'thinkingLevel': 'low'}
-    else:
+    elif '2.5' in m or 'thinking' in m:
         cfg['thinkingConfig'] = {'thinkingBudget': 0}
+    else:
+        cfg.pop('thinkingConfig', None)
     return cfg
 
 
@@ -3406,6 +3444,17 @@ async def record_token_usage(uid: int, tokens: int) -> None:
         await db.ai_inc_tokens(uid, tokens)
     except Exception:
         logger.exception("ثبت توکن مصرفی هوشیار ناموفق بود")
+
+
+def resolve_candidate_models(cfg: dict | None = None) -> list[str]:
+    from backend.services.lecture_scribe import resolve_candidate_models as _res
+    return _res(cfg)
+
+
+def auto_repair_generation_config(gen_cfg: dict) -> dict:
+    from backend.services.lecture_scribe import auto_repair_generation_config as _res
+    return _res(gen_cfg)
+
 
 
 # ══════════════════════════════════════════════════

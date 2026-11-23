@@ -2779,6 +2779,16 @@ async def post_init(application: Application):
         logger.warning("⚠️ JobQueue فعال نیست — یادآوری‌ها و گزارش هفتگی غیرفعال هستند")
         logger.warning('   نصب با: pip install "python-telegram-bot[job-queue]"')
 
+    # 🎙 راه‌اندازی صف پردازش پس‌زمینه جزوه‌نویس چندرسانه‌ای
+    try:
+        from backend.services.lecture_worker import get_lecture_worker_queue
+        worker_queue = get_lecture_worker_queue()
+        worker_queue.start(bot=application.bot)
+        application.bot_data['lecture_worker_queue'] = worker_queue
+        logger.info("✅ LectureWorkerQueue started in post_init")
+    except Exception as e:
+        logger.error(f"Failed to start LectureWorkerQueue: {e}", exc_info=True)
+
 
 def _env_flag(name: str, default: bool = False) -> bool:
     """پرچم boolean از env — مقادیر 1/true/yes/on = True."""
@@ -2874,6 +2884,26 @@ def _run_polling_with_retry(build_app):
 
 
 async def _graceful_shutdown(app):
+    # 🎙 توقف صف پردازش پس‌زمینه جزوه‌نویس
+    try:
+        worker = getattr(app, 'bot_data', {}).get('lecture_worker_queue')
+        if not worker:
+            from backend.services.lecture_worker import get_lecture_worker_queue
+            worker = get_lecture_worker_queue()
+        if worker:
+            await worker.stop(timeout=5.0)
+            logger.info("✅ LectureWorkerQueue stopped cleanly")
+    except Exception as e:
+        logger.warning(f"LectureWorkerQueue stop failed: {e}")
+
+    # 🌊 بستن کلاینت MTProto تلگرام در صورت وجود
+    try:
+        from backend.services.telegram_downloader import stop_mtproto_downloader_client
+        await stop_mtproto_downloader_client()
+        logger.info("✅ MTProto downloader client stopped cleanly")
+    except Exception as e:
+        logger.warning(f"MTProto downloader client stop failed: {e}")
+
     # 🌊 W3 — graceful: بستن http client مشترک + آزادسازی db
     try:
         from http_client import aclose_shared_client

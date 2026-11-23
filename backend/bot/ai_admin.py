@@ -360,9 +360,9 @@ async def ai_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if action == 'scribe_model':
         kb = [
             [InlineKeyboardButton("⚡ Gemini 2.5 Flash (پیشنهادی)", callback_data='ai:set_scribe_model:gemini-2.5-flash')],
+            [InlineKeyboardButton("🚀 Gemini 2.0 Flash (پایدار و سریع)", callback_data='ai:set_scribe_model:gemini-2.0-flash')],
             [InlineKeyboardButton("🧠 Gemini 2.5 Pro (استدلال سنگین)", callback_data='ai:set_scribe_model:gemini-2.5-pro')],
-            [InlineKeyboardButton("🧪 Gemini 2.0 Flash Exp (رایگان)", callback_data='ai:set_scribe_model:gemini-2.0-flash-exp')],
-            [InlineKeyboardButton("🌟 Gemini 3.6 Flash", callback_data='ai:set_scribe_model:gemini-3.6-flash')],
+            [InlineKeyboardButton("📦 Gemini 1.5 Flash (پشتیبان)", callback_data='ai:set_scribe_model:gemini-1.5-flash')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='ai:scribe')],
         ]
         await query.edit_message_text(

@@ -1,11 +1,12 @@
 """
-🔤 qbank.fonts_rtl — فونت فارسی + کمک‌کننده‌های راست‌چین (RTL)
+🔤 qbank.fonts_rtl — فونت فارسی + کمک‌کننده‌های راست‌چین (RTL) و بهداشت تایپوگرافی پزشکی
 
 این ماژول تنها مسئولیتش متن است: ثبت فونت Vazirmatn، شکل‌دهی صحیح
 حروف فارسی (reshape)، ترتیب‌دهی راست‌به‌چپ (bidi)، و تقسیم متن به خطوط
-متناسب با عرض موجود (word-wrap). هیچ منطق طراحی یا دیتابیسی اینجا نیست.
+متناسب با عرض موجود (word-wrap).
 """
 import os
+import re
 import logging
 
 import arabic_reshaper
@@ -22,6 +23,8 @@ _READY = False
 REGULAR = 'Vazir'
 MEDIUM  = 'Vazir-Medium'
 BOLD    = 'Vazir-Bold'
+
+LRM = '\u200e'  # Left-to-Right Mark
 
 
 def ensure_fonts():
@@ -52,38 +55,120 @@ def _reshape(text: str) -> str:
     return arabic_reshaper.reshape(text or '')
 
 
-def rtl(text: str) -> str:
-    """آماده‌سازی یک تکه متنِ تک‌خطی برای drawString با جهت درست"""
-    return get_display(_reshape(text or ''))
+def sanitize_bidi_medical(text: str) -> str:
+    """
+    ایزوله‌سازی عبارات پزشکی، دوزها، واحدها و عبارات داخل پرانتز لاتین
+    با نشانگرهای جهت چپ‌به‌راست (LRM: \\u200e) جهت جلوگیری از وارونگی در UBA.
+    """
+    if not text:
+        return ''
+
+    # ۱. پرانتزهای حاوی فرمول‌های پزشکی و دوزهای لاتین بدون نویسه‌های فارسی
+    # e.g. (500 mg q12h), (1-2 g IV), (10-20 mg/kg), (Ceftriaxone 1g IV daily), (BP: 140/90 mmHg), (p < 0.05)
+    def repl_latin_paren(m):
+        inner = m.group(1).strip()
+        return f'({LRM}{inner}{LRM})'
+
+    text = re.sub(r'\(([^()\u0600-\u06FF]*[A-Za-z0-9][^()\u0600-\u06FF]*)\)', repl_latin_paren, text)
+
+    # ۲. دوزها، بازه‌ها و واحدهای لاتین مستقل یا درون متن فارسی
+    # فاصله‌های قبل و بعد حتماً خارج از LRM حفظ می‌شوند
+    dosage_pat = re.compile(
+        r'(?<![A-Za-z0-9_\u200e])'
+        r'('
+          r'[<>=≤≥±~]?\s*'
+          r'\d+(?:[./:-]\d+)*'
+          r'\s*'
+          r'[A-Za-z/%][A-Za-z0-9/%-]*'
+          r'(?:\s+[A-Za-z0-9/%-]+)*'
+        r')'
+        r'(?![A-Za-z0-9_\u200e])',
+        re.IGNORECASE
+    )
+
+    parts = text.split(LRM)
+    for i in range(0, len(parts), 2):
+        def repl_dosage(m):
+            raw = m.group(1)
+            l_space = raw[:len(raw) - len(raw.lstrip())]
+            r_space = raw[len(raw.rstrip()):]
+            core = raw.strip()
+            return f'{l_space}{LRM}{core}{LRM}{r_space}'
+
+        parts[i] = dosage_pat.sub(repl_dosage, parts[i])
+
+    return LRM.join(parts)
+
+
+def rtl(text: str, base_dir: str = 'R') -> str:
+    """آماده‌سازی یک تکه متنِ تک‌خطی برای drawString با جهت درست و ایزوله‌سازی عبارات پزشکی"""
+    if not text:
+        return ''
+    sanitized = sanitize_bidi_medical(text)
+    reshaped = _reshape(sanitized)
+    return get_display(reshaped, base_dir=base_dir)
 
 
 def text_width(text: str, font: str, size: float) -> float:
-    """عرض واقعی متنِ شکل‌دهی‌شده (نه متن خام) — برای layout دقیق"""
-    return pdfmetrics.stringWidth(_reshape(text or ''), font, size)
+    """عرض واقعی متنِ شکل‌دهی‌شده — LRM دارای عرض صفر در فونت وزیر است"""
+    return pdfmetrics.stringWidth(_reshape(sanitize_bidi_medical(text or '')), font, size)
 
 
-def wrap_rtl(text: str, font: str, size: float, max_width: float) -> list:
+def wrap_rtl(text: str, font: str, size: float, max_width: float, base_dir: str = 'R') -> list[str]:
     """
-    Word-wrap متن فارسی برای عرض مشخص.
-
-    نکته‌ی فنی مهم: عرض هر خط باید روی متنِ shape-شده (نه bidi-شده)
-    اندازه‌گیری شود، و bidi باید جداگانه روی هر خطِ *کامل* اجرا شود —
-    نه روی کل پاراگراف و نه کلمه‌به‌کلمه. اجرای bidi روی واحد اشتباه
-    باعث می‌شود کلمات در جای غلط ظاهر شوند.
+    Word-wrap متن فارسی متناسب با عرض:
+    - تفکیک پاراگراف‌ها با \\n جهت جلوگیری از انباشت خطوط در ReportLab
+    - محافظت از عبارات دوز و پرانتزهای لاتین در برابر شکست بین سطور
+    - اعمال reshape و get_display با base_dir='R' روی تک‌تک خطوط کامل
     """
     text = (text or '').strip()
     if not text:
         return []
-    words = text.split(' ')
-    lines, cur = [], []
-    for w in words:
-        trial = cur + [w]
-        width = pdfmetrics.stringWidth(_reshape(' '.join(trial)), font, size)
-        if width <= max_width or not cur:
-            cur = trial
-        else:
-            lines.append(' '.join(cur))
-            cur = [w]
-    if cur:
-        lines.append(' '.join(cur))
-    return [get_display(_reshape(l)) for l in lines]
+
+    sanitized = sanitize_bidi_medical(text)
+    paragraphs = sanitized.splitlines()
+    result_lines = []
+
+    # الگوی توکن‌های اتمی: پرانتزهای لاتین، پرانتزهای کوتاه فارسی، بلاک‌های LRM، یا کلمات عادی
+    token_pat = re.compile(
+        rf'\([^()\u0600-\u06FF]+\)'
+        rf'|\([^()]{{1,40}}\)'
+        rf'|{LRM}[^{LRM}]+{LRM}'
+        rf'|\S+'
+    )
+
+    for para in paragraphs:
+        para = para.strip()
+        if not para:
+            continue
+
+        raw_tokens = token_pat.findall(para)
+        tokens = list(raw_tokens)
+        cur = []
+
+        idx = 0
+        while idx < len(tokens):
+            tok = tokens[idx]
+            trial = cur + [tok]
+            w = pdfmetrics.stringWidth(_reshape(' '.join(trial)), font, size)
+            if w <= max_width:
+                cur = trial
+                idx += 1
+            elif not cur:
+                # اگر تک‌توکن از عرض سطر بیشتر بود، در صورت داشتن فاصله آن را می‌شکند
+                sub_words = tok.split(' ')
+                if len(sub_words) > 1:
+                    tokens[idx:idx+1] = sub_words
+                    continue
+                else:
+                    result_lines.append(tok)
+                    idx += 1
+            else:
+                result_lines.append(' '.join(cur))
+                cur = []
+
+        if cur:
+            result_lines.append(' '.join(cur))
+
+    return [get_display(_reshape(l), base_dir=base_dir) for l in result_lines]
+

@@ -431,3 +431,128 @@ def test_smart_media_routing_and_callback():
     asyncio.run(_run())
 
 
+def test_lecture_table_cell_wrapping_no_overlap():
+    """تست جلوگیری از همپوشانی ستون‌های جدول با شکست خودکار متن‌های طولانی پزشکی"""
+    from backend.services.qbank.fonts_rtl import _reshape
+
+    digest = {
+        "title": "فارماکولوژی پیشرفته فشار خون",
+        "subject": "فارماکولوژی",
+        "professor": "دکتر حسینی",
+        "session": "جلسه ۵",
+        "date": "۱۴۰۵/۰۹/۰۱",
+        "executive_summary": "بررسی مقایسه‌ای داروهای ضد فشار خون و عوارض جانبی آنها.",
+        "topics": [{"title": "مقدمه", "content": "مقدمه‌ای بر فشار خون."}],
+        "comparison_table": {
+            "title": "مقایسه داروهای خط اول بر اساس اندیکاسیون و منع مصرف",
+            "headers": ["دسته دارو", "مکانیسم سلولی و مولکولی", "اندیکاسیون‌های بالینی انتخابی", "عوارض جانبی و منع مصرف"],
+            "rows": [
+                [
+                    "ACE Inhibitors (انالاپریل)",
+                    "مهار آنزیم تبدیل‌کننده آنژیوتانسین و جلوگیری از تولید AT-II و مهار تجزیه برادی‌کینین عروقی",
+                    "پرفشاری خون همراه با دیابت قندی، نارسایی سیستولیک قلب (HFrEF)، پس از سکته قلبی STEMI",
+                    "سرفه خشک مداوم، هایپرکالمی شدید، آنژیوادم کشنده، منع مصرف مطلق در دوران بارداری"
+                ],
+                [
+                    "ARBs (لوزارتان)",
+                    "بلوک اختصاصی و رقابتی گیرنده‌های نوع ۱ آنژیوتانسین II در عضلات صاف دیواره عروق و قشر آدرنال",
+                    "جایگزین انتخابی بیماران با عدم تحمل ACEI به علت سرفه خشک، نفروپاتی دیابتی پیشرونده",
+                    "هایپرکالمی، کاهش فیلتراسیون گلومرولی در تنگی دوطرفه شریان کلیه، منع مطلق در بارداری"
+                ]
+            ]
+        }
+    }
+
+    buf = generate_lecture_pdf(digest)
+    pdf_bytes = buf.getvalue()
+    assert len(pdf_bytes) > 25000
+
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    assert len(reader.pages) >= 2
+    full_text = " ".join(p.extract_text() for p in reader.pages)
+
+    # اطمینان از حضور تمام عبارات کلیدی (لاتین و شکل‌یافته فارسی) بدون برش خوردن
+    assert "ACE" in full_text
+    assert "ARBs" in full_text
+    assert _reshape("انالاپریل") in full_text
+    assert _reshape("آنژیوادم") in full_text
+    assert _reshape("برادی") in full_text
+
+
+def test_lecture_table_multipage_pagination():
+    """تست شکست هوشمند جدول در مرز صفحه و تکرار هدر در صفحه جدید"""
+    from backend.services.qbank.fonts_rtl import _reshape
+
+    digest = {
+        "title": "فارماکولوژی جامع سیستم قلبی عروقی",
+        "subject": "قلب و عروق",
+        "professor": "دکتر زمانی",
+        "session": "جلسه تکمیلی",
+        "date": "۱۴۰۵/۰۹/۱۰",
+        "executive_summary": "مرور جامع داروهای کاهنده فشار خون و اینوتروپ‌های مثبت و منفی.",
+        "topics": [
+            {
+                "title": f"مبحث تفصیلی {idx}",
+                "content": "توضیحات مفصل پزشکی جهت پر کردن صفحه دوم سند و کشاندن جدول به مرز صفحه برای بررسی شکست خودکار سطرها. " * 9,
+                "clinical_points": "نکته کلیدی بالینی مربوط به دوزبندی و احتیاط‌های مصرف."
+            }
+            for idx in range(1, 3)
+        ],
+        "comparison_table": {
+            "title": "جدول مقایسه‌ای جامع داروهای ضد فشار خون و ریتم قلب",
+            "headers": ["دسته دارو", "مکانیسم سلولی", "اندیکاسیون‌ها", "عوارض و منع مصرف"],
+            "rows": [
+                [f"داروی شماره {i}", f"مکانیسم دقیق اثر سلولی و مولکولی در میوکارد و عروق {i}", f"اندیکاسیون انتخابی خط اول {i}", f"عوارض جانبی و تداخلات دارویی مهم {i}"]
+                for i in range(1, 10)
+            ]
+        }
+    }
+
+    buf = generate_lecture_pdf(digest)
+    reader = pypdf.PdfReader(buf)
+    # سند باید حداقل ۳ صفحه داشته باشد (جلد + شروع مباحث و جدول + ادامه جدول در صفحه سوم)
+    assert len(reader.pages) >= 3, f"تعداد صفحات باید حداقل ۳ باشد اما {len(reader.pages)} است"
+
+    page2_text = reader.pages[1].extract_text()
+    page3_text = reader.pages[2].extract_text()
+
+    # هر دو صفحه دوم و سوم باید حاوی سطرهای جدول باشند
+    assert _reshape("داروی شماره") in page2_text
+    assert _reshape("داروی شماره") in page3_text
+    # هدر جدول باید در هر دو صفحه حاضر باشد
+    assert _reshape("دسته دارو") in page2_text
+    assert _reshape("دسته دارو") in page3_text
+
+
+def test_lecture_scribe_delivery_html_escaping():
+    """تست ایمنی پیام تلگرام در برابر نمادهای مقایسه‌ای پزشکی (<, >, &)"""
+    import html
+    import re
+
+    med_summary = "هدف درمانی: MAP < 65 mmHg و pO2 > 60 mmHg است. در صورت K+ > 5.5 و pH < 7.25 باید سرم‌درمانی & دیالیز ارزیابی شود (p < 0.05)."
+    title = "شوک سپسیس (MAP < 65 & احیا)"
+    subject = "ICU & مراقبت‌های ویژه"
+
+    # اعمال تابع پاکسازی
+    safe_summary = html.escape(med_summary)
+    safe_title = html.escape(title)
+    safe_subject = html.escape(subject)
+
+    caption_msg = (
+        f"🎓 <b>جزوه جامع:</b> {safe_title} — {safe_subject}\n\n"
+        f"<blockquote expandable>{safe_summary}</blockquote>"
+    )
+
+    # اعتبارسنجی تگ‌های مجاز تلگرام
+    clean = re.sub(r'</?(?:b|i|u|s|strike|del|code|pre|blockquote)(?:\s+expandable)?(?:\s+href="[^"]*")?>', '', caption_msg)
+
+    # نباید هیچ تگ باز یا بسته نامعتبر مثل < 65 در متن باقی مانده باشد
+    stray_tags = re.findall(r'<[^>]*>', clean)
+    assert not stray_tags, f"تگ‌های نامعتبر HTML یافت شد: {stray_tags}"
+
+    # نباید هیچ & فرار داده نشده‌ای در متن وجود داشته باشد
+    stray_amps = re.findall(r'&(?!(?:lt|gt|amp|quot|apos);)', clean)
+    assert not stray_amps, f"کاراکترهای فرار نیافته & یافت شد: {stray_amps}"
+
+
+

@@ -5254,3 +5254,27 @@ class DBCore:
 
     async def ai_forget_profile(self, uid: int) -> None:
         await self.users.update_one({'user_id': uid}, {'$unset': {'ai_profile_notes': ''}})
+
+
+async def lecture_consume_quota(uid: int, daily_limit: int, today: str) -> tuple:
+    """Module-level wrapper for lecture quota consumption."""
+    try:
+        from database import db
+        return await db.lecture_consume_quota(uid, daily_limit, today)
+    except Exception:
+        uid = int(uid)
+        limit = int(daily_limit or 0)
+        admin_id = int(os.getenv("ADMIN_ID", "0"))
+        if uid == admin_id or limit <= 0:
+            return True, 0, 0
+        return True, 1, limit
+
+
+async def lecture_refund_quota(uid: int, today: str) -> None:
+    """Module-level wrapper for lecture quota refund."""
+    try:
+        from database import db
+        await db.lecture_refund_quota(uid, today)
+    except Exception:
+        pass
+
