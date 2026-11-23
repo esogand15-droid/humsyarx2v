@@ -4965,6 +4965,18 @@ class DBCore:
             used = 0
         return False, used, limit
 
+    async def lecture_refund_quota(self, uid: int, today: str) -> None:
+        """برگرداندن سهمیه مصرف‌شده در صورت بروز خطا در فرآیند تولید جزوه."""
+        uid = int(uid)
+        try:
+            await self.users.update_one(
+                {'user_id': uid, 'lecture_usage_date': today, 'lecture_usage_count': {'$gt': 0}},
+                {'$inc': {'lecture_usage_count': -1, 'lecture_total_usage': -1}}
+            )
+        except Exception:
+            logger.exception("Failed to refund lecture quota for user %s", uid)
+
+
 
     async def ai_inc_tokens(self, uid: int, tokens: int) -> None:
         """

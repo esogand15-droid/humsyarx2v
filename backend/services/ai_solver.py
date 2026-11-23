@@ -2192,10 +2192,15 @@ async def _gemini_upload_file(api_key: str, file_bytes: bytes, mime_type: str, d
         'X-Goog-Upload-Header-Content-Type': mime_type,
         'Content-Type':                      'application/json',
     }
-    async with httpx.AsyncClient(timeout=60) as client:
+    timeout_upload = 180.0
+    async with httpx.AsyncClient(timeout=timeout_upload) as client:
         start_resp = await client.post(base, headers=start_headers, json={'file': {'display_name': display_name}})
         if start_resp.status_code != 200:
-            raise AIError("آپلودِ فایل روی سرویسِ هوش مصنوعی ناموفق بود.")
+            if start_resp.status_code == 429:
+                raise AIQuotaError("سقف درخواست آپلود فایل برای این کلید گوگل پر شده است.")
+            if start_resp.status_code in (401, 403):
+                raise AIConfigError(f"کلید API گوگل نامعتبر است یا دسترسی ندارد (کد {start_resp.status_code}).")
+            raise AIError(f"شروع آپلود فایل روی گوگل ناموفق بود (کد {start_resp.status_code}): {start_resp.text[:180]}")
         upload_url = start_resp.headers.get('x-goog-upload-url')
         if not upload_url:
             raise AIError("آپلودِ فایل ناموفق بود (URL آپلود دریافت نشد).")
@@ -2210,7 +2215,11 @@ async def _gemini_upload_file(api_key: str, file_bytes: bytes, mime_type: str, d
             content=file_bytes,
         )
         if upload_resp.status_code != 200:
-            raise AIError("آپلودِ فایل روی سرویسِ هوش مصنوعی ناموفق بود.")
+            if upload_resp.status_code == 429:
+                raise AIQuotaError("سقف حجم یا آپلود فایل گوگل برای این کلید پر شده است.")
+            if upload_resp.status_code in (401, 403):
+                raise AIConfigError(f"کلید API گوگل نامعتبر است (کد {upload_resp.status_code}).")
+            raise AIError(f"آپلود داده‌های فایل روی گوگل ناموفق بود (کد {upload_resp.status_code}): {upload_resp.text[:180]}")
         file_info = (upload_resp.json() or {}).get('file') or {}
         if not file_info.get('uri'):
             raise AIError("آپلودِ فایل ناموفق بود (URI دریافت نشد).")
@@ -3377,6 +3386,16 @@ async def check_and_consume_lecture_quota(uid: int) -> tuple:
     limit = int(cfg.get('lecture_daily_quota', 5) or 5)
     today = today_tehran().isoformat()
     return await db.lecture_consume_quota(uid, limit, today)
+
+
+async def refund_lecture_quota(uid: int) -> None:
+    """بازگرداندن سهمیه روزانه جزوه کلاسی در صورت شکست پردازش یا خطا."""
+    today = today_tehran().isoformat()
+    try:
+        await db.lecture_refund_quota(uid, today)
+    except Exception:
+        logger.exception("خطا در بازگرداندن سهمیه جزوه کلاسی برای کاربر %s", uid)
+
 
 
 async def record_token_usage(uid: int, tokens: int) -> None:

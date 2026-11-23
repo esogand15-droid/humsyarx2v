@@ -222,3 +222,147 @@ def test_lecture_scribe_attach_second_file():
         assert len(_LECTURE_SESSIONS[session_id]['files']) == 2
 
     asyncio.run(_run())
+
+
+def test_transcode_media_m4a_to_mp3():
+    """تست تبدیل خودکار فایل m4a به mp3 استاندارد با ffmpeg"""
+    import asyncio
+    import subprocess
+    import tempfile
+    from backend.services.lecture_scribe import _get_ffmpeg_path, transcode_media_to_optimized_audio
+
+    ffmpeg_exe = _get_ffmpeg_path()
+    if not ffmpeg_exe:
+        pytest.skip("ffmpeg در محیط تست یافت نشد")
+
+    # ساخت یک فایل صوتی نمونه m4a با استفاده از tempfile
+    with tempfile.NamedTemporaryFile(suffix='.m4a', delete=False) as tf:
+        tmp_name = tf.name
+
+    try:
+        cmd = [ffmpeg_exe, '-y', '-f', 'lavfi', '-i', 'sine=frequency=800:duration=1', '-c:a', 'aac', tmp_name]
+        subprocess.run(cmd, capture_output=True, check=True)
+        with open(tmp_name, 'rb') as f:
+            m4a_bytes = f.read()
+    finally:
+        if os.path.exists(tmp_name):
+            os.remove(tmp_name)
+
+    assert len(m4a_bytes) > 0
+
+    async def _run():
+        mp3_bytes, mime, out_name = await transcode_media_to_optimized_audio(
+            m4a_bytes, "جلسه دوم ایین خواهران.m4a"
+        )
+        assert mime == "audio/mp3", "فرمت خروجی باید حتما audio/mp3 باشد"
+        assert out_name == "optimized_lecture.mp3"
+        assert len(mp3_bytes) > 0, "فایل تبدیل‌شده نباید خالی باشد"
+
+    asyncio.run(_run())
+
+
+def test_handle_lecture_file_input_m4a_forwarded_document():
+    """تست پذیرش فایل صوتی m4a که به صورت document تلگرام فوروارد شده است"""
+    import asyncio
+
+    async def _run():
+        mock_update = MagicMock()
+        mock_update.effective_user.id = 55555
+        mock_msg = MagicMock()
+        mock_msg.voice = None
+        mock_msg.audio = None
+        mock_msg.video = None
+        mock_msg.video_note = None
+        mock_msg.caption = "ویس استاد جلسه دوم"
+
+        doc_mock = MagicMock()
+        doc_mock.file_name = "جلسه دوم ایین خواهران.m4a"
+        doc_mock.mime_type = "audio/x-m4a"
+        doc_mock.file_size = 53400000
+        doc_mock.file_id = "doc_m4a_123"
+        tg_file_mock = MagicMock()
+        doc_mock.get_file = AsyncMock(return_value=tg_file_mock)
+
+        mock_msg.document = doc_mock
+        mock_msg.reply_text = AsyncMock()
+        mock_update.message = mock_msg
+
+        mock_context = MagicMock()
+        mock_context.user_data = {}
+
+        await handle_lecture_file_input(mock_update, mock_context)
+
+        assert mock_msg.reply_text.called
+        sent_text = mock_msg.reply_text.call_args[0][0]
+        assert "فایل جلسه با موفقیت دریافت شد" in sent_text
+        session_id = mock_context.user_data.get('lecture_session_id')
+        assert session_id in _LECTURE_SESSIONS
+        sess_file = _LECTURE_SESSIONS[session_id]['files'][0]
+        assert sess_file['kind'] == 'audio'
+        assert sess_file['name'] == "جلسه دوم ایین خواهران.m4a"
+
+    asyncio.run(_run())
+
+
+def test_handle_lecture_file_input_video_lecture():
+    """تست پذیرش ویدیو کلاس درس با فرمت mp4"""
+    import asyncio
+
+    async def _run():
+        mock_update = MagicMock()
+        mock_update.effective_user.id = 66666
+        mock_msg = MagicMock()
+        mock_msg.voice = None
+        mock_msg.audio = None
+        mock_msg.video_note = None
+        mock_msg.document = None
+        mock_msg.caption = "فیلم کلاس پاتولوژی"
+
+        vid_mock = MagicMock()
+        vid_mock.file_name = "pathology_lec.mp4"
+        vid_mock.mime_type = "video/mp4"
+        vid_mock.file_size = 45000000
+        vid_mock.file_id = "vid_123"
+        tg_file_mock = MagicMock()
+        vid_mock.get_file = AsyncMock(return_value=tg_file_mock)
+
+        mock_msg.video = vid_mock
+        mock_msg.reply_text = AsyncMock()
+        mock_update.message = mock_msg
+
+        mock_context = MagicMock()
+        mock_context.user_data = {}
+
+        await handle_lecture_file_input(mock_update, mock_context)
+
+        assert mock_msg.reply_text.called
+        session_id = mock_context.user_data.get('lecture_session_id')
+        assert session_id in _LECTURE_SESSIONS
+        sess_file = _LECTURE_SESSIONS[session_id]['files'][0]
+        assert sess_file['kind'] == 'video'
+
+    asyncio.run(_run())
+
+
+def test_gemini_vault_key_failover_on_429():
+    """تست چرخش خودکار کلیدهای Vault هوشیار هنگام بروز خطای 429 سهمیه در Gemini"""
+    import asyncio
+    from backend.services.ai_solver import run_with_key_failover, _raise_gemini_status_error
+
+    keys = ["key_alpha_exhausted", "key_beta_active"]
+    attempted_keys = []
+
+    async def _mock_api_call(key: str):
+        attempted_keys.append(key)
+        if key == "key_alpha_exhausted":
+            _raise_gemini_status_error(429, "Resource has been exhausted (e.g. check quota).")
+        return {"status": "success", "used_key": key}
+
+    async def _run():
+        result = await run_with_key_failover("gemini", keys, _mock_api_call, label="test-quota-failover")
+        assert result["status"] == "success"
+        assert result["used_key"] == "key_beta_active"
+        assert attempted_keys == ["key_alpha_exhausted", "key_beta_active"]
+
+    asyncio.run(_run())
+
