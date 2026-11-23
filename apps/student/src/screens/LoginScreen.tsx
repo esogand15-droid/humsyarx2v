@@ -160,10 +160,6 @@ export function LoginScreen() {
     }
   }
 
-  async function handleFillDemoCode() {
-    setUserCode('HY-7K9M-2P4X');
-  }
-
   async function handleVerifyFallback() {
     const cleanOtp = fallbackOtp.replace(/\D/g, '');
     if (cleanOtp.length < 4 || fallbackBusy) return;
@@ -189,19 +185,25 @@ export function LoginScreen() {
   // ── ۲. مرحلهٔ انتظار برای تأیید ربات تلگرام با کد تطبیق ۴ کاراکتری ──
   if (step === 'waiting' && challenge) {
     return (
-      <div className="auth">
-        <div className="auth__head text-center">
-          <Brand size="xl" />
-          <div className="brand-wordmark mt-12">
-            <span className="hums">هامز</span>
-            <span className="yar">یار</span>
+      <div className="login-universe-wrap">
+        <div className="login-ambient-glow login-ambient-glow--cyan" aria-hidden="true" />
+        <div className="login-ambient-glow login-ambient-glow--blue" aria-hidden="true" />
+        <div className="login-grid-overlay" aria-hidden="true" />
+
+        <div className="login-stellar-card">
+          <div className="login-brand-hero text-center">
+            <div className="login-logo-glow-halo">
+              <Brand size="xl" />
+            </div>
+            <div className="brand-wordmark mt-12">
+              <span className="hums">هامز</span>
+              <span className="yar">یار</span>
+            </div>
+            <h1 className="h1 mt-12" style={{ fontSize: '22px', fontWeight: 900 }}>تأیید ورود در تلگرام</h1>
+            <p className="body mt-6" style={{ color: 'var(--ink-2, #94a3b8)', fontSize: '13.5px' }}>
+              اعلان ورود به ربات تلگرام هامزیار ارسال شد. برای امنیت حساب، کد زیر را با پیام ربات مطابقت دهید:
+            </p>
           </div>
-          <div className="ecg-line my-12" style={{ maxWidth: '200px', marginInline: 'auto' }} />
-          <h1 className="h1 mt-8">تأیید ورود در تلگرام</h1>
-          <p className="body mt-8">
-            اعلان ورود به ربات تلگرام هامزیار ارسال شد. برای امنیت حساب، کد زیر را با پیام ربات مطابقت دهید:
-          </p>
-        </div>
 
         <div className="card card--glass text-center my-16" style={{ padding: '24px' }}>
           <div className="tiny color-muted mb-8" style={{ letterSpacing: '0.06em' }}>کد تأیید تطبیق در ربات</div>
@@ -280,17 +282,6 @@ export function LoginScreen() {
               تلگرام در دسترس نیست؟ کد اضطراری
             </Button>
           </div>
-
-          <div className="mt-8">
-            <Button
-              type="button"
-              variant="cyan"
-              block
-              onClick={() => void handleFillDemoCode()}
-            >
-              🚀 پر کردن کد نمونه در کادر (HY-7K9M-2P4X)
-            </Button>
-          </div>
         </div>
 
         {/* مودال ورود با کد اضطراری */}
@@ -334,6 +325,7 @@ export function LoginScreen() {
             </form>
           </div>
         </Sheet>
+        </div>
       </div>
     );
   }
@@ -433,7 +425,7 @@ export function LoginScreen() {
               autoCapitalize="characters"
               spellCheck={false}
               dir="ltr"
-              placeholder="HY-7K9M-2P4X"
+              placeholder="HY-••••-••••"
               disabled={busy}
               aria-label="کد کاربری اختصاصی (۸ کاراکتر)"
             />
@@ -470,24 +462,6 @@ export function LoginScreen() {
               </>
             )}
           </button>
-
-          {/* خط تفکیک کننده با برچسب وسط */}
-          <div className="login-divider-row my-16">
-            <span className="login-divider-line" />
-            <span className="login-divider-label">یا دسترسی سریع به پنل دانشجویی</span>
-            <span className="login-divider-line" />
-          </div>
-
-          {/* کلید پرکردن خودکار کد نمونه */}
-          <div className="mt-12 text-center">
-            <button
-              type="button"
-              className="login-text-link"
-              onClick={() => void handleFillDemoCode()}
-            >
-              پر کردن کد نمونه در کادر (HY-7K9M-2P4X)
-            </button>
-          </div>
         </form>
 
         {/* پانویس کارت ورود */}

@@ -375,7 +375,7 @@ export default function Landing() {
           </nav>
 
           <div className="lp-header__cta">
-            <a className="lp-btn lp-btn--primary" href="/pwa/">
+            <a className="lp-btn lp-btn--primary" href="/student/install">
               ورود به نسخهٔ وب (PWA)
               <Icon name="arrow" size={16} />
             </a>
@@ -412,7 +412,7 @@ export default function Landing() {
               {/* دو دکمه اصلی جهت اتصال */}
               <div className="lp-hero__actions">
                 <div className="lp-cta-group">
-                  <a className="lp-btn lp-btn--primary lp-btn--lg" href="/pwa/">
+                  <a className="lp-btn lp-btn--primary lp-btn--lg" href="/student/install">
                     ورود به نسخهٔ وب (PWA)
                     <Icon name="arrow" size={18} />
                   </a>
@@ -564,7 +564,7 @@ export default function Landing() {
                 </ul>
 
                 <div className="lp-pillar-cta-row">
-                  <a className="lp-btn lp-btn--primary" href="/pwa/">
+                  <a className="lp-btn lp-btn--primary" href="/student/install">
                     مشاهده در نسخه وب
                     <Icon name="arrow" size={16} />
                   </a>
@@ -824,7 +824,7 @@ export default function Landing() {
               به جمع صدها دانشجوی پزشکی بپیوندید که برنامه‌ریزی، جزوات، تست‌زنی و روتیشن‌های خود را با هامزیار سازمان‌دهی می‌کنند.
             </p>
             <div className="lp-hero__actions lp-hero__actions--center">
-              <a className="lp-btn lp-btn--primary lp-btn--lg" href="/pwa/">
+              <a className="lp-btn lp-btn--primary lp-btn--lg" href="/student/install">
                 ورود به نسخهٔ وب (PWA)
                 <Icon name="arrow" size={18} />
               </a>
@@ -851,7 +851,7 @@ export default function Landing() {
           </div>
 
           <nav className="lp-footer__links" aria-label="پیوندهای پانوشت">
-            <a href="/pwa/">ورود به نسخهٔ وب</a>
+            <a href="/student/install">ورود به نسخهٔ وب</a>
             <a href={botUrl} target="_blank" rel="noreferrer">
               ربات تلگرام
             </a>

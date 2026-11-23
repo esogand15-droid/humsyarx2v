@@ -103,12 +103,67 @@ export function BlockedScreen() {
   );
 }
 
+export function CircularSpinner({ size = 48 }: { size?: number }) {
+  return (
+    <div className="hym-circular-spinner-wrap" aria-hidden="true">
+      <svg
+        className="hym-circular-spinner"
+        viewBox="0 0 50 50"
+        style={{ width: size, height: size }}
+      >
+        <circle
+          className="hym-circular-track"
+          cx="25"
+          cy="25"
+          r="20"
+          fill="none"
+          strokeWidth="3.5"
+        />
+        <circle
+          className="hym-circular-arc"
+          cx="25"
+          cy="25"
+          r="20"
+          fill="none"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="hym-circular-core-glow" />
+    </div>
+  );
+}
+
 export function SplashScreen() {
   return (
-    <div className="auth auth--splash" aria-busy="true">
-      <Brand size="lg" />
-      <div className="ecg-line mt-16" style={{ width: 120, height: 16 }} />
-      <p className="small mt-16">در حال بررسی وضعیت حساب…</p>
+    <div className="login-universe-wrap" aria-busy="true">
+      <div className="login-ambient-glow login-ambient-glow--cyan" aria-hidden="true" />
+      <div className="login-ambient-glow login-ambient-glow--blue" aria-hidden="true" />
+      <div className="login-grid-overlay" aria-hidden="true" />
+
+      <div className="login-stellar-card text-center" style={{ maxWidth: 420, padding: '44px 28px' }}>
+        <div className="login-brand-hero text-center">
+          <div className="login-logo-glow-halo">
+            <Brand size="xl" />
+          </div>
+          <div className="brand-wordmark mt-12">
+            <span className="hums">هامز</span>
+            <span className="yar">یار</span>
+          </div>
+          <div className="login-medical-badge mt-8">
+            <span className="login-badge-dot" />
+            <span>سامانهٔ یکپارچه آموزش بالینی و یادگیری پزشکی</span>
+          </div>
+        </div>
+
+        <div className="mt-28 mb-16" style={{ display: 'flex', justifyContent: 'center' }}>
+          <CircularSpinner size={52} />
+        </div>
+
+        <p className="body mt-12" style={{ color: 'var(--ink-2, #94a3b8)', fontSize: '14px', fontWeight: 600 }}>
+          در حال بررسی و اتصال به سامانه…
+        </p>
+      </div>
     </div>
   );
 }

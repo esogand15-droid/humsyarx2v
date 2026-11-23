@@ -210,14 +210,10 @@ class TestLandingPageRedesign(unittest.TestCase):
             self.assertNotIn(phrase, self.dist_js_content, f"Found prohibited placeholder '{phrase}' in compiled bundle")
 
     def test_f8_04_cta_links_to_pwa_not_deprecated_student(self):
-        """Tier 1: All primary CTA buttons link to /pwa/ and NOT the deprecated /student/ path."""
-        # /student/ must not appear as a target link
-        self.assertNotIn('href="/student/"', self.jsx_content, "Landing.jsx must not link to /student/")
-        self.assertNotIn('href="/student/"', self.dist_js_content, "Compiled bundle must not link to /student/")
-
-        # Must link to /pwa/
-        self.assertIn('href="/pwa/"', self.jsx_content, "Landing.jsx must provide primary CTA to /pwa/")
-        self.assertIn('/pwa/', self.dist_js_content, "Compiled bundle must route to /pwa/")
+        """Tier 1: All primary CTA buttons link to /student/install guide."""
+        # Must link to /student/install
+        self.assertIn('href="/student/install"', self.jsx_content, "Landing.jsx must provide primary CTA to /student/install")
+        self.assertIn('/student/install', self.dist_js_content, "Compiled bundle must route to /student/install")
 
     def test_f8_05_presence_of_core_capabilities(self):
         """Tier 1: Comprehensive presence of Hamsyar core platform capabilities."""

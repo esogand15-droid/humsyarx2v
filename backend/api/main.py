@@ -694,7 +694,7 @@ async def health_deep():
 # حالا تست واقعاً وجود دارد و روی هر push اجرا می‌شود.
 # هر تغییر عمدیِ سطح API باید این عدد و EXPECTED_OPENAPI_OPERATIONS در
 # tests/test_route_inventory.py را هم‌زمان به‌روز کند.
-_ROUTE_BASELINE = 759
+_ROUTE_BASELINE = 761
 
 
 def _walk_included_routes(routes, prefix: str = "") -> list:
@@ -897,6 +897,13 @@ _WEBADMIN_DIST_STATE: dict = {"built": False, "path": "webadmin/dist"}
 _WA_MOUNTED = _mount_spa("/admin", _WA_DIST, "web-admin-spa", _WEBADMIN_DIST_STATE)
 # بعد /app
 _MA_MOUNTED = _mount_spa("/app", _MA_DIST, "mini-app-spa", _MINIAPP_DIST_STATE)
+# 📲 هدایت مستقیم /pwa به راهنمای نصب PWA و کلاینت دانشجو (/student/install)
+@app.get("/pwa", include_in_schema=False)
+@app.get("/pwa/", include_in_schema=False)
+async def _pwa_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/student/install", status_code=307)
+
 # 📲 و /pwa — نسخهٔ نصب‌شدنی (iOS/Android/Windows)
 _PWA_DIST_STATE: dict = {"built": False, "path": "miniapp/dist-pwa"}
 _PWA_MOUNTED = _mount_spa("/pwa", _PWA_DIST, "pwa-spa", _PWA_DIST_STATE)
