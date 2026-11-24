@@ -115,7 +115,7 @@ def api_key_problem(key: str) -> str | None:
 #  پیش‌فرض‌ها — فقط وقتی استفاده می‌شن که ادمین هنوز چیزی ست نکرده
 # ══════════════════════════════════════════════════
 DEFAULT_MODELS = {
-    'gemini':     'gemini-2.5-flash',
+    'gemini':     'gemini-3.5-flash',   # 2.x/1.x کلاً deprecated — به‌روزرسانی 1405/09
     'openrouter': 'google/gemma-4-31b-it:free',
     'groq':       'llama-3.3-70b-versatile',
     'cerebras':   'llama-3.3-70b',
@@ -184,11 +184,11 @@ PROVIDERS = {
 # (شناسه‌ی مدل, برچسب فارسی, رایگان؟) — منبع: https://freellm.net/models/?free=1 (299 مدل رایگان، 239 تأیید Live 2026-09-08)
 MODEL_CATALOG = {
     'gemini': [
-        ('gemini-2.5-flash',      '⚡ Gemini 2.5 Flash (پیشنهادی، پایدار)', True),
-        ('gemini-2.0-flash',      '🚀 Gemini 2.0 Flash (سریع، GA)', True),
-        ('gemini-2.5-pro',        '🧠 Gemini 2.5 Pro (استدلال سنگین)', False),
-        ('gemini-1.5-flash',      '📦 Gemini 1.5 Flash (پشتیبان)', True),
-        ('gemini-1.5-pro',        '🔬 Gemini 1.5 Pro (پشتیبان دقیق)', False),
+        ('gemini-3.5-flash',      '⚡ Gemini 3.5 Flash (پیشنهادی، پایدار)', True),
+        ('gemini-3.6-flash',      '🚀 Gemini 3.6 Flash (سریع، GA)', True),
+        ('gemini-flash-lite-latest', '💨 Gemini Flash Lite Latest (سبک، رایگان)', True),
+        ('gemini-3.5-flash-lite', '📦 Gemini 3.5 Flash Lite (پشتیبان سبک)', True),
+        ('gemini-3.8-flash',      '🧠 Gemini 3.8 Flash (پشتیبان — 503 موقتی)', True),
     ],
     'openrouter': [
         # FreeLLM top free models aggregated under OpenRouter OpenAI-compatible API
@@ -1532,7 +1532,7 @@ async def get_ai_config() -> dict:
         # 🎙 دستیار جزوه‌نویس چندرسانه‌ای هوشمند (Lecture Scribe)
         'lecture_scribe_enabled': str(raw.get('ai_lecture_scribe_enabled', '1')) not in ('0', 'false', 'False', ''),
         'lecture_daily_quota': int(raw.get('ai_lecture_daily_quota', 5) or 5),
-        'lecture_model': (raw.get('ai_lecture_model') or 'gemini-2.5-flash').strip() or 'gemini-2.5-flash',
+        'lecture_model': (raw.get('ai_lecture_model') or 'gemini-3.5-flash').strip() or 'gemini-3.5-flash',
     }
 
 
@@ -5003,13 +5003,14 @@ async def repair_foreign_stt_to_persian(
         "فقط و فقط جمله‌ی اصلی فارسی گفتاری که دانشجو گفته است را به خط فارسی بنویس "
         "(بدون هیچ توضیحی، بدون گیومه، حداکثر یک خط کوتاه فارسی؛ اگر صرفاً نویز بی‌معنی بوده فقط بنویس: «...»):"
     )
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    _stt_model = 'gemini-3.5-flash'
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{_stt_model}:generateContent"
     payload = {
         'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
-        'generationConfig': {
+        'generationConfig': _no_thinking({
             'maxOutputTokens': 80,
             'temperature': 0.1,
-        },
+        }, model=_stt_model),
     }
     try:
         async with httpx.AsyncClient(timeout=4.0) as client:

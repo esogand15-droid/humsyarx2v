@@ -317,7 +317,7 @@ async def ai_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cfg = await get_ai_config()
         scribe_on = cfg.get('lecture_scribe_enabled', True)
         quota = cfg.get('lecture_daily_quota', 5)
-        model = cfg.get('lecture_model', 'gemini-2.5-flash')
+        model = cfg.get('lecture_model', 'gemini-3.5-flash')
 
         text = (
             "🎙 <b>تنظیمات دستیار جزوه‌نویس چندرسانه‌ای کلاسی (Lecture Scribe)</b>\n"
@@ -359,22 +359,23 @@ async def ai_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if action == 'scribe_model':
         kb = [
-            [InlineKeyboardButton("⚡ Gemini 2.5 Flash (پیشنهادی)", callback_data='ai:set_scribe_model:gemini-2.5-flash')],
-            [InlineKeyboardButton("🚀 Gemini 2.0 Flash (پایدار و سریع)", callback_data='ai:set_scribe_model:gemini-2.0-flash')],
-            [InlineKeyboardButton("🧠 Gemini 2.5 Pro (استدلال سنگین)", callback_data='ai:set_scribe_model:gemini-2.5-pro')],
-            [InlineKeyboardButton("📦 Gemini 1.5 Flash (پشتیبان)", callback_data='ai:set_scribe_model:gemini-1.5-flash')],
+            [InlineKeyboardButton("⚡ Gemini 3.5 Flash (پیشنهادی — پایدار)", callback_data='ai:set_scribe_model:gemini-3.5-flash')],
+            [InlineKeyboardButton("🚀 Gemini 3.6 Flash (سریع و پایدار)", callback_data='ai:set_scribe_model:gemini-3.6-flash')],
+            [InlineKeyboardButton("💨 Gemini Flash Lite Latest (سبک و رایگان)", callback_data='ai:set_scribe_model:gemini-flash-lite-latest')],
+            [InlineKeyboardButton("📦 Gemini 3.5 Flash Lite (پشتیبان سبک)", callback_data='ai:set_scribe_model:gemini-3.5-flash-lite')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='ai:scribe')],
         ]
         await query.edit_message_text(
             "🧩 <b>انتخاب مدل چندرسانه‌ای برای استخراج جزوه</b>\n\n"
-            "مدل‌های Google Gemini توانایی شنیدن مستقیم تا ۲ ساعت فایل صوتی و اسلایدهای کلاسی را دارند.",
+            "مدل‌های Google Gemini 3.x توانایی شنیدن مستقیم تا ۲ ساعت فایل صوتی و اسلایدهای کلاسی را دارند.\n"
+            "<i>⚠️ مدل‌های 2.x/1.x از سرویس‌دهی خارج شدند (404).</i>",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(kb)
         )
         return
 
     if action == 'set_scribe_model':
-        m = parts[2] if len(parts) > 2 else 'gemini-2.5-flash'
+        m = parts[2] if len(parts) > 2 else 'gemini-3.5-flash'
         await set_ai_setting('lecture_model', m)
         await query.answer(f"✅ مدل جزوه‌نویس روی {m} تنظیم شد.", show_alert=True)
         query.data = 'ai:scribe'

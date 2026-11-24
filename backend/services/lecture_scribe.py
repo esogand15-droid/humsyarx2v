@@ -57,19 +57,17 @@ def _parse_json_from_text(raw: str) -> dict:
         raise
 
 
-# مدل‌های تأییدشده و معتبر گوگل برای جلوگیری از خطای مدل‌های خیالی
+# مدل‌های تأییدشده و معتبر گوگل (تست‌شده با API — 1405/09)
+# ترتیب: پایدارترین → پشتیبان (503 موقتی آخر می‌آید)
 VERIFIED_MODEL_CASCADE = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-2.5-pro',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
+    'gemini-3.5-flash',        # ✅ 200 OK — پایدار
+    'gemini-3.6-flash',        # ✅ 200 OK — پایدار
+    'gemini-flash-lite-latest', # ✅ 200 OK — سبک و سریع
+    'gemini-3.5-flash-lite',   # ✅ 200 OK — پشتیبان lite
+    'gemini-3.8-flash',        # 503 موقتی — آخرین پشتیبان
 ]
 
-HALLUCINATED_MODELS = [
-    'gemini-3.6-flash',
-    'gemini-3.5-flash-lite',
-]
+HALLUCINATED_MODELS: list[str] = []  # مدل‌های 2.x/1.x کلاً deprecated شدند
 
 
 def resolve_gemini_api_keys(cfg: dict | None = None, filter_cooldown: bool = True) -> list[str]:
@@ -155,14 +153,15 @@ def sanitize_filename_for_disk(filename: str, default: str = "media_file") -> st
 def resolve_candidate_models(cfg: dict | None = None) -> list[str]:
     """Canonical resolver for candidate Gemini models adhering to verified production hierarchy.
 
-    Eliminates hallucinated models (gemini-3.6-flash, gemini-3.5-flash-lite)
-    and establishes high-throughput cascade starting with gemini-2.5-flash.
+    از VERIFIED_MODEL_CASCADE استفاده می‌کند (مدل‌های تأییدشده 3.x).
+    مدل‌های 2.x/1.x کلاً deprecated هستند (به‌روزرسانی 1405/09).
     """
     hallucinated = set(HALLUCINATED_MODELS)
-    preferred = ((cfg.get('lecture_model') if cfg else '') or 'gemini-2.5-flash').strip()
+    preferred = ((cfg.get('lecture_model') if cfg else '') or 'gemini-3.5-flash').strip()
 
     models: list[str] = []
-    if preferred and preferred not in hallucinated:
+    # مدل ذخیرهشدهی قدیمی در DB (مثل gemini-2.5-flash) فقط یک درخواستِ 404 هدر میدهد → رد میشود
+    if preferred and preferred not in hallucinated and not re.match(r'gemini-[12]\.', preferred.lower()):
         models.append(preferred)
 
     for m in VERIFIED_MODEL_CASCADE:
@@ -1076,9 +1075,26 @@ async def run_lecture_processing_worker(
                     logger.warning("کلید Gemini با کد %d نامعتبر است → سوییچ خودکار به کلید بعدی...", res.status_code)
                     _raise_gemini_status_error(res.status_code, res.text)
 
-                if res.status_code in (400, 404, 503):
+                if res.status_code in (400, 404):
                     logger.warning("مدل %s با کد %d پاسخ نداد (%s)؛ سوئیچ به مدل بعدی در زنجیره فال‌بک...", model_cand, res.status_code, res.text[:140])
                     last_model_error = AIError(f"Model {model_cand} returned {res.status_code}: {res.text[:120]}")
+                    continue
+
+                if res.status_code == 503:
+                    # 503 موقتی است (بار زیاد) → یک retry روی همین مدل با تأخیر کوتاه
+                    logger.warning("مدل %s با 503 (بار زیاد) پاسخ داد؛ ۳ ثانیه صبر و retry...", model_cand)
+                    await asyncio.sleep(3)
+                    async with httpx.AsyncClient(timeout=240) as retry_client:
+                        retry_res = await retry_client.post(url, headers=headers, json=payload)
+                    if retry_res.status_code == 200:
+                        try:
+                            data = retry_res.json()
+                            raw_text = _extract_gemini_text(data, "جزوه")
+                            return _parse_json_from_text(raw_text)
+                        except Exception as parse_err:
+                            logger.warning("خطا در پردازش JSON بعد از retry مدل %s: %s", model_cand, parse_err)
+                    logger.warning("مدل %s بعد از retry هم %d داد؛ سوئیچ به مدل بعدی...", model_cand, retry_res.status_code)
+                    last_model_error = AIError(f"Model {model_cand} returned 503 (high demand) after retry")
                     continue
 
                 _raise_gemini_status_error(res.status_code, res.text)

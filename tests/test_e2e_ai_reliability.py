@@ -182,14 +182,15 @@ class TestTier1FeatureCoverage(unittest.TestCase):
         self.assertEqual(keys[1], K_VAULT_2)
 
     def test_t1_02_verified_model_hierarchy_cascade(self):
-        """Feature 4: Production model hierarchy cascade starts with gemini-2.5-flash without hallucinations."""
+        """Feature 4: Production model hierarchy cascade starts with gemini-3.5-flash (به‌روزرسانی 1405/09)."""
         models = resolve_candidate_models()
-        self.assertEqual(models[0], "gemini-2.5-flash")
-        self.assertIn("gemini-2.0-flash", models)
-        self.assertIn("gemini-2.5-pro", models)
-        self.assertIn("gemini-1.5-flash", models)
-        self.assertIn("gemini-1.5-pro", models)
+        self.assertEqual(models[0], "gemini-3.5-flash")
+        self.assertIn("gemini-3.6-flash", models)
+        self.assertIn("gemini-flash-lite-latest", models)
+        self.assertIn("gemini-3.5-flash-lite", models)
+        self.assertIn("gemini-3.8-flash", models)
 
+        # HALLUCINATED_MODELS اکنون خالی است — مدل‌های 2.x/1.x کلاً deprecated هستند
         for hallu in HALLUCINATED_MODELS:
             self.assertNotIn(hallu, models, f"Hallucinated model {hallu} must be eliminated from cascade")
 
@@ -272,7 +273,7 @@ class TestTier1FeatureCoverage(unittest.TestCase):
         async def _mock_post(client, url, headers=None, json=None, **kwargs):
             model = url.split("/models/")[1].split(":")[0]
             models_attempted.append(model)
-            if model == "gemini-2.5-flash":
+            if model == "gemini-3.5-flash":
                 return httpx.Response(404, text="Model not found", request=httpx.Request("POST", url))
             return httpx.Response(200, text=json_lib.dumps({"candidates": [{"content": {"parts": [{"text": json_lib.dumps(SAMPLE_LECTURE_DIGEST)}]}}]}), request=httpx.Request("POST", url))
 
@@ -281,9 +282,9 @@ class TestTier1FeatureCoverage(unittest.TestCase):
             success = asyncio.run(run_lecture_processing_worker(bot=bot, chat_id=123, uid=55502, session=session, status_msg_id=10))
 
         self.assertTrue(success)
-        self.assertIn("gemini-2.5-flash", models_attempted)
-        self.assertIn("gemini-2.0-flash", models_attempted)
-        self.assertEqual(models_attempted[:2], ["gemini-2.5-flash", "gemini-2.0-flash"])
+        # 404 دائمی است → بدون retry، فقط یک بار امتحان و سوئیچ به مدل بعدی
+        self.assertEqual(models_attempted.count("gemini-3.5-flash"), 1)
+        self.assertIn("gemini-3.6-flash", models_attempted)
 
     @patch("database.db.op_claim", AsyncMock(return_value=True))
     @patch("database.db.op_release", AsyncMock(return_value=True))
@@ -312,7 +313,7 @@ class TestTier1FeatureCoverage(unittest.TestCase):
         async def _mock_post(client, url, headers=None, json=None, **kwargs):
             model = url.split("/models/")[1].split(":")[0]
             models_attempted.append(model)
-            if model == "gemini-2.5-flash":
+            if model == "gemini-3.5-flash":
                 return httpx.Response(503, text="Service Unavailable", request=httpx.Request("POST", url))
             return httpx.Response(200, text=json_lib.dumps({"candidates": [{"content": {"parts": [{"text": json_lib.dumps(SAMPLE_LECTURE_DIGEST)}]}}]}), request=httpx.Request("POST", url))
 
@@ -321,17 +322,18 @@ class TestTier1FeatureCoverage(unittest.TestCase):
             success = asyncio.run(run_lecture_processing_worker(bot=bot, chat_id=123, uid=55503, session=session, status_msg_id=11))
 
         self.assertTrue(success)
-        self.assertIn("gemini-2.5-flash", models_attempted)
-        self.assertIn("gemini-2.0-flash", models_attempted)
-        self.assertEqual(models_attempted[:2], ["gemini-2.5-flash", "gemini-2.0-flash"])
+        # gemini-3.5-flash باید دوبار امتحان شود (یک بار + retry بعد از 503)
+        self.assertEqual(models_attempted.count("gemini-3.5-flash"), 2)
+        # بعد از دو retry، gemini-3.6-flash باید امتحان شود
+        self.assertIn("gemini-3.6-flash", models_attempted)
 
     def test_t1_08_preferred_model_override(self):
         """Feature 4: Valid user/admin preferred model takes first priority in cascade."""
-        cfg = {"lecture_model": "gemini-2.5-pro"}
+        cfg = {"lecture_model": "gemini-3.6-flash"}
         cascade = resolve_candidate_models(cfg)
-        self.assertEqual(cascade[0], "gemini-2.5-pro")
-        self.assertIn("gemini-2.5-flash", cascade)
-        self.assertIn("gemini-2.0-flash", cascade)
+        self.assertEqual(cascade[0], "gemini-3.6-flash")
+        self.assertIn("gemini-3.5-flash", cascade)
+        self.assertIn("gemini-flash-lite-latest", cascade)
 
     def test_t1_09_thinking_config_generation(self):
         """Feature 5: _no_thinking safely configures generationConfig without raising syntax error."""
@@ -708,24 +710,24 @@ class TestTier3PairwiseInteractions(unittest.TestCase):
         interaction_log = []
 
         async def _simulate_matrix_call(key: str):
-            models = ["gemini-2.5-flash", "gemini-2.0-flash"]
+            models = ["gemini-3.5-flash", "gemini-3.6-flash"]
             for m in models:
                 interaction_log.append((key, m))
-                if key == K_VAULT_1 and m == "gemini-2.5-flash":
+                if key == K_VAULT_1 and m == "gemini-3.5-flash":
                     continue
-                if key == K_VAULT_1 and m == "gemini-2.0-flash":
+                if key == K_VAULT_1 and m == "gemini-3.6-flash":
                     raise AIQuotaError("Key 1 exhausted on Model 2")
-                if key == K_VAULT_2 and m == "gemini-2.5-flash":
+                if key == K_VAULT_2 and m == "gemini-3.5-flash":
                     return {"key": key, "model": m, "data": SAMPLE_LECTURE_DIGEST}
             raise AIError("Exhausted models on key")
 
         result = asyncio.run(run_with_key_failover("gemini", [K_VAULT_1, K_VAULT_2], _simulate_matrix_call))
 
         self.assertEqual(result["key"], K_VAULT_2)
-        self.assertEqual(result["model"], "gemini-2.5-flash")
-        self.assertIn((K_VAULT_1, "gemini-2.5-flash"), interaction_log)
-        self.assertIn((K_VAULT_1, "gemini-2.0-flash"), interaction_log)
-        self.assertIn((K_VAULT_2, "gemini-2.5-flash"), interaction_log)
+        self.assertEqual(result["model"], "gemini-3.5-flash")
+        self.assertIn((K_VAULT_1, "gemini-3.5-flash"), interaction_log)
+        self.assertIn((K_VAULT_1, "gemini-3.6-flash"), interaction_log)
+        self.assertIn((K_VAULT_2, "gemini-3.5-flash"), interaction_log)
 
     @patch("backend.database.core.lecture_refund_quota", new_callable=AsyncMock)
     @patch("backend.database.core.lecture_consume_quota", new_callable=AsyncMock)
@@ -843,7 +845,7 @@ class TestTier3PairwiseInteractions(unittest.TestCase):
         async def _mock_post(client, url, headers=None, json=None, **kwargs):
             model = url.split("/models/")[1].split(":")[0]
             models_attempted.append(model)
-            if model == "gemini-2.5-flash":
+            if model == "gemini-3.5-flash":
                 return httpx.Response(400, text="INVALID_ARGUMENT: unsupported format", request=httpx.Request("POST", url))
             return httpx.Response(200, text=json_lib.dumps({"candidates": [{"content": {"parts": [{"text": json_lib.dumps(SAMPLE_LECTURE_DIGEST)}]}}]}), request=httpx.Request("POST", url))
 
@@ -852,8 +854,8 @@ class TestTier3PairwiseInteractions(unittest.TestCase):
             success = asyncio.run(run_lecture_processing_worker(bot=bot, chat_id=123, uid=66004, session=session, status_msg_id=12))
 
         self.assertTrue(success)
-        self.assertIn("gemini-2.5-flash", models_attempted)
-        self.assertIn("gemini-2.0-flash", models_attempted)
+        self.assertIn("gemini-3.5-flash", models_attempted)
+        self.assertIn("gemini-3.6-flash", models_attempted)
 
 
 # ============================================================================
@@ -886,7 +888,7 @@ class TestTier4RealWorldScenarios(unittest.TestCase):
         - K1 hits HTTP 429 Quota Exhausted.
         - K2 hits HTTP 401 Invalid Key.
         - K3 is active.
-        - Primary model (gemini-2.5-flash) on K3 hits HTTP 400 schema conflict.
+        - Primary model (gemini-3.5-flash) on K3 hits HTTP 400 schema conflict.
         - Auto-repair triggers and strips schema -> succeeds with 200 OK + valid lecture digest.
         - Digest parsed and verified with clinical pearls, exam traps, and comparison table.
         - User quota atomically consumed and remains debited.
