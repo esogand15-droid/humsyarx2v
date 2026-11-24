@@ -923,13 +923,15 @@ async def run_lecture_processing_worker(
                     )
                     fi = await _gemini_upload_file(key, audio_bytes, audio_mime or 'audio/mp3', 'lecture_recording.mp3')
                     uploaded_audio = await _gemini_wait_file_active(key, fi, timeout=180)
-                    if uploaded_audio and uploaded_audio.get('uri'):
+                    if uploaded_audio and (uploaded_audio.get('state') or 'ACTIVE').upper() == 'ACTIVE' and uploaded_audio.get('uri'):
                         parts.append({
                             'file_data': {
                                 'file_uri': uploaded_audio['uri'],
                                 'mime_type': uploaded_audio.get('mimeType') or 'audio/mp3'
                             }
                         })
+                    elif uploaded_audio and (uploaded_audio.get('state') or '').upper() == 'FAILED':
+                        raise AIError("Google Gemini failed to process the uploaded audio file.")
 
             if pdf_bytes:
                 if len(pdf_bytes) < 10 * 1024 * 1024:
@@ -947,13 +949,15 @@ async def run_lecture_processing_worker(
                     )
                     fi = await _gemini_upload_file(key, pdf_bytes, 'application/pdf', 'lecture_slides.pdf')
                     uploaded_doc = await _gemini_wait_file_active(key, fi, timeout=180)
-                    if uploaded_doc and uploaded_doc.get('uri'):
+                    if uploaded_doc and (uploaded_doc.get('state') or 'ACTIVE').upper() == 'ACTIVE' and uploaded_doc.get('uri'):
                         parts.append({
                             'file_data': {
                                 'file_uri': uploaded_doc['uri'],
                                 'mime_type': 'application/pdf'
                             }
                         })
+                    elif uploaded_doc and (uploaded_doc.get('state') or '').upper() == 'FAILED':
+                        raise AIError("Google Gemini failed to process the uploaded slides PDF.")
 
             parts.append({'text': user_prompt_text})
 
@@ -982,8 +986,8 @@ async def run_lecture_processing_worker(
                 async with httpx.AsyncClient(timeout=240) as client:
                     res = await client.post(url, headers=headers, json=payload)
 
-                if res.status_code == 400 and ('schema' in res.text.lower() or 'argument' in res.text.lower()):
-                    logger.warning("مدل %s با اسکیما خطای ۴۰۰ داد؛ تلاش مجدد بدون responseSchema و thinkingConfig...", model_cand)
+                if res.status_code == 400:
+                    logger.warning("مدل %s با خطای ۴۰۰ مواجه شد (%s)؛ تلاش مجدد با حذف responseSchema و thinkingConfig...", model_cand, res.text[:140])
                     fallback_cfg = auto_repair_generation_config(gen_cfg)
                     fallback_payload = dict(payload)
                     fallback_payload['generationConfig'] = fallback_cfg
@@ -997,7 +1001,7 @@ async def run_lecture_processing_worker(
                         return _parse_json_from_text(raw_text)
                     except Exception as parse_err:
                         logger.warning("خطا در پردازش JSON دریافتی از مدل %s: %s", model_cand, parse_err)
-                        last_model_error = parse_err
+                        last_model_error = AIError(f"JSON parse error from {model_cand}: {parse_err}")
                         continue
 
                 if res.status_code == 429:
@@ -1008,9 +1012,9 @@ async def run_lecture_processing_worker(
                     logger.warning("کلید Gemini با کد %d نامعتبر است → سوییچ خودکار به کلید بعدی...", res.status_code)
                     _raise_gemini_status_error(res.status_code, res.text)
 
-                if res.status_code in (404, 503) or (res.status_code == 400 and ('not found' in res.text.lower() or 'not supported' in res.text.lower() or 'argument' in res.text.lower() or 'schema' in res.text.lower())):
-                    logger.warning("مدل %s با کد %d پاسخ نداد؛ سوئیچ به مدل بعدی در زنجیره فال‌بک...", model_cand, res.status_code)
-                    last_model_error = RuntimeError(f"Model {model_cand} returned {res.status_code}")
+                if res.status_code in (400, 404, 503):
+                    logger.warning("مدل %s با کد %d پاسخ نداد (%s)؛ سوئیچ به مدل بعدی در زنجیره فال‌بک...", model_cand, res.status_code, res.text[:140])
+                    last_model_error = AIError(f"Model {model_cand} returned {res.status_code}: {res.text[:120]}")
                     continue
 
                 _raise_gemini_status_error(res.status_code, res.text)
@@ -1117,22 +1121,22 @@ async def run_lecture_processing_worker(
             if not doc_sent:
                 raise last_doc_err or Exception("عدم موفقیت در ارسال سند PDF تلگرام پس از ۳ تلاش")
 
-        # پاکسازی سشن
+        # پاکسازی سشن و تثبیت سهمیه
+        quota_consumed = False
         _LECTURE_SESSIONS.pop(sess_id, None)
         return True
 
     except Exception as exc:
         logger.exception("خطا در پردازش جزوه چندرسانه‌ای در صف پس‌زمینه: %s", exc)
-        try:
-            from ai_solver import refund_lecture_quota
-            await refund_lecture_quota(uid)
-        except Exception:
-            pass
-        await _update_status(
-            "⚠️ <b>متأسفانه در فرآیند تحلیل یا تولید جزوه خطایی رخ داد.</b>\n"
-            "سهمیهٔ مصرف‌شده برای این جلسه برگردانده شد و کسر نگردید. لطفاً دوباره امتحان فرمایید.",
-            force=True
-        )
+        if quota_consumed:
+            try:
+                from ai_solver import refund_lecture_quota
+                await refund_lecture_quota(uid)
+            except Exception as ref_err:
+                logger.error("Failed to refund lecture quota for user %s: %s", uid, ref_err)
+            quota_consumed = False
+        persian_err = format_persian_lecture_error(exc)
+        await _update_status(persian_err, force=True)
         return False
 
     finally:
@@ -1157,47 +1161,76 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
         await msg.reply_text("⚠️ اطلاعات این جلسه یافت نشد یا منقضی شده است. لطفاً فایل‌ها را مجدداً ارسال فرمایید.")
         return
 
-    # ۱. بررسی سهمیه روزانه کاربر
-    from ai_solver import check_and_consume_lecture_quota, refund_lecture_quota
-    allowed, used, limit = await check_and_consume_lecture_quota(uid)
-    if not allowed:
+    # ۱. گارد هم‌زمانی: ابتدا قفل اجرای همزمان بررسی می‌شود تا هیچ سهمیه‌ای برای درخواست موازی کسر نشود
+    from ai_solver import ai_claim_inflight, ai_release_inflight, check_and_consume_lecture_quota, refund_lecture_quota
+    if not await ai_claim_inflight(uid):
         await msg.reply_text(
-            f"⛔️ <b>سقف روزانهٔ تولید جزوه پایان یافته است ({used}/{limit}).</b>\n"
-            "فردا مجدداً می‌توانید برای کلاس‌های جدید جزوه تولید کنید.",
+            "⏳ <b>شما در حال حاضر یک درخواست در حال پردازش دارید.</b>\n"
+            "لطفاً تا اتمام تولید جزوه قبلی شکیبا باشید.",
             parse_mode='HTML'
         )
         return
 
-    # ۲. ثبت پیام وضعیت اولیه
-    status_msg = await msg.reply_text(
-        "⏳ <b>درخواست شما در صف پردازش قرار گرفت...</b>\n"
-        "به محض شروع، مراحل پیشرفت در همین پیام به‌روزرسانی خواهد شد.",
-        parse_mode='HTML'
-    )
+    quota_consumed = False
+    try:
+        # ۲. بررسی و کسر سهمیه روزانه کاربر
+        allowed, used, limit = await check_and_consume_lecture_quota(uid)
+        if not allowed:
+            await msg.reply_text(
+                f"⛔️ <b>سقف روزانهٔ تولید جزوه پایان یافته است ({used}/{limit}).</b>\n"
+                "فردا مجدداً می‌توانید برای کلاس‌های جدید جزوه تولید کنید.",
+                parse_mode='HTML'
+            )
+            return
+        quota_consumed = True
 
-    # ۳. ارسال به صف پس‌زمینه LectureWorkerQueue (<200ms)
-    from backend.services.lecture_worker import get_lecture_worker_queue
-    worker = get_lecture_worker_queue()
-    enqueued = await worker.enqueue_job(
-        chat_id=msg.chat_id,
-        user_id=uid,
-        session_id=session_id,
-        file_info=session,
-        status_message_id=status_msg.message_id,
-        bot=context.bot,
-        quota_consumed=True,
-    )
-
-    if not enqueued:
-        await refund_lecture_quota(uid)
-        await status_msg.edit_text(
-            "⚠️ <b>صف پردازش در حال حاضر تکمیل است.</b>\n"
-            "سهمیه شما محفوظ ماند و کسر نگردید. لطفاً چند دقیقه دیگر مجدداً تلاش فرمایید.",
+        # ۳. ثبت پیام وضعیت اولیه
+        status_msg = await msg.reply_text(
+            "⏳ <b>درخواست شما در صف پردازش قرار گرفت...</b>\n"
+            "به محض شروع، مراحل پیشرفت در همین پیام به‌روزرسانی خواهد شد.",
             parse_mode='HTML'
         )
-        return
 
-    # پاکسازی وضعیت سشن از user_data تا کاربر معطل نماند
-    context.user_data.pop('lecture_session_id', None)
-    context.user_data['mode'] = 'ai_query'
+        # ۴. ارسال به صف پس‌زمینه LectureWorkerQueue (<200ms)
+        from backend.services.lecture_worker import get_lecture_worker_queue
+        worker = get_lecture_worker_queue()
+        enqueued = await worker.enqueue_job(
+            chat_id=msg.chat_id,
+            user_id=uid,
+            session_id=session_id,
+            file_info=session,
+            status_message_id=status_msg.message_id,
+            bot=context.bot,
+            quota_consumed=True,
+        )
+
+        if not enqueued:
+            if quota_consumed:
+                await refund_lecture_quota(uid)
+                quota_consumed = False
+            await status_msg.edit_text(
+                "⚠️ <b>صف پردازش در حال حاضر تکمیل است.</b>\n"
+                "سهمیه شما محفوظ ماند و کسر نگردید. لطفاً چند دقیقه دیگر مجدداً تلاش فرمایید.",
+                parse_mode='HTML'
+            )
+            return
+
+        # پاکسازی وضعیت سشن از user_data تا کاربر معطل نماند
+        context.user_data.pop('lecture_session_id', None)
+        context.user_data['mode'] = 'ai_query'
+
+    except Exception as exc:
+        logger.exception("خطا در ثبت درخواست جزوه در صف: %s", exc)
+        if quota_consumed:
+            try:
+                await refund_lecture_quota(uid)
+            except Exception:
+                pass
+            quota_consumed = False
+        try:
+            await ai_release_inflight(uid)
+        except Exception:
+            pass
+        persian_err = format_persian_lecture_error(exc)
+        await msg.reply_text(persian_err, parse_mode='HTML')
 
