@@ -1338,7 +1338,7 @@ def _load_vault(raw: dict) -> dict:
     return normalized
 
 
-def resolve_gemini_api_keys(cfg: dict | None = None) -> list[str]:
+def resolve_gemini_api_keys(cfg: dict | None = None, filter_cooldown: bool = True) -> list[str]:
     r"""Canonical resolver for Gemini API keys across MongoDB Vault and Environment Variables.
 
     Order of precedence:
@@ -1347,7 +1347,7 @@ def resolve_gemini_api_keys(cfg: dict | None = None) -> list[str]:
       3. GEMINI_API_KEY
       4. GOOGLE_API_KEY
     All keys are sanitized with sanitize_api_key, trimmed, deduplicated preserving priority,
-    and sorted via ordered_keys('gemini', deduped).
+    and sorted via ordered_keys('gemini', deduped) if filter_cooldown is True.
     """
     raw_keys: list[str] = []
     if cfg:
@@ -1373,7 +1373,9 @@ def resolve_gemini_api_keys(cfg: dict | None = None) -> list[str]:
         if clean and clean not in seen:
             seen.add(clean)
             deduped.append(clean)
-    return ordered_keys('gemini', deduped)
+    if filter_cooldown:
+        return ordered_keys('gemini', deduped)
+    return deduped
 
 
 async def get_ai_config() -> dict:
@@ -1395,7 +1397,8 @@ async def get_ai_config() -> dict:
              for pid, lst in vault.items()}
     vault = {pid: lst for pid, lst in vault.items() if lst}
     # Incorporate environment Gemini keys into vault['gemini'] and api_key
-    env_gemini = resolve_gemini_api_keys({'vault_multi': vault, 'provider': provider})
+    # filter_cooldown=False ensures vault_multi retains all configured keys without removing cooled-down keys
+    env_gemini = resolve_gemini_api_keys({'vault_multi': vault, 'provider': provider}, filter_cooldown=False)
     if env_gemini:
         vault['gemini'] = env_gemini
 
@@ -2219,6 +2222,8 @@ async def _gemini_wait_file_active(api_key: str, file_info: dict,
     file_info['state'] = state
     if state == 'FAILED':
         raise AIError(f"فایل روی سرور گوگل پردازش نشد و به وضعیت FAILED رفت: {file_info.get('error') or name}")
+    if state == 'PROCESSING':
+        raise AIError(f"پردازش فایل روی سرور گوگل پس از {int(timeout)} ثانیه کامل نشد (Timeout).")
     return file_info
 
 
@@ -2232,7 +2237,7 @@ async def _gemini_upload_file(api_key: str, file_bytes: bytes, mime_type: str, d
         'X-Goog-Upload-Header-Content-Type': mime_type,
         'Content-Type':                      'application/json',
     }
-    timeout_upload = 180.0
+    timeout_upload = max(300.0, float(len(file_bytes)) / (25 * 1024))
     async with httpx.AsyncClient(timeout=timeout_upload) as client:
         start_resp = await client.post(base, headers=start_headers, json={'file': {'display_name': display_name}})
         if start_resp.status_code != 200:
@@ -2270,6 +2275,7 @@ def _sanitize_provider_text(text: str) -> str:
     """ماسک هر الگوی شبیه‌کلید در متن خطا (احتیاط — بدنه‌ی خطای رسمی
     provider کلید را برنمی‌گرداند، ولی محکم‌کاری می‌کنیم)."""
     text = re.sub(r'AIza[0-9A-Za-z_\-]{10,}', 'AIza***', text)
+    text = re.sub(r'AQ\.[0-9A-Za-z_\-\.]{8,}', 'AQ.***', text)
     text = re.sub(r'sk-[0-9A-Za-z_\-]{10,}', 'sk-***', text)
     text = re.sub(r'Bearer\s+\S+', 'Bearer ***', text, flags=re.I)
     return ' '.join(text.split())[:400]
@@ -5366,7 +5372,14 @@ async def probe_live_model(provider: str, api_key: str, model: str) -> dict:
                 ws_url = f"{base_ws}?key={api_key}"
                 raw_setup = build_live_setup_message(mid, include_tools=False)
                 setup_msg = _adapt_setup_for_model(raw_setup, mid, minimal=minimal)
-                async with websockets.connect(ws_url, open_timeout=12, close_timeout=3) as ws:
+                ws_headers = {'x-goog-api-key': api_key}
+                async with websockets.connect(
+                    ws_url,
+                    open_timeout=12,
+                    close_timeout=3,
+                    extra_headers=ws_headers,
+                    additional_headers=ws_headers,
+                ) as ws:
                     await ws.send(json.dumps(setup_msg))
                     raw = await asyncio.wait_for(ws.recv(), timeout=12)
                 ms = max(1, int((_t.monotonic() - started) * 1000))
@@ -5446,6 +5459,7 @@ async def connect_gemini_live_with_failover(
                     try:
                         ws_url = f"{base_ws}?key={api_key}"
                         adapted_setup = _adapt_setup_for_model(setup_msg, cand_model, minimal=minimal_mode)
+                        ws_headers = {'x-goog-api-key': api_key}
                         ws = await websockets.connect(
                             ws_url,
                             open_timeout=15,
@@ -5453,6 +5467,8 @@ async def connect_gemini_live_with_failover(
                             max_size=16 * 1024 * 1024,
                             ping_interval=20,
                             ping_timeout=20,
+                            extra_headers=ws_headers,
+                            additional_headers=ws_headers,
                         )
                         await ws.send(json.dumps(adapted_setup))
                         raw = await asyncio.wait_for(ws.recv(), timeout=15)

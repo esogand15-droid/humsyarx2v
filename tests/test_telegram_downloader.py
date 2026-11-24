@@ -52,6 +52,43 @@ def test_get_telegram_credentials():
         assert creds["local_api_url"] == "http://127.0.0.1:8081"
 
 
+def test_get_telegram_credentials_fallback_defaults():
+    """Tests that omitted TELEGRAM_API_ID and TELEGRAM_API_HASH fall back to default application credentials."""
+    with patch.dict(os.environ, {
+        "TELEGRAM_API_ID": "",
+        "TELEGRAM_API_HASH": "",
+        "TELEGRAM_TOKEN": "123456:ABC",
+    }, clear=False):
+        creds = get_telegram_credentials()
+        assert creds["api_id"] == 34514776
+        assert creds["api_hash"] == "7f1426930f421bc5bcbeef4e33184027"
+        assert creds["token"] == "123456:ABC"
+
+
+def test_mtproto_client_fallback_credentials_large_file_download():
+    """Tier 3 MTProto initializes with fallback credentials when env vars are missing."""
+    mock_client = MagicMock()
+    mock_client.is_connected = True
+    mock_client.start = AsyncMock()
+    mock_client.stop = AsyncMock()
+    mock_msg = MagicMock()
+    mock_msg.media = True
+    mock_client.get_messages = AsyncMock(return_value=mock_msg)
+    mock_client.download_media = AsyncMock(return_value="/tmp/test_53mb.m4a")
+
+    with patch.dict(os.environ, {
+        "TELEGRAM_API_ID": "",
+        "TELEGRAM_API_HASH": "",
+        "TELEGRAM_TOKEN": "valid_token_xyz",
+    }, clear=False), patch("backend.services.telegram_downloader.Client", return_value=mock_client) as mock_cls:
+        client = asyncio.run(get_mtproto_downloader_client(bot_token="valid_token_xyz"))
+        assert client is mock_client
+        mock_cls.assert_called_once()
+        _, kwargs = mock_cls.call_args
+        assert kwargs["api_id"] == 34514776
+        assert kwargs["api_hash"] == "7f1426930f421bc5bcbeef4e33184027"
+
+
 def test_download_missing_file_id_raises():
     """Missing file_id must immediately raise ValueError."""
     mock_bot = MagicMock()

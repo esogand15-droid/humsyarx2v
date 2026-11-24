@@ -424,6 +424,96 @@ class TestTier1FeatureCoverage(unittest.TestCase):
             self.assertEqual(limit, 0)
         self.assertEqual(mock_consume.call_count, 10)
 
+    @patch("database.db.op_claim", AsyncMock(return_value=True))
+    @patch("database.db.op_release", AsyncMock(return_value=True))
+    @patch("ai_solver.check_and_consume_lecture_quota", new_callable=AsyncMock)
+    def test_t1_16_inflight_lock_released_on_quota_rejection(self, mock_check_quota):
+        """Feature 7: Rejection due to exhausted daily quota releases in-flight lock so user is not stuck."""
+        uid = 88005
+        session_id = "test_quota_exhausted_sess"
+        lecture_scribe._LECTURE_SESSIONS[session_id] = {
+            "files": [{"kind": "audio", "name": "lecture.mp3", "tg_file_id": "file_1"}]
+        }
+        self.addCleanup(lambda: lecture_scribe._LECTURE_SESSIONS.pop(session_id, None))
+
+        mock_check_quota.return_value = (False, 3, 3)
+
+        update = MagicMock()
+        update.effective_user.id = uid
+        update.callback_query = None
+        msg = AsyncMock()
+        update.effective_message = msg
+
+        context = MagicMock()
+        context.user_data = {}
+        context.bot = AsyncMock()
+
+        self.assertNotIn(uid, ai_solver._busy_users)
+
+        asyncio.run(run_lecture_processing(update, context, session_id))
+
+        # Check that user received quota limit message
+        msg.reply_text.assert_called_once()
+        sent_text = msg.reply_text.call_args[0][0]
+        self.assertIn("سقف روزانهٔ تولید جزوه پایان یافته است", sent_text)
+
+        # Check that in-flight lock was cleanly released (not stuck in _busy_users)
+        self.assertNotIn(uid, ai_solver._busy_users)
+
+        # Confirm user can immediately acquire in-flight lock for next AI query
+        self.assertTrue(asyncio.run(ai_claim_inflight(uid)))
+        asyncio.run(ai_release_inflight(uid))
+
+    @patch("database.db.op_claim", AsyncMock(return_value=True))
+    @patch("database.db.op_release", AsyncMock(return_value=True))
+    @patch("ai_solver.check_and_consume_lecture_quota", new_callable=AsyncMock)
+    @patch("ai_solver.refund_lecture_quota", new_callable=AsyncMock)
+    @patch("backend.services.lecture_worker.get_lecture_worker_queue")
+    def test_t1_17_inflight_lock_released_on_queue_full(self, mock_get_worker, mock_refund, mock_check_quota):
+        """Feature 7: Rejection due to full worker queue refunds quota and releases in-flight lock."""
+        uid = 88006
+        session_id = "test_queue_full_sess"
+        lecture_scribe._LECTURE_SESSIONS[session_id] = {
+            "files": [{"kind": "audio", "name": "lecture.mp3", "tg_file_id": "file_2"}]
+        }
+        self.addCleanup(lambda: lecture_scribe._LECTURE_SESSIONS.pop(session_id, None))
+
+        mock_check_quota.return_value = (True, 1, 3)
+        worker = MagicMock()
+        worker.enqueue_job = AsyncMock(return_value=False)
+        mock_get_worker.return_value = worker
+
+        update = MagicMock()
+        update.effective_user.id = uid
+        update.callback_query = None
+        msg = AsyncMock()
+        status_msg = AsyncMock()
+        msg.reply_text = AsyncMock(return_value=status_msg)
+        update.effective_message = msg
+
+        context = MagicMock()
+        context.user_data = {}
+        context.bot = AsyncMock()
+
+        self.assertNotIn(uid, ai_solver._busy_users)
+
+        asyncio.run(run_lecture_processing(update, context, session_id))
+
+        # Check that quota was refunded
+        mock_refund.assert_called_once_with(uid)
+
+        # Check that queue full status message was edited
+        status_msg.edit_text.assert_called_once()
+        edited_text = status_msg.edit_text.call_args[0][0]
+        self.assertIn("صف پردازش در حال حاضر تکمیل است", edited_text)
+
+        # Check that in-flight lock was cleanly released
+        self.assertNotIn(uid, ai_solver._busy_users)
+
+        # Confirm user can immediately acquire in-flight lock for next AI query
+        self.assertTrue(asyncio.run(ai_claim_inflight(uid)))
+        asyncio.run(ai_release_inflight(uid))
+
 
 # ============================================================================
 # TIER 2: BOUNDARY & CORNER CASES

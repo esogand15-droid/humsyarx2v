@@ -688,5 +688,253 @@ def test_model_cascade_continues_on_400_invalid_argument():
     assert "gemini-2.0-flash" in attempted_models
 
 
+def test_canonical_audio_mime_resolution():
+    """Verify canonical_audio_mime resolves .m4a and variants to audio/mp4 and .mp3 to audio/mpeg."""
+    from backend.services.lecture_scribe import canonical_audio_mime
+
+    # M4A variants
+    assert canonical_audio_mime(mime="audio/x-m4a", filename="lecture.m4a") == "audio/mp4"
+    assert canonical_audio_mime(mime="audio/m4a", filename="audio.bin") == "audio/mp4"
+    assert canonical_audio_mime(mime="", filename="جلسه_دوم.m4a") == "audio/mp4"
+    assert canonical_audio_mime(mime="audio/mp4", filename="audio.m4a") == "audio/mp4"
+
+    # MP3 variants
+    assert canonical_audio_mime(mime="audio/mp3", filename="lecture.mp3") == "audio/mpeg"
+    assert canonical_audio_mime(mime="audio/mpeg", filename="sound.mp3") == "audio/mpeg"
+    assert canonical_audio_mime(mime="", filename="voice.mp3") == "audio/mpeg"
+
+    # Other common formats
+    assert canonical_audio_mime(mime="audio/x-wav", filename="recording.wav") == "audio/wav"
+    assert canonical_audio_mime(mime="audio/ogg", filename="audio.ogg") == "audio/ogg"
+    assert canonical_audio_mime(mime="audio/flac", filename="music.flac") == "audio/flac"
+
+
+def test_sanitize_filename_for_disk():
+    """Verify sanitize_filename_for_disk cleans Windows/Linux reserved characters."""
+    from backend.services.lecture_scribe import sanitize_filename_for_disk
+
+    raw_name = 'جلسه دوم: ایین/خواهران? *آموزش<فارما>|پزشکی".m4a'
+    safe_name = sanitize_filename_for_disk(raw_name)
+    assert ":" not in safe_name
+    assert "/" not in safe_name
+    assert "?" not in safe_name
+    assert "*" not in safe_name
+    assert "<" not in safe_name
+    assert ">" not in safe_name
+    assert "|" not in safe_name
+    assert '"' not in safe_name
+    assert safe_name.endswith(".m4a")
+
+    # Empty / whitespace fallback
+    assert sanitize_filename_for_disk("", default="fallback.mp3") == "fallback.mp3"
+    assert sanitize_filename_for_disk(None, default="fallback.mp3") == "fallback.mp3"
+
+
+def test_early_return_no_files_refunds_quota():
+    """When run_lecture_processing_worker is invoked with no files, quota must be refunded immediately."""
+    import asyncio
+    from backend.services.lecture_scribe import run_lecture_processing_worker
+
+    mock_bot = MagicMock()
+    mock_refund = AsyncMock()
+    mock_status = AsyncMock()
+
+    async def _run():
+        with patch("backend.services.ai_solver.refund_lecture_quota", mock_refund), \
+             patch("backend.services.ai_solver.ai_release_inflight", AsyncMock()):
+            success = await run_lecture_processing_worker(
+                bot=mock_bot,
+                chat_id=12345,
+                uid=67890,
+                status_msg_id=111,
+                status_updater=mock_status,
+                file_info=[],
+                session_id="ls_empty_session",
+                quota_consumed=True,
+            )
+            assert success is False
+            mock_refund.assert_called_once_with(67890)
+
+    asyncio.run(_run())
+
+
+def test_early_return_claim_inflight_failed_refunds_quota():
+    """When concurrency lock cannot be claimed, user quota must be refunded and job aborted cleanly."""
+    import asyncio
+    from backend.services.lecture_scribe import run_lecture_processing_worker
+
+    mock_bot = MagicMock()
+    mock_refund = AsyncMock()
+    mock_status = AsyncMock()
+    sample_file = {"kind": "audio", "name": "lecture.m4a", "tg_file_id": "tg_123", "chat_id": 12345, "message_id": 111}
+
+    async def _run():
+        with patch("backend.services.ai_solver.refund_lecture_quota", mock_refund), \
+             patch("backend.services.ai_solver.ai_release_inflight", AsyncMock()), \
+             patch("backend.services.ai_solver.ai_is_inflight", AsyncMock(return_value=False)), \
+             patch("backend.services.ai_solver.ai_claim_inflight", AsyncMock(return_value=False)):
+            success = await run_lecture_processing_worker(
+                bot=mock_bot,
+                chat_id=12345,
+                uid=67890,
+                status_msg_id=111,
+                status_updater=mock_status,
+                file_info=[sample_file],
+                session_id="ls_busy_session",
+                quota_consumed=True,
+            )
+            assert success is False
+            mock_refund.assert_called_once_with(67890)
+
+    asyncio.run(_run())
+
+
+def test_wait_file_active_timeout_raises_ai_error():
+    """In ai_solver, if _gemini_wait_file_active deadline expires with state PROCESSING, AIError is raised."""
+    import asyncio
+    from backend.services.ai_solver import _gemini_wait_file_active, AIError
+
+    file_info = {"name": "files/sample_audio_123", "state": "PROCESSING"}
+
+    # Mock get to return state 'PROCESSING'
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"name": "files/sample_audio_123", "state": "PROCESSING"}
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_resp)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    async def _run():
+        with patch("httpx.AsyncClient", return_value=mock_client), \
+             patch("backend.services.ai_solver._GEMINI_FILE_STATE_POLL", 0.01):
+            with pytest.raises(AIError, match="کامل نشد"):
+                await _gemini_wait_file_active(api_key="AIza_test", file_info=file_info, timeout=0.05)
+
+    asyncio.run(_run())
+
+
+def test_large_m4a_upload_mime_and_display_name_and_failover():
+    """Audio files > 15MB must use audio/mp4 MIME, dynamic .m4a display name, and raise AIError on wait timeout."""
+    import asyncio
+    from backend.services.lecture_scribe import run_lecture_processing_worker
+
+    mock_bot = MagicMock()
+    mock_bot.send_document = AsyncMock()
+    mock_bot.send_message = AsyncMock()
+    mock_status = AsyncMock()
+    large_audio_bytes = b"M4A_LARGE_AUDIO_STREAM" * (16 * 1024 * 1024 // 22 + 10) # > 16MB
+    sample_file = {
+        "kind": "audio",
+        "name": "جلسه دوم فارماکولوژی.m4a",
+        "mime": "audio/x-m4a",
+        "tg_file_id": "large_m4a_id",
+        "chat_id": 12345,
+        "message_id": 999,
+        "file_size": len(large_audio_bytes),
+    }
+
+    uploaded_calls = []
+
+    async def _mock_upload(key, fbytes, mime, display_name):
+        uploaded_calls.append((key, mime, display_name, len(fbytes)))
+        return {"name": "files/uploaded_audio_res", "uri": "https://generativelanguage.googleapis.com/v1beta/files/audio_res"}
+
+    # Simulate transcode returning raw path (transcode skipped or ffmpeg absent)
+    async def _mock_transcode(input_path, output_path, bitrate="32k"):
+        return input_path
+
+    # Simulate download writing large audio bytes
+    async def _mock_download(bot, chat_id, message_id, file_id, file_size, dest_path):
+        with open(dest_path, "wb") as f:
+            f.write(large_audio_bytes)
+        return dest_path
+
+    async def _run():
+        with patch("backend.services.telegram_downloader.download_telegram_media", side_effect=_mock_download), \
+             patch("backend.services.lecture_scribe.transcode_audio_file", side_effect=_mock_transcode), \
+             patch("backend.services.ai_solver._gemini_upload_file", side_effect=_mock_upload), \
+             patch("backend.services.ai_solver._gemini_wait_file_active", AsyncMock(return_value={"state": "ACTIVE", "uri": "https://files/123"})), \
+             patch("backend.services.ai_solver.get_ai_config", AsyncMock(return_value={"vault_multi": {"gemini": ["AIza_key1"]}})), \
+             patch("backend.services.ai_solver.ai_is_inflight", AsyncMock(return_value=False)), \
+             patch("backend.services.ai_solver.ai_claim_inflight", AsyncMock(return_value=True)), \
+             patch("backend.services.ai_solver.ai_release_inflight", AsyncMock()), \
+             patch("lecture_notes_pdf.generate_lecture_pdf", return_value=io.BytesIO(b"%PDF-1.4 test")), \
+             patch("httpx.AsyncClient.post", AsyncMock(return_value=MagicMock(status_code=200, json=lambda: {"candidates": [{"content": {"parts": [{"text": '{"title":"جلسه فارما"}'}]}}]}))):
+
+            await run_lecture_processing_worker(
+                bot=mock_bot,
+                chat_id=12345,
+                uid=67890,
+                status_msg_id=111,
+                status_updater=mock_status,
+                file_info=[sample_file],
+                session_id="ls_large_m4a_session",
+                quota_consumed=False,
+            )
+
+            assert len(uploaded_calls) >= 1
+            call_key, call_mime, call_display_name, call_size = uploaded_calls[0]
+            assert call_key == "AIza_key1"
+            assert call_mime == "audio/mp4", f"Expected audio/mp4 for .m4a file, got {call_mime}"
+            assert call_display_name == "lecture_recording.m4a", f"Expected lecture_recording.m4a, got {call_display_name}"
+            assert call_size > 15 * 1024 * 1024
+
+    asyncio.run(_run())
+
+
+def test_large_audio_upload_non_active_wait_raises_error_no_silent_drop():
+    """If _gemini_wait_file_active returns a non-ACTIVE state (e.g. PROCESSING or FAILED), AIError must be raised."""
+    import asyncio
+    from backend.services.lecture_scribe import run_lecture_processing_worker
+
+    mock_bot = MagicMock()
+    mock_status = AsyncMock()
+    sample_file = {
+        "kind": "audio",
+        "name": "lecture.m4a",
+        "mime": "audio/x-m4a",
+        "tg_file_id": "m4a_id",
+        "chat_id": 12345,
+        "message_id": 999,
+        "file_size": 20 * 1024 * 1024,
+    }
+
+    async def _mock_transcode(input_path, output_path, bitrate="32k"):
+        return input_path
+
+    async def _mock_download(bot, chat_id, message_id, file_id, file_size, dest_path):
+        with open(dest_path, "wb") as f:
+            f.write(b"SAMPLE" * (20 * 1024 * 1024 // 6))
+        return dest_path
+
+    async def _run():
+        with patch("backend.services.telegram_downloader.download_telegram_media", side_effect=_mock_download), \
+             patch("backend.services.lecture_scribe.transcode_audio_file", side_effect=_mock_transcode), \
+             patch("backend.services.ai_solver._gemini_upload_file", AsyncMock(return_value={"name": "files/x", "uri": "https://uri"})), \
+             patch("backend.services.ai_solver._gemini_wait_file_active", AsyncMock(return_value={"state": "PROCESSING", "uri": "https://uri"})), \
+             patch("backend.services.ai_solver.get_ai_config", AsyncMock(return_value={"vault_multi": {"gemini": ["AIza_key1"]}})), \
+             patch("backend.services.ai_solver.ai_is_inflight", AsyncMock(return_value=False)), \
+             patch("backend.services.ai_solver.ai_claim_inflight", AsyncMock(return_value=True)), \
+             patch("backend.services.ai_solver.ai_release_inflight", AsyncMock()):
+
+            # When wait returns PROCESSING (timeout reached), worker must NOT succeed silently
+            success = await run_lecture_processing_worker(
+                bot=mock_bot,
+                chat_id=12345,
+                uid=67890,
+                status_msg_id=111,
+                status_updater=mock_status,
+                file_info=[sample_file],
+                session_id="ls_processing_timeout_session",
+                quota_consumed=False,
+            )
+            assert success is False
+
+    asyncio.run(_run())
+
+
+
 
 

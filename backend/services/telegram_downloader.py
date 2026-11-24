@@ -48,6 +48,10 @@ def get_telegram_credentials(bot: Optional[Any] = None) -> dict:
         except ValueError:
             logger.warning("Invalid TELEGRAM_API_ID: %r (must be integer)", api_id_raw)
 
+    # Fallback to default application MTProto credentials (.env.example) if omitted
+    api_id = api_id or 34514776
+    api_hash = api_hash or "7f1426930f421bc5bcbeef4e33184027"
+
     return {
         "api_id": api_id,
         "api_hash": api_hash,
@@ -71,8 +75,8 @@ async def get_mtproto_downloader_client(bot_token: Optional[str] = None) -> Clie
             return _mtproto_client
 
         creds = get_telegram_credentials()
-        api_id = creds["api_id"]
-        api_hash = creds["api_hash"]
+        api_id = creds["api_id"] or 34514776
+        api_hash = creds["api_hash"] or "7f1426930f421bc5bcbeef4e33184027"
         token = bot_token or creds["token"]
 
         if not api_id or not api_hash or not token:

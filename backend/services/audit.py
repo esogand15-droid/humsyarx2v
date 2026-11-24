@@ -240,6 +240,8 @@ SENSITIVE_KEYS = (
 _SENSITIVE_VALUE_RE = re.compile(
     r"(sk-[A-Za-z0-9]{10,}|sk-proj-[A-Za-z0-9_-]{10,}|"
     r"gh[pousr]_[A-Za-z0-9_]{10,}|"
+    r"AIza[0-9A-Za-z_\-]{10,}|"
+    r"AQ\.[0-9A-Za-z_\-\.]{8,}|"
     r"Bearer\s+[A-Za-z0-9\-\._~\+\/]+=*)",
     re.IGNORECASE,
 )

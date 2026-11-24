@@ -72,7 +72,7 @@ HALLUCINATED_MODELS = [
 ]
 
 
-def resolve_gemini_api_keys(cfg: dict | None = None) -> list[str]:
+def resolve_gemini_api_keys(cfg: dict | None = None, filter_cooldown: bool = True) -> list[str]:
     """Canonical resolver for Gemini API keys across MongoDB Vault and Environment Variables.
 
     Order of precedence:
@@ -80,7 +80,7 @@ def resolve_gemini_api_keys(cfg: dict | None = None) -> list[str]:
       2. GEMINI_API_KEYS (comma, semicolon, or newline delimited)
       3. GEMINI_API_KEY
       4. GOOGLE_API_KEY
-    All keys are sanitized, trimmed, deduplicated, and passed through ordered_keys.
+    All keys are sanitized, trimmed, deduplicated, and passed through ordered_keys if filter_cooldown is True.
     """
     raw_keys: list[str] = []
     if cfg:
@@ -107,7 +107,49 @@ def resolve_gemini_api_keys(cfg: dict | None = None) -> list[str]:
         if clean and clean not in seen:
             seen.add(clean)
             deduped.append(clean)
-    return ordered_keys('gemini', deduped)
+    if filter_cooldown:
+        return ordered_keys('gemini', deduped)
+    return deduped
+
+
+def canonical_audio_mime(mime: str = '', filename: str = '') -> str:
+    """Canonical resolver for audio MIME types for Google Gemini and modern decoders.
+
+    Resolves:
+      .m4a, .m4b, audio/x-m4a, audio/m4a -> audio/mp4
+      .mp3, audio/mp3, audio/mpeg -> audio/mpeg
+      .wav, audio/x-wav, audio/wav -> audio/wav
+      .aac, audio/x-aac, audio/aac -> audio/aac
+      .ogg, .opus, audio/ogg, audio/opus -> audio/ogg
+      .flac, audio/flac -> audio/flac
+    """
+    mime_clean = (mime or '').lower().strip()
+    fn_lower = (filename or '').lower().strip()
+
+    if mime_clean in ('audio/mp4', 'audio/m4a', 'audio/x-m4a') or fn_lower.endswith(('.m4a', '.m4b')):
+        return 'audio/mp4'
+    if mime_clean in ('audio/mpeg', 'audio/mp3') or fn_lower.endswith('.mp3'):
+        return 'audio/mpeg'
+    if mime_clean in ('audio/wav', 'audio/x-wav') or fn_lower.endswith('.wav'):
+        return 'audio/wav'
+    if mime_clean in ('audio/aac', 'audio/x-aac') or fn_lower.endswith('.aac'):
+        return 'audio/aac'
+    if mime_clean in ('audio/ogg', 'audio/opus') or fn_lower.endswith(('.ogg', '.opus')):
+        return 'audio/ogg'
+    if mime_clean in ('audio/flac', 'audio/x-flac') or fn_lower.endswith('.flac'):
+        return 'audio/flac'
+
+    if mime_clean.startswith('audio/'):
+        return mime_clean
+    return 'audio/mpeg'
+
+
+def sanitize_filename_for_disk(filename: str, default: str = "media_file") -> str:
+    """Sanitizes a filename to ensure it is valid on Windows and Linux filesystems."""
+    if not filename:
+        return default
+    cleaned = re.sub(r'[\\/*?:"<>|\x00-\x1f]', '_', filename).strip('. ')
+    return cleaned or default
 
 
 def resolve_candidate_models(cfg: dict | None = None) -> list[str]:
@@ -752,12 +794,13 @@ async def run_lecture_processing_worker(
     - تولید سند آکادمیک PDF با سربرگ هامزیار و تحویل در چت کاربر
     - مدیریت خطای اتمیک: استرداد تضمینی سهمیه و آزادسازی قفل در finally
     """
-    from ai_solver import (
+    from backend.services.ai_solver import (
         ai_claim_inflight, ai_release_inflight, refund_lecture_quota, get_ai_config,
         sanitize_api_key, ordered_keys, run_with_key_failover,
         _gemini_upload_file, _gemini_wait_file_active,
         _extract_gemini_text, _raise_gemini_status_error,
-        AIConfigError, AIQuotaError, AIError, _no_thinking
+        AIConfigError, AIQuotaError, AIError, _no_thinking,
+        ai_is_inflight, _busy_users
     )
     from backend.services.telegram_downloader import download_telegram_media
 
@@ -792,22 +835,33 @@ async def run_lecture_processing_worker(
         files = [file_info]
         session['files'] = files
 
-    if not files:
-        await _update_status("⚠️ اطلاعات فایل‌های جلسه یافت نشد یا منقضی شده است.", force=True)
-        return False
-
-    job_temp_dir = tempfile.mkdtemp(prefix=f"lecture_{sess_id}_")
-
-    # اخذ قفل اجرای همزمان (در صورتی که قبلاً توسط run_lecture_processing ثبت نشده باشد)
-    from ai_solver import ai_is_inflight, _busy_users
-    if uid not in _busy_users and not await ai_is_inflight(uid):
-        if not await ai_claim_inflight(uid):
-            await _update_status("⏳ لطفاً تا اتمام پردازش درخواست فعلی خود صبر فرمایید.", force=True)
-            return False
-
+    job_temp_dir = None
     quota_consumed = kwargs.get('quota_consumed', True)
 
     try:
+        if not files:
+            if quota_consumed:
+                try:
+                    await refund_lecture_quota(uid)
+                except Exception as ref_err:
+                    logger.error("Failed to refund lecture quota for user %s: %s", uid, ref_err)
+                quota_consumed = False
+            await _update_status("⚠️ اطلاعات فایل‌های جلسه یافت نشد یا منقضی شده است.", force=True)
+            return False
+
+        job_temp_dir = tempfile.mkdtemp(prefix=f"lecture_{sess_id}_")
+
+        # اخذ قفل اجرای همزمان (در صورتی که قبلاً توسط run_lecture_processing ثبت نشده باشد)
+        if uid not in _busy_users and not await ai_is_inflight(uid):
+            if not await ai_claim_inflight(uid):
+                if quota_consumed:
+                    try:
+                        await refund_lecture_quota(uid)
+                    except Exception as ref_err:
+                        logger.error("Failed to refund lecture quota for user %s: %s", uid, ref_err)
+                    quota_consumed = False
+                await _update_status("⏳ لطفاً تا اتمام پردازش درخواست فعلی خود صبر فرمایید.", force=True)
+                return False
         cfg = await get_ai_config()
 
         # مرحله ۱: دانلود فایل‌ها از سرور تلگرام به صورت دیسک-به-دیسک
@@ -820,11 +874,12 @@ async def run_lecture_processing_worker(
 
         if audio_file_info:
             file_name = audio_file_info.get('name') or 'lecture_media.m4a'
+            safe_audio_fn = sanitize_filename_for_disk(file_name, "lecture_media.m4a")
             await _update_status(
                 f"📥 <b>در حال دریافت فایل صوتی/تصویری از تلگرام...</b>\n📁 <code>{file_name}</code>",
                 force=True
             )
-            raw_audio_path = os.path.join(job_temp_dir, f"raw_{file_name}")
+            raw_audio_path = os.path.join(job_temp_dir, f"raw_{safe_audio_fn}")
             await download_telegram_media(
                 bot=bot,
                 chat_id=audio_file_info.get('chat_id') or chat_id,
@@ -844,22 +899,23 @@ async def run_lecture_processing_worker(
                 output_path=out_mp3_path,
                 bitrate="32k",
             )
-            if os.path.exists(optimized_path) and os.path.getsize(optimized_path) > 0:
+            if optimized_path and optimized_path != raw_audio_path and os.path.exists(optimized_path) and os.path.getsize(optimized_path) > 0:
                 with open(optimized_path, 'rb') as f:
                     audio_bytes = f.read()
-                audio_mime = 'audio/mp3'
+                audio_mime = 'audio/mpeg'
             elif os.path.exists(raw_audio_path):
                 with open(raw_audio_path, 'rb') as f:
                     audio_bytes = f.read()
-                audio_mime = audio_file_info.get('mime') or 'audio/mp3'
+                audio_mime = canonical_audio_mime(audio_file_info.get('mime'), file_name)
 
         if pdf_file_info:
             pdf_name = pdf_file_info.get('name') or 'lecture_slides.pdf'
+            safe_pdf_fn = sanitize_filename_for_disk(pdf_name, "lecture_slides.pdf")
             await _update_status(
                 f"📄 <b>در حال دانلود اسلایدهای جلسه (PDF)...</b>\n📁 <code>{pdf_name}</code>",
                 force=True
             )
-            raw_pdf_path = os.path.join(job_temp_dir, f"slides_{pdf_name}")
+            raw_pdf_path = os.path.join(job_temp_dir, f"slides_{safe_pdf_fn}")
             await download_telegram_media(
                 bot=bot,
                 chat_id=pdf_file_info.get('chat_id') or chat_id,
@@ -912,7 +968,7 @@ async def run_lecture_processing_worker(
                     b64_audio = base64.b64encode(audio_bytes).decode('utf-8')
                     parts.append({
                         'inline_data': {
-                            'mime_type': 'audio/mp3',
+                            'mime_type': audio_mime or 'audio/mpeg',
                             'data': b64_audio
                         }
                     })
@@ -921,17 +977,22 @@ async def run_lecture_processing_worker(
                         "🧠 <b>در حال بارگذاری صوت طولانی جلسه در پردازشگر ابری گوگل...</b>",
                         force=True
                     )
-                    fi = await _gemini_upload_file(key, audio_bytes, audio_mime or 'audio/mp3', 'lecture_recording.mp3')
+                    ext = 'm4a' if 'mp4' in (audio_mime or '') or 'm4a' in (audio_mime or '') else 'mp3'
+                    upload_mime = audio_mime or ('audio/mp4' if ext == 'm4a' else 'audio/mpeg')
+                    fi = await _gemini_upload_file(key, audio_bytes, upload_mime, f'lecture_recording.{ext}')
                     uploaded_audio = await _gemini_wait_file_active(key, fi, timeout=180)
-                    if uploaded_audio and (uploaded_audio.get('state') or 'ACTIVE').upper() == 'ACTIVE' and uploaded_audio.get('uri'):
+                    state = ((uploaded_audio or {}).get('state') or '').upper()
+                    if uploaded_audio and state == 'ACTIVE' and uploaded_audio.get('uri'):
                         parts.append({
                             'file_data': {
                                 'file_uri': uploaded_audio['uri'],
-                                'mime_type': uploaded_audio.get('mimeType') or 'audio/mp3'
+                                'mime_type': uploaded_audio.get('mimeType') or upload_mime
                             }
                         })
-                    elif uploaded_audio and (uploaded_audio.get('state') or '').upper() == 'FAILED':
-                        raise AIError("Google Gemini failed to process the uploaded audio file.")
+                    elif state == 'FAILED':
+                        raise AIError("Google Gemini failed to process the uploaded audio file (state FAILED).")
+                    else:
+                        raise AIError(f"فایل صوتی بارگذاری‌شده در گوگل در وضعیت فعال قرار نگرفت (state={state or 'UNKNOWN'}).")
 
             if pdf_bytes:
                 if len(pdf_bytes) < 10 * 1024 * 1024:
@@ -949,15 +1010,18 @@ async def run_lecture_processing_worker(
                     )
                     fi = await _gemini_upload_file(key, pdf_bytes, 'application/pdf', 'lecture_slides.pdf')
                     uploaded_doc = await _gemini_wait_file_active(key, fi, timeout=180)
-                    if uploaded_doc and (uploaded_doc.get('state') or 'ACTIVE').upper() == 'ACTIVE' and uploaded_doc.get('uri'):
+                    state = ((uploaded_doc or {}).get('state') or '').upper()
+                    if uploaded_doc and state == 'ACTIVE' and uploaded_doc.get('uri'):
                         parts.append({
                             'file_data': {
                                 'file_uri': uploaded_doc['uri'],
                                 'mime_type': 'application/pdf'
                             }
                         })
-                    elif uploaded_doc and (uploaded_doc.get('state') or '').upper() == 'FAILED':
-                        raise AIError("Google Gemini failed to process the uploaded slides PDF.")
+                    elif state == 'FAILED':
+                        raise AIError("Google Gemini failed to process the uploaded slides PDF (state FAILED).")
+                    else:
+                        raise AIError(f"فایل اسلایدها در گوگل در وضعیت فعال قرار نگرفت (state={state or 'UNKNOWN'}).")
 
             parts.append({'text': user_prompt_text})
 
@@ -1130,7 +1194,6 @@ async def run_lecture_processing_worker(
         logger.exception("خطا در پردازش جزوه چندرسانه‌ای در صف پس‌زمینه: %s", exc)
         if quota_consumed:
             try:
-                from ai_solver import refund_lecture_quota
                 await refund_lecture_quota(uid)
             except Exception as ref_err:
                 logger.error("Failed to refund lecture quota for user %s: %s", uid, ref_err)
@@ -1141,7 +1204,6 @@ async def run_lecture_processing_worker(
 
     finally:
         try:
-            from ai_solver import ai_release_inflight
             await ai_release_inflight(uid)
         except Exception:
             pass
@@ -1176,6 +1238,7 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
         # ۲. بررسی و کسر سهمیه روزانه کاربر
         allowed, used, limit = await check_and_consume_lecture_quota(uid)
         if not allowed:
+            await ai_release_inflight(uid)
             await msg.reply_text(
                 f"⛔️ <b>سقف روزانهٔ تولید جزوه پایان یافته است ({used}/{limit}).</b>\n"
                 "فردا مجدداً می‌توانید برای کلاس‌های جدید جزوه تولید کنید.",
@@ -1208,6 +1271,7 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
             if quota_consumed:
                 await refund_lecture_quota(uid)
                 quota_consumed = False
+            await ai_release_inflight(uid)
             await status_msg.edit_text(
                 "⚠️ <b>صف پردازش در حال حاضر تکمیل است.</b>\n"
                 "سهمیه شما محفوظ ماند و کسر نگردید. لطفاً چند دقیقه دیگر مجدداً تلاش فرمایید.",

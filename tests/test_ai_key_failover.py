@@ -507,5 +507,106 @@ class FileUploadFailoverTests(unittest.TestCase):
         self.assertEqual(uploads[1][0], "AIza_key_B")
 
 
+class GeminiAQKeyFormatAndVaultMultiTests(unittest.TestCase):
+    """Tests for AQ.A... key format support, redaction, vault_multi preservation, and failover."""
+
+    def setUp(self):
+        self._env_backup = dict(os.environ)
+        for k in ['GEMINI_API_KEYS', 'GEMINI_API_KEY', 'GOOGLE_API_KEY']:
+            os.environ.pop(k, None)
+        ai_solver._KEY_STATE.clear()
+        _rtloop.adopt()
+        self.fake = _FakeSettingsDB()
+        self._p = mock.patch.object(ai_solver, 'db', self.fake)
+        self._p.start()
+
+    def tearDown(self):
+        self._p.stop()
+        ai_solver._KEY_STATE.clear()
+        os.environ.clear()
+        os.environ.update(self._env_backup)
+
+    def test_aq_key_sanitization_and_validation(self):
+        """AQ. format keys must be sanitized and validated as legitimate Gemini API keys."""
+        from ai_solver import sanitize_api_key, api_key_problem
+
+        raw_key = "  AQ.AbCd_1234-xyz.999\u200b  "
+        cleaned = sanitize_api_key(raw_key)
+        self.assertEqual(cleaned, "AQ.AbCd_1234-xyz.999")
+        self.assertIsNone(api_key_problem(cleaned))
+
+        # Persian digits within AQ keys should be converted to ASCII
+        persian_key = "AQ.۱۲۳۴_abcd"
+        cleaned_persian = sanitize_api_key(persian_key)
+        self.assertEqual(cleaned_persian, "AQ.1234_abcd")
+        self.assertIsNone(api_key_problem(cleaned_persian))
+
+    def test_aq_key_redaction_in_provider_error_text(self):
+        """_sanitize_provider_text must mask AQ. format keys to prevent leaks in logs and UI."""
+        from ai_solver import _sanitize_provider_text
+
+        err_msg = "Google API call failed with key AQ.AbCd_1234-xyz.999 on https://example.com"
+        sanitized = _sanitize_provider_text(err_msg)
+        self.assertNotIn("AQ.AbCd_1234-xyz.999", sanitized)
+        self.assertIn("AQ.***", sanitized)
+
+    def test_aq_key_redaction_in_audit_module(self):
+        """backend.services.audit.sanitize_value must redact AQ. format keys."""
+        from backend.services.audit import sanitize_value, REDACTED
+
+        sensitive_text = "Key AQ.SecretKey1234_xyz"
+        redacted = sanitize_value(sensitive_text)
+        self.assertEqual(redacted, REDACTED)
+
+    def test_vault_multi_preserves_cooled_down_keys(self):
+        """get_ai_config must retain all keys in vault_multi even when keys are temporarily in cooldown."""
+        import json
+        import backend.services.ai_solver as ai_mod
+
+        k_primary = "AIza_gemini_primary_123"
+        k_secondary = "AQ.GeminiSecondary_456"
+
+        # Seed database vault with both keys
+        self.fake.settings['ai_api_keys'] = json.dumps({'gemini': [k_primary, k_secondary]})
+
+        cfg1 = _rtloop.run(get_ai_config())
+        self.assertEqual(cfg1['vault_multi']['gemini'], [k_primary, k_secondary])
+        self.assertEqual(cfg1['vault_counts']['gemini'], 2)
+
+        # Put k_primary into cooldown (e.g. HTTP 429)
+        ai_mod.mark_key_failed('gemini', k_primary, ai_mod.AIQuotaError("429 rate limit"))
+        self.assertGreater(ai_mod.key_cooldown_remaining('gemini', k_primary), 0)
+
+        # get_ai_config must STILL retain both keys in vault_multi and vault_counts
+        cfg2 = _rtloop.run(get_ai_config())
+        self.assertEqual(cfg2['vault_multi']['gemini'], [k_primary, k_secondary])
+        self.assertEqual(cfg2['vault_counts']['gemini'], 2)
+
+        # Active resolver with filter_cooldown=True should prioritize healthy key
+        active_keys = ai_mod.resolve_gemini_api_keys(cfg2, filter_cooldown=True)
+        self.assertEqual(active_keys, [k_secondary])
+
+    def test_run_with_key_failover_with_aq_keys(self):
+        """run_with_key_failover must rotate cleanly between AQ. format keys on 429/auth errors."""
+        import backend.services.ai_solver as ai_mod
+        aq_k1 = "AQ.KeyOne_QuotaFail_123"
+        aq_k2 = "AQ.KeyTwo_Healthy_456"
+
+        attempts = []
+
+        async def _test_factory(key):
+            attempts.append(key)
+            if key == aq_k1:
+                raise ai_mod.AIQuotaError("429 Too Many Requests")
+            return f"success_with_{key}"
+
+        result = _rtloop.run(ai_mod.run_with_key_failover("gemini", [aq_k1, aq_k2], _test_factory))
+        self.assertEqual(result, f"success_with_{aq_k2}")
+        self.assertEqual(attempts, [aq_k1, aq_k2])
+        self.assertGreater(ai_mod.key_cooldown_remaining('gemini', aq_k1), 0)
+        self.assertEqual(ai_mod.key_cooldown_remaining('gemini', aq_k2), 0)
+
+
+
 if __name__ == '__main__':
     unittest.main()
