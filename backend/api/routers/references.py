@@ -9,7 +9,7 @@ from api.auth import (
     get_current_user, get_references_access_user,
 )
 from api.telegram_send import (
-    is_previewable, preview_token, proxy_telegram_preview,
+    PREVIEW_TTL_SEC, is_previewable, preview_token, proxy_telegram_preview,
     send_ref_file, verify_preview_token,
 )
 from database import db
@@ -522,7 +522,7 @@ async def preview_url(
         raise HTTPException(
             status_code=415,
             detail="این نوع فایل پیش‌نمایش ندارد؛ از دانلود استفاده کنید")
-    exp = int(_t.time()) + 600
+    exp = int(_t.time()) + PREVIEW_TTL_SEC
     tok = preview_token(int(user["id"]), "ref", file_id, exp)
     return {"url": (f"/api/references/preview/{file_id}"
                     f"?uid={int(user['id'])}&exp={exp}&token={tok}")}
@@ -535,8 +535,11 @@ async def preview(
     user=Depends(_preview_user),
 ):
     """🌊 W8/UX-03 — استریم فایل رفرنس برای پیش‌نمایش داخل مینی‌اپ."""
+    from backend.services.media_stream import is_continuation_range
     user_id = int(user["id"])
-    await rate_limit_user(user_id, "ref_preview", 300, 3600)
+    # 🎬 seek/بافرِ مجدد شمرده نمیشود (پلیر دهها درخواست Range میزند)
+    if not is_continuation_range(request.headers.get("range")):
+        await rate_limit_user(user_id, "ref_preview", 300, 3600)
 
     item = await db.ref_get_file(file_id)
     if not item:
@@ -567,4 +570,6 @@ async def preview(
     name = (_text(item.get("display_file_name"))
             or _text(item.get("description")) or "file")
     return await proxy_telegram_preview(
-        tg_id, mime, name, request.headers.get("range"))
+        tg_id, mime, name, request.headers.get("range"),
+        size=int(item.get("file_size") or 0),
+        ext=_text(item.get("file_extension")))

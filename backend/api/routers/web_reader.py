@@ -152,7 +152,9 @@ async def view_url(scope: str, file_id: str, request: Request, user: dict = Depe
                                                          "message": str(exc.detail)})
         raise
 
-    return {**meta, "available": True, "url": out.get("url", ""), "expires_in": 600}
+    from api.telegram_send import PREVIEW_TTL_SEC
+    return {**meta, "available": True, "url": out.get("url", ""),
+            "expires_in": PREVIEW_TTL_SEC}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -309,8 +311,9 @@ async def _fetch_and_cache_master_pdf(scope: str, item: dict) -> bytes:
     tg_id = str(item.get("file_id") or item.get("telegram_file_id") or "")
     if tg_id:
         try:
-            from api.telegram_send import download_telegram_file
-            tg_bytes = await download_telegram_file(tg_id)
+            # 🎬 PDF بزرگتر از ۲۰MB هم (سقف getFile ابری) از MTProto میآید
+            from api.telegram_send import download_telegram_file_any_size
+            tg_bytes = await download_telegram_file_any_size(tg_id)
             if tg_bytes:
                 await storage.save_original(fid, tg_bytes)
                 return tg_bytes

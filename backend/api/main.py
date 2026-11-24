@@ -356,8 +356,21 @@ async def _wa2_security_headers(request, call_next):
 # payloadهای چند‌ده‌KB (لیست کاربران/رسیدها/آمار)
 # روی شبکه‌ی موبایل محسوس کوچک‌تر و سریع‌تر می‌شوند.
 # فقط بالای ۱KB — پاسخ‌های کوچک سربار نمی‌گیرند.
+# 🎬 استریم ویدیو/ویس (Range/206) هرگز فشرده نمیشود: gzip هدر
+# Content-Length را حذف میکند و seek در پلیر میشکند.
+class _MediaAwareGZip(GZipMiddleware):
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            path = scope.get("path") or ""
+            has_range = any(k == b"range" for k, _v in scope.get("headers") or [])
+            if has_range or "/preview/" in path:
+                await self.app(scope, receive, send)
+                return
+        await super().__call__(scope, receive, send)
+
+
 app.add_middleware(
-    GZipMiddleware,
+    _MediaAwareGZip,
     minimum_size=1000,
 )
 

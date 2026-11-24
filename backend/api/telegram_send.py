@@ -156,6 +156,18 @@ def preview_token(uid: int, scope: str, fid: str, exp: int) -> str:
     return _m.new(_preview_key(), msg, _h.sha256).hexdigest()[:48]
 
 
+def _preview_ttl() -> int:
+    """اعتبار لینک پیشنمایش. پلیر روی هر seek دوباره درخواست میزند؛ ۱۰ دقیقه
+    برای جلسهی ۹۰دقیقهای کم بود و پخش وسط کار 401 میگرفت. پیشفرض ۶ ساعت."""
+    try:
+        return max(300, int(os.getenv("PREVIEW_TOKEN_TTL_SEC", "21600") or 21600))
+    except ValueError:
+        return 21600
+
+
+PREVIEW_TTL_SEC = _preview_ttl()
+
+
 def verify_preview_token(token: str, uid: int, scope: str,
                          fid: str, exp: int) -> bool:
     import hmac as _m
@@ -172,18 +184,35 @@ def verify_preview_token(token: str, uid: int, scope: str,
 
 
 async def proxy_telegram_preview(file_id: str, mime: str, name: str,
-                                 range_header: str | None = None):
+                                 range_header: str | None = None,
+                                 size: int = 0, ext: str = ""):
     """🌊 W8/UX-03 — پاسخ استریمینگ فایل تلگرام با پشتیبانی Range.
 
-    توکن فقط سمت سرور می‌ماند؛ خطا ⇒ HTTPException (502).
+    توکن فقط سمت سرور میماند؛ خطا ⇒ HTTPException (502).
     صداکننده باید قبلاً دسترسی/ورودی را گارد کرده باشد.
+
+    🎬 فایل >۲۰MB (سقف getFile ابری) از MTProto استریم میشود و نسخهی
+    کامل در کش دیسک میماند (backend/services/media_stream).
     """
     from urllib.parse import quote
     from fastapi import HTTPException as _HTTP
     from fastapi.responses import StreamingResponse as _SR
+    from backend.services import media_stream as _ms
+
+    mime = _ms.canonical_media_mime(mime, name, ext)
+    size = max(0, int(size or 0))
+
+    cached = _ms.cached_file(file_id)
+    if cached:
+        return _ms.file_response(cached, mime, name)
+    if size > _ms.CLOUD_GETFILE_LIMIT and _ms.mtproto_enabled():
+        return await _ms.mtproto_response(file_id, mime, name, range_header, size)
 
     url = await telegram_file_url(file_id)
     if not url:
+        # اندازهی ثبتنشده/اشتباه در DB: شاید همان «file is too big» باشد
+        if _ms.mtproto_enabled():
+            return await _ms.mtproto_response(file_id, mime, name, range_header, size)
         raise _HTTP(status_code=502,
                     detail="دریافت فایل از تلگرام ناموفق بود")
     fwd = {"Range": range_header} if range_header else {}
@@ -255,6 +284,15 @@ async def download_telegram_file(file_id: str) -> bytes | None:
     except Exception as e:
         logger.warning("TG_DOWNLOAD_FAILED err=%s", type(e).__name__)
         return None
+
+
+async def download_telegram_file_any_size(file_id: str) -> bytes | None:
+    """مثل download_telegram_file، ولی بالای ۲۰MB (سقف getFile ابری) از MTProto."""
+    data = await download_telegram_file(file_id)
+    if data is not None:
+        return data
+    from backend.services import media_stream as _ms
+    return await _ms.download_bytes(file_id)
 
 
 async def reupload_with_new_filename(chat_id: int, original_file_id: str,
