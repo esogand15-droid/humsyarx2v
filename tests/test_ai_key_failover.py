@@ -14,7 +14,15 @@ import sys
 import unittest
 from unittest import mock
 
-sys.path.insert(0, os.path.dirname(__file__))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+_SERVICES = os.path.join(_ROOT, "backend", "services")
+if _SERVICES not in sys.path:
+    sys.path.insert(0, _SERVICES)
+if os.path.dirname(__file__) not in sys.path:
+    sys.path.insert(0, os.path.dirname(__file__))
+
 os.environ.setdefault('MONGODB_URI', 'mongodb://localhost:27017/test_fallback')
 
 import _rtloop
@@ -383,6 +391,120 @@ class AskAiStreamFallbackTests(unittest.TestCase):
                         pass
                 _rtloop.run(_collect())
         self.assertEqual(seen, [K1])   # K2 امتحان نشد — استریم نیمه‌جاری
+
+
+class EnvKeyResolutionTests(unittest.TestCase):
+    """تست‌های جامع رزولوشن کلیدها از متغیرهای محیطی و والت دیتابیس"""
+
+    def setUp(self):
+        self._env_backup = dict(os.environ)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._env_backup)
+
+    def test_env_key_loading_multi_delimiters(self):
+        """تست تفکیک کلیدها با جداکننده‌های کاما، سمیکولون، خط جدید، و اسپیس/تب"""
+        from ai_solver import resolve_gemini_api_keys
+        os.environ["GEMINI_API_KEYS"] = "AIza_k1, AIza_k2;  AIza_k3\nAIza_k4\t AIza_k5"
+        keys = resolve_gemini_api_keys({})
+        self.assertIn("AIza_k1", keys)
+        self.assertIn("AIza_k2", keys)
+        self.assertIn("AIza_k3", keys)
+        self.assertIn("AIza_k4", keys)
+        self.assertIn("AIza_k5", keys)
+        self.assertEqual(len(keys), 5)
+
+    def test_precedence_order_db_then_env(self):
+        """تست تقدم ترتیبی: DB Vault > GEMINI_API_KEYS > GEMINI_API_KEY > GOOGLE_API_KEY"""
+        from ai_solver import resolve_gemini_api_keys
+        os.environ["GEMINI_API_KEYS"] = "AIza_env_multi_1, AIza_env_multi_2"
+        os.environ["GEMINI_API_KEY"] = "AIza_env_single"
+        os.environ["GOOGLE_API_KEY"] = "AIza_env_google"
+
+        cfg = {"vault_multi": {"gemini": ["AIza_vault_1", "AIza_vault_2"]}}
+        keys = resolve_gemini_api_keys(cfg)
+        expected = [
+            "AIza_vault_1",
+            "AIza_vault_2",
+            "AIza_env_multi_1",
+            "AIza_env_multi_2",
+            "AIza_env_single",
+            "AIza_env_google"
+        ]
+        self.assertEqual(keys, expected)
+
+    def test_deduplication_across_db_and_env(self):
+        """تست حذف کلیدهای تکراری بدون تغییر تقدم اولین کلید مشاهده‌شده"""
+        from ai_solver import resolve_gemini_api_keys
+        os.environ["GEMINI_API_KEYS"] = "AIza_common, AIza_env_only"
+        os.environ["GEMINI_API_KEY"] = "AIza_common"
+        os.environ["GOOGLE_API_KEY"] = "AIza_google"
+
+        cfg = {"vault_multi": {"gemini": ["AIza_common", "AIza_vault_only"]}}
+        keys = resolve_gemini_api_keys(cfg)
+        self.assertEqual(keys[0], "AIza_common")
+        self.assertEqual(keys.count("AIza_common"), 1)
+        self.assertIn("AIza_vault_only", keys)
+        self.assertIn("AIza_env_only", keys)
+        self.assertIn("AIza_google", keys)
+
+    def test_dirty_unicode_sanitization_in_env_keys(self):
+        """تست پاکسازی کاراکترهای مخفی و یونیکد نامرئی در کلیدهای محیطی"""
+        from ai_solver import resolve_gemini_api_keys
+        os.environ["GEMINI_API_KEYS"] = " \u200eAIza_dirty_1\u200f , \u200bAIza_dirty_2 "
+        keys = resolve_gemini_api_keys({})
+        self.assertIn("AIza_dirty_1", keys)
+        self.assertIn("AIza_dirty_2", keys)
+        for k in keys:
+            self.assertTrue(k.isascii())
+
+
+class FileUploadFailoverTests(unittest.TestCase):
+    """تست‌های فال‌بک کلید در آپلود فایل‌های حجیم و عدم تداخل URI بین پروژه‌ها"""
+
+    def test_upload_429_triggers_key_rotation(self):
+        """تست سوییچ به کلید دوم در صورت بروز خطای 429 در فرایند آپلود اولیه"""
+        import asyncio
+        from ai_solver import run_with_key_failover, AIQuotaError
+
+        keys = ["AIza_upload_k1", "AIza_upload_k2"]
+        attempts = []
+
+        async def _mock_factory(key):
+            attempts.append(key)
+            if key == "AIza_upload_k1":
+                raise AIQuotaError("Upload quota exceeded")
+            return {"status": "success", "active_key": key}
+
+        result = asyncio.run(run_with_key_failover("gemini", keys, _mock_factory))
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["active_key"], "AIza_upload_k2")
+        self.assertEqual(attempts, ["AIza_upload_k1", "AIza_upload_k2"])
+
+    def test_content_generation_429_reupload_scoping(self):
+        """تست سناریوی تفکیک آپلود: در صورت شکست محتوا با کلید ۱، فایل تحت کلید ۲ آپلود می‌شود"""
+        import asyncio
+        from ai_solver import run_with_key_failover, AIQuotaError
+
+        keys = ["AIza_key_A", "AIza_key_B"]
+        uploads = []
+        generations = []
+
+        async def _mock_pipeline(key):
+            file_uri = f"https://generativelanguage.googleapis.com/v1beta/files/{key}_file"
+            uploads.append((key, file_uri))
+            generations.append(key)
+            if key == "AIza_key_A":
+                raise AIQuotaError("Rate limit 429 on generateContent")
+            return {"file_used": file_uri, "delivered_by": key}
+
+        result = asyncio.run(run_with_key_failover("gemini", keys, _mock_pipeline))
+        self.assertEqual(result["delivered_by"], "AIza_key_B")
+        self.assertEqual(result["file_used"], "https://generativelanguage.googleapis.com/v1beta/files/AIza_key_B_file")
+        self.assertEqual(len(uploads), 2)
+        self.assertEqual(uploads[0][0], "AIza_key_A")
+        self.assertEqual(uploads[1][0], "AIza_key_B")
 
 
 if __name__ == '__main__':

@@ -555,4 +555,138 @@ def test_lecture_scribe_delivery_html_escaping():
     assert not stray_amps, f"کاراکترهای فرار نیافته & یافت شد: {stray_amps}"
 
 
+def test_resolve_candidate_models_hierarchy_and_filtering():
+    """تست اعتبارسنجی سلسله‌مراتب مدل‌های مجاز و حذف مدل‌های خیالی (gemini-3.6-flash)"""
+    from backend.services.lecture_scribe import (
+        resolve_candidate_models, VERIFIED_MODEL_CASCADE, HALLUCINATED_MODELS
+    )
+
+    # 1. پیش‌فرض بدون کانفیگ
+    models_default = resolve_candidate_models()
+    assert models_default[0] == "gemini-2.5-flash"
+    assert models_default == VERIFIED_MODEL_CASCADE
+
+    # 2. کانفیگ حاوی مدل خیالی gemini-3.6-flash
+    cfg_hallucinated = {"lecture_model": "gemini-3.6-flash"}
+    models_filtered = resolve_candidate_models(cfg_hallucinated)
+    assert "gemini-3.6-flash" not in models_filtered
+    assert "gemini-3.5-flash-lite" not in models_filtered
+    assert models_filtered[0] == "gemini-2.5-flash"
+
+    # 3. اولویت‌بندی مدل معتبر انتخابی ادمین
+    cfg_preferred = {"lecture_model": "gemini-2.0-flash"}
+    models_preferred = resolve_candidate_models(cfg_preferred)
+    assert models_preferred[0] == "gemini-2.0-flash"
+    assert len(models_preferred) == len(VERIFIED_MODEL_CASCADE)
+    assert set(models_preferred) == set(VERIFIED_MODEL_CASCADE)
+
+
+def test_auto_repair_generation_config_strips_schema_and_thinking():
+    """تست حذف responseSchema و thinkingConfig هنگام مواجهه با خطای ۴۰۰ در auto_repair"""
+    from backend.services.lecture_scribe import auto_repair_generation_config, LECTURE_DIGEST_SCHEMA
+
+    initial_cfg = {
+        "responseMimeType": "application/json",
+        "responseSchema": LECTURE_DIGEST_SCHEMA,
+        "thinkingConfig": {"thinkingBudget": 0},
+        "temperature": 0.2,
+        "maxOutputTokens": 8192,
+    }
+
+    repaired = auto_repair_generation_config(initial_cfg)
+    assert "responseSchema" not in repaired
+    assert "thinkingConfig" not in repaired
+    assert repaired.get("responseMimeType") == "application/json"
+    assert repaired.get("temperature") == 0.2
+    assert repaired.get("maxOutputTokens") == 8192
+
+
+def test_no_thinking_model_aware_behavior():
+    """تست هوشمندی تابع _no_thinking در تفکیک مدل‌های استدلالی و غیراستدلالی"""
+    from backend.services.ai_solver import _no_thinking
+
+    base = {"maxOutputTokens": 4096}
+
+    # مدل 2.5 استدلالی: باید thinkingBudget: 0 داشته باشد
+    cfg_25 = _no_thinking(base, model="gemini-2.5-flash")
+    assert "thinkingConfig" in cfg_25
+    assert cfg_25["thinkingConfig"].get("thinkingBudget") == 0
+
+    # مدل 2.0 غیر استدلالی: نباید thinkingConfig داشته باشد
+    cfg_20 = _no_thinking(base, model="gemini-2.0-flash")
+    assert "thinkingConfig" not in cfg_20
+
+    # مدل 1.5 غیر استدلالی: نباید thinkingConfig داشته باشد
+    cfg_15 = _no_thinking(base, model="gemini-1.5-flash")
+    assert "thinkingConfig" not in cfg_15
+
+    # مدل 3.0: باید thinkingLevel: 'low' داشته باشد
+    cfg_30 = _no_thinking(base, model="gemini-3.0-flash")
+    assert "thinkingConfig" in cfg_30
+    assert cfg_30["thinkingConfig"].get("thinkingLevel") == "low"
+
+
+def test_model_cascade_continues_on_400_invalid_argument():
+    """تست عدم توقف چرخه مدل‌ها هنگام بروز خطای ۴۰۰ INVALID_ARGUMENT در مدل اول و صعود به مدل دوم"""
+    import asyncio
+    import json
+    import httpx
+    from backend.services.ai_solver import _extract_gemini_text, AIError
+    from backend.services.lecture_scribe import auto_repair_generation_config, _parse_json_from_text
+
+    calls = []
+    models_sequence = ["gemini-2.5-flash", "gemini-2.0-flash"]
+
+    async def _mock_client_post(url, headers, json_payload):
+        model = "gemini-2.5-flash" if "gemini-2.5-flash" in url else "gemini-2.0-flash"
+        calls.append((model, json_payload.get("generationConfig", {})))
+
+        if model == "gemini-2.5-flash":
+            # حتی با auto-repair هم خطای ۴۰۰ می‌دهد
+            return httpx.Response(
+                status_code=400,
+                text='{"error": {"code": 400, "message": "INVALID_ARGUMENT: model rejected payload"}}',
+                request=httpx.Request("POST", url),
+            )
+        # مدل دوم با موفقیت پاسخ می‌دهد
+        sample_resp = {
+            "candidates": [{
+                "content": {"parts": [{"text": '{"title": "قلب و عروق", "subject": "پزشکی"}'}]}
+            }]
+        }
+        return httpx.Response(status_code=200, text=json.dumps(sample_resp), request=httpx.Request("POST", url))
+
+    async def _run_loop():
+        last_err = None
+        for model_cand in models_sequence:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_cand}:generateContent"
+            gen_cfg = {"responseMimeType": "application/json", "responseSchema": {"type": "OBJECT"}}
+            payload = {"generationConfig": gen_cfg}
+
+            res = await _mock_client_post(url, {}, payload)
+            if res.status_code == 400:
+                repaired = auto_repair_generation_config(gen_cfg)
+                res = await _mock_client_post(url, {}, {"generationConfig": repaired})
+
+            if res.status_code == 200:
+                data = res.json()
+                raw_text = _extract_gemini_text(data)
+                return _parse_json_from_text(raw_text)
+
+            if res.status_code in (400, 404, 503):
+                last_err = AIError(f"Model {model_cand} failed: {res.status_code}")
+                continue
+
+        if last_err:
+            raise last_err
+
+    result = asyncio.run(_run_loop())
+    assert result["title"] == "قلب و عروق"
+    assert result["subject"] == "پزشکی"
+    attempted_models = [m for m, _ in calls]
+    assert "gemini-2.5-flash" in attempted_models
+    assert "gemini-2.0-flash" in attempted_models
+
+
+
 
