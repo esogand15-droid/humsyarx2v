@@ -38,14 +38,18 @@ export function ReaderScreen() {
 
   const scopeTyped = (scope === 'ref' ? 'ref' : 'res') as Scope;
   const saveTimer = useRef<number | null>(null);
+  const pendingKind = useRef<Kind | null>(null);
   const latest = useRef({ page: 1, total: 0, position: 0 });
 
   const persist = useCallback(
     (kind: Kind, patch: Partial<{ page: number; total: number; position: number }>) => {
       latest.current = { ...latest.current, ...patch };
+      pendingKind.current = kind;
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
       // ذخیرهٔ تأخیری: پیمایش سریع نباید ده‌ها درخواست بسازد
       saveTimer.current = window.setTimeout(() => {
+        saveTimer.current = null;
+        pendingKind.current = null;
         void reader
           .save(scopeTyped, id, {
             page: latest.current.page,
@@ -96,8 +100,16 @@ export function ReaderScreen() {
     // هر خطی که آفلاین مانده بود، همین‌جا فرستاده می‌شود
     void ink.flush();
     return () => {
-      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+      // leaving the reader: flush the pending save instead of dropping it
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+        const kind = pendingKind.current;
+        pendingKind.current = null;
+        if (kind) void reader.save(scopeTyped, id, { ...latest.current, kind }).catch(() => undefined);
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   useEffect(() => {
@@ -259,6 +271,7 @@ export function ReaderScreen() {
                     size={info.size}
                     startAt={startAt}
                     onPosition={(seconds) => persist(kind, { position: seconds })}
+                    onExpired={refreshUrl}
                   />
                 ) : (
                   <div className="page">
@@ -273,7 +286,7 @@ export function ReaderScreen() {
 
               <p className="reader__foot tiny">
                 <Icon name="i-lock" size={13} /> این فایل فقط برای حساب تو و از سرور هامزیار سرو می‌شود؛
-                لینکش پس از ۱۰ دقیقه باطل می‌شود.
+                لینکش موقت است و بیرون از هامزیار کار نمی‌کند.
               </p>
             </div>
           </div>
