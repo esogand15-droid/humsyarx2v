@@ -60,6 +60,23 @@ router = APIRouter()
 SCOPES = ("res", "ref")
 
 
+def _reader_url_ttl() -> int:
+    """⏳ اعتبار آدرسهای امضاشدهٔ صفحات ریدر PDF (ثانیه).
+
+    قبلاً ۶۰۰ ثانیه بود و مطالعهٔ طولانی بعد از ۱۰ دقیقه با 403 قطع میشد.
+    پیشفرض ۳ ساعت؛ با `READER_URL_TTL_SEC` قابل تغییر (کف ۵ دقیقه، سقف ۲۴ ساعت).
+    کلاینت قبل از انقضا مانیفست را بیصدا تازه میکند، پس این عدد فقط حاشیهٔ امن است.
+    """
+    try:
+        val = int(os.getenv("READER_URL_TTL_SEC", "10800") or 10800)
+    except ValueError:
+        val = 10800
+    return max(300, min(val, 86400))
+
+
+READER_URL_TTL_SEC = _reader_url_ttl()
+
+
 def _coll(name: str):
     return db.users.database[name]
 
@@ -124,7 +141,7 @@ async def view_url(scope: str, file_id: str, request: Request, user: dict = Depe
             "kind": "pdf",
             "available": True,
             "url": f"/api/web/reader/manifest/{scope}/{file_id}",
-            "expires_in": 600,
+            "expires_in": READER_URL_TTL_SEC,
             "size": 1024,
             "mime": "application/pdf",
         }
@@ -153,8 +170,11 @@ async def view_url(scope: str, file_id: str, request: Request, user: dict = Depe
         raise
 
     from api.telegram_send import PREVIEW_TTL_SEC
+    # expires_at (افزوده): کلاینت زمان تازهسازی را دقیق میداند، حتی اگر
+    # پاسخ با تأخیر برسد. فیلدهای قبلی دست نخوردهاند (سازگاری مینیاپ).
     return {**meta, "available": True, "url": out.get("url", ""),
-            "expires_in": PREVIEW_TTL_SEC}
+            "expires_in": PREVIEW_TTL_SEC,
+            "expires_at": int(time.time()) + PREVIEW_TTL_SEC}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -452,8 +472,11 @@ async def get_reader_manifest(
         user_id=uid,
     )
 
-    # Attach signed token template expiring in 10 minutes (600 seconds)
-    expires = int(time.time()) + 600
+    # ⏳ توکنهای امضاشدهٔ صفحه با READER_URL_TTL_SEC (پیشفرض ۳ ساعت).
+    # expires_at/expires_in افزودهاند تا کلاینت پیش از انقضا مانیفست را تازه کند.
+    expires = int(time.time()) + READER_URL_TTL_SEC
+    manifest["expires_at"] = expires
+    manifest["expires_in"] = READER_URL_TTL_SEC
     for page_info in manifest["page_dimensions"]:
         p = int(page_info["page"])
         tok = generate_page_token(uid, file_id, p, expires)
