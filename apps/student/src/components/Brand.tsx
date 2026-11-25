@@ -28,13 +28,16 @@ export function Brand({
   const px = PX[size];
   const r = R[size];
 
+  // مسیر از base بیلد (/student/) ساخته می‌شود، نه نسبی: در مسیرهای تودرتو
+  // مثل /me/notes آدرس نسبی به /student/me/… می‌رسید و ۴۰۴ می‌داد.
+  const base = (import.meta.env.BASE_URL || '/student/').replace(/\/?$/, '/');
   const primarySrc =
-    variant === 'emblem' ? './brand-emblem-transparent.png' : './brand-app-icon.png';
+    variant === 'emblem' ? `${base}brand-emblem-transparent.png` : `${base}brand-app-icon.png`;
   const fallbackSrc =
     variant === 'emblem'
       ? '/student/brand-emblem-transparent.png'
       : '/student/brand-app-icon.png';
-  const legacyFallback = './brand-logo.png';
+  const legacyFallback = `${base}brand-logo.png`;
 
   return (
     <div

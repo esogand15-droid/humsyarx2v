@@ -13,6 +13,7 @@ import type { StudyTask } from '../lib/schedule';
 import { useSession } from '../lib/session';
 import { errorText } from '../lib/api';
 import { fa } from '../lib/library';
+import { groupLabel, intakeLabel } from '../lib/intake';
 
 /* ═══════════════════════════════════════════════════════════════════
    توابع کمکی فرمت‌بندی جلالی و اعداد
@@ -688,8 +689,8 @@ export function HomeScreen() {
 
   const displayName = data?.user?.display_name || user?.name || 'دانشجوی گرامی';
   const studentId = user?.student_id || data?.user?.student_id || '';
-  const intake = data?.user?.intake || user?.intake || '';
-  const group = data?.user?.group || user?.group || '';
+  const intake = intakeLabel(data?.user?.intake || user?.intake);
+  const group = groupLabel(data?.user?.group || user?.group);
   const prestigeTitle = (data?.prestige?.level_title as string) || '';
   const prestigeLevel = typeof data?.prestige?.level === 'number' ? data.prestige.level : undefined;
 

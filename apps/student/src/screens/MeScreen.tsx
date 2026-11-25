@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { AppBar, Brand, Card, Chip, DeviceListModal, ListRow } from '../components';
 import { Icon } from '../icons';
+import { groupLabel, intakeLabel } from '../lib/intake';
 import { useSession } from '../lib/session';
 import { useTheme } from '../lib/theme';
 
@@ -17,8 +18,8 @@ export function MeScreen() {
   const name = user?.name?.trim() || 'دانشجوی هامزیار';
   const code = user?.student_id?.trim() || '—';
   const handle = user?.username ? `@${user.username}` : '—';
-  const group = user?.group || '';
-  const intake = user?.intake || '';
+  const group = groupLabel(user?.group);
+  const intake = intakeLabel(user?.intake);
 
   const copyCode = () => {
     if (code && code !== '—') {

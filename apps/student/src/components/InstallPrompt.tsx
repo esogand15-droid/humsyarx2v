@@ -5,7 +5,7 @@
    - حالت standalone: هیچ چیزی نمایش داده نمی‌شود (کاربر برنامهٔ نصب‌شده را باز کرده). */
 
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly prompt: () => Promise<void>;
@@ -31,6 +31,7 @@ function isIOS(): boolean {
  */
 export function ShowAddToHome() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -47,7 +48,8 @@ export function ShowAddToHome() {
     setIsVisible(false);
   };
 
-  if (!isVisible) return null;
+  // روی خودِ صفحهٔ راهنمای نصب، همان راهنما تکرار نمی‌شود
+  if (!isVisible || pathname.startsWith('/install')) return null;
 
   return (
     <div className="install-prompt install-prompt--ios" role="banner" aria-label="راهنمای افزودن به صفحهٔ اصلی">
