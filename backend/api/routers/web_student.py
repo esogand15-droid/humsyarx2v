@@ -346,13 +346,24 @@ async def _resolve_session(request: Request) -> dict | None:
         hu_hash = _sha(hu_token)
         doc = await _coll("web_user_sessions").find_one({"_id": hu_hash, "revoked": False})
         if doc and not _expired(doc.get("expires_at")):
+            # Sliding renewal: before, only last_active was written and expires_at
+            # stayed fixed 30 days after login. Now at most once an hour (not on
+            # every request) expiry moves forward to SESSION_TTL_DAYS from now.
+            last = _parse_dt(doc.get("last_active") or doc.get("created_at"))
             try:
-                await _coll("web_user_sessions").update_one(
-                    {"_id": hu_hash},
-                    {"$set": {"last_active": _now()}}
-                )
-            except Exception:
-                pass
+                stale = last is None or (_now() - last) > timedelta(hours=1)
+            except TypeError:
+                stale = True
+            if stale:
+                new_exp = _now() + timedelta(days=SESSION_TTL_DAYS)
+                try:
+                    await _coll("web_user_sessions").update_one(
+                        {"_id": hu_hash},
+                        {"$set": {"last_active": _now(), "expires_at": new_exp}},
+                    )
+                    doc["expires_at"] = new_exp
+                except Exception:
+                    pass
             return doc
 
     # 2. Legacy student session fallback (hy_student_session in web_sessions)
@@ -554,7 +565,7 @@ async def auth_verify(body: VerifyBody, request: Request, response: Response):
 
 
 @router.get("/auth/session")
-async def auth_session(request: Request):
+async def auth_session(request: Request, response: Response):
     """وضعیت نشست — تنها منبع حقیقت برای گارد سمت کلاینت.
 
     حتی وقتی سشن هست ولی حساب تأیید نشده، `authenticated: true` و
@@ -582,7 +593,32 @@ async def auth_session(request: Request):
     user = await db.get_user(int(session["uid"]), use_cache=False)
     if not user:
         return {"authenticated": False, "state": "not_registered", "user": None}
+    _refresh_session_cookies(request, response)
     return {"authenticated": True, "state": account_state(user), "user": _public_user(user)}
+
+
+def _refresh_session_cookies(request: Request, response: Response) -> None:
+    """Sliding session on the browser side too: the server slides expires_at,
+    but the cookie's max_age was only set at login, so the browser would still
+    drop it 30 days after login. The app calls /auth/session on every load, so
+    re-issuing the same token with a fresh max_age here keeps an active user
+    signed in. Token, flags and path are unchanged (backward compatible)."""
+    hu_token = (request.cookies.get("hu_session") or "").strip()
+    if hu_token and not hu_token.startswith("demo_"):
+        proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+        secure = (proto == "https") if proto else (request.url.scheme == "https")
+        response.set_cookie(
+            "hu_session",
+            hu_token,
+            max_age=SESSION_TTL_DAYS * 86400,
+            httponly=True,
+            secure=secure,
+            samesite="lax",
+            path="/",
+        )
+    legacy = (request.cookies.get(COOKIE_NAME) or "").strip()
+    if legacy and not legacy.startswith("demo_"):
+        _set_cookie(response, legacy)
 
 
 @router.post("/auth/logout")

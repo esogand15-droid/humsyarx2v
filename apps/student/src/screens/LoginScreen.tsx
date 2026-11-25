@@ -2,32 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { Brand, Button, Input, Sheet } from '../components';
-import { api, errorText, setDemoMode } from '../lib/api';
+import { api, errorText } from '../lib/api';
 import type { LoginChallengeResponse } from '../lib/api-types';
 import { useSession } from '../lib/session';
 
-/**
- * بررسی هوشمند و نرمال‌سازی کدهای حالت آزمایشی (Demo)
- * پشتیبانی از ارقام فارسی/عربی، خط تیره، حروف کوچک/بزرگ، و عبارات DEMO
- */
-export function isDemoCode(input: string): boolean {
-  if (!input) return false;
-  const faDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-  const arDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-  let s = input.trim();
-  for (let i = 0; i < 10; i++) {
-    s = s.split(faDigits[i]).join(String(i)).split(arDigits[i]).join(String(i));
-  }
-  const clean = s.toUpperCase().replace(/[^0-9A-Z]/g, '');
-  return (
-    clean === '7K9M2P4X' ||
-    clean === 'HY7K9M2P4X' ||
-    clean.includes('7K9M2P4X') ||
-    clean === 'DEMO' ||
-    clean === 'HYDEMO' ||
-    clean.startsWith('DEMO')
-  );
-}
+/* Demo code / local demo mode: DEV only (lib/demo, via a dynamic import inside
+   import.meta.env.DEV). Not one byte of it reaches the production build. */
 
 /**
  * قالب‌بندی خودکار کد ۸ کاراکتری Crockford Base32
@@ -139,13 +119,15 @@ export function LoginScreen() {
     setError('');
     setBusy(true);
 
-    // اگر کد دمو است، حالت دمو لوکال را فعال کن و مستقیم وارد شو
-    if (isDemoCode(userCode)) {
-      setDemoMode(true);
-      await refresh();
-      navigate('/', { replace: true });
-      setBusy(false);
-      return;
+    if (import.meta.env.DEV) {
+      const demo = await import('../lib/demo');
+      if (demo.isDemoCode(userCode)) {
+        demo.setDemoMode(true);
+        await refresh();
+        navigate('/', { replace: true });
+        setBusy(false);
+        return;
+      }
     }
 
     try {

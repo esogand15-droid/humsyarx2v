@@ -35,6 +35,7 @@ import { TicketsScreen } from './screens/TicketsScreen';
 import { InstallGuideScreen } from './screens/InstallGuideScreen';
 import { useSession } from './lib/session';
 import { InstallPrompt, ShowAddToHome } from './components/InstallPrompt';
+import { SessionExpiredBanner } from './components/SessionExpiredBanner';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -83,6 +84,8 @@ export function App() {
       {/* CTA نصب PWA (اندروید/دسکتاپ) + راهنمای افزودن به صفحهٔ اصلی (iOS) */}
       <InstallPrompt />
       <ShowAddToHome />
+      {/* T3: session expired mid-use, non-blocking banner (screen stays) */}
+      <SessionExpiredBanner />
       <Routes>
         <Route
           path="/login"

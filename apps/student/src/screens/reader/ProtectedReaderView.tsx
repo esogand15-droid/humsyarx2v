@@ -30,6 +30,27 @@ export interface DocumentManifest {
   page_dimensions: PageDimension[];
   encryption_mode?: string;
   watermark_user_id?: number;
+  /** ثانیهٔ اعتبار آدرسهای امضاشدهٔ صفحات (سرورهای جدید) */
+  expires_in?: number;
+  /** epoch ثانیهٔ انقضا در ساعت سرور (سرورهای جدید) */
+  expires_at?: number;
+}
+
+/** چند ثانیه قبل از انقضا مانیفست بیصدا تازه شود. */
+const MANIFEST_REFRESH_LEAD_SEC = 120;
+
+/** زمان تازهسازی (ms در ساعت همین مرورگر) از روی مانیفست.
+    از expires_in نسبی استفاده میکنیم تا اختلاف ساعت دستگاه با سرور مهم نباشد؛
+    سرور قدیمی که expires_in نمیفرستد، از پارامتر expires آدرس صفحه خوانده میشود. */
+export function manifestRefreshAt(m: DocumentManifest, receivedAt = Date.now()): number {
+  let ttl = typeof m.expires_in === 'number' && m.expires_in > 0 ? m.expires_in : 0;
+  if (!ttl) {
+    const first = m.page_dimensions?.[0]?.url || '';
+    const match = /[?&]expires=(\d+)/.exec(first);
+    if (match) ttl = Math.max(0, Number(match[1]) - Math.floor(receivedAt / 1000));
+  }
+  if (!ttl) return 0; // آدرس بدون انقضا (مثلاً دمو) — تازهسازی لازم نیست
+  return receivedAt + Math.max(30, ttl - MANIFEST_REFRESH_LEAD_SEC) * 1000;
 }
 
 export interface ProtectedReaderViewProps {
@@ -214,13 +235,75 @@ export function ProtectedReaderView({
     setZoom((z) => Math.min(2.5, Math.max(0.6, Math.round(z * factor * 100) / 100)));
   }, [captureZoomAnchor]);
 
+  // ── تازهسازی بیصدای آدرسهای امضاشده (T1) ──
+  // مانیفست جدید فقط آدرس صفحات را عوض میکند؛ صفحهٔ جاری، زوم و اسکرول
+  // دست نمیخورند و صفحاتی که قبلاً نمایش داده شدهاند دوباره دانلود نمیشوند.
+  const refreshAtRef = useRef(0);
+  const inflightRef = useRef<Promise<DocumentManifest | null> | null>(null);
+
+  const acceptManifest = useCallback((data: DocumentManifest) => {
+    refreshAtRef.current = manifestRefreshAt(data);
+    setManifest(data);
+  }, []);
+
+  const silentRefresh = useCallback((): Promise<DocumentManifest | null> => {
+    if (inflightRef.current) return inflightRef.current;
+    const job = (async () => {
+      try {
+        const data = await fetchDocumentManifest(scope, id);
+        acceptManifest(data);
+        return data;
+      } catch {
+        // شبکه/نشست: صفحات فعلی تا انقضای واقعی کار میکنند؛ تلاش بعدی یک دقیقه دیگر
+        refreshAtRef.current = Date.now() + 60_000;
+        return null;
+      } finally {
+        inflightRef.current = null;
+      }
+    })();
+    inflightRef.current = job;
+    return job;
+  }, [scope, id, acceptManifest]);
+
+  /** یک صفحه 401/403 گرفت: یکبار مانیفست تازه بگیر و آدرس جدید همان صفحه را بده. */
+  const freshPageUrl = useCallback(
+    async (page: number): Promise<string | null> => {
+      const data = await silentRefresh();
+      return data?.page_dimensions.find((d) => d.page === page)?.url ?? null;
+    },
+    [silentRefresh],
+  );
+
+  // زمانبندی تازهسازی ~۲ دقیقه قبل از انقضا؛ تایمر در تب پسزمینه کند میشود،
+  // پس هنگام برگشت به تب و آنلاین شدن هم بررسی میکنیم.
+  useEffect(() => {
+    if (!manifest) return;
+    const at = refreshAtRef.current;
+    if (!at) return;
+    const timer = window.setTimeout(() => void silentRefresh(), Math.max(0, at - Date.now()));
+    const check = () => {
+      if (document.visibilityState === 'visible' && refreshAtRef.current && Date.now() >= refreshAtRef.current) {
+        void silentRefresh();
+      }
+    };
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('online', check);
+    window.addEventListener('focus', check);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('online', check);
+      window.removeEventListener('focus', check);
+    };
+  }, [manifest, silentRefresh]);
+
   // دریافت مانیفست
   const loadManifest = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const data = await fetchDocumentManifest(scope, id);
-      setManifest(data);
+      acceptManifest(data);
       if (data.total_pages > 0) {
         const initialPage = Math.min(Math.max(1, startPage || 1), data.total_pages);
         setCurrentPage(initialPage);
@@ -232,7 +315,7 @@ export function ProtectedReaderView({
           const fresh = await onExpired();
           if (fresh) {
             const data = await fetchDocumentManifest(scope, id);
-            setManifest(data);
+            acceptManifest(data);
             setLoading(false);
             return;
           }
@@ -243,7 +326,7 @@ export function ProtectedReaderView({
       setLoading(false);
       setError('بارگذاری اطلاعات سند با خطا مواجه شد. لطفاً دوباره تلاش کنید.');
     }
-  }, [scope, id, startPage, onExpired]);
+  }, [scope, id, startPage, onExpired, acceptManifest]);
 
   useEffect(() => {
     void loadManifest();
@@ -454,6 +537,7 @@ export function ProtectedReaderView({
                     width={targetW}
                     height={targetH}
                     url={dim.url}
+                    onUrlRejected={freshPageUrl}
                     scope={scope}
                     id={id}
                     tool={tool}
@@ -592,6 +676,8 @@ interface VirtualPageContainerProps {
   width: number;
   height: number;
   url: string;
+  /** آدرس صفحه رد شد (۴۰۱/۴۰۳ یا انقضا): آدرس تازهٔ همین صفحه */
+  onUrlRejected?: (page: number) => Promise<string | null>;
   scope: Scope;
   id: string;
   tool: ReaderTool;
@@ -629,6 +715,7 @@ function VirtualPageContainer({
   width,
   height,
   url,
+  onUrlRejected,
   scope,
   id,
   tool,
@@ -664,6 +751,65 @@ function VirtualPageContainer({
   const [isNearViewport, setIsNearViewport] = useState(page <= 2);
   const [imgLoaded, setImgLoaded] = useState(false);
   const textLayerRefInternal = useRef<any>(null);
+
+  // آدرس نمایشی جدا از آدرس مانیفست: تازهسازی مانیفست صفحهای را که
+  // نمایش داده شده دوباره دانلود نمیکند؛ فقط صفحهٔ بارگذارینشده یا ردشده
+  // آدرس تازه میگیرد. صفحهٔ ردشده یکبار بیصدا با آدرس نو تلاش میشود.
+  const [src, setSrc] = useState(url);
+  const [failed, setFailed] = useState(false);
+  const latestUrl = useRef(url);
+  latestUrl.current = url;
+  const loadedRef = useRef(false);
+  const retriedRef = useRef(false);
+
+  useEffect(() => {
+    if (!loadedRef.current) setSrc(url);
+  }, [url]);
+
+  useEffect(() => {
+    if (!isNearViewport) {
+      // img برداشته شد؛ دفعهٔ بعد با تازهترین آدرس ساخته شود
+      loadedRef.current = false;
+      retriedRef.current = false;
+      setImgLoaded(false);
+      setFailed(false);
+      setSrc(latestUrl.current);
+    }
+  }, [isNearViewport]);
+
+  const recover = useCallback(async () => {
+    if (!onUrlRejected) {
+      setFailed(true);
+      return;
+    }
+    const fresh = await onUrlRejected(page);
+    const next = fresh || latestUrl.current;
+    setFailed(false);
+    loadedRef.current = false;
+    setImgLoaded(false);
+    // همان آدرس هم باشد (مثلاً خطای گذرای شبکه)، با پارامتر کوچک دوباره میخوانیم
+    setSrc(next === src ? `${next}${next.includes('?') ? '&' : '?'}r=${Date.now()}` : next);
+  }, [onUrlRejected, page, src]);
+
+  const handleImgError = useCallback(() => {
+    if (retriedRef.current) {
+      setFailed(true);
+      return;
+    }
+    retriedRef.current = true;
+    void recover();
+  }, [recover]);
+
+  // اینترنت برگشت ⇒ صفحهٔ ناموفق خودکار دوباره
+  useEffect(() => {
+    if (!failed) return;
+    const on = () => {
+      retriedRef.current = false;
+      void recover();
+    };
+    window.addEventListener('online', on);
+    return () => window.removeEventListener('online', on);
+  }, [failed, recover]);
 
   useEffect(() => {
     const el = ref.current;
@@ -723,8 +869,37 @@ function VirtualPageContainer({
     >
       {isNearViewport ? (
         <>
+          {failed ? (
+            <div
+              className="page-placeholder"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                color: 'var(--ink-3, #94a3b8)',
+                fontSize: '12px',
+                backgroundColor: 'var(--paper-2, #f8fafc)',
+              }}
+            >
+              <span>صفحهٔ {fa(page)} بارگذاری نشد</span>
+              <button
+                type="button"
+                className="btn btn--quiet"
+                onClick={() => {
+                  retriedRef.current = false;
+                  void recover();
+                }}
+              >
+                تلاش دوباره
+              </button>
+            </div>
+          ) : (
           <img
-            src={url}
+            src={src}
             alt={`صفحهٔ ${fa(page)}`}
             className={`reader__page ${invertContrast ? 'reader__page--inverted' : ''}`}
             style={{
@@ -739,8 +914,14 @@ function VirtualPageContainer({
             }}
             loading="lazy"
             draggable={false}
-            onLoad={() => setImgLoaded(true)}
+            onLoad={() => {
+              loadedRef.current = true;
+              retriedRef.current = false;
+              setImgLoaded(true);
+            }}
+            onError={handleImgError}
           />
+          )}
 
           {/* Text Layer - Semantic text overlay for selection, search, copy */}
           {textContent && viewport && (
