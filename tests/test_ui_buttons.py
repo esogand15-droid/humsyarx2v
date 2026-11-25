@@ -44,6 +44,9 @@ FAKE_TOKEN = "123456:TEST-not-a-real-token"
 def _clean_env(monkeypatch):
     monkeypatch.delenv("BUTTON_STYLES_ENABLED", raising=False)
     monkeypatch.delenv("BUTTON_AUTO_STYLES", raising=False)
+    # These tests cover explicit + keyword-auto styling; the central palette
+    # table is covered (with a fake table) by tests/test_button_palette_engine.py.
+    monkeypatch.setenv("BUTTON_PALETTE_ENABLED", "0")
 
 
 def _styles(markup):
@@ -473,11 +476,13 @@ def test_install_skips_unknown_bot_types():
 
 # ── 6. explicit palette at call sites ─────────────────────────────
 def test_main_keyboards_have_single_primary_dashboard():
+    # colour-grouped main menu: the learning group (rows 1-2) is blue
     from backend.bot import utils as bu
     for fn in (bu.main_keyboard, bu.content_admin_keyboard, bu.admin_keyboard, bu.sub_admin_keyboard):
         kb = fn()
         prim = [b.text for row in kb.keyboard for b in row if get_style(b) == PRIMARY]
-        assert prim == ["🩺 داشبورد"], fn.__name__
+        assert prim == ["🩺 داشبورد", "📚 منابع", "🧪 بانک سوال", "🤖 هوشیار"], fn.__name__
+        assert kb.keyboard[0][0].text == "🩺 داشبورد", fn.__name__
 
 
 def test_hero_builder_style_optional():

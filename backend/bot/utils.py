@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Optional, List
 from telegram import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ConversationHandler
-from backend.bot.ui_buttons import kbtn, PRIMARY   # 🎨 رنگ دکمه‌ها
+from backend.bot.ui_buttons import kbtn, PRIMARY, SUCCESS, DANGER   # 🎨 رنگ دکمه‌ها
 
 logger = logging.getLogger(__name__)
 
@@ -49,55 +49,71 @@ DIFF_LABELS = {
 #  کیبوردهای ReplyKeyboard
 # ══════════════════════════════════════════════════
 
+# 🎨 چیدمان رنگی منوی اصلی — دکمهها بر اساس رنگ گروهبندی شدهاند
+# (اولین آیتم هر ردیف = سمت چپ در کلاینت). برچسبها عیناً همان قبلیاند؛
+# message_router._route_menu_button و bot.MENU_BUTTON_TEXTS با *متن* مچ میکنند.
+# رنگها صریح (kbtn) ست میشوند تا حتی با جدول palette خاموش هم منو درست باشد؛
+# سوییچ BUTTON_STYLES_ENABLED=0 همه را مرکزی پاک میکند.
+MENU_ADMIN_PANEL = "\U0001f468\u200d\u2695\ufe0f پنل ادمین"
+MENU_CONTENT_PANEL = "🎓 پنل محتوا"
+
+
+def _menu_learning_rows() -> list:
+    """ردیف ۱-۲ آبی (ورودیهای اصلی آموزشی)."""
+    return [
+        [kbtn("🩺 داشبورد", style=PRIMARY), kbtn("📚 منابع", style=PRIMARY)],
+        [kbtn("🧪 بانک سوال", style=PRIMARY), kbtn("🤖 هوشیار", style=PRIMARY)],
+    ]
+
+
+def _menu_support_rows() -> list:
+    """ردیف ۳ سبز (اشتراک/حمایت)."""
+    return [[kbtn("💎 اشتراک ویژه", style=SUCCESS), kbtn("💙 حمایت مالی", style=SUCCESS)]]
+
+
+def _menu_default_rows(with_grades: bool = True) -> list:
+    """ردیفهای خنثی (رنگ پیشفرض کلاینت)."""
+    rows = []
+    if with_grades:
+        rows.append([KeyboardButton("📅 برنامه"), KeyboardButton("📊 کارنامه و معدل")])
+    rows.append([KeyboardButton("👤 پروفایل"), KeyboardButton("🔔 اعلان\u200cها")])
+    rows.append([KeyboardButton("❓ سوالات متداول"), KeyboardButton("🎫 پشتیبانی")])
+    if not with_grades:
+        # sub_admin کارنامه ندارد — «📅 برنامه» تنها در ردیف خنثی میماند
+        rows.insert(0, [KeyboardButton("📅 برنامه")])
+    return rows
+
+
 def main_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup([
-        [kbtn("🩺 داشبورد", style=PRIMARY), KeyboardButton("📚 منابع")],
-        [KeyboardButton("🧪 بانک سوال"),   KeyboardButton("❓ سوالات متداول")],
-        [KeyboardButton("🤖 هوشیار"),      KeyboardButton("📅 برنامه")],
-        [KeyboardButton("👤 پروفایل"),     KeyboardButton("💎 اشتراک ویژه")],
-        [KeyboardButton("💙 حمایت مالی"),  KeyboardButton("🔔 اعلان‌ها")],
-        [KeyboardButton("📊 کارنامه و معدل"), KeyboardButton("🎫 پشتیبانی")],
-    ], resize_keyboard=True)
+    return ReplyKeyboardMarkup(
+        _menu_learning_rows() + _menu_support_rows() + _menu_default_rows(),
+        resize_keyboard=True)
 
 
 def content_admin_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup([
-        [kbtn("🩺 داشبورد", style=PRIMARY), KeyboardButton("📚 منابع")],
-        [KeyboardButton("🧪 بانک سوال"),   KeyboardButton("❓ سوالات متداول")],
-        [KeyboardButton("🤖 هوشیار"),      KeyboardButton("📅 برنامه")],
-        [KeyboardButton("👤 پروفایل"),     KeyboardButton("💎 اشتراک ویژه")],
-        [KeyboardButton("💙 حمایت مالی"),  KeyboardButton("🔔 اعلان‌ها")],
-        [KeyboardButton("📊 کارنامه و معدل"), KeyboardButton("🎫 پشتیبانی")],
-        [KeyboardButton("🎓 پنل محتوا")],
-    ], resize_keyboard=True)
+    return ReplyKeyboardMarkup(
+        _menu_learning_rows() + _menu_support_rows() + _menu_default_rows()
+        + [[kbtn(MENU_CONTENT_PANEL, style=DANGER)]],
+        resize_keyboard=True)
 
 
 def admin_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup([
-        [kbtn("🩺 داشبورد", style=PRIMARY), KeyboardButton("📚 منابع")],
-        [KeyboardButton("🧪 بانک سوال"),   KeyboardButton("❓ سوالات متداول")],
-        [KeyboardButton("🤖 هوشیار"),      KeyboardButton("📅 برنامه")],
-        [KeyboardButton("👤 پروفایل"),     KeyboardButton("💎 اشتراک ویژه")],
-        [KeyboardButton("💙 حمایت مالی"),  KeyboardButton("🔔 اعلان‌ها")],
-        [KeyboardButton("📊 کارنامه و معدل"), KeyboardButton("🎫 پشتیبانی")],
-        [KeyboardButton("👨‍⚕️ پنل ادمین"), KeyboardButton("🎓 پنل محتوا")],
-    ], resize_keyboard=True)
+    return ReplyKeyboardMarkup(
+        _menu_learning_rows() + _menu_support_rows() + _menu_default_rows()
+        + [[kbtn(MENU_ADMIN_PANEL, style=DANGER), kbtn(MENU_CONTENT_PANEL, style=DANGER)]],
+        resize_keyboard=True)
 
 
 def sub_admin_keyboard() -> ReplyKeyboardMarkup:
     """
     FIX جدید: کیبورد برای کاربرانی که نقش فرعی ادمین دارند
-    (support/broadcaster) — دکمه‌های دانشجویی عادی + پنل ادمین محدود.
+    (support/broadcaster) — دکمههای دانشجویی عادی + پنل ادمین محدود.
+    (همان مجموعهٔ دکمههای قبلی، بدون کارنامه؛ فقط گروهبندی رنگی.)
     """
-    return ReplyKeyboardMarkup([
-        [kbtn("🩺 داشبورد", style=PRIMARY), KeyboardButton("📚 منابع")],
-        [KeyboardButton("🧪 بانک سوال"),   KeyboardButton("❓ سوالات متداول")],
-        [KeyboardButton("🤖 هوشیار"),      KeyboardButton("📅 برنامه")],
-        [KeyboardButton("👤 پروفایل"),     KeyboardButton("💎 اشتراک ویژه")],
-        [KeyboardButton("💙 حمایت مالی"),  KeyboardButton("🔔 اعلان‌ها")],
-        [KeyboardButton("🎫 پشتیبانی")],
-        [KeyboardButton("👨‍⚕️ پنل ادمین")],
-    ], resize_keyboard=True)
+    return ReplyKeyboardMarkup(
+        _menu_learning_rows() + _menu_support_rows() + _menu_default_rows(with_grades=False)
+        + [[kbtn(MENU_ADMIN_PANEL, style=DANGER)]],
+        resize_keyboard=True)
 
 
 async def get_keyboard_for_user(user: dict, uid: int) -> ReplyKeyboardMarkup:
@@ -156,11 +172,15 @@ async def ring_aware_keyboard(kb: ReplyKeyboardMarkup) -> ReplyKeyboardMarkup:
             return kb
         # ⚠️ کیبورد reply آتریبیوت `keyboard` دارد (نه `inline_keyboard`)؛
         # اشتباه در اینجا با except بلعیده می‌شد و دکمه هیچ‌وقت اضافه نمی‌شد.
+        # 🎨 همان اشیای دکمه (با api_kwargs/style) دوباره استفاده میشوند؛
+        # دکمهٔ رینگ عمداً رنگ پیشفرض دارد.
         rows = [[KeyboardButton("💍 رینگ استریت")]] + [list(r) for r in (kb.keyboard or [])]
         return ReplyKeyboardMarkup(rows, resize_keyboard=True,
                                    one_time_keyboard=getattr(kb, "one_time_keyboard", False),
                                    input_field_placeholder=getattr(kb, "input_field_placeholder", None),
-                                   is_persistent=getattr(kb, "is_persistent", None))
+                                   is_persistent=getattr(kb, "is_persistent", None),
+                                   selective=getattr(kb, "selective", None),
+                                   api_kwargs=dict(getattr(kb, "api_kwargs", None) or {}) or None)
     except Exception:
         logger.exception("ring_aware_keyboard failed — منوی بدون دکمهٔ رینگ")
         return kb

@@ -14,15 +14,23 @@ ENV SWITCHES (read on every outgoing request)
   ``btn()``/``kbtn()`` stop adding ``style`` AND ``StyledExtBot`` strips every
   ``style`` key from outgoing ``reply_markup`` (explicit ones included), so all
   colours can be disabled by env + restart without a code deploy.
+* ``BUTTON_PALETTE_ENABLED`` (default ``1``) — central palette table
+  (``backend/bot/button_palette.py``, ``palette_style(text, callback_data,
+  kind=)``) colours every button that has no explicit style. No effect when
+  the master switch is off. Missing/raising palette module → markup is sent
+  unchanged (logged once).
 * ``BUTTON_AUTO_STYLES`` (default ``0``) — automatic semantic colouring of
-  buttons that have no explicit style. OFF by default; only explicit styles
-  (``btn``/``kbtn``/``style_button``/``add_hero(style=)``) are sent.
+  buttons that are STILL unstyled after the palette pass. OFF by default.
 
-EXPLICIT PALETTE (the normal path, works with auto OFF)
-=======================================================
-* PRIMARY (blue): the ONE main entry action of a screen (max one per keyboard).
-* SUCCESS (green): final confirm / pay buttons and admin approve buttons.
-* DANGER  (red):   only the final destructive confirmation (delete/block).
+Order in ``StyledExtBot``: master off → strip every style; otherwise
+palette pass (if enabled) → keyword auto pass (if enabled). An explicit style
+(``btn``/``kbtn``/``style_button``/``add_hero(style=)``) always wins.
+
+EXPLICIT PALETTE (call sites)
+=============================
+* PRIMARY (blue): main entry actions (main menu: learning group).
+* SUCCESS (green): final confirm / pay buttons, subscription/support entries.
+* DANGER  (red):   final destructive confirmation (delete/block), admin panels.
 
 AUTO RULES (only when BUTTON_AUTO_STYLES=1; first match wins)
 =============================================================
@@ -61,9 +69,12 @@ switches the app's bot instance to ``StyledExtBot``.
 from __future__ import annotations
 
 import copy
+import functools
+import importlib
 import logging
 import os
 import re
+import sys
 from types import MappingProxyType
 from typing import Callable, Iterable, Optional, Sequence, Union
 
@@ -99,6 +110,13 @@ def auto_styles_enabled() -> bool:
     Default: OFF. Has no effect when the master switch is off."""
     return (styles_enabled()
             and os.getenv("BUTTON_AUTO_STYLES", "0").strip().lower() not in _FALSY)
+
+
+def palette_enabled() -> bool:
+    """Central palette table — ``BUTTON_PALETTE_ENABLED=0`` turns it off.
+    Default: ON. Has no effect when the master switch is off."""
+    return (styles_enabled()
+            and os.getenv("BUTTON_PALETTE_ENABLED", "1").strip().lower() not in _FALSY)
 
 
 # ──────────────────────────────────────────────────
@@ -347,14 +365,91 @@ def strip_styles(markup):
 
 
 # ──────────────────────────────────────────────────
+#  Central palette table (backend/bot/button_palette.py)
+# ──────────────────────────────────────────────────
+PALETTE_MODULE = "backend.bot.button_palette"
+_palette_state = {"import_failed": False}
+_logged_once: set = set()
+
+
+def _log_once(key: str, msg: str, *args, exc_info: bool = True) -> None:
+    if key in _logged_once:
+        return
+    _logged_once.add(key)
+    logger.warning(msg, *args, exc_info=exc_info)
+
+
+def _palette_callable():
+    """``palette_style`` of the palette module, imported lazily; None if the
+    module is missing / broken (logged once, import not retried)."""
+    mod = sys.modules.get(PALETTE_MODULE)
+    if mod is None:
+        if _palette_state["import_failed"]:
+            return None
+        try:
+            mod = importlib.import_module(PALETTE_MODULE)
+        except Exception:
+            _palette_state["import_failed"] = True
+            _log_once("palette-import", "🎨 button palette unavailable (%s) — "
+                      "palette colours skipped", PALETTE_MODULE)
+            return None
+    fn = getattr(mod, "palette_style", None)
+    if not callable(fn):
+        _log_once("palette-attr", "🎨 %s has no callable palette_style — "
+                  "palette colours skipped", PALETTE_MODULE, exc_info=False)
+        return None
+    return fn
+
+
+@functools.lru_cache(maxsize=4096)
+def _cached_palette_style(fn, text: str, callback_data: Optional[str], kind: str) -> Optional[str]:
+    # Palette lookups are pure → memoised per (text, callback_data, kind).
+    # ``fn`` is part of the key so a swapped module (tests / reload) never
+    # serves stale entries. Exceptions are not cached by lru_cache.
+    style = fn(text, callback_data, kind=kind)
+    return style if style in VALID_STYLES else None
+
+
+def _palette_button(fn, button: AnyButton) -> AnyButton:
+    if isinstance(button, InlineKeyboardButton):
+        kind = "inline"
+        cb = button.callback_data if isinstance(button.callback_data, str) else None
+    elif isinstance(button, KeyboardButton):
+        kind, cb = "reply", None
+    else:
+        return button
+    if get_style(button) is not None:  # explicit wins
+        return button
+    style = _cached_palette_style(fn, str(button.text or ""), cb, kind)
+    return style_button(button, style) if style else button
+
+
+def apply_palette_styles(markup):
+    """Return a markup where every unstyled button got its palette style
+    (same object when nothing changes). Ignores env. Never raises: if the
+    palette module is missing or raises, the ORIGINAL markup is returned."""
+    if not isinstance(markup, (InlineKeyboardMarkup, ReplyKeyboardMarkup)):
+        return markup
+    try:
+        fn = _palette_callable()
+        if fn is None:
+            return markup
+        return _map_markup(markup, lambda b: _palette_button(fn, b))
+    except Exception:
+        _log_once("palette-call", "🎨 palette_style raised — sending markup unchanged")
+        return markup
+
+
+# ──────────────────────────────────────────────────
 #  Central wiring (bot instance level)
 # ──────────────────────────────────────────────────
 class StyledExtBot(ExtBot):
     """ExtBot that post-processes every outgoing ``reply_markup``.
 
     * master switch off → strip all ``style`` keys (kill switch, no deploy);
-    * auto styles on    → add semantic styles to unstyled buttons;
-    * otherwise         → untouched (explicit styles go through as built).
+    * palette on (default) → palette-table style for unstyled buttons;
+    * auto styles on    → semantic styles for buttons still unstyled;
+    * explicit styles always go through as built.
 
     Hooks ``_insert_defaults`` — the single place every Bot API call's params
     pass through in ``Bot._post`` (send_*, edit_message_*, copy_message, …)
@@ -372,8 +467,14 @@ class StyledExtBot(ExtBot):
                 return
             if not styles_enabled():
                 data["reply_markup"] = strip_styles(rm)
-            elif auto_styles_enabled():
-                data["reply_markup"] = apply_semantic_styles(rm)
+                return
+            out = rm
+            if palette_enabled():
+                out = apply_palette_styles(out)
+            if auto_styles_enabled():
+                out = apply_semantic_styles(out)
+            if out is not rm:
+                data["reply_markup"] = out
         except Exception:  # pragma: no cover
             logger.exception("StyledExtBot: styling skipped")
 
@@ -389,8 +490,8 @@ def install_button_styles(bot) -> bool:
         return False
     try:
         bot.__class__ = StyledExtBot
-        logger.info("🎨 button styles hook installed (styles=%s, auto=%s)",
-                    styles_enabled(), auto_styles_enabled())
+        logger.info("🎨 button styles hook installed (styles=%s, palette=%s, auto=%s)",
+                    styles_enabled(), palette_enabled(), auto_styles_enabled())
         return True
     except Exception:  # pragma: no cover
         logger.exception("🎨 install_button_styles failed")
@@ -402,4 +503,5 @@ __all__ = [
     "btn", "kbtn", "style_button", "get_style", "semantic_style",
     "apply_semantic_styles", "strip_styles", "StyledExtBot",
     "install_button_styles", "styles_enabled", "auto_styles_enabled",
+    "palette_enabled", "apply_palette_styles",
 ]
