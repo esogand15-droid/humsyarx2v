@@ -6,6 +6,7 @@ import './design/tokens.css';
 import './design/base.css';
 import './design/brand.css';
 import './design/ui.css';
+import './design/components.css';
 
 import { App } from './App';
 import { IconSprite } from './icons';
