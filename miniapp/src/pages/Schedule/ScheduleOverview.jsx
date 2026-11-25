@@ -14,6 +14,8 @@ import Icon from '../../components/ui/Icon';
 
 import { useMemo, useState } from 'react';
 
+import WeeklyTimetable from './WeeklyTimetable';
+
 import { faNum } from '../../lib/format';
 import { haptic } from '../../lib/telegram';
 import {
@@ -61,7 +63,6 @@ export function WeekLoadChart({ week, activeDay, onPickDay }) {
           </button>
         );
       })}
-      <span className="v3-load__total">{faNum(total)} جلسه در ترم</span>
     </div>
   );
 }
@@ -253,6 +254,7 @@ export default function ScheduleOverview({
   onPickDay,
   onOpenLesson,
   mode,
+  allItems,
 }) {
   const stats = useMemo(() => buildStats(items), [items]);
 
@@ -296,7 +298,7 @@ export default function ScheduleOverview({
         ))}
       </div>
 
-      {!stats.week.hasAny && (
+      {!stats.week.hasAny && mode !== 'class' && (
         <div className="v3-note">
           <Icon name="info" size={16} />
           ساعت این جلسه‌ها در سامانه ثبت نشده، پس در جدول هفتگی جای نمی‌گیرند؛
@@ -304,7 +306,11 @@ export default function ScheduleOverview({
         </div>
       )}
 
-      {stats.week.hasAny && view === 'week' && (
+      {view === 'week' && mode === 'class' && (
+        <WeeklyTimetable items={allItems || items} onOpenLesson={onOpenLesson} />
+      )}
+
+      {stats.week.hasAny && view === 'week' && mode !== 'class' && (
         <section className="v3-panel v3-panel--grid">
           <header className="v3-panel__head">
             <span className="v3-panel__title">

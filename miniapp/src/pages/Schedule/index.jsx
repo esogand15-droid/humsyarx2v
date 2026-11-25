@@ -15,6 +15,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { faNum, faDate } from '../../lib/format';
 
 import ScheduleOverview from './ScheduleOverview';
+import { tehranNow, weekStart } from '../../lib/weekPlan';
 import { buildStats, lessonTone, shortLesson } from '../../lib/scheduleEngine';
 /* ─────────────────────────────────────────────────────────────
  برنامهٔ درسی — بازسازی v3
@@ -64,7 +65,9 @@ export default function Schedule() {
   /* ── داده ── */
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['schedule', userGroup],
-    queryFn: () => api.get('/api/schedule').then((r) => r.data),
+    queryFn: () => api
+      .get('/api/schedule', { params: { since: weekStart(tehranNow().iso) } })
+      .then((r) => r.data),
     staleTime: 5 * 60 * 1000,
     refetchOnMount: 'always',
   });
@@ -418,6 +421,7 @@ export default function Schedule() {
           <ScheduleOverview
             items={items}
             mode={section}
+            allItems={schedule}
             activeDay={activeDay}
             onPickDay={setActiveDay}
             onOpenLesson={setOpenLesson}

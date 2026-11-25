@@ -1,0 +1,243 @@
+/* 📅 برنامهٔ هفتگی — گوشی: نوار روز + فهرست؛ تبلت/دسکتاپ: جدول هفت ستونه */
+.wt {
+  display: grid;
+  gap: 10px;
+  direction: rtl;
+}
+
+.wt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wt-head__mid {
+  flex: 1;
+  display: grid;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.wt-head__mid b {
+  font-size: var(--fs-md, 15px);
+}
+
+.wt-head__mid span {
+  font-size: var(--fs-sm, 13px);
+  color: var(--hym-text-muted, #94a3b8);
+}
+
+.wt-nav {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--hym-border-default);
+  background: var(--hym-bg-surface);
+  color: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wt-nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.wt-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-sm, 13px);
+  color: var(--hym-text-muted, #94a3b8);
+}
+
+.wt-summary b {
+  color: var(--hym-text-default, inherit);
+}
+
+.wt-groups {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 11px;
+  border: 1px solid var(--hym-border-default);
+  background: var(--hym-bg-surface);
+}
+
+.wt-group {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wt-group.is-on {
+  background: var(--hym-brand-subtle, rgba(42, 218, 215, 0.16));
+  color: var(--hym-brand-default, #2adad7);
+  font-weight: 700;
+}
+
+.wt-now {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--hym-border-default);
+  background: var(--hym-bg-surface-raised, var(--hym-bg-surface));
+  font-size: var(--fs-sm, 13px);
+  line-height: 1.7;
+}
+
+/* ── برچسبها ── */
+.wt-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.7;
+  vertical-align: middle;
+}
+
+.wt-tag--now { background: var(--hym-success-default, #2fd09a); color: #04140e; }
+.wt-tag--next { background: var(--hym-brand-subtle, rgba(61, 134, 255, 0.18)); color: var(--hym-brand-default, #9cc3ff); }
+.wt-tag--today { background: var(--hym-brand-subtle, rgba(61, 134, 255, 0.18)); color: var(--hym-brand-default, #9cc3ff); margin-inline-start: 6px; }
+.wt-tag--makeup { background: rgba(196, 181, 253, 0.18); color: #c9beff; }
+.wt-tag--flex { background: rgba(242, 178, 75, 0.18); color: #f5c877; }
+.wt-tag--changed { background: rgba(255, 107, 122, 0.18); color: #ff9aa4; }
+
+/* ── کارت جلسه ── */
+.wt-card {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--wt-line);
+  border-inline-start: 4px solid var(--wt-fg);
+  background: var(--wt-bg);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.wt-card__time { font-size: 12px; color: var(--wt-fg); font-weight: 700; }
+.wt-card__title { font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+.wt-card__meta { font-size: 12px; color: var(--hym-text-muted, #94a3b8); overflow-wrap: anywhere; }
+.wt-card__tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+.wt-card.is-now { box-shadow: 0 0 0 2px var(--hym-success-default, #2fd09a); }
+.wt-card.is-next { box-shadow: 0 0 0 2px var(--hym-brand-default, #3d86ff); }
+.wt-card.is-over { opacity: 0.55; }
+
+.wt-card--compact { padding: 8px 9px; }
+.wt-card--compact .wt-card__title { font-size: 13px; }
+
+.wt-exam {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 107, 122, 0.14);
+  color: #ff9aa4;
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.wt-free {
+  margin: 0;
+  padding: 18px 8px;
+  text-align: center;
+  color: var(--hym-text-muted, #94a3b8);
+  font-size: var(--fs-sm, 13px);
+}
+
+.wt-free--sm { padding: 8px 4px; font-size: 12px; }
+
+/* ── گوشی ── */
+.wt-phone { display: grid; gap: 10px; }
+
+.wt-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.wt-strip__day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-height: 60px;
+  padding: 6px 0;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: var(--hym-bg-surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.wt-strip__day.is-today { border-color: var(--hym-brand-default, #3d86ff); }
+.wt-strip__day.is-on { background: var(--hym-brand-subtle, rgba(61, 134, 255, 0.18)); font-weight: 700; }
+.wt-strip__name { font-size: 13px; }
+.wt-strip__date { font-size: 12px; color: var(--hym-text-muted, #94a3b8); }
+.wt-strip__dots { display: flex; gap: 3px; min-height: 6px; }
+.wt-strip__dots i { width: 6px; height: 6px; border-radius: 50%; }
+.wt-strip__dots i.is-exam { background: #ff6b7a; }
+
+.wt-agenda { display: grid; gap: 8px; touch-action: pan-y; }
+.wt-agenda__title { font-size: var(--fs-sm, 13px); color: var(--hym-text-muted, #94a3b8); }
+.wt-agenda__title b { color: var(--hym-text-default, inherit); font-size: 15px; }
+
+/* ── تبلت و دسکتاپ ── */
+.wt-grid { display: none; }
+
+@media (min-width: 768px) {
+  .wt-phone { display: none; }
+
+  .wt-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+    align-items: start;
+  }
+
+  .wt-col {
+    display: grid;
+    gap: 6px;
+    min-height: 120px;
+    padding: 6px;
+    border-radius: 12px;
+    border: 1px solid var(--hym-border-default);
+    background: var(--hym-bg-surface);
+  }
+
+  .wt-col.is-today { border-color: var(--hym-brand-default, #3d86ff); }
+  .wt-col.is-past { opacity: 0.75; }
+
+  .wt-col__head {
+    display: grid;
+    text-align: center;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--hym-border-subtle, var(--hym-border-default));
+    line-height: 1.5;
+  }
+
+  .wt-col__head b { font-size: 14px; }
+  .wt-col__head span { font-size: 12px; color: var(--hym-text-muted, #94a3b8); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wt-card, .wt-strip__day { transition: transform 120ms ease, background-color 120ms ease; }
+  .wt-card:active, .wt-strip__day:active { transform: scale(0.98); }
+}

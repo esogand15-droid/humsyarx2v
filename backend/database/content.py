@@ -1537,11 +1537,13 @@ class DBContent:
 
     async def get_schedules(self, stype: str = None, upcoming: bool = True, group: str = None,
                             term: str = None, educational_group: str = None,
-                            include_archived: bool = False):
+                            include_archived: bool = False, since: str = None):
         from utils import now_tehran
         q = {}
         if stype:    q['type'] = stype
-        if upcoming: q['date'] = {'$gte': now_tehran().strftime('%Y-%m-%d')}
+        # since: از اول هفتهٔ جاری (برنامهٔ هفتگی وباپ)؛ بدون آن همان «از امروز»
+        if since:    q['date'] = {'$gte': since}
+        elif upcoming: q['date'] = {'$gte': now_tehran().strftime('%Y-%m-%d')}
         if group:
             aliases = self.group_aliases(group)
             q['$or'] = [
@@ -2990,7 +2992,8 @@ class DBContent:
             'conflicts': conflicts,
         }
 
-    async def get_personalized_schedules(self, uid: int, stype: str = None, upcoming: bool = True, term: str = None) -> dict:
+    async def get_personalized_schedules(self, uid: int, stype: str = None, upcoming: bool = True, term: str = None,
+                                         since: str = None) -> dict:
         """ساخت برنامه کلاسی و امتحانی دانشجو دقیقاً از روی انتخاب‌های درس‌به‌درس و گروه آموزشی (آقایان/بانوان) او."""
         uid = int(uid)
         sel_state = await self.get_student_course_selections(uid, term=term)
@@ -3006,7 +3009,7 @@ class DBContent:
         if not sel_map:
             items = await self.get_schedules(
                 stype=stype, upcoming=upcoming, group=effective_group,
-                term=active_term, educational_group=edu_filter,
+                term=active_term, educational_group=edu_filter, since=since,
             )
             conflicts = self.detect_schedule_conflicts(
                 items, active_term=active_term, user_educational_group=edu_filter,
@@ -3030,7 +3033,7 @@ class DBContent:
 
         all_items = await self.get_schedules(
             stype=stype, upcoming=upcoming, group=None,
-            term=active_term, educational_group=edu_filter,
+            term=active_term, educational_group=edu_filter, since=since,
         )
         filtered = []
         for item in (all_items or []):

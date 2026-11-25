@@ -154,6 +154,25 @@ def _serialize(
     return result
 
 
+def _clamp_since(value: str | None) -> str | None:
+    """📅 «از اول همین هفته» برای برنامهٔ هفتگی وباپ (شنبه تا امروز).
+
+    فقط تاریخ میلادی YYYY-MM-DD پذیرفته میشود و حداکثر ۷ روز عقب؛
+    هر چیز دیگر نادیده گرفته میشود (همان رفتار قبلی: از امروز).
+    """
+    if not value:
+        return None
+    try:
+        day = parse_gregorian_date(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    today = now_tehran().date()
+    if day >= today:
+        return None
+    from datetime import timedelta
+    return max(day, today - timedelta(days=7)).isoformat()
+
+
 @router.get("")
 async def get_schedule(
     user=Depends(get_current_user),
@@ -161,11 +180,13 @@ async def get_schedule(
     stype: ScheduleType | None = Query(
         default=None
     ),
+    since: str | None = Query(default=None, max_length=10),
 ):
     personalized = await db.get_personalized_schedules(
         user["id"],
         stype=stype,
         upcoming=True,
+        since=_clamp_since(since),
     )
     items = personalized.get("items") or []
     eff_group = personalized.get("computed_group") or _text(user["_db"].get("group")) or "1"
