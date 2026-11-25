@@ -555,10 +555,10 @@ html.dark {
   --hym-role-money-subtle-border: var(--hym-green-200);
   --hym-role-money-text:          var(--hym-green-800);
 
-  /* notes: sticky-note yellow solid with dark ink */
-  --hym-role-notes-solid:         var(--hym-honey-400);
-  --hym-role-notes-solid-hover:   var(--hym-honey-500);
-  --hym-role-notes-on-solid:      var(--hym-honey-950);
+  /* notes: honey-400 is 1.4:1 against the light canvas → light solid steps down to 700 + white */
+  --hym-role-notes-solid:         var(--hym-honey-700);
+  --hym-role-notes-solid-hover:   var(--hym-honey-800);
+  --hym-role-notes-on-solid:      var(--hym-slate-0);
   --hym-role-notes-subtle:        var(--hym-honey-50);
   --hym-role-notes-subtle-border: var(--hym-honey-200);
   --hym-role-notes-text:          var(--hym-honey-800);
@@ -727,7 +727,7 @@ html.dark {
   --hym-surface-0:       #F3F5F8;  /* canvas */
   --hym-surface-1:       #FFFFFF;  /* cards, lists */
   --hym-surface-2:       #FFFFFF;  /* raised: sheets, popovers, sticky bars */
-  --hym-surface-sunken:  #EBEEF2;  /* inputs, tracks, segmented wells */
+  --hym-surface-sunken:  #F1F5F9;  /* inputs, tracks, segmented wells (link 4.7:1, muted 5.4:1) */
   --hym-hairline:        rgba(15, 23, 42, 0.08);
   --hym-hairline-strong: rgba(15, 23, 42, 0.16);
 
