@@ -1,7 +1,7 @@
-/* لایهٔ دادهٔ هوشیار — گفتوگوهای چندگانه، استریم SSE، وضعیت سهمیه.
+/* لایهٔ دادهٔ هوش‌یار — گفتوگوهای چندگانه، استریم SSE، وضعیت سهمیه.
    W3: پارسر SSE مستقل از مرز تکهها (باگ P0 گم شدن توکن وقتی event: و data:
    در دو تکهٔ شبکه میرسیدند)، CRUD گفتوگو، و نگاشت خطاها به پیام فارسی.
-   امضای streamAiChat برای پنل هوشیار در ریدر دستنخورده مانده است. */
+   امضای streamAiChat برای پنل هوش‌یار در ریدر دستنخورده مانده است. */
 import { apiCall, ApiError } from './api';
 
 /* ── انواع ─────────────────────────────────────────────── */
@@ -93,17 +93,17 @@ export class AiError extends Error {
 const MSG: Record<AiErrorCode, string> = {
   offline: 'اتصال اینترنت برقرار نیست. دوباره تلاش کن.',
   unauthorized: 'نشست تو منقضی شده است. دوباره وارد شو.',
-  no_access: 'دسترسی به هوشیار در اشتراک فعلی تو فعال نیست.',
-  banned: 'دسترسی تو به هوشیار مسدود شده است.',
-  busy: 'پاسخ قبلی هنوز در حال آمادهشدن است. چند لحظه صبر کن.',
-  too_long: 'متن پرسش طولانیتر از حد مجاز است.',
-  quota: 'سهمیهٔ امروز هوشیار تمام شده است.',
-  rate_limit: 'پرسشها خیلی پشت سر هم بود. کمی صبر کن و دوباره بفرست.',
-  unavailable: 'هوشیار موقتاً در دسترس نیست.',
+  no_access: 'دسترسی به هوش‌یار در اشتراک فعلی تو فعال نیست.',
+  banned: 'دسترسی تو به هوش‌یار مسدود شده است.',
+  busy: 'پاسخ قبلی هنوز در حال آماده‌شدن است. چند لحظه صبر کن.',
+  too_long: 'متن پرسش طولانی‌تر از حد مجاز است.',
+  quota: 'سهمیهٔ امروز هوش‌یار تمام شده است.',
+  rate_limit: 'پرسش‌ها خیلی پشت سر هم بود. کمی صبر کن و دوباره بفرست.',
+  unavailable: 'هوش‌یار موقتاً در دسترس نیست.',
   stream_failed: 'ارتباط با سرویس هوش مصنوعی قطع شد.',
   provider_unavailable: 'سرویس هوش مصنوعی موقتاً در دسترس نیست.',
   incomplete: 'پاسخ کامل نشد.',
-  unknown: 'خطا در ارتباط با هوشیار.',
+  unknown: 'خطا در ارتباط با هوش‌یار.',
 };
 
 function detailOf(body: unknown): { text: string; code: string } {
@@ -296,7 +296,7 @@ export async function streamAsk(message: string, o: StreamOptions): Promise<Stre
   return { status: 'done', tokensUsed: tokens };
 }
 
-/* ── API قدیمی (پنل هوشیار در ریدر) ───────────────────── */
+/* ── API قدیمی (پنل هوش‌یار در ریدر) ───────────────────── */
 
 export interface StreamCallbacks {
   onToken: (token: string) => void;
@@ -353,20 +353,33 @@ export async function diagnoseClinicalImage(file: File, prompt?: string): Promis
 
 const C = '/api/ai/conversations';
 
+function qs(params: Record<string, string | number | undefined>): string {
+  const u = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') u.set(k, String(v));
+  const s = u.toString();
+  return s ? `?${s}` : '';
+}
+
 export const ai = {
   stream: streamAiChat,
   vision: diagnoseClinicalImage,
 
   status: () => apiCall<AiStatus>('/api/ai/status'),
 
-  /** فهرست گفتوگوها (پینشدهها اول، سپس جدیدترین). */
-  conversations: () => apiCall<{ conversations: AiConversation[]; total?: number }>(C),
+  /** فهرست گفتوگوها (پینشدهها اول، سپس جدیدترین). q/limit/offset اختیاری. */
+  conversations: (p: { q?: string; limit?: number; offset?: number } = {}) =>
+    apiCall<{ conversations: AiConversation[]; total?: number; has_more?: boolean }>(
+      C + qs({ q: p.q?.trim() || undefined, limit: p.limit, offset: p.offset || undefined }),
+    ),
 
   createConversation: (title?: string) =>
     apiCall<{ id: string }>(C, { method: 'POST', body: JSON.stringify(title ? { title } : {}) }),
 
-  messages: (id: string) =>
-    apiCall<{ messages: AiHistoryMessage[]; total?: number }>(`${C}/${encodeURIComponent(id)}/messages`),
+  /** پیامهای یک گفتوگو؛ با limit دُم تاریخچه، با before صفحهٔ قدیمیتر. */
+  messages: (id: string, p: { before?: number; limit?: number } = {}) =>
+    apiCall<{ messages: AiHistoryMessage[]; total?: number; has_more?: boolean }>(
+      `${C}/${encodeURIComponent(id)}/messages` + qs({ before: p.before, limit: p.limit }),
+    ),
 
   rename: (id: string, title: string) =>
     apiCall<{ ok: boolean }>(`${C}/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ title }) }),
