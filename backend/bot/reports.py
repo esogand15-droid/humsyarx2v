@@ -8,6 +8,7 @@ import os
 import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from backend.bot.ui_buttons import btn, SUCCESS, DANGER   # 🎨 button colours
 from telegram.ext import ContextTypes
 from database import db
 from utils import fmt_jalali_dt, send_audit_log
@@ -434,8 +435,8 @@ async def _show_report_detail(query, report_key):
             InlineKeyboardButton("🔍 در حال بررسی", callback_data=f'report:status:{oid}:reviewing'),
         ])
         keyboard.append([
-            InlineKeyboardButton("✅ رفع شد",  callback_data=f'report:status:{oid}:resolved'),
-            InlineKeyboardButton("❌ رد شد",   callback_data=f'report:status:{oid}:rejected'),
+            btn("✅ رفع شد", style=SUCCESS, callback_data=f'report:status:{oid}:resolved'),
+            btn("❌ رد شد", style=DANGER, callback_data=f'report:status:{oid}:rejected'),
         ])
     else:
         # امکان بازگشایی گزارش بسته‌شده

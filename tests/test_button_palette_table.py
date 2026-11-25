@@ -284,3 +284,17 @@ def test_total_for_odd_inputs():
 ])
 def test_lead_audit_regressions(text, cb, expected):
     assert palette_style(text, cb, kind="inline") == expected
+
+
+def test_exam_abandon_is_danger_but_answers_stay_plain():
+    from backend.bot import button_palette as bp
+    assert bp.palette_style("⏹ رها کردن آزمون", "questions:exam_abandon", kind="inline") == bp.DANGER
+    assert bp.palette_style("🅐 x", "questions:exam_answer:s1:0", kind="inline") is None
+
+
+def test_report_status_buttons_are_explicitly_coloured():
+    import pathlib
+    src = pathlib.Path(__file__).resolve().parents[1].joinpath(
+        "backend", "bot", "reports.py").read_text(encoding="utf-8")
+    assert "btn(\"✅ رفع شد\", style=SUCCESS" in src
+    assert "btn(\"❌ رد شد\", style=DANGER" in src

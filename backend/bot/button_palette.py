@@ -124,6 +124,7 @@ CALLBACK_EXACT: dict[str, str] = {
     "questions:cx_confirm_smaller": SUCCESS,
     "questions:submit_question": SUCCESS,  # ✅ ارسال برای بررسی
     "questions:dup_confirm": SUCCESS,     # ✅ ثبت با وجود شباهت
+    "questions:exam_abandon": DANGER,     # ⏹ رها کردن آزمون (ends the exam)
     "questions:create_ca": PRIMARY,       # content panel: ✏️ شروع طراحی سوال
 
     # ── Hooshyar (ai_solver.py) + lecture scribe (bot.py / lecture_scribe.py) ──
