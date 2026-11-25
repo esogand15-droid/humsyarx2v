@@ -108,7 +108,7 @@ function Row({
       >
         <span className="aic-conv__title" dir="auto">
           {c.pinned && <Icon name="i-pin" size={13} />}
-          {c.title || NEW_TITLE}
+          <span className="aic-conv__text">{c.title || NEW_TITLE}</span>
         </span>
         <span className="aic-conv__meta">
           {c.legacy && <span className="ds-badge">تلگرام</span>}

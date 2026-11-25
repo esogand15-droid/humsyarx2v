@@ -76,7 +76,8 @@
 .aic-hist { display: flex; flex-direction: column; gap: var(--hym-space-3); height: 100%; min-height: 0; padding: var(--hym-space-3); }
 .aic-hist__head { display: flex; align-items: center; gap: var(--hym-space-2); }
 .aic-hist__new { flex: 1; }
-.aic-hist__search .ds-input { width: 100%; }
+.aic-hist__search .ds-input { width: 100%; -webkit-appearance: none; appearance: none; }
+.aic-hist__search .ds-input::-webkit-search-cancel-button { display: none; }
 .aic-hist__list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin-inline: calc(var(--hym-space-1) * -1); padding-inline: var(--hym-space-1); }
 .aic-hist__group + .aic-hist__group { margin-block-start: var(--hym-space-3); }
 .aic-hist__label {
@@ -105,11 +106,12 @@
 }
 .aic-conv__main:focus-visible { outline: none; box-shadow: var(--hym-focus-ring-v2); }
 .aic-conv__title {
-  display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 4px; min-width: 0;
   font-size: var(--hym-fs-small); font-weight: var(--hym-fw-semibold); line-height: var(--hym-lh-ui);
   color: var(--hym-text-primary);
 }
-.aic-conv__title svg { vertical-align: -2px; margin-inline-end: 4px; color: var(--hym-accent-text); }
+.aic-conv__title svg { flex: 0 0 auto; color: var(--hym-accent-text); }
+.aic-conv__text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .aic-conv.is-active .aic-conv__title { color: var(--hym-accent-text); }
 .aic-conv__meta { display: flex; align-items: center; gap: var(--hym-space-2); font-size: var(--hym-fs-caption); color: var(--hym-text-muted); line-height: var(--hym-lh-ui); }
 .aic-conv__more {
@@ -138,7 +140,7 @@
 .aic-sheet__danger, .aic-sheet__danger .ds-row__title, .aic-sheet__danger .ds-row__icon { color: var(--hym-role-danger-text); }
 
 /* ── رشتهٔ پیامها ────────────────────────────────────────────────── */
-.aic-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block-end: var(--hym-space-4); -webkit-overflow-scrolling: touch; }
+.aic-scroll { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block-end: var(--hym-space-4); -webkit-overflow-scrolling: touch; }
 .aic-thread {
   display: flex; flex-direction: column; gap: var(--hym-space-5);
   width: 100%; max-width: var(--aic-col); margin-inline: auto;
@@ -239,7 +241,7 @@
 .aic-error__title { margin: 0; font-size: var(--hym-fs-small); font-weight: var(--hym-fw-bold); line-height: var(--hym-lh-body); }
 .aic-error__sub { margin: 0; font-size: var(--hym-fs-caption); line-height: var(--hym-lh-body); }
 
-.aic-actions { display: flex; gap: var(--hym-space-1); margin-inline-start: calc(var(--hym-space-2) * -1); }
+.aic-actions { display: flex; gap: var(--hym-space-1); }
 .aic-act {
   display: inline-flex; align-items: center; gap: var(--hym-space-1);
   min-height: 36px; padding-inline: var(--hym-space-2);
