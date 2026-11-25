@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Optional, List
 from telegram import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ConversationHandler
+from backend.bot.ui_buttons import kbtn, PRIMARY   # 🎨 رنگ دکمه‌ها
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ DIFF_LABELS = {
 
 def main_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup([
-        [KeyboardButton("🩺 داشبورد"),     KeyboardButton("📚 منابع")],
+        [kbtn("🩺 داشبورد", style=PRIMARY), KeyboardButton("📚 منابع")],
         [KeyboardButton("🧪 بانک سوال"),   KeyboardButton("❓ سوالات متداول")],
         [KeyboardButton("🤖 هوشیار"),      KeyboardButton("📅 برنامه")],
         [KeyboardButton("👤 پروفایل"),     KeyboardButton("💎 اشتراک ویژه")],
@@ -61,7 +62,7 @@ def main_keyboard() -> ReplyKeyboardMarkup:
 
 def content_admin_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup([
-        [KeyboardButton("🩺 داشبورد"),     KeyboardButton("📚 منابع")],
+        [kbtn("🩺 داشبورد", style=PRIMARY), KeyboardButton("📚 منابع")],
         [KeyboardButton("🧪 بانک سوال"),   KeyboardButton("❓ سوالات متداول")],
         [KeyboardButton("🤖 هوشیار"),      KeyboardButton("📅 برنامه")],
         [KeyboardButton("👤 پروفایل"),     KeyboardButton("💎 اشتراک ویژه")],
@@ -73,7 +74,7 @@ def content_admin_keyboard() -> ReplyKeyboardMarkup:
 
 def admin_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup([
-        [KeyboardButton("🩺 داشبورد"),     KeyboardButton("📚 منابع")],
+        [kbtn("🩺 داشبورد", style=PRIMARY), KeyboardButton("📚 منابع")],
         [KeyboardButton("🧪 بانک سوال"),   KeyboardButton("❓ سوالات متداول")],
         [KeyboardButton("🤖 هوشیار"),      KeyboardButton("📅 برنامه")],
         [KeyboardButton("👤 پروفایل"),     KeyboardButton("💎 اشتراک ویژه")],
@@ -89,7 +90,7 @@ def sub_admin_keyboard() -> ReplyKeyboardMarkup:
     (support/broadcaster) — دکمه‌های دانشجویی عادی + پنل ادمین محدود.
     """
     return ReplyKeyboardMarkup([
-        [KeyboardButton("🩺 داشبورد"),     KeyboardButton("📚 منابع")],
+        [kbtn("🩺 داشبورد", style=PRIMARY), KeyboardButton("📚 منابع")],
         [KeyboardButton("🧪 بانک سوال"),   KeyboardButton("❓ سوالات متداول")],
         [KeyboardButton("🤖 هوشیار"),      KeyboardButton("📅 برنامه")],
         [KeyboardButton("👤 پروفایل"),     KeyboardButton("💎 اشتراک ویژه")],

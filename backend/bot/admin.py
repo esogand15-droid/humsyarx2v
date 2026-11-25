@@ -30,6 +30,7 @@ from utils import (
     send_audit_log, get_keyboard_for_user, fmt_jalali_dt, now_tehran, now_tehran_str,
 )
 from time_utils import fa_digits, format_time_fa, now_utc, parse_machine_datetime
+from backend.bot.ui_buttons import btn, SUCCESS, DANGER   # 🎨 button colours
 
 logger   = logging.getLogger(__name__)
 ADMIN_ID = int(os.getenv('ADMIN_ID', '0'))
@@ -1227,7 +1228,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             f"⚠️ <b>حذف کاربر</b>\n\nمطمئنی می‌خواهی <b>{name}</b> را حذف کنی؟", parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("⚠️ بله، حذف", callback_data=f'admin:delete_user:{target_uid}'),
+                btn("⚠️ بله، حذف", style=DANGER, callback_data=f'admin:delete_user:{target_uid}'),
                 InlineKeyboardButton("❌ لغو", callback_data=f'admin:user_detail:{target_uid}'),
             ]]))
     elif action == 'delete_user':
@@ -1261,7 +1262,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "مگر این‌که بعداً از بلک‌لیست خارجش کنی.",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🚫 بله، بلاک کن", callback_data=f'admin:block_user:{target_uid}'),
+                btn("🚫 بله، بلاک کن", style=DANGER, callback_data=f'admin:block_user:{target_uid}'),
                 InlineKeyboardButton("❌ لغو", callback_data=f'admin:user_detail:{target_uid}'),
             ]]))
     elif action == 'block_user':
@@ -2685,7 +2686,7 @@ async def _show_user_detail(query, context, target_uid: int):
     if user.get('approved'):
         keyboard.append([InlineKeyboardButton("🚫 تعلیق", callback_data=f'admin:suspend:{target_uid}')])
     else:
-        keyboard.append([InlineKeyboardButton("✅ تأیید", callback_data=f'admin:approve:{target_uid}'), InlineKeyboardButton("❌ رد", callback_data=f'admin:reject:{target_uid}')])
+        keyboard.append([btn("✅ تأیید", style=SUCCESS, callback_data=f'admin:approve:{target_uid}'), InlineKeyboardButton("❌ رد", callback_data=f'admin:reject:{target_uid}')])
     keyboard.append([InlineKeyboardButton("🗑 حذف کامل", callback_data=f'admin:confirm_delete_user:{target_uid}')])
     keyboard.append([InlineKeyboardButton("🚫 بلاک کامل (حذف + جلوگیری از ثبت‌نام مجدد)", callback_data=f'admin:confirm_block_user:{target_uid}')])
     back_page = context.user_data.get('users_page', 0)
@@ -2703,7 +2704,7 @@ async def _show_pending(query):
     for u in pending:
         uid = u['user_id']
         keyboard.append([InlineKeyboardButton(f"👤 {u.get('name','')} | {u.get('student_id','') or 'بدون شماره'} | گروه {u.get('group','')}", callback_data=f'admin:user_detail:{uid}')])
-        keyboard.append([InlineKeyboardButton("✅ تأیید", callback_data=f'admin:approve:{uid}'), InlineKeyboardButton("❌ رد", callback_data=f'admin:reject:{uid}')])
+        keyboard.append([btn("✅ تأیید", style=SUCCESS, callback_data=f'admin:approve:{uid}'), InlineKeyboardButton("❌ رد", callback_data=f'admin:reject:{uid}')])
     keyboard.append([InlineKeyboardButton("🔙 بازگشت به پنل", callback_data='admin:cat_users')])
     await query.edit_message_text(f"⏳ <b>کاربران در انتظار</b> — {len(pending)} نفر", parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
 

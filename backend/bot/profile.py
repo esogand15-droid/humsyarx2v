@@ -11,6 +11,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.ext import ContextTypes, ConversationHandler
 from database import db
 from utils import send_audit_log
+from backend.bot.ui_buttons import btn, PRIMARY   # 🎨 button colours
 from utils import progress_bar, get_rank, fmt_jalali_dt
 
 logger   = logging.getLogger(__name__)
@@ -99,7 +100,7 @@ async def _profile_keyboard(user: dict = None) -> InlineKeyboardMarkup:
             InlineKeyboardButton("🔑 راهنمای کد وب‌اپ", callback_data='profile:web_code'),
         ],
         [
-            InlineKeyboardButton("✏️ ویرایش نام",          callback_data='profile:edit_name'),
+            btn("✏️ ویرایش نام", style=PRIMARY,          callback_data='profile:edit_name'),
             InlineKeyboardButton("🎓 ویرایش شماره دانشجویی", callback_data='profile:edit_sid'),
         ],
         [

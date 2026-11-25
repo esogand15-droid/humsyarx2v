@@ -23,6 +23,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.ext import ContextTypes
 from database import db
 from utils import fmt_jalali, fmt_jalali_dt, send_audit_log, webapp_kb
+from backend.bot.ui_buttons import btn, PRIMARY   # 🎨 رنگ دکمه‌ها
 
 def _tk_kb(rows, link: str):
     """🧠 موج N2 — کیبورد تیکت + ردیف web_app‌‌ی همان رشته‌ی تیکت
@@ -1229,7 +1230,7 @@ async def _ticket_main(query, uid: int):
                      if db.ticket_norm_status(t.get('status')) != 'closed')
     done_count = len(tickets) - open_count
     keyboard   = [
-        [InlineKeyboardButton("🎫 ارسال تیکت جدید",            callback_data='ticket:new')],
+        [btn("🎫 ارسال تیکت جدید", style=PRIMARY,            callback_data='ticket:new')],
         [InlineKeyboardButton(f"📋 تیکت‌های من ({len(tickets)})", callback_data='ticket:list')],
     ]
     if await _tperm(uid, 'tickets.manage'):
@@ -1283,7 +1284,7 @@ async def show_ticket_main(message: Message, uid: int):
                      if db.ticket_norm_status(t.get('status')) != 'closed')
     done_count = len(tickets) - open_count
     keyboard   = [
-        [InlineKeyboardButton("🎫 ارسال تیکت جدید",              callback_data='ticket:new')],
+        [btn("🎫 ارسال تیکت جدید", style=PRIMARY,              callback_data='ticket:new')],
         [InlineKeyboardButton(f"📋 تیکت‌های من ({len(tickets)})", callback_data='ticket:list')],
     ]
     if await _tperm(uid, 'tickets.manage'):

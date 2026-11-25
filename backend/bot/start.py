@@ -63,7 +63,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🎫 پشتیبانی و پاسخ سریع"
         )
         builder = ButtonGridBuilder()
-        builder.add_hero("✅ شروع ثبت‌نام", callback_data='register:start')
+        builder.add_hero("✅ شروع ثبت‌نام", callback_data='register:start', style="primary")
         await update.message.reply_text(
             f"🩺 <b>به ربات آموزشی پزشکی خوش آمدید!</b>\n\n"
             f"سلام <b>{first_name}</b> عزیز 👋\n\n"

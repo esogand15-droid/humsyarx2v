@@ -36,10 +36,16 @@ class ButtonGridBuilder:
         callback_data: Optional[str] = None,
         url: Optional[str] = None,
         web_app: Optional[Union[WebAppInfo, str]] = None,
+        style: Optional[str] = None,
     ) -> ButtonGridBuilder:
-        """Add a full-width hero action button occupying its own row."""
+        """Add a full-width hero action button occupying its own row.
+
+        ``style`` — optional Bot API button colour ('primary'/'success'/'danger'),
+        see backend/bot/ui_buttons.py."""
         wapp = WebAppInfo(url=web_app) if isinstance(web_app, str) else web_app
-        btn = InlineKeyboardButton(text=text, callback_data=callback_data, url=url, web_app=wapp)
+        from backend.bot.ui_buttons import styles_enabled as _styles_on  # 🎨 kill switch
+        btn = InlineKeyboardButton(text=text, callback_data=callback_data, url=url, web_app=wapp,
+                                   api_kwargs={"style": style} if style and _styles_on() else None)
         self.rows.append([btn])
         return self
 

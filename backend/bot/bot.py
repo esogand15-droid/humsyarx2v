@@ -2238,6 +2238,14 @@ def build_application() -> Application:
         .build()
     )
 
+    # 🎨 رنگبندی معنایی دکمهها (Bot API `style`) — فقط روی همین نمونهٔ bot
+    # (نه monkeypatch سراسری PTB). خاموشکردن: BUTTON_STYLES_ENABLED=0
+    try:
+        from backend.bot.ui_buttons import install_button_styles
+        install_button_styles(app.bot)
+    except Exception:
+        logging.getLogger(__name__).exception("button styles not installed")
+
     # ── ConversationHandler مرکزی ──
     # NOTE: BROADCAST از اینجا حذف شد — در unified_text_handler مدیریت میشه
     conv = ConversationHandler(

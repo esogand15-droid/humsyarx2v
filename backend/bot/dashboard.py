@@ -12,6 +12,7 @@ from telegram.ext import ContextTypes
 from database import db
 from time_utils import parse_gregorian_date
 from utils import progress_bar, get_rank, exam_countdown, now_tehran
+from backend.bot.ui_buttons import btn, PRIMARY   # 🎨 button colours
 
 logger   = logging.getLogger(__name__)
 ADMIN_ID = int(os.getenv('ADMIN_ID', '0'))
@@ -132,7 +133,7 @@ async def build_dashboard_text(uid: int) -> tuple:
             InlineKeyboardButton("📊 آمار کامل",     callback_data='stats:main'),
         ],
         [
-            InlineKeyboardButton("🧪 تمرین هوشمند", callback_data='questions:weak'),
+            btn("🧪 تمرین هوشمند", style=PRIMARY, callback_data='questions:weak'),
             InlineKeyboardButton("🏆 جدول برترین",  callback_data='dashboard:leaderboard'),
         ],
         [

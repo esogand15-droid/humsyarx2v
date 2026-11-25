@@ -274,6 +274,38 @@ Replace incrementally:
 
 ---
 
+## Telegram Bot Buttons (رنگ دکمه‌ها)
+
+The bot uses the Bot API `style` field on `InlineKeyboardButton` / `KeyboardButton`
+(PTB 21.3 has no parameter for it, so it travels in `api_kwargs`). Old clients ignore it.
+Helper module: `backend/bot/ui_buttons.py` (full rules in its docstring).
+
+Colours are **explicit**: set them with `btn(..., style=...)`, `kbtn(...)`,
+`style_button(...)` or `ButtonGridBuilder.add_hero(..., style=...)`.
+
+| Style | Colour | Use for | Examples |
+|-------|--------|---------|----------|
+| `primary` | blue | The ONE main entry action of a screen (max one per keyboard) | 🩺 داشبورد (main menu), ✅ شروع ثبت‌نام, 🎫 ارسال تیکت جدید, 💳 خرید اشتراک, 🧪 تمرین هوشمند, ✏️ ویرایش نام |
+| `success` | green | Final confirm / pay, admin approve | 💳 پرداخت در زرین‌پال, ✅ پرداخت کردم، بررسی کن, ✅ تأیید خرید, ✅ تأیید (receipt / user approval) |
+| `danger` | red | Only the final destructive confirmation | ⚠️ بله، حذف, 🚫 بله، بلاک کن |
+| *(none)* | default | Everything else: navigation, cancel, quiz options, selections, content lists | 🔙 بازگشت, ❌ لغو, 🅐 … options, ✅ selected toggles, FAQ / resources |
+
+Rules:
+- Cancel (لغو / انصراف) is never red. Red is only for the final delete/block confirm, not the menu entry that leads to it.
+- Never colour quiz options, answer choices, selection toggles or dynamic content titles.
+
+Env switches (read on every request; change env + restart, no deploy):
+- `BUTTON_STYLES_ENABLED` (default `1`): master kill switch. `0` strips **every** `style`
+  key centrally in `StyledExtBot` (explicit ones too), and `btn()`/`kbtn()`/`add_hero()` stop adding it.
+- `BUTTON_AUTO_STYLES` (default `0`): optional automatic semantic colouring of unstyled
+  buttons. Off by default. When on, it skips quiz/option callbacks (`answer:`,
+  `questions:exam_answer:`, `questions:ai_personal_answer:`, `btn_disabled:`, `qd:`, `quiz:cnt|go|tp|doc:` …),
+  🔒 labels, option markers (الف) ب) 🅐), cancel/mute words, a lone leading ✅, long labels (> 28 chars)
+  and `faq:`/`resources:`/`ref:` content, and never assigns `primary`.
+- Styling only adds or removes the `style` key. `callback_data`, `url`, `web_app` and `login_url` stay byte-identical.
+
+---
+
 ## File Locations
 
 | Environment | Token File | Base Styles | Component Styles |

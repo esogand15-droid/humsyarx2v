@@ -12,6 +12,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from database import db
 from utils import ADMIN_ID as _ADMIN_ID_FALLBACK, safe_send, send_audit_log
+from backend.bot.ui_buttons import btn, PRIMARY, SUCCESS   # 🎨 button colours
 
 logger = logging.getLogger(__name__)
 ADMIN_ID = int(os.getenv('ADMIN_ID', '0')) or _ADMIN_ID_FALLBACK
@@ -310,8 +311,8 @@ async def _zarinpal_start(query, context, uid: int, kind: str, ref: str):
         f"<i>این لینک ۱ ساعت اعتبار دارد.</i>{mock_note}"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💳 پرداخت در زرین‌پال", url=zp["url"])],
-        [InlineKeyboardButton("✅ پرداخت کردم، بررسی کن", callback_data=f"sub:zchk:{authority}")],
+        [btn("💳 پرداخت در زرین‌پال", style=SUCCESS, url=zp["url"])],
+        [btn("✅ پرداخت کردم، بررسی کن", style=SUCCESS, callback_data=f"sub:zchk:{authority}")],
         [InlineKeyboardButton(back_label, callback_data=back_cb)],
     ])
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
@@ -776,7 +777,7 @@ async def screenshot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         + warn_line
     )
     kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ تأیید", callback_data=f"sub:appr:{pid}"),
+        btn("✅ تأیید", style=SUCCESS, callback_data=f"sub:appr:{pid}"),
         InlineKeyboardButton("❌ رد", callback_data=f"sub:rej:{pid}"),
     ]])
     try:
@@ -941,7 +942,7 @@ async def topup_screenshot_handler(update: Update,
         + warn_line
     )
     kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ تأیید", callback_data=f"sub:appr:{pid}"),
+        btn("✅ تأیید", style=SUCCESS, callback_data=f"sub:appr:{pid}"),
         InlineKeyboardButton("❌ رد", callback_data=f"sub:rej:{pid}"),
     ]])
     try:
@@ -1293,7 +1294,7 @@ async def _build_my_status(uid: int):
 
     if not s or s.get('status') not in ('active', 'expired', 'revoked'):
         text = "💎 <b>اشتراک ویژه من</b>\n\n⚠️ فعلاً هیچ اشتراکی نداری."
-        keyboard.append([InlineKeyboardButton("💳 خرید اشتراک", callback_data='sub:back')])
+        keyboard.append([btn("💳 خرید اشتراک", style=PRIMARY, callback_data='sub:back')])
 
     elif s.get('status') == 'active' and await db.sub_is_active(uid):
         days_left  = await db.sub_days_left(uid)
@@ -1570,7 +1571,7 @@ async def _wallet_confirm(query, context, plan_id: str, uid: int):
         f"با تأیید، مبلغ از کیف پول کسر و اشتراکت فعال می‌شه ✅"
     )
     keyboard = [
-        [InlineKeyboardButton("✅ تأیید خرید", callback_data=f"sub:wbuy:{plan_id}")],
+        [btn("✅ تأیید خرید", style=SUCCESS, callback_data=f"sub:wbuy:{plan_id}")],
         [InlineKeyboardButton("🔙 بازگشت", callback_data='sub:back')],
     ]
     try:
@@ -1642,7 +1643,7 @@ async def _show_wallet(query, uid: int, skip: int = 0):
         keyboard.append([InlineKeyboardButton(
             "🕓 تراکنش‌های قدیمی‌تر", callback_data=f"sub:wallet:{page + 8}")])
     keyboard.append(
-        [InlineKeyboardButton("💳 خرید اشتراک", callback_data='sub:back')])
+        [btn("💳 خرید اشتراک", style=PRIMARY, callback_data='sub:back')])
     keyboard.append([InlineKeyboardButton(
         "🔙 بازگشت",
         callback_data=f"sub:wallet:{max(0, page - 8)}" if page
