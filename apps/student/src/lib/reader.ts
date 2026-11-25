@@ -16,6 +16,8 @@ export interface ViewInfo {
   reason?: string;
   url?: string;
   expires_in?: number;
+  /** epoch ثانیه (سرورهای جدید؛ افزوده) */
+  expires_at?: number;
 }
 
 export interface Progress {

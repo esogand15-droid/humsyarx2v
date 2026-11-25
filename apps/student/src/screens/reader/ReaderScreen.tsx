@@ -16,6 +16,14 @@ const MediaView = lazy(() => import('./MediaView').then((m) => ({ default: m.Med
 
 type StudySidePanel = 'none' | 'ai_chat' | 'notes';
 
+const MEDIA_REFRESH_LEAD_MS = 120_000;
+
+/** انقضای لینک مدیا در ساعت مرورگر؛ از expires_in نسبی (مستقل از اختلاف ساعت دستگاه). */
+function expiryFromView(view: ViewInfo): number {
+  const ttl = typeof view.expires_in === 'number' && view.expires_in > 0 ? view.expires_in : 0;
+  return ttl ? Date.now() + ttl * 1000 : 0;
+}
+
 /** ریدر — یک صفحه برای هر سه نوع محتوا (PDF / ویدیو-ویس / تصویر)
  *  همراه با محیط مطالعه چندپنله و دستیار هوش‌یار همزمان در دسکتاپ. */
 export function ReaderScreen() {
@@ -24,6 +32,8 @@ export function ReaderScreen() {
 
   const [info, setInfo] = useState<ViewInfo | null>(null);
   const [url, setUrl] = useState('');
+  /** زمان انقضای لینک مدیا در ساعت همین مرورگر (ms)؛ ۰ = نامعلوم */
+  const [urlExpiresAt, setUrlExpiresAt] = useState(0);
   const [startPage, setStartPage] = useState(1);
   const [startAt, setStartAt] = useState(0);
   const [error, setError] = useState<unknown>(null);
@@ -76,7 +86,10 @@ export function ReaderScreen() {
         reader.progress(scopeTyped, id).catch(() => null),
       ]);
       setInfo(view);
-      if (view.available && view.url) setUrl(view.url);
+      if (view.available && view.url) {
+        setUrl(view.url);
+        setUrlExpiresAt(expiryFromView(view));
+      }
       if (prog) {
         latest.current = { page: prog.page || 1, total: prog.total || 0, position: prog.position || 0 };
         setStartPage(prog.page > 0 ? prog.page : 1);
@@ -165,6 +178,7 @@ export function ReaderScreen() {
       const view = await reader.viewUrl(scopeTyped, id);
       if (view.available && view.url) {
         setUrl(view.url);
+        setUrlExpiresAt(expiryFromView(view));
         return view.url;
       }
     } catch {
@@ -174,6 +188,24 @@ export function ReaderScreen() {
   }, [scopeTyped, id]);
 
   const kind: Kind = info?.kind ?? 'other';
+
+  // T2: refresh the video/voice link ~2 min before it expires.
+  // MediaView swaps the new link in without interrupting playback. PDF has its own path.
+  useEffect(() => {
+    if (kind === 'pdf' || !urlExpiresAt) return;
+    const due = urlExpiresAt - MEDIA_REFRESH_LEAD_MS;
+    const timer = window.setTimeout(() => void refreshUrl(), Math.max(1000, due - Date.now()));
+    const check = () => {
+      if (document.visibilityState === 'visible' && Date.now() >= due) void refreshUrl();
+    };
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('online', check);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('online', check);
+    };
+  }, [kind, urlExpiresAt, refreshUrl]);
 
   return (
     <>
@@ -272,6 +304,7 @@ export function ReaderScreen() {
                     startAt={startAt}
                     onPosition={(seconds) => persist(kind, { position: seconds })}
                     onExpired={refreshUrl}
+                    expiresAt={urlExpiresAt}
                   />
                 ) : (
                   <div className="page">

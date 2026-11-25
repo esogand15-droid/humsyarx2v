@@ -20,6 +20,8 @@ interface Props {
   onPosition: (seconds: number) => void;
   /** لینک امضاشدهٔ تازه (همان مسیر refresh ریدر PDF) */
   onExpired?: () => Promise<string | null>;
+  /** زمان انقضای لینک فعلی (ms، ساعت همین مرورگر)؛ والد کمی قبل از آن لینک تازه میدهد */
+  expiresAt?: number;
 }
 
 type PlayerProps = Omit<Props, 'kind'>;
@@ -354,6 +356,25 @@ function useMediaEngine(opts: EngineOpts) {
   expCb.current = opts.onExpired;
   const fsCb = useRef(opts.onFullscreen);
   fsCb.current = opts.onFullscreen;
+  /** لینک تازهای که هنوز سوار نشده (پخش روان است و نمیخواهیم قطعش کنیم) */
+  const pendingSrc = useRef<string | null>(null);
+  /** reload پس از خطا: لینک تازهٔ والد باید فوراً سوار شود، نه معلق بماند */
+  const forceSwap = useRef(false);
+
+  /** سوار کردن لینک تازه با حفظ ثانیهٔ پخش و وضعیت پخش/توقف. */
+  const applySwap = useCallback((next: string, at?: number) => {
+    const el = ref.current;
+    if (el) {
+      const t = at ?? el.currentTime;
+      if (t > 1) resumeAt.current = t;
+      wantPlay.current = wantPlay.current || !el.paused;
+    }
+    pendingSrc.current = null;
+    forceSwap.current = false;
+    swapping.current = true;
+    setFail(null);
+    setSrc(next);
+  }, []);
 
   const save = useCallback((t: number) => {
     lastSaved.current = t;
@@ -367,16 +388,19 @@ function useMediaEngine(opts: EngineOpts) {
   }, [opts.startAt]);
 
   // لینک تازه از والد ⇒ جابهجایی src بدون از دست رفتن جای پخش
+  // تازهسازی پیشدستانه وسط پخش روان: اتصال باز را نمیبُریم؛ لینک تازه
+  // معلق میماند و در اولین seek/خطا/گیر بدون درخواست شبکهٔ اضافه سوار میشود.
   useEffect(() => {
-    if (opts.url === src) return;
-    const el = ref.current;
-    if (el) {
-      if (el.currentTime > 1) resumeAt.current = el.currentTime;
-      wantPlay.current = wantPlay.current || !el.paused;
+    if (opts.url === src) {
+      pendingSrc.current = null;
+      return;
     }
-    swapping.current = true;
-    setFail(null);
-    setSrc(opts.url);
+    const el = ref.current;
+    if (!forceSwap.current && el && !el.error && !failRef.current && el.readyState >= 1) {
+      pendingSrc.current = opts.url;
+      return;
+    }
+    applySwap(opts.url);
     // src عمداً در وابستگیها نیست: فقط تغییر لینک والد مهم است
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opts.url]);
@@ -408,17 +432,28 @@ function useMediaEngine(opts: EngineOpts) {
       if (!auto) autoTries.current = 0;
       setFail(null);
       setWaiting(true);
+      if (pendingSrc.current) {
+        applySwap(pendingSrc.current);
+        return;
+      }
       swapping.current = true;
+      forceSwap.current = true;
       const fresh = expCb.current ? await expCb.current() : null;
       if (fresh && fresh !== src) return; // اثر بالا src را عوض میکند
+      forceSwap.current = false;
       ref.current?.load();
     },
-    [src],
+    [src, applySwap],
   );
 
   const onError = useCallback(async () => {
     const el = ref.current;
     if (!el || !el.error) return;
+    // لینک تازه از قبل آماده است ⇒ بیصدا سوار کن، بدون probe و بدون پیام
+    if (pendingSrc.current) {
+      applySwap(pendingSrc.current);
+      return;
+    }
     if (el.currentTime > 1) resumeAt.current = el.currentTime;
     const why = await probe(el.currentSrc || src);
     if (autoTries.current < 2 && (why === 'expired' || why === 'upstream' || why === 'network')) {
@@ -431,7 +466,7 @@ function useMediaEngine(opts: EngineOpts) {
     setWaiting(false);
     setPlaying(false);
     setFail(why);
-  }, [src, reload]);
+  }, [src, reload, applySwap]);
 
   // اینترنت برگشت ⇒ خودکار ادامه
   useEffect(() => {
@@ -451,21 +486,32 @@ function useMediaEngine(opts: EngineOpts) {
     }
     if (el.paused) {
       wantPlay.current = true;
+      // A fresh link is waiting (refreshed while paused): mount it now, before play makes a new request
+      if (pendingSrc.current) {
+        setWaiting(true);
+        applySwap(pendingSrc.current);
+        return;
+      }
       if (el.readyState < 3) setWaiting(true);
       void el.play().catch(() => setWaiting(false));
     } else {
       el.pause();
     }
-  }, [reload]);
+  }, [reload, applySwap]);
 
   const seek = useCallback((t: number) => {
     const el = ref.current;
     if (!el) return;
     const d = Number.isFinite(el.duration) ? el.duration : 0;
     const v = Math.max(0, d > 0 ? Math.min(d - 0.25, t) : t);
-    el.currentTime = v;
     setTime(v);
-  }, []);
+    // seek درخواست Range تازه میسازد؛ اگر لینک تازه آماده است همینجا سوارش کن
+    if (pendingSrc.current) {
+      applySwap(pendingSrc.current, v);
+      return;
+    }
+    el.currentTime = v;
+  }, [applySwap]);
 
   const skip = useCallback(
     (delta: number) => {
@@ -677,6 +723,10 @@ function useMediaEngine(opts: EngineOpts) {
       if (!wantPlay.current) setWaiting(false);
     },
     onWaiting: () => setWaiting(true),
+    // گیر در بافر نزدیک انقضا: لینک تازهٔ آماده را سوار کن
+    onStalled: () => {
+      if (pendingSrc.current) applySwap(pendingSrc.current);
+    },
     onPlaying: () => {
       setWaiting(false);
       setPlaying(true);
