@@ -131,6 +131,7 @@ export function App() {
         <Route path="/search" element={<Gate><SearchScreen /></Gate>} />
         <Route path="/schedule" element={<Gate><ScheduleScreen /></Gate>} />
         <Route path="/ai" element={<Gate><AiChatScreen /></Gate>} />
+        <Route path="/ai/:id" element={<Gate><AiChatScreen /></Gate>} />
         <Route path="/grades" element={<Gate><GradesScreen /></Gate>} />
         <Route path="/subscription" element={<Gate><SubscriptionScreen /></Gate>} />
         <Route path="/notifications" element={<Gate><NotificationsScreen /></Gate>} />
