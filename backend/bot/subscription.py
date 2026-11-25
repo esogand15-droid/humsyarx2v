@@ -654,8 +654,8 @@ async def gift_recipient_handler(update: Update, context: ContextTypes.DEFAULT_T
     if len(results) == 1:
         r = results[0]
         kb = InlineKeyboardMarkup([[
-            InlineKeyboardButton("✅ بله، همینه",
-                                 callback_data=f"sub:grsel:{r['user_id']}"),
+            btn("✅ بله، همینه", style=SUCCESS,
+                callback_data=f"sub:grsel:{r['user_id']}"),
             InlineKeyboardButton("🔙 نه، دوباره", callback_data='sub:gift'),
         ]])
         await update.message.reply_text(

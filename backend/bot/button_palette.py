@@ -131,8 +131,8 @@ CALLBACK_EXACT: dict[str, str] = {
     "aiu:imgstart": PRIMARY,              # 🎨 ساخت تصویر
     "aiu:fu:example": PRIMARY,            # 🔬 مثال بزن
     "aiu:ask_now": PRIMARY,               # message_router: 🤖 پاسخ بالینی با هوشیار
-    "ls:smart_scribe": PRIMARY,           # 📄 تدوین جزوه کامل PDF
-    "ls:smart_ai": PRIMARY,               # 🤖 تحلیل صوتی توسط هوشیار
+    "ls:smart_scribe": PRIMARY,           # 📄 تدوین جزوه کامل PDF (the ONE blue choice;
+                                          # «🤖 تحلیل صوتی» = secondary → default)
 
     # ── profile ──
     "profile:edit_name": PRIMARY,
@@ -142,6 +142,8 @@ CALLBACK_EXACT: dict[str, str] = {
     "sub:trial": PRIMARY,                 # 🎁 شروع … روز آزمایشی رایگان
     "sub:gift": SUCCESS,                  # 🎁 خرید اشتراک هدیه
     "sub:topup": SUCCESS,                 # 💰 شارژ کیف پول
+    "sub:famcode": PRIMARY,               # ➕ ساخت کد دعوت جدید (family plan)
+    "sub:famredeem": SUCCESS,             # 🎟 ثبت کد دعوت خانواده
 
     # ── ticket ──
     "ticket:new": PRIMARY,                # 🎫 ارسال تیکت جدید / 🎫 تیکت جدید / 💡 بازخورد
@@ -223,7 +225,8 @@ CALLBACK_PREFIX: tuple[tuple[str, str], ...] = (
     ("sub:wbuy:", SUCCESS),                   # ✅ تأیید خرید
     ("sub:zchk:", SUCCESS),                   # ✅ پرداخت کردم، بررسی کن
     ("sub:ztop:", SUCCESS),                   # ⚡ پرداخت آنلاین (شارژ)
-    ("sub:grsel:", SUCCESS),                  # ✅ بله، همینه (gift recipient)
+    # `sub:grsel:` is NOT here: it is also the multi-result recipient LIST
+    # (a selection). The single «✅ بله، همینه» confirm is styled explicitly.
     ("sub:dcode:", SUCCESS),                  # 💳 تهیه اشتراک با تخفیف
     ("sub:appr:", SUCCESS),                   # admin: ✅ تأیید رسید
     ("sub:rej:", DANGER),                     # admin: ❌ رد رسید
@@ -255,8 +258,9 @@ CALLBACK_PREFIX: tuple[tuple[str, str], ...] = (
     # content panel — delete entries + confirmations, unfork (= drop override)
     ("ca:del_", DANGER),                      # 🗑 next to lesson/session/content/ref/faq
     ("ca:confirm_del_", DANGER),              # 🗑 بله / 🗑 حذف
-    ("ca:unfork_session:", DANGER),
-    ("ca:unfork_book:", DANGER),
+    # unfork ENTRY («↩️» icon in every list row / «↩️ بازگشت به نسخهی سراسری»)
+    # stays default — a second red icon per row next to 🗑 is a wall of red;
+    # only the final «↩️ بله، بازگشت به سراسری» confirmation is red.
     ("ca:confirm_unfork_session:", DANGER),
     ("ca:confirm_unfork_book:", DANGER),
     # ai_admin
@@ -304,10 +308,15 @@ NEVER_CALLBACK_EXACT: frozenset[str] = frozenset({
 
 # Navigation / cancel labels — never coloured whatever the callback is
 # (protects shared callbacks such as `sub:back`, `questions:practice` used as
-# back targets). «↩️» is NOT here: it also prefixes undo actions
-# (↩️ لغو دسترسی محتوا, ↩️ بازگشت به نسخه‌ی سراسری).
+# back targets). «↩️» is NOT a prefix here: it also starts undo actions
+# (↩️ لغو دسترسی محتوا, ↩️ بله، بازگشت به سراسری) — so the ↩️ BACK labels are
+# listed exactly (they share callbacks such as `ring:p:done`, `quiz:start:`).
 NEVER_TEXT_PREFIX: tuple[str, ...] = ("🔙", "🏠", "◀", "⬅", "⏮", "🔒")
-NEVER_TEXT_EXACT: frozenset[str] = frozenset({"❌ لغو", "❌ انصراف"})
+NEVER_TEXT_EXACT: frozenset[str] = frozenset({
+    "❌ لغو", "❌ انصراف",
+    "↩️ بازگشت", "↩️ بازگشت به رینگ", "↩️ بازگشت به گفتگو",
+    "↩️ بازگشت به پروفایل من", "↩️ بیخیال",
+})
 
 _PREFIX_SORTED: tuple[tuple[str, str], ...] = tuple(
     sorted(CALLBACK_PREFIX, key=lambda p: len(p[0]), reverse=True))

@@ -267,3 +267,20 @@ def test_pair_styles_for_shared_callbacks():
 def test_total_for_odd_inputs():
     assert palette_style(None, None, kind="inline") is None  # type: ignore[arg-type]
     assert palette_style("", "answer:1", kind="inline") is None
+
+
+# ── lead audit regressions (shared callbacks / selection lists) ──
+@pytest.mark.parametrize("text, cb, expected", [
+    ("↩️ بازگشت", "ring:p:done", None),               # back shares ring:p:done with «💾 ذخیره»
+    ("💾 ذخیره و بازگشت", "ring:p:done", SUCCESS),
+    ("↩️ بازگشت", "quiz:start:abc", None),            # back shares quiz:start: with «🎯 شروع آزمون»
+    ("🎯 شروع آزمون", "quiz:start:abc", PRIMARY),
+    ("↩️", "ca:unfork_session:1", None),              # per-row unfork icon: no wall of red
+    ("↩️ بله، بازگشت به سراسری", "ca:confirm_unfork_session:1", DANGER),
+    ("Ali (@a) — 5", "sub:grsel:5", None),            # recipient LIST is a selection
+    ("🤖 تحلیل صوتی توسط هوشیار", "ls:smart_ai", None),  # one blue per lecture keyboard
+    ("📄 تدوین جزوه کامل PDF", "ls:smart_scribe", PRIMARY),
+    ("↩️ لغو دسترسی محتوا", "admin:ca_remove:1", DANGER),
+])
+def test_lead_audit_regressions(text, cb, expected):
+    assert palette_style(text, cb, kind="inline") == expected
