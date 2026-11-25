@@ -17,7 +17,7 @@ from pathlib import PurePath
 
 import httpx
 from fastapi import (
-    APIRouter, Depends, File, Form, HTTPException,
+    APIRouter, Depends, File, Form, HTTPException, Query,
     Request, UploadFile, WebSocket, WebSocketDisconnect,
 )
 from fastapi.responses import StreamingResponse
@@ -104,6 +104,14 @@ class AskRequest(BaseModel):
         default=None,
         max_length=40,
     )
+    # W3 — «پاسخ دوباره»: اگر آخرین دورِ گفتوگو همین پرسش باشد، آن دور
+    # (پرسش + پاسخ) برداشته و دوباره پرسیده میشود. پیشفرض False ⇒
+    # کلاینتهای قدیمی (ربات/مینیاپ) دقیقاً رفتار قبلی را میبینند.
+    regenerate: bool = False
+    # W3 — رویداد «event: start» (شناسهی گفتوگو، عنوان خودکار) فقط وقتی
+    # کلاینت بخواهد فرستاده میشود؛ بدون آن، فرمت سیمِ SSE دقیقاً همان
+    # قبلی است (token… سپس done) تا کلاینتهای قدیمی نشکنند.
+    stream_meta: bool = False
 
 
 class ConversationCreate(BaseModel):
@@ -978,6 +986,23 @@ async def history(
 
 CONV_MAX_ITEMS = 120       # سقف پیام‌های ذخیره‌شده در هر گفت‌وگو
 CONV_CONTEXT_ITEMS = 10    # ۵ دورِ آخر → کانتکست مدل
+DEFAULT_CONV_TITLE = "گفت‌وگوی جدید"  # همان املای ai_conv_create (با نیمفاصله)
+# عنوانهایی که «هنوز نامگذاری نشده» حساب میشوند — هر دو املا، چون دادهی قدیمی
+# ممکن است بدون نیمفاصله ذخیره شده باشد.
+_UNTITLED = {"", DEFAULT_CONV_TITLE, DEFAULT_CONV_TITLE.replace("‌", "")}
+CONV_PAGE_MAX = 200        # سقفِ فعلیِ ai_conv_list — صفحهبندی روی همین برش
+
+
+def _auto_title(message: str) -> str:
+    """W3 — عنوانِ خودکار از اولین پرسش: پیشوندِ [برچسب] حذف، اولین خط،
+    فاصلههای تکراری جمع، حداکثر ۴۰ نویسه و برش روی مرزِ واژه."""
+    text = re.sub(r"^\[[^\]]*\]\s*", "", str(message or "")).strip()
+    text = re.sub(r"\s+", " ", text.split("\n")[0]).strip()
+    if len(text) > 40:
+        cut = text[:40]
+        space = cut.rfind(" ")
+        text = (cut[:space] if space >= 24 else cut).rstrip(" ،,.:؛") + "…"
+    return text or DEFAULT_CONV_TITLE
 
 
 def _conv_public(doc: dict) -> dict:
@@ -1031,17 +1056,28 @@ async def _load_conv(cid: str, user_id: int) -> dict:
     return doc
 
 
+def _conv_matches(item: dict, needle: str) -> bool:
+    hay = f"{item.get('title') or ''} {item.get('preview') or ''}".casefold()
+    return needle in hay
+
+
 @router.get("/conversations")
 async def list_conversations(
     user=Depends(require_feature("ai_chat")),
     include_archived: bool = False,
+    q: str | None = Query(default=None, max_length=80),
+    limit: int | None = Query(default=None, ge=1, le=CONV_PAGE_MAX),
+    offset: int = Query(default=0, ge=0, le=10_000),
 ):
+    """فهرست گفتوگوها. بدون q/limit/offset پاسخ دقیقاً همان قبلی است
+    (افزوده شدن total/has_more سازگار رو به عقب است)."""
     user_id = user["id"]
     docs = await db.ai_conv_list(
         user_id,
         include_archived=include_archived,
     )
     items = [_conv_public(d) for d in docs]
+    needle = (q or "").strip().casefold()
 
     # رشته‌ی مشترک با ربات تلگرام — همان حافظه‌ی ai_mem که امروز هم
     # بین دو کانال مشترک است؛ بعد از گفت‌وگوهای پین‌شده می‌نشیند.
@@ -1068,7 +1104,20 @@ async def list_conversations(
         )
         items.insert(pinned_count, legacy)
 
-    return {"conversations": items}
+    if needle:
+        items = [i for i in items if _conv_matches(i, needle)]
+
+    total = len(items)
+    if limit is None and not offset:
+        # مسیر قدیمی — همان شکل پاسخ، فقط total اضافه شده
+        return {"conversations": items, "total": total, "has_more": False}
+
+    end = offset + (limit or CONV_PAGE_MAX)
+    return {
+        "conversations": items[offset:end],
+        "total": total,
+        "has_more": end < total,
+    }
 
 
 @router.post("/conversations")
@@ -1086,16 +1135,31 @@ async def create_conversation(
     return {"id": cid}
 
 
+def _page_messages(messages: list, before: int | None, limit: int | None) -> dict:
+    """W3 — هر پیام index پایدار (جایگاه در رشته) میگیرد؛ before/limit
+    اختیاریاند و بدون آنها کل فهرست مثل قبل برمیگردد."""
+    for i, m in enumerate(messages):
+        m["index"] = i
+    total = len(messages)
+    if before is None and limit is None:
+        return {"messages": messages, "total": total, "has_more": False}
+    end = min(total, before) if before is not None else total
+    start = max(0, end - limit) if limit is not None else 0
+    return {"messages": messages[start:end], "total": total, "has_more": start > 0}
+
+
 @router.get("/conversations/{cid}/messages")
 async def conversation_messages(
     cid: str,
     user=Depends(require_feature("ai_chat")),
+    before: int | None = Query(default=None, ge=0),
+    limit: int | None = Query(default=None, ge=1, le=200),
 ):
     if cid == "legacy":
-        # رشته‌ی مشترک — نسخه‌ی خام ai_mem بدون محدودیت TTL
+        # رشتهی مشترک — نسخهی خام ai_mem بدون محدودیت TTL
         raw, _ = await db.ai_get_memory(user["id"])
-        return {
-            "messages": [
+        return _page_messages(
+            [
                 {
                     "role": (
                         "assistant"
@@ -1107,11 +1171,13 @@ async def conversation_messages(
                 }
                 for it in raw
                 if it.get("r") in ("user", "assistant", "model")
-            ]
-        }
+            ],
+            before,
+            limit,
+        )
 
     doc = await _load_conv(cid, user["id"])
-    return {"messages": _conv_messages_public(doc)}
+    return _page_messages(_conv_messages_public(doc), before, limit)
 
 
 @router.patch("/conversations/{cid}")
@@ -1270,6 +1336,15 @@ async def ask(
                 if conv_id and conv_id != "legacy"
                 else None
             )
+            regenerated = False
+            if conv_doc and body.regenerate:
+                # W3 — پاسخ دوباره: دورِ آخر (همین پرسش) برداشته میشود تا
+                # کانتکست مدل و تاریخچه، پاسخ قبلی را تکرار نکنند.
+                regenerated = await db.ai_conv_pop_last_turn(
+                    conv_id, user_id, user_text=message
+                )
+                if regenerated:
+                    conv_doc = await _load_conv(conv_id, user_id)
             history_items = (
                 _conv_context_items(conv_doc)
                 if conv_doc
@@ -1281,24 +1356,60 @@ async def ask(
                 await rel
             raise
 
+        # W3 — عنوان خودکار در مسیر SSE (قبلاً فقط مسیر JSON عنوان میگذاشت)
+        stream_title = (
+            _auto_title(message)
+            if conv_doc and not _safe_int(conv_doc.get("msg_count"))
+            and str(conv_doc.get("title") or "").strip() in _UNTITLED
+            else None
+        )
+
         async def event_generator():
             accumulated_text: list[str] = []
             tokens_used = 0
+            failed = False
+            start_payload = {
+                "conversation_id": conv_id if conv_doc else "legacy",
+                "regenerated": regenerated,
+            }
+            if stream_title:
+                start_payload["title"] = stream_title
+            if body.stream_meta:
+                yield f"event: start\ndata: {json.dumps(start_payload, ensure_ascii=False)}\n\n"
             try:
-                async for event in ask_ai_stream(
-                    text=message, history=history_items, uid=user_id
-                ):
-                    if await request.is_disconnected():
-                        logger.info("Client disconnected from SSE stream user=%s", user_id)
-                        break
+                try:
+                    async for event in ask_ai_stream(
+                        text=message, history=history_items, uid=user_id
+                    ):
+                        if await request.is_disconnected():
+                            logger.info("Client disconnected from SSE stream user=%s", user_id)
+                            break
 
-                    if event.get("type") == "delta":
-                        delta_text = event.get("text", "")
-                        accumulated_text.append(delta_text)
-                        payload = json.dumps({"text": delta_text}, ensure_ascii=False)
-                        yield f"event: token\ndata: {payload}\n\n"
-                    elif event.get("type") == "done":
-                        tokens_used = event.get("tokens", 0)
+                        if event.get("type") == "delta":
+                            delta_text = event.get("text", "")
+                            accumulated_text.append(delta_text)
+                            payload = json.dumps({"text": delta_text}, ensure_ascii=False)
+                            yield f"event: token\ndata: {payload}\n\n"
+                        elif event.get("type") == "done":
+                            tokens_used = event.get("tokens", 0)
+                except Exception as error:
+                    # W3 — خطای وسط استریم دیگر بیصدا نیست: رویداد error
+                    # با پیام فارسی، و متنِ نیمهکاره (اگر بود) ذخیره میشود.
+                    failed = True
+                    logger.exception("Hoshyar SSE stream failed for user %s", user_id)
+                    code = "provider_unavailable" if isinstance(error, AIError) else "stream_failed"
+                    err_payload = json.dumps(
+                        {
+                            "code": code,
+                            "message": (
+                                str(error) if isinstance(error, AIError) and str(error)
+                                else "ارتباط با سرویس هوش مصنوعی ناموفق بود"
+                            ),
+                            "partial": bool(accumulated_text),
+                        },
+                        ensure_ascii=False,
+                    )
+                    yield f"event: error\ndata: {err_payload}\n\n"
 
                 full_answer = "".join(accumulated_text).strip()
                 if full_answer:
@@ -1308,7 +1419,7 @@ async def ask(
                             user_id,
                             {"r": "user", "t": message[:12000], "at": utc_now_iso()},
                             {"r": "assistant", "t": full_answer[:12000], "at": utc_now_iso()},
-                            title=None,
+                            title=stream_title,
                             preview=full_answer,
                             max_items=CONV_MAX_ITEMS,
                         )

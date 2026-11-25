@@ -16,7 +16,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'خانه', icon: 'i-home' },
   { to: '/library', label: 'کتابخانه', icon: 'i-book' },
   { to: '/exam', label: 'بانک سؤال', icon: 'i-flask' },
-  { to: '/ai', label: 'هوش‌یار پزشکی', icon: 'i-chat' },
+  { to: '/ai', label: 'هوش‌یار', icon: 'i-chat' },
   { to: '/grades', label: 'کارنامه و معدل', icon: 'i-award' },
   { to: '/schedule', label: 'برنامه مطالعه', icon: 'i-calendar' },
   { to: '/me/notes', label: 'دفترچه من', icon: 'i-pen' },

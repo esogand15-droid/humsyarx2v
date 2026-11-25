@@ -16,7 +16,7 @@ export function NotFoundScreen() {
         <DsEmpty
           icon={<Icon name="i-search" size={28} />}
           title="این صفحه وجود ندارد"
-          body="ممکن است نشانی اشتباه وارد شده باشد یا این بخش جابهجا شده باشد."
+          body="ممکن است نشانی اشتباه وارد شده باشد یا این بخش جابه‌جا شده باشد."
           action={
             <div className="not-found__actions">
               <DsButton onClick={() => navigate('/', { replace: true })}>

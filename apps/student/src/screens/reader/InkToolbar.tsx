@@ -837,8 +837,8 @@ export function InkToolbar({
                 type="button"
                 className={`ink-mini-action${isAiOpen ? ' is-on' : ''}`}
                 onClick={onToggleAi}
-                title="دستیار هوش‌یار بالینی (\)"
-                aria-label="هوش‌یار بالینی"
+                title="دستیار هوش‌یار (\)"
+                aria-label="هوش‌یار"
                 style={isAiOpen ? { color: '#00F2FE', background: 'rgba(0, 242, 254, 0.15)' } : undefined}
               >
                 <Icon name="i-chat" size={15} />

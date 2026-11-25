@@ -1,435 +1,441 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+/* هوش‌یار — گفتوگوی چندگانه در سطح ChatGPT.
+   مسیرها: /ai (گفتوگوی تازه، ساخت تنبل با اولین ارسال) و /ai/:id.
+   چیدمان: ≥۷۶۸px دو ستون (تاریخچه + گفتوگو)؛ موبایل: کشوی تاریخچه.
+   اسکرول: فقط وقتی کاربر پایین است دنبال استریم میرود؛ بالا رفتن ⇒ دکمهٔ «پایین».
+   iOS: ارتفاع با 100dvh و --aic-kb (از visualViewport) تا نوار نوشتن بالای کیبورد بماند. */
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { AppBar } from '../../components/AppBar';
-import { Button } from '../../components/Button';
-import { Card } from '../../components/Card';
-import { Chip } from '../../components/Chip';
 import { Icon } from '../../icons';
-import { streamAiChat, type AiMessage, type VisionDiagnosisResult } from '../../lib/ai';
+import { ai, aiErrorFrom, type AiConversation, type AiStatus, type VisionDiagnosisResult } from '../../lib/ai';
 import { AiVisionModal } from './AiVisionModal';
+import { ChatMessage } from './ChatMessage';
+import { Composer, type ComposerHandle } from './Composer';
+import { ConversationList } from './ConversationList';
+import { faNum } from './dates';
+import { pickStarters } from './starters';
+import { useAiChat } from './useAiChat';
+import './ai-chat.css';
 
-const SUGGESTIONS = [
-  'توضیح پاتوفیزیولوژی شوک سپتیک و مراحل درمانی',
-  'تفسیر تغییرات قطعه ST و موج T در نوار قلب (ECG)',
-  'مرور درمان مرحله‌ای پرفشاری خون مطابق آخرین گایدلاین',
-  'تشخیص‌های افتراقی درد حاد شکم در ربع تحتانی راست',
-];
+const ZW = '\u200c';
+const NEW_TITLE = `گفت${ZW}وگوی جدید`;
+const STICK_PX = 96;
+
+/** ارتفاع در دسترس برای گفتوگو: فاصلهٔ ریشه از بالای صفحه (هدر دسکتاپ) و
+    از پایین (تببار موبایل یا کیبورد مجازی، هر کدام بزرگتر) ⇒ --aic-top / --aic-bottom. */
+function useChatViewport(root: React.RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const vv = window.visualViewport;
+    let raf = 0;
+    const update = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const top = Math.max(0, el.getBoundingClientRect().top + window.scrollY);
+        const tab = document.querySelector<HTMLElement>('.app-tabbar, .tabbar');
+        const tabH = tab && getComputedStyle(tab).display !== 'none' ? tab.getBoundingClientRect().height : 0;
+        const kb = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+        const hasKb = kb > 80;
+        el.style.setProperty('--aic-top', `${Math.round(top)}px`);
+        el.style.setProperty('--aic-bottom', `${Math.round(hasKb ? kb : tabH)}px`);
+        el.classList.toggle('has-kb', hasKb);
+      });
+    };
+    update();
+    window.addEventListener('resize', update);
+    vv?.addEventListener('resize', update);
+    vv?.addEventListener('scroll', update);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', update);
+      vv?.removeEventListener('resize', update);
+      vv?.removeEventListener('scroll', update);
+    };
+  }, [root]);
+}
 
 export function AiChatScreen() {
-  const [messages, setMessages] = useState<AiMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [showVisionModal, setShowVisionModal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { id: routeId } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<ComposerHandle>(null);
+  useChatViewport(rootRef);
 
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const chatBottomRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  /* ── وضعیت سرویس ─────────────────────────────── */
+  const [status, setStatus] = useState<AiStatus | null>(null);
+  useEffect(() => {
+    let alive = true;
+    ai.status()
+      .then((s) => alive && setStatus(s))
+      .catch(() => {
+        /* بدون وضعیت هم گفتوگو کار میکند؛ خطا سر ارسال نشان داده میشود */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
-  const scrollToBottom = useCallback(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  /* ── فهرست گفتوگوها ──────────────────────────── */
+  const [convs, setConvs] = useState<AiConversation[]>([]);
+  const [convLoading, setConvLoading] = useState(true);
+  const [convError, setConvError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const queryRef = useRef('');
+  queryRef.current = query;
+
+  const fetchConvs = useCallback(async (q: string) => {
+    setConvLoading(true);
+    try {
+      const r = await ai.conversations({ q, limit: 100 });
+      if (queryRef.current.trim() !== q.trim()) return;
+      setConvs((r.conversations || []).filter((c) => !c.archived));
+      setConvError(null);
+    } catch (e) {
+      setConvError(aiErrorFrom(e).message);
+    } finally {
+      setConvLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isStreaming, scrollToBottom]);
+    const t = window.setTimeout(() => void fetchConvs(query), query ? 250 : 0);
+    return () => window.clearTimeout(t);
+  }, [query, fetchConvs]);
 
-  const handleSend = async (textToSend?: string) => {
-    const text = (textToSend || input).trim();
-    if (!text || isStreaming) return;
+  /* ── گفتوگوی فعال ────────────────────────────── */
+  const chat = useAiChat({
+    onCreated: (cid) => {
+      setConvs((prev) => {
+        const pinned = prev.filter((c) => c.pinned).length;
+        const now = new Date().toISOString();
+        const next = [...prev];
+        next.splice(pinned, 0, { id: cid, title: NEW_TITLE, created_at: now, updated_at: now, count: 0 });
+        return next;
+      });
+      navigate(`/ai/${encodeURIComponent(cid)}`, { replace: true });
+    },
+    onStart: (meta) => {
+      if (meta.title) setConvs((prev) => prev.map((c) => (c.id === meta.conversation_id ? { ...c, title: meta.title! } : c)));
+    },
+    onSettled: () => {
+      void fetchConvs(queryRef.current);
+      ai.status()
+        .then(setStatus)
+        .catch(() => undefined);
+    },
+  });
 
-    setError(null);
-    setInput('');
+  const activeId = routeId ? decodeURIComponent(routeId) : null;
+  useEffect(() => {
+    if ((activeId || null) === chat.cid()) return;
+    void chat.load(activeId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
 
-    const userMsgId = `user_${Date.now()}`;
-    const assistantMsgId = `assistant_${Date.now()}`;
+  const active = convs.find((c) => c.id === activeId) || null;
 
-    const userMsg: AiMessage = {
-      id: userMsgId,
-      role: 'user',
-      text,
-      timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-    };
+  /* ── اسکرول هوشمند ───────────────────────────── */
+  const stickRef = useRef(true);
+  const [showJump, setShowJump] = useState(false);
+  const olderAnchor = useRef<number | null>(null);
 
-    const initialAssistantMsg: AiMessage = {
-      id: assistantMsgId,
-      role: 'assistant',
-      text: '',
-      timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-    };
+  const toBottom = useCallback((smooth = false) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
 
-    setMessages((prev) => [...prev, userMsg, initialAssistantMsg]);
-    setIsStreaming(true);
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickRef.current = gap < STICK_PX;
+    setShowJump(gap > STICK_PX * 2);
+  };
 
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (olderAnchor.current !== null) {
+      el.scrollTop = el.scrollHeight - olderAnchor.current;
+      olderAnchor.current = null;
+      return;
+    }
+    if (stickRef.current) el.scrollTop = el.scrollHeight;
+  }, [chat.msgs]);
 
+  useEffect(() => {
+    stickRef.current = true;
+    setShowJump(false);
+  }, [activeId]);
+
+  /* ── کنشها ───────────────────────────────────── */
+  const [drawer, setDrawer] = useState(false);
+  const [vision, setVision] = useState(false);
+
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawer(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [drawer]);
+
+  const send = useCallback(
+    async (text: string) => {
+      stickRef.current = true;
+      return chat.send(text);
+    },
+    [chat],
+  );
+
+  const newChat = useCallback(() => {
+    setDrawer(false);
+    if (!activeId && chat.msgs.length === 0) {
+      composerRef.current?.focus();
+      return;
+    }
+    navigate('/ai');
+  }, [activeId, chat.msgs.length, navigate]);
+
+  const openConv = useCallback(
+    (id: string) => {
+      setDrawer(false);
+      if (id !== activeId) navigate(`/ai/${encodeURIComponent(id)}`);
+    },
+    [activeId, navigate],
+  );
+
+  const rename = useCallback(async (id: string, title: string) => {
     try {
-      await streamAiChat(
-        text,
-        null,
-        {
-          onToken: (token: string) => {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMsgId ? { ...msg, text: msg.text + token } : msg,
-              ),
-            );
-          },
-          onDone: (tokensUsed: number) => {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMsgId ? { ...msg, tokens_used: tokensUsed } : msg,
-              ),
-            );
-          },
-          onError: (err: Error) => {
-            setError(err.message || 'خطا در دریافت پاسخ از هوش‌یار');
-          },
-        },
-        controller.signal,
-      );
+      await ai.rename(id, title);
+      setConvs((prev) => prev.map((c) => (c.id === id ? { ...c, title } : c)));
+      return true;
     } catch {
-      // already reported in onError
-    } finally {
-      setIsStreaming(false);
-      abortControllerRef.current = null;
+      return false;
     }
+  }, []);
+
+  const pin = useCallback(
+    async (id: string, pinned: boolean) => {
+      try {
+        await ai.setPinned(id, pinned);
+        void fetchConvs(queryRef.current);
+      } catch {
+        /* بیصدا */
+      }
+    },
+    [fetchConvs],
+  );
+
+  const remove = useCallback(
+    async (id: string) => {
+      try {
+        await ai.remove(id);
+        setConvs((prev) => prev.filter((c) => c.id !== id));
+        if (id === activeId) navigate('/ai', { replace: true });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [activeId, navigate],
+  );
+
+  const onVision = (result: VisionDiagnosisResult, imageUrl: string, prompt: string) => {
+    stickRef.current = true;
+    const now = new Date().toISOString();
+    chat.append([
+      { role: 'user', text: prompt || `تحلیل این تصویر بالینی`, image: imageUrl, at: now, status: 'done' },
+      { role: 'assistant', text: result.analysis, chips: result.detected_structures, image: imageUrl, at: now, status: 'done' },
+    ]);
   };
 
-  const handleStop = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-      setIsStreaming(false);
-    }
+  const loadOlder = () => {
+    const el = scrollRef.current;
+    if (el) olderAnchor.current = el.scrollHeight - el.scrollTop;
+    void chat.loadOlder();
   };
 
-  const handleVisionApplied = (result: VisionDiagnosisResult, imageUrl: string, promptText: string) => {
-    const visionUserMsg: AiMessage = {
-      id: `user_vision_${Date.now()}`,
-      role: 'user',
-      text: promptText,
-      timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-      vision: { image_url: imageUrl },
-    };
+  /* ── وضعیت سهمیه/دسترسی ──────────────────────── */
+  const blocked = status && (!status.enabled || status.banned);
+  const quotaOut = status && !status.unlimited && status.remaining !== null && status.remaining <= 0;
+  const lowQuota = status && !status.unlimited && status.remaining !== null && status.remaining > 0 && status.remaining <= 3;
+  const canAttach = status?.capabilities?.image !== false;
+  const maxChars = status?.max_input_chars || 2000;
 
-    const visionAssistantMsg: AiMessage = {
-      id: `assistant_vision_${Date.now()}`,
-      role: 'assistant',
-      text: result.analysis,
-      timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-      tokens_used: result.tokens_used,
-      vision: {
-        detected_structures: result.detected_structures,
-        confidence_level: result.confidence_level,
-      },
-    };
+  const lastAssistant = useMemo(() => {
+    for (let i = chat.msgs.length - 1; i >= 0; i--) if (chat.msgs[i].role === 'assistant') return chat.msgs[i].key;
+    return '';
+  }, [chat.msgs]);
 
-    setMessages((prev) => [...prev, visionUserMsg, visionAssistantMsg]);
-  };
+  const starters = useMemo(() => pickStarters(4), []);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      void handleSend();
-    }
-  };
+  const headerActions = useMemo(
+    () => (
+      <div className="aic-head-actions">
+        <button type="button" className="iconbtn aic-hist-toggle" onClick={() => setDrawer(true)} aria-label={`تاریخچهٔ گفت${ZW}وگوها`} title={`تاریخچهٔ گفت${ZW}وگوها`}>
+          <Icon name="i-menu" size={20} />
+        </button>
+        <button type="button" className="iconbtn" onClick={newChat} aria-label={NEW_TITLE} title={NEW_TITLE}>
+          <Icon name="i-pen" size={18} />
+        </button>
+      </div>
+    ),
+    [newChat],
+  );
+
+  const empty = chat.msgs.length === 0 && !chat.loading && !chat.loadError;
 
   return (
-    <>
-      <AppBar
-        title="هوش‌یار پزشکی"
-        sub="دستیار هوشمند و تحلیل بالینی"
-        actions={
-          <div className="row gap-8">
-            <button
-              type="button"
-              className="iconbtn"
-              onClick={() => setShowVisionModal(true)}
-              title="تحلیل تصویر بالینی (Vision)"
-              aria-label="تحلیل تصویر بالینی"
-            >
-              <Icon name="i-upload" size={18} />
-            </button>
-            <button
-              type="button"
-              className="iconbtn"
-              onClick={() => {
-                if (isStreaming) handleStop();
-                setMessages([]);
-                setError(null);
-              }}
-              title="گفت‌وگوی تازه"
-              aria-label="گفت‌وگوی تازه"
-            >
-              <Icon name="i-chat" size={18} />
-            </button>
-          </div>
-        }
-      />
+    <div ref={rootRef} className="aic" data-section="ai">
+      <AppBar title="هوش‌یار" sub={active?.title && active.title !== NEW_TITLE ? active.title : `دستیار آموزشی پزشکی`} actions={headerActions} />
 
-      <div
-        className="page"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: 'calc(100vh - 120px)',
-          paddingBottom: 0,
-        }}
-      >
-        {/* پیام‌های چت */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '12px 0 20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 16,
-          }}
-        >
-          {messages.length === 0 ? (
-            <div style={{ textAlign: 'center', margin: 'auto 0', padding: '24px 12px' }}>
-              <div
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(0, 242, 254, 0.2))',
-                  border: '1px solid rgba(0, 242, 254, 0.3)',
-                  display: 'grid',
-                  placeItems: 'center',
-                  margin: '0 auto 16px',
-                  boxShadow: '0 0 24px -4px rgba(0, 242, 254, 0.3)',
-                }}
-              >
-                <Icon name="logo-mark" size={32} />
-              </div>
-              <h2 className="h2" style={{ fontSize: 18, marginBottom: 8 }}>
-                سلام! من هوش‌یار، دستیار هوش مصنوعی پزشکی هستم
-              </h2>
-              <p className="small color-muted" style={{ maxWidth: 440, margin: '0 auto 24px' }}>
-                می‌توانی درباره مباحث علوم پایه، بالینی، فارماکولوژی، تفسیر آزمایش‌ها و تحلیل تصاویر تشخیصی از من بپرسی.
-              </p>
+      <div className="aic-layout">
+        <div className={`aic-scrim${drawer ? ' is-open' : ''}`} onClick={() => setDrawer(false)} aria-hidden="true" />
+        <aside className={`aic-side${drawer ? ' is-open' : ''}`} aria-label={`گفت${ZW}وگوها`}>
+          <ConversationList
+            items={convs}
+            loading={convLoading}
+            error={convError}
+            activeId={activeId}
+            query={query}
+            onQuery={setQuery}
+            onOpen={openConv}
+            onNew={newChat}
+            onRename={rename}
+            onPin={pin}
+            onDelete={remove}
+            onRetry={() => void fetchConvs(query)}
+            onClose={() => setDrawer(false)}
+          />
+        </aside>
 
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                  maxWidth: 480,
-                  margin: '0 auto',
-                  textAlign: 'right',
-                }}
-              >
-                {SUGGESTIONS.map((sug, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => void handleSend(sug)}
-                    className="card card--glass"
-                    style={{
-                      padding: '12px 16px',
-                      cursor: 'pointer',
-                      fontSize: 13.5,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      textAlign: 'right',
-                      transition: 'all var(--t-fast) ease',
-                    }}
-                  >
-                    <Icon name="i-flask" size={16} />
-                    <span className="grow">{sug}</span>
-                    <Icon name="i-chevron" size={16} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            messages.map((msg) => {
-              const isUser = msg.role === 'user';
-              return (
-                <div
-                  key={msg.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: isUser ? 'flex-start' : 'flex-end',
-                    maxWidth: '85%',
-                    alignSelf: isUser ? 'flex-end' : 'flex-start',
-                  }}
-                >
-                  <div
-                    className={isUser ? 'card' : 'card card--glass'}
-                    style={{
-                      background: isUser
-                        ? 'linear-gradient(135deg, var(--hym-brand-700), var(--hym-brand-600))'
-                        : undefined,
-                      color: isUser ? '#FFFFFF' : 'var(--ink)',
-                      border: isUser ? 'none' : '1px solid var(--line)',
-                      borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                      padding: '12px 16px',
-                      boxShadow: 'var(--sh-1)',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {msg.vision?.image_url && (
-                      <div className="mb-10">
-                        <img
-                          src={msg.vision.image_url}
-                          alt="پیوست تصویر پزشکی"
-                          style={{
-                            maxHeight: 180,
-                            borderRadius: 8,
-                            objectFit: 'contain',
-                            display: 'block',
-                          }}
-                        />
-                      </div>
+        <section className="aic-pane" aria-label={`گفت${ZW}وگو با هوش‌یار`}>
+          <div ref={scrollRef} className="aic-scroll" onScroll={onScroll}>
+            <div className="aic-thread">
+              {chat.hasMore && (
+                <button type="button" className="ds-btn ds-btn--ghost ds-btn--sm aic-older" onClick={loadOlder} disabled={chat.loadingOlder} aria-busy={chat.loadingOlder || undefined}>
+                  {chat.loadingOlder && <span className="ds-btn__spin" aria-hidden="true" />}
+                  {`پیام${ZW}های قدیمی${ZW}تر`}
+                </button>
+              )}
+
+              {chat.loading && (
+                <div className="aic-loading" aria-label={`در حال بارگذاری گفت${ZW}وگو`}>
+                  <span className="ds-skel ds-skel--text aic-loading__u" />
+                  <span className="ds-skel ds-skel--card" />
+                  <span className="ds-skel ds-skel--text aic-loading__u" />
+                  <span className="ds-skel ds-skel--card" />
+                </div>
+              )}
+
+              {chat.loadError && (
+                <div className="ds-empty" role="alert">
+                  <div className="ds-empty__icon">
+                    <Icon name="i-alert-circle" size={28} />
+                  </div>
+                  <p className="ds-empty__title">{chat.loadError.status === 404 ? `این گفت${ZW}وگو پیدا نشد` : `گفت${ZW}وگو بارگذاری نشد`}</p>
+                  <p className="ds-empty__body">{chat.loadError.status === 404 ? `شاید حذف شده باشد.` : chat.loadError.message}</p>
+                  <div className="ds-empty__action aic-row">
+                    {chat.loadError.status !== 404 && (
+                      <button type="button" className="ds-btn ds-btn--secondary" onClick={() => void chat.load(activeId)}>
+                        <Icon name="i-refresh" size={18} />
+                        تلاش دوباره
+                      </button>
                     )}
-
-                    <div
-                      style={{
-                        fontSize: 14.5,
-                        lineHeight: 1.8,
-                        whiteSpace: 'pre-wrap',
-                      }}
-                    >
-                      {msg.text}
-                      {msg.role === 'assistant' && !msg.text && isStreaming && (
-                        <span className="typing-cursor" style={{ opacity: 0.8 }}>▍ در حال نگارش…</span>
-                      )}
-                    </div>
-
-                    {msg.vision?.detected_structures && msg.vision.detected_structures.length > 0 && (
-                      <div className="mt-8 pt-8" style={{ borderTop: '1px solid var(--line)' }}>
-                        <div className="row gap-4" style={{ flexWrap: 'wrap' }}>
-                          {msg.vision.detected_structures.map((s, idx) => (
-                            <Chip key={idx} variant="quiet">{s}</Chip>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div
-                      className="row row--between mt-6"
-                      style={{
-                        fontSize: 10,
-                        opacity: 0.7,
-                        alignItems: 'center',
-                        direction: 'ltr',
-                      }}
-                    >
-                      <span>{msg.timestamp}</span>
-                      {msg.tokens_used ? <span>{msg.tokens_used} tokens</span> : null}
-                    </div>
+                    <button type="button" className="ds-btn" onClick={() => navigate('/ai', { replace: true })}>
+                      <Icon name="i-plus" size={18} />
+                      {NEW_TITLE}
+                    </button>
                   </div>
                 </div>
-              );
-            })
-          )}
+              )}
 
-          {error && (
-            <Card
-              className="mt-8"
-              style={{
-                background: 'var(--danger-soft)',
-                borderColor: 'var(--danger)',
-                color: 'var(--danger)',
-                padding: '10px 14px',
-              }}
-            >
-              <div className="row gap-8" style={{ alignItems: 'center' }}>
-                <Icon name="i-alert-circle" size={18} />
-                <span className="small">{error}</span>
-              </div>
-            </Card>
-          )}
+              {empty && (
+                <div className="aic-hero">
+                  <span className="aic-hero__mark" aria-hidden="true">
+                    <Icon name="logo-mark" size={30} />
+                  </span>
+                  <h2 className="aic-hero__title">سلام، من هوش‌یارم</h2>
+                  <p className="aic-hero__sub">
+                    {`دستیار آموزشی تو برای علوم پایه و بالینی، فارماکولوژی، تفسیر آزمایش${ZW}ها و مرور پیش از امتحان.`}
+                  </p>
+                  {!blocked && !quotaOut && (
+                    <div className="aic-starters" role="list" aria-label={`پیشنهادهای شروع`}>
+                      {starters.map((s) => (
+                        <button key={s.text} type="button" role="listitem" className="aic-starter" onClick={() => void send(s.text)}>
+                          <span className="aic-starter__tag">
+                            <Icon name={s.icon} size={15} />
+                            {s.tag}
+                          </span>
+                          <span className="aic-starter__text">{s.text}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-          <div ref={chatBottomRef} />
-        </div>
+              {chat.msgs.map((m) => (
+                <ChatMessage key={m.key} msg={m} isLast={m.key === lastAssistant} busy={chat.streaming} onRegenerate={(k) => void chat.regenerate(k)} />
+              ))}
+            </div>
+          </div>
 
-        {/* ناحیه ورودی پیام */}
-        <div
-          style={{
-            borderTop: '1px solid var(--line)',
-            padding: '10px 0 16px',
-            background: 'var(--paper)',
-          }}
-        >
-          <div
-            className="row gap-8"
-            style={{
-              alignItems: 'flex-end',
-              background: 'var(--paper-2)',
-              border: '1px solid var(--line)',
-              borderRadius: 'var(--r-lg)',
-              padding: '6px 10px',
-            }}
-          >
+          {showJump && (
             <button
               type="button"
-              className="iconbtn"
-              style={{ width: 34, height: 34, border: 'none', background: 'transparent' }}
-              onClick={() => setShowVisionModal(true)}
-              title="بارگذاری تصویر بالینی (Vision)"
-              aria-label="بارگذاری تصویر بالینی"
-            >
-              <Icon name="i-upload" size={20} />
-            </button>
-
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="سؤال پزشکی یا بالینی خود را بنویسید…"
-              disabled={isStreaming}
-              style={{
-                flex: 1,
-                border: 'none',
-                background: 'transparent',
-                resize: 'none',
-                padding: '6px 4px',
-                fontSize: 'var(--hym-fs-input)',
-                lineHeight: 1.5,
-                outline: 'none',
-                color: 'var(--ink)',
-                maxHeight: 120,
+              className="aic-jump"
+              onClick={() => {
+                stickRef.current = true;
+                toBottom(true);
               }}
-            />
+              aria-label="رفتن به آخرین پیام"
+            >
+              <Icon name="i-arrow-down" size={20} />
+            </button>
+          )}
 
-            {isStreaming ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleStop}
-                style={{ padding: '6px 12px', color: 'var(--danger)' }}
-              >
-                توقف
-              </Button>
+          <div className="aic-dock">
+            {blocked ? (
+              <div className="aic-banner aic-banner--danger" role="status">
+                <Icon name="i-lock" size={18} />
+                <span>{status?.disabled_message || (status?.banned ? `دسترسی تو به هوش‌یار مسدود شده است.` : `هوش‌یار موقتاً غیرفعال است.`)}</span>
+              </div>
+            ) : quotaOut ? (
+              <div className="aic-banner" role="status">
+                <Icon name="i-clock" size={18} />
+                <span>
+                  {`سهمیهٔ امروز تمام شد (${faNum(status!.used_today)} از ${faNum(status!.daily_limit)}). از نیمه${ZW}شب دوباره می${ZW}توانی بپرسی.`}
+                </span>
+              </div>
             ) : (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => void handleSend()}
-                disabled={!input.trim()}
-                style={{ padding: '6px 16px' }}
-              >
-                ارسال
-              </Button>
+              <>
+                {lowQuota && (
+                  <div className="aic-quota" role="status">
+                    <span className="ds-badge ds-badge--warning">{`${faNum(status!.remaining!)} پرسش باقی${ZW}مانده امروز`}</span>
+                  </div>
+                )}
+                <Composer
+                  ref={composerRef}
+                  streaming={chat.streaming}
+                  maxChars={maxChars}
+                  canAttach={canAttach}
+                  draftId={activeId || 'new'}
+                  onSend={send}
+                  onStop={chat.stop}
+                  onAttach={() => setVision(true)}
+                />
+              </>
             )}
+            <p className="aic-disclaimer">{`هوش‌یار ممکن است اشتباه کند؛ برای تصمیم بالینی به منابع معتبر مراجعه کن.`}</p>
           </div>
-        </div>
+        </section>
       </div>
 
-      <AiVisionModal
-        open={showVisionModal}
-        onClose={() => setShowVisionModal(false)}
-        onApplyToChat={handleVisionApplied}
-      />
-    </>
+      <AiVisionModal open={vision} onClose={() => setVision(false)} onApplyToChat={onVision} />
+    </div>
   );
 }

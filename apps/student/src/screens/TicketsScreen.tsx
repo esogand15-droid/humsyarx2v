@@ -145,8 +145,8 @@ export function TicketsScreen() {
   return (
     <>
       <AppBar
-        title={selectedId != null ? `تیکت #${fa(selectedId)}` : 'پشتیبانی و تیکتها'}
-        sub="پاسخگویی به سؤالات فنی و آموزشی"
+        title={selectedId != null ? `تیکت ${fa(selectedId)}` : 'پشتیبانی و تیکت‌ها'}
+        sub="پاسخ‌گویی به سؤالات فنی و آموزشی"
         back={idParam != null}
         onBack={idParam != null ? () => setSelectedId(null) : undefined}
         actions={
@@ -163,10 +163,10 @@ export function TicketsScreen() {
           <EmptyState
             icon="i-message-circle"
             title="این تیکت پیدا نشد"
-            text="نشانی تیکت معتبر نیست. از فهرست تیکتها یکی را انتخاب کن."
+            text="نشانی تیکت معتبر نیست. از فهرست تیکت‌ها یکی را انتخاب کن."
             action={
               <Button variant="primary" size="sm" onClick={() => setSelectedId(null)}>
-                فهرست تیکتها
+                فهرست تیکت‌ها
               </Button>
             }
           />
@@ -187,7 +187,7 @@ export function TicketsScreen() {
                 <Card className="card--glass mb-16">
                   <div className="h3">{detail.subject}</div>
                   <div className="tiny color-muted mt-2">
-                    شناسه: #{fa(detail.id)}
+                    شناسه: {fa(detail.id)}
                     {detail.created_at ? ` · ${ticketTime(detail.created_at)}` : ''}
                   </div>
                 </Card>

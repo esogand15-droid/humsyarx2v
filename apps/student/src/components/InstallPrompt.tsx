@@ -119,17 +119,17 @@ export function InstallCard() {
           <h2 id="install-card-title" className="install-card__title">
             هامزیار را روی صفحهٔ اصلی نصب کن
           </h2>
-          <p className="install-card__sub">تمامصفحه و سریعتر باز میشود، مثل یک برنامهٔ واقعی.</p>
+          <p className="install-card__sub">تمام‌صفحه و سریع‌تر باز می‌شود، مثل یک برنامهٔ واقعی.</p>
         </div>
       </div>
 
       {ios && !canPrompt && (
         <ol className="install-card__steps">
           <li>
-            در Safari دکمهٔ <b>اشتراکگذاری</b> را بزن (مربع با فلش رو به بالا).
+            در <bdi dir="ltr">Safari</bdi> دکمهٔ <b>اشتراک‌گذاری</b> را بزن (مربع با فلش رو به بالا).
           </li>
           <li>
-            گزینهٔ <b>افزودن به صفحهٔ اصلی</b> (<bdi>Add to Home Screen</bdi>) را انتخاب کن.
+            گزینهٔ <b>افزودن به صفحهٔ اصلی</b> (<bdi dir="ltr">Add to Home Screen</bdi>) را انتخاب کن.
           </li>
         </ol>
       )}
