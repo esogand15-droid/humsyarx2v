@@ -18,7 +18,7 @@ const PRESET_PROMPTS = [
 
 export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
   void onClose;
-  const defaultWelcomeText = `سلام! من هوش‌یار بالینی هستم؛ همکار هوشمند مطالعهٔ شما در پلتفرم هامزیار.\nدر حال حاضر جزوهٔ «${bookletName || 'این بخش'}»${page ? ` (صفحهٔ ${page})` : ''} را مرور می‌کنید. هر سؤالی پیرامون فارماکولوژی، پاتوفیزیولوژی، تشخیص‌های افتراقی، یا تفسیر ECG دارید بپرسید تا با شواهد علمی پاسخ دهم.`;
+  const defaultWelcomeText = `سلام! من هوش‌یار هستم؛ همکار هوشمند مطالعهٔ شما در پلتفرم هامزیار.\nدر حال حاضر جزوهٔ «${bookletName || 'این بخش'}»${page ? ` (صفحهٔ ${page})` : ''} را مرور می‌کنید. هر سؤالی پیرامون فارماکولوژی، پاتوفیزیولوژی، تشخیص‌های افتراقی، یا تفسیر ECG دارید بپرسید تا با شواهد علمی پاسخ دهم.`;
 
   const [messages, setMessages] = useState<AiMessage[]>([
     {
@@ -127,7 +127,7 @@ export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
               {m.role === 'assistant' ? (
                 <div className="embedded-ai-sender-tag">
                   <span className="embedded-ai-pulse-dot" />
-                  <span className="embedded-ai-sender-name">هوش‌یار بالینی</span>
+                  <span className="embedded-ai-sender-name">هوش‌یار</span>
                 </div>
               ) : (
                 <span className="embedded-ai-user-tag">پرسش شما</span>

@@ -568,7 +568,7 @@ const COMMAND_MODULES: QuickAction[] = [
   },
   {
     to: '/ai',
-    label: 'هوش‌یار بالینی (AI)',
+    label: 'هوش‌یار',
     sub: 'دستیار پزشکی، سناریو و تحلیل تصویر',
     icon: 'i-chat',
     tag: 'هوش مصنوعی',
