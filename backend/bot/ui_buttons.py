@@ -424,16 +424,73 @@ def _palette_button(fn, button: AnyButton) -> AnyButton:
     return style_button(button, style) if style else button
 
 
+def _palette_row_callable():
+    """``palette_row_styles`` of the (already imported) palette module, or None."""
+    mod = sys.modules.get(PALETTE_MODULE)
+    fn = getattr(mod, "palette_row_styles", None) if mod is not None else None
+    return fn if callable(fn) else None
+
+
+def _button_key(button) -> Optional[tuple]:
+    if isinstance(button, InlineKeyboardButton):
+        cb = button.callback_data if isinstance(button.callback_data, str) else None
+        return (str(button.text or ""), cb, "inline", get_style(button))
+    if isinstance(button, KeyboardButton):
+        return (str(button.text or ""), None, "reply", get_style(button))
+    return None
+
+
+@functools.lru_cache(maxsize=4096)
+def _cached_row_styles(fn, keys: tuple) -> tuple:
+    # Row lookups are pure → memoised per row; ``fn`` is part of the key.
+    styles = tuple(fn(keys))
+    if len(styles) != len(keys):
+        raise ValueError("palette_row_styles returned a row of the wrong length")
+    return tuple(st if st in VALID_STYLES else None for st in styles)
+
+
+def _palette_rows(fn, markup):
+    """Row-aware palette pass (row rule: exit next to destructive → blue)."""
+    if isinstance(markup, InlineKeyboardMarkup):
+        attr = "inline_keyboard"
+    elif isinstance(markup, ReplyKeyboardMarkup):
+        attr = "keyboard"
+    else:
+        return markup
+    rows = getattr(markup, attr) or ()
+    new_rows, changed = [], False
+    for row in rows:
+        row = tuple(row)
+        keys = tuple(_button_key(b) for b in row)
+        styles = _cached_row_styles(fn, keys)
+        new_row = []
+        for b, key, st in zip(row, keys, styles):
+            nb = style_button(b, st) if (key is not None and key[3] is None and st) else b
+            changed = changed or nb is not b
+            new_row.append(nb)
+        new_rows.append(tuple(new_row))
+    if not changed:
+        return markup
+    new = copy.copy(markup)
+    with new._unfrozen():
+        setattr(new, attr, tuple(new_rows))
+    return new
+
+
 def apply_palette_styles(markup):
     """Return a markup where every unstyled button got its palette style
     (same object when nothing changes). Ignores env. Never raises: if the
-    palette module is missing or raises, the ORIGINAL markup is returned."""
+    palette module is missing or raises, the ORIGINAL markup is returned.
+    Uses the row-aware ``palette_row_styles`` when the module has it."""
     if not isinstance(markup, (InlineKeyboardMarkup, ReplyKeyboardMarkup)):
         return markup
     try:
         fn = _palette_callable()
         if fn is None:
             return markup
+        row_fn = _palette_row_callable()
+        if row_fn is not None:
+            return _palette_rows(row_fn, markup)
         return _map_markup(markup, lambda b: _palette_button(fn, b))
     except Exception:
         _log_once("palette-call", "🎨 palette_style raised — sending markup unchanged")

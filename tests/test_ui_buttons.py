@@ -476,12 +476,17 @@ def test_install_skips_unknown_bot_types():
 
 # ── 6. explicit palette at call sites ─────────────────────────────
 def test_main_keyboards_have_single_primary_dashboard():
-    # colour-grouped main menu: the learning group (rows 1-2) is blue
+    # colour-grouped main menu: blue block (learning first) → green money row
+    # → red staff panels; every button is coloured.
     from backend.bot import utils as bu
     for fn in (bu.main_keyboard, bu.content_admin_keyboard, bu.admin_keyboard, bu.sub_admin_keyboard):
         kb = fn()
-        prim = [b.text for row in kb.keyboard for b in row if get_style(b) == PRIMARY]
-        assert prim == ["🩺 داشبورد", "📚 منابع", "🧪 بانک سوال", "🤖 هوشیار"], fn.__name__
+        flat = [b for row in kb.keyboard for b in row]
+        prim = [b.text for b in flat if get_style(b) == PRIMARY]
+        assert prim[:4] == ["🩺 داشبورد", "📚 منابع", "🧪 بانک سوال", "🤖 هوشیار"], fn.__name__
+        assert all(get_style(b) is not None for b in flat), fn.__name__
+        order = [get_style(b) for b in flat]
+        assert order == sorted(order, key=[PRIMARY, "success", "danger"].index), fn.__name__
         assert kb.keyboard[0][0].text == "🩺 داشبورد", fn.__name__
 
 

@@ -67,39 +67,39 @@ def _menu_learning_rows() -> list:
 
 
 def _menu_support_rows() -> list:
-    """ردیف ۳ سبز (اشتراک/حمایت)."""
+    """ردیف سبز (اشتراک/حمایت) — زیر بلوک آبی، بالای پنل‌های قرمز."""
     return [[kbtn("💎 اشتراک ویژه", style=SUCCESS), kbtn("💙 حمایت مالی", style=SUCCESS)]]
 
 
 def _menu_default_rows(with_grades: bool = True) -> list:
-    """ردیفهای خنثی (رنگ پیشفرض کلاینت)."""
+    """ردیف‌های آبی: ابزارهای دانشجو، حساب و پشتیبانی (باز کردن یک بخش)."""
     rows = []
     if with_grades:
-        rows.append([KeyboardButton("📅 برنامه"), KeyboardButton("📊 کارنامه و معدل")])
-    rows.append([KeyboardButton("👤 پروفایل"), KeyboardButton("🔔 اعلان\u200cها")])
-    rows.append([KeyboardButton("❓ سوالات متداول"), KeyboardButton("🎫 پشتیبانی")])
+        rows.append([kbtn("📅 برنامه", style=PRIMARY), kbtn("📊 کارنامه و معدل", style=PRIMARY)])
+    rows.append([kbtn("👤 پروفایل", style=PRIMARY), kbtn("🔔 اعلان\u200cها", style=PRIMARY)])
+    rows.append([kbtn("❓ سوالات متداول", style=PRIMARY), kbtn("🎫 پشتیبانی", style=PRIMARY)])
     if not with_grades:
         # sub_admin کارنامه ندارد — «📅 برنامه» تنها در ردیف خنثی میماند
-        rows.insert(0, [KeyboardButton("📅 برنامه")])
+        rows.insert(0, [kbtn("📅 برنامه", style=PRIMARY)])
     return rows
 
 
 def main_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
-        _menu_learning_rows() + _menu_support_rows() + _menu_default_rows(),
+        _menu_learning_rows() + _menu_default_rows() + _menu_support_rows(),
         resize_keyboard=True)
 
 
 def content_admin_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
-        _menu_learning_rows() + _menu_support_rows() + _menu_default_rows()
+        _menu_learning_rows() + _menu_default_rows() + _menu_support_rows()
         + [[kbtn(MENU_CONTENT_PANEL, style=DANGER)]],
         resize_keyboard=True)
 
 
 def admin_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
-        _menu_learning_rows() + _menu_support_rows() + _menu_default_rows()
+        _menu_learning_rows() + _menu_default_rows() + _menu_support_rows()
         + [[kbtn(MENU_ADMIN_PANEL, style=DANGER), kbtn(MENU_CONTENT_PANEL, style=DANGER)]],
         resize_keyboard=True)
 
@@ -111,7 +111,7 @@ def sub_admin_keyboard() -> ReplyKeyboardMarkup:
     (همان مجموعهٔ دکمههای قبلی، بدون کارنامه؛ فقط گروهبندی رنگی.)
     """
     return ReplyKeyboardMarkup(
-        _menu_learning_rows() + _menu_support_rows() + _menu_default_rows(with_grades=False)
+        _menu_learning_rows() + _menu_default_rows(with_grades=False) + _menu_support_rows()
         + [[kbtn(MENU_ADMIN_PANEL, style=DANGER)]],
         resize_keyboard=True)
 
@@ -173,8 +173,8 @@ async def ring_aware_keyboard(kb: ReplyKeyboardMarkup) -> ReplyKeyboardMarkup:
         # ⚠️ کیبورد reply آتریبیوت `keyboard` دارد (نه `inline_keyboard`)؛
         # اشتباه در اینجا با except بلعیده می‌شد و دکمه هیچ‌وقت اضافه نمی‌شد.
         # 🎨 همان اشیای دکمه (با api_kwargs/style) دوباره استفاده میشوند؛
-        # دکمهٔ رینگ عمداً رنگ پیشفرض دارد.
-        rows = [[KeyboardButton("💍 رینگ استریت")]] + [list(r) for r in (kb.keyboard or [])]
+        # دکمهٔ رینگ هم آبی است (ورود به یک بخش).
+        rows = [[kbtn("💍 رینگ استریت", style=PRIMARY)]] + [list(r) for r in (kb.keyboard or [])]
         return ReplyKeyboardMarkup(rows, resize_keyboard=True,
                                    one_time_keyboard=getattr(kb, "one_time_keyboard", False),
                                    input_field_placeholder=getattr(kb, "input_field_placeholder", None),

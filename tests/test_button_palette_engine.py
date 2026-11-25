@@ -284,19 +284,21 @@ P, S, D, N = "primary", "success", "danger", None
 _COMMON = [
     [("🩺 داشبورد", P), ("📚 منابع", P)],
     [("🧪 بانک سوال", P), ("🤖 هوشیار", P)],
+]
+_MONEY = [
     [("💎 اشتراک ویژه", S), ("💙 حمایت مالی", S)],
 ]
 _TAIL = [
-    [("👤 پروفایل", N), ("🔔 اعلان\u200cها", N)],
-    [("❓ سوالات متداول", N), ("🎫 پشتیبانی", N)],
+    [("👤 پروفایل", P), ("🔔 اعلان\u200cها", P)],
+    [("❓ سوالات متداول", P), ("🎫 پشتیبانی", P)],
 ]
 EXPECTED = {
-    "main_keyboard": _COMMON + [[("📅 برنامه", N), ("📊 کارنامه و معدل", N)]] + _TAIL,
-    "content_admin_keyboard": _COMMON + [[("📅 برنامه", N), ("📊 کارنامه و معدل", N)]] + _TAIL
+    "main_keyboard": _COMMON + [[("📅 برنامه", P), ("📊 کارنامه و معدل", P)]] + _TAIL + _MONEY,
+    "content_admin_keyboard": _COMMON + [[("📅 برنامه", P), ("📊 کارنامه و معدل", P)]] + _TAIL + _MONEY
     + [[("🎓 پنل محتوا", D)]],
-    "admin_keyboard": _COMMON + [[("📅 برنامه", N), ("📊 کارنامه و معدل", N)]] + _TAIL
+    "admin_keyboard": _COMMON + [[("📅 برنامه", P), ("📊 کارنامه و معدل", P)]] + _TAIL + _MONEY
     + [[(ADMIN_LABEL, D), ("🎓 پنل محتوا", D)]],
-    "sub_admin_keyboard": _COMMON + [[("📅 برنامه", N)]] + _TAIL + [[(ADMIN_LABEL, D)]],
+    "sub_admin_keyboard": _COMMON + [[("📅 برنامه", P)]] + _TAIL + _MONEY + [[(ADMIN_LABEL, D)]],
 }
 
 
@@ -399,7 +401,7 @@ def test_ring_aware_keyboard_preserves_styles(monkeypatch):
     out = asyncio.run(bu.ring_aware_keyboard(src))
     assert out is not src
     ser = _serialized(out)
-    assert ser[0] == [(RING_LABEL, None)]              # ring button: default colour
+    assert ser[0] == [(RING_LABEL, "primary")]         # ring button: blue entry
     assert ser[1:] == EXPECTED["admin_keyboard"]       # every style kept
     assert out.resize_keyboard is True
     assert _serialized(src) == EXPECTED["admin_keyboard"]  # original untouched

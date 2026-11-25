@@ -7,36 +7,44 @@ gets the same colour on every screen.
 Telegram styles: ``primary`` (blue), ``success`` (green), ``danger`` (red);
 anything not in these tables = ``None`` = default client colour.
 
-PALETTE (decided by the lead)
------------------------------
-* primary  — go deeper into learning content / the main "open" action of a
-             hub (dashboard, resources, question bank, Hooshyar, smart practice,
-             start exam/quiz, open lecture scribe, start registration,
-             new ticket, buy-subscription entry, edit-profile main action).
-* success  — money + final positive commitments (plans/buy/pay/"I paid,
-             check", donation, final confirm/submit/send/save/approve/accept/
-             renew, admin approve).
-* danger   — destructive / rejecting actions (delete, remove, block/ban,
-             reject, purge/clear, cancel subscription) — entry button AND the
-             final "yes, delete" confirmation. Also the staff-area entries
-             («👨‍⚕️ پنل ادمین», «🎓 پنل محتوا», «🎓 رفتن به پنل محتوا») ONLY on the
-             reply main menu and their direct entry buttons.
-* none     — back/home/menu/page/close, cancel/«لغو»/«انصراف»/«نه», toggles,
-             DB selection lists, info/secondary entries, external urls (unless
-             payment/donation) and NEVER quiz answer options.
+PALETTE — one rule for every button (user request 2026-11-25: «همهٔ دکمه‌ها
+رنگی و مرتب، با یک منطق مشخص؛ دکمهٔ بازگشت قرمز»)
+-----------------------------------------------------------------------------
+* primary (blue)  — "go / open": every entry, menu item, list item (terms,
+                    lessons, sessions, books, FAQ, users …), page navigation,
+                    toggles, external links. This is the DEFAULT for any button
+                    that matches nothing else.
+* success (green) — money + final positive commitments (plans/buy/pay/"I paid",
+                    donation, confirm/submit/send/save/approve/renew) and the
+                    selected / current item of a list (label starts with ✅).
+* danger  (red)   — EXIT: back / home / cancel / «نه» / «بی‌خیال» / close (by
+                    label, or by a cancel callback) — and DESTRUCTIVE: delete /
+                    remove / block / reject / purge / cancel subscription (by the
+                    callback tables). Also the staff-area entries
+                    («👨‍⚕️ پنل ادمین», «🎓 پنل محتوا», «🎓 رفتن به پنل محتوا»).
+* none            — ONLY quiz answer options (``NEVER_PREFIX``): every option of
+                    a question looks identical, so a colour can never hint the
+                    answer.
 
-LOOKUP ORDER (``palette_style``)
---------------------------------
-1. NEVER wins over everything: ``NEVER_TEXT_PREFIX`` / ``NEVER_TEXT_EXACT``
-   (navigation / cancel labels), then ``NEVER_CALLBACK_EXACT`` /
-   ``NEVER_PREFIX`` (quiz answers, selections, cancel callbacks).
-2. reply keyboards → ``REPLY_LABEL_STYLES`` (exact label).
-3. inline url / web_app buttons (no callback_data) → ``URL_LABEL_STYLES``.
-4. ``INLINE_PAIR_STYLES`` — (exact label, exact callback) for callbacks that
-   are SHARED between an action and a back button (``sub:back``,
-   ``quiz:main``, ``ca:main``, ``admin:main``) and therefore can't be keyed
-   by callback alone.
-5. ``CALLBACK_EXACT`` → longest matching ``CALLBACK_PREFIX``.
+ROW RULE (``palette_row_styles``): when a row holds a DESTRUCTIVE button next
+to an EXIT button («🗑 بله، حذف کن» | «🔙 انصراف»), the exit one turns blue so
+the two are never the same red side by side.
+
+LOOKUP ORDER (``palette_role``)
+-------------------------------
+1. quiz answers (``NEVER_PREFIX``) → none.
+2. reply keyboards → ``REPLY_LABEL_STYLES``; else exit label → red; else blue.
+3. url / web_app buttons → ``URL_LABEL_STYLES``; else exit label → red; else blue.
+4. ``INLINE_PAIR_STYLES`` — (label, callback) for callbacks shared between an
+   action and a back button (``sub:back``, ``quiz:main``, ``ca:main``,
+   ``admin:main``).
+5. ``CALLBACK_EXACT`` / longest ``CALLBACK_PREFIX`` = danger → destructive red.
+6. exit label (``is_exit_text``) or exit callback → red. The label wins over a
+   non-danger callback, so «↩️ بازگشت» sharing ``ring:p:done`` with «💾 ذخیره»
+   is red while «💾 ذخیره» stays green.
+7. any other table hit (primary / success).
+8. label starts with 🗑 / 🚫 / ⛔ / 🛑 / ⏹ / ⏸ → red; ✅ / ☑ / ✔ → green;
+   otherwise → blue.
 
 Styling never changes text/callback_data (ring ``CONTROL_LABELS`` stay intact).
 Labels are byte-exact copies of the source (ZWNJ ``\\u200c`` / ZWJ ``\\u200d``
@@ -44,6 +52,7 @@ written as escapes on purpose).
 """
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 PRIMARY, SUCCESS, DANGER = "primary", "success", "danger"
@@ -71,18 +80,18 @@ REPLY_LABEL_STYLES: dict[str, str] = {
     # ناحیهٔ محدود (کادر) — قرمز
     _ADMIN_PANEL: DANGER,
     _CONTENT_PANEL: DANGER,
+    # ابزارهای دانشجو / حساب / پشتیبانی / رینگ — آبی (باز کردن یک بخش)
+    "❓ سوالات متداول": PRIMARY,
+    "📅 برنامه": PRIMARY,
+    "👤 پروفایل": PRIMARY,
+    "🔔 اعلان" + _ZWNJ + "ها": PRIMARY,
+    "📊 کارنامه و معدل": PRIMARY,
+    "🎫 پشتیبانی": PRIMARY,
+    "💍 رینگ استریت": PRIMARY,
 }
 
-# Reply labels deliberately left default (documentation + drift test).
-EXPLICIT_NONE_REPLY_LABELS: frozenset[str] = frozenset({
-    "❓ سوالات متداول",
-    "📅 برنامه",
-    "👤 پروفایل",
-    "🔔 اعلان" + _ZWNJ + "ها",
-    "📊 کارنامه و معدل",
-    "🎫 پشتیبانی",
-    "💍 رینگ استریت",          # ring entry → none
-})
+# Kept for backwards compatibility — every main-menu label is coloured now.
+EXPLICIT_NONE_REPLY_LABELS: frozenset[str] = frozenset()
 
 # ══════════════════════════════════════════════════════════════
 #  2) Inline url / web_app buttons — matched by exact label
@@ -200,6 +209,15 @@ CALLBACK_EXACT: dict[str, str] = {
     "ring:r:send_block": DANGER,          # 🚫 گزارش + مسدودسازی
     "ring:del": DANGER,                   # 🗑 حذف پروفایل
     "ring:del:yes": DANGER,               # ⚠️ بله، پروفایل رینگ حذف شود
+    "ring:stopq": DANGER,                 # ⏸ توقف جست‌وجو (leaves the queue for good)
+
+    # ── stop / leave actions ──
+    "aiu:vc_leave": DANGER,               # 📴 خروج هوشیار از ویس‌چت
+
+    # ── list views whose label starts with 🚫 — opening a list is not destructive ──
+    "admin:blacklist_view": PRIMARY,      # 🚫 لیست مسدودها (بلک‌لیست)
+    "ai:ban_list": PRIMARY,               # 📋 لیست مسدودشده‌ها
+    "ring:blocked": PRIMARY,              # 🚫 مسدودشده‌ها
 }
 
 # ══════════════════════════════════════════════════════════════
@@ -271,56 +289,49 @@ CALLBACK_PREFIX: tuple[tuple[str, str], ...] = (
 )
 
 # ══════════════════════════════════════════════════════════════
-#  6) NEVER styled — wins over everything above
+#  6) Never / exit
 # ══════════════════════════════════════════════════════════════
+# Quiz answer options — NEVER coloured: all options of a question must look
+# identical whatever their callbacks, so no colour can hint the answer.
 NEVER_PREFIX: tuple[str, ...] = (
-    # quiz answer options / disabled — must never leak the correct answer
     "answer:", "questions:exam_answer:", "questions:ai_personal_answer:",
     "exam_answer:", "ai_personal_answer:", "btn_disabled:",
-    # quiz / exam setup selections
-    "qd:", "questions:sel_", "questions:cr_",
-    "questions:cx_count:", "questions:cx_lesson:", "questions:cx_topic:",
-    "questions:cx_time:", "questions:cx_output:",
-    "quiz:cnt:", "quiz:go:", "quiz:tp:", "quiz:doc:",
-    "report:question:", "report:reason:",
-    # DB selection lists (terms, lessons, sessions, books, FAQ, users, intakes)
-    "resources:term:", "resources:lesson:", "resources:topic:", "resources:files:",
-    "download_resource:", "bs:term:", "bs:lesson:", "bs:session:", "bs_dl:",
-    "ref:subject:", "ref:book:", "ref:volumes:", "ref:dl:",
-    "faq:cat:", "faq:item:",
-    "ca:term:", "ca:lesson:", "ca:session:", "ca:ref_subject:", "ca:ref_book:",
-    "ca:intake:", "admin:user_detail:", "admin:users:", "suba:user:",
-    "suba:view_pay:", "grades:lesson_pick:", "grades:term_pick",
-    "register:intake:", "profile:set_intake:", "admin:set_intake_user:",
-    # cancel
-    "ls:cancel:",
 )
+# Kept for backwards compatibility (cancel callbacks are EXIT now).
+NEVER_CALLBACK_EXACT: frozenset[str] = frozenset()
 
-NEVER_CALLBACK_EXACT: frozenset[str] = frozenset({
-    # cancel / «نه» / skip — cancelling is not destructive
+# Cancel / «نه» / skip / clear-filter callbacks → EXIT (red) whatever the label.
+EXIT_CALLBACK_EXACT: frozenset[str] = frozenset({
     "admin:bc_cancel", "admin:poll_cancel", "ls:smart_cancel",
-    "schedule:scan_cancel", "schedule:cancel_pending", "ticket:preview_cancel",
+    "schedule:scan_cancel", "schedule:cancel_pending",
     "questions:dup_cancel", "register:cancel", "report:cancel",
     "ca:cancel_filename", "ring:cancelq", "ring:t:no", "ring:reveal:no",
-    "sub:gskip",
-    # «❌ حذف فیلتر» only clears a list filter; «🙂 کسی را مسدود نکرده‌ای» is info
-    "admin:uf_clear", "ring:blocked",
+    "sub:gskip", "admin:uf_clear",
 })
+# «✏️ ویرایش» uses ticket:preview_cancel — an edit, so it is NOT an exit.
+EXIT_PREFIX: tuple[str, ...] = ("ls:cancel:",)
 
-# Navigation / cancel labels — never coloured whatever the callback is
-# (protects shared callbacks such as `sub:back`, `questions:practice` used as
-# back targets). «↩️» is NOT a prefix here: it also starts undo actions
-# (↩️ لغو دسترسی محتوا, ↩️ بله، بازگشت به سراسری) — so the ↩️ BACK labels are
-# listed exactly (they share callbacks such as `ring:p:done`, `quiz:start:`).
-NEVER_TEXT_PREFIX: tuple[str, ...] = ("🔙", "🏠", "◀", "⬅", "⏮", "🔒")
-NEVER_TEXT_EXACT: frozenset[str] = frozenset({
-    "❌ لغو", "❌ انصراف",
-    "↩️ بازگشت", "↩️ بازگشت به رینگ", "↩️ بازگشت به گفتگو",
-    "↩️ بازگشت به پروفایل من", "↩️ بیخیال",
+# Back / home / cancel labels → EXIT (red): a leading icon, or a FIRST word
+# from EXIT_WORDS («🔒 بازگشت به …», «🙏 نه», «بی‌خیال پیام ✋»). Only the first
+# word counts, so «💾 ذخیره و بازگشت» stays a save button.
+EXIT_TEXT_PREFIX: tuple[str, ...] = ("🔙", "🏠", "↩", "❌", "✖", "🔚")
+EXIT_WORDS: frozenset[str] = frozenset({
+    "بازگشت", "برگشت", "انصراف", "لغو", "بیخیال", "بستن", "خیر", "نه",
 })
+# Stop / delete / block icons → DESTRUCTIVE (red) when no table entry decides
+# (ring reply controls «🚫 بلاک», «⏹ پایان گفتگو», «🛑 توقف پاسخ», «⛔️ پایان و گزارش»).
+DANGER_TEXT_PREFIX: tuple[str, ...] = ("🗑", "🚫", "⛔", "🛑", "⏹", "⏸")
+# «🔔 لغو بی‌صدا» = unmute, not cancel.
+_NOT_EXIT_MARKERS: tuple[str, ...] = ("صدا",)
+# A leading tick marks the selected / current item of a list → green.
+SELECTED_TEXT_PREFIX: tuple[str, ...] = ("✅", "☑", "✔")
+
+EXIT, DESTRUCTIVE = "exit", "destructive"
 
 _PREFIX_SORTED: tuple[tuple[str, str], ...] = tuple(
     sorted(CALLBACK_PREFIX, key=lambda p: len(p[0]), reverse=True))
+_WORD_RE = re.compile(r"[\w\u200c]+")
+_CHAR_MAP = str.maketrans({"ي": "ی", "ك": "ک"})
 
 
 def _lookup(cb: str, exact, prefixes) -> Optional[str]:
@@ -334,38 +345,107 @@ def _lookup(cb: str, exact, prefixes) -> Optional[str]:
     return best
 
 
-def _never_text(text: str) -> bool:
-    return text in NEVER_TEXT_EXACT or text.startswith(NEVER_TEXT_PREFIX)
+def is_exit_text(text: str) -> bool:
+    """True for back / home / cancel / «نه» labels."""
+    t = (text if isinstance(text, str) else "").strip()
+    if not t:
+        return False
+    if t.startswith(EXIT_TEXT_PREFIX):
+        return True
+    if any(mk in t for mk in _NOT_EXIT_MARKERS):
+        return False
+    m = _WORD_RE.search(t.translate(_CHAR_MAP))
+    return bool(m) and m.group(0).replace(_ZWNJ, "") in EXIT_WORDS
+
+
+def _by_label(t: str) -> tuple[Optional[str], Optional[str]]:
+    """Fallback when no table entry decides: exit → red, stop/delete icon →
+    red, tick → green, anything else → blue."""
+    if is_exit_text(t):
+        return DANGER, EXIT
+    s = t.lstrip()
+    if s.startswith(DANGER_TEXT_PREFIX):
+        return DANGER, DESTRUCTIVE
+    if s.startswith(SELECTED_TEXT_PREFIX):
+        return SUCCESS, None
+    return PRIMARY, None
+
+
+def palette_role(text: str, callback_data: Optional[str], *,
+                 kind: str) -> tuple[Optional[str], Optional[str]]:
+    """``(style, role)`` of a button; role is ``EXIT``, ``DESTRUCTIVE`` or None.
+
+    ``kind`` is ``'reply'`` or ``'inline'``. Pure and total: never raises for
+    str/None inputs.
+    """
+    t = text if isinstance(text, str) else ""
+    if not t.strip():
+        return None, None
+    if kind == "reply":
+        style = REPLY_LABEL_STYLES.get(t)
+        return (style, None) if style is not None else _by_label(t)
+    if kind != "inline":
+        return None, None
+    if not callback_data:            # url / web_app / login_url buttons
+        style = URL_LABEL_STYLES.get(t)
+        return (style, None) if style is not None else _by_label(t)
+    cb = str(callback_data)
+    if cb.startswith(NEVER_PREFIX) or cb in NEVER_CALLBACK_EXACT:
+        return None, None
+    pair = INLINE_PAIR_STYLES.get((t, cb))
+    if pair is not None:
+        return pair, None
+    looked = _lookup(cb, CALLBACK_EXACT, _PREFIX_SORTED)
+    if looked == DANGER:
+        return DANGER, DESTRUCTIVE
+    if is_exit_text(t) or cb in EXIT_CALLBACK_EXACT or cb.startswith(EXIT_PREFIX):
+        return DANGER, EXIT
+    if looked is not None:
+        return looked, None
+    return _by_label(t)
 
 
 def palette_style(text: str, callback_data: Optional[str], *, kind: str) -> Optional[str]:
-    """Central colour for a button. ``kind`` is ``'reply'`` or ``'inline'``.
+    """Central colour for a single button (no row context).
 
     Returns ``"primary"``/``"success"``/``"danger"`` or ``None`` (default).
-    Pure and total: never raises for str/None inputs.
     """
-    t = text if isinstance(text, str) else ""
-    if _never_text(t):
-        return None
-    if kind == "reply":
-        return REPLY_LABEL_STYLES.get(t)
-    if kind != "inline":
-        return None
-    if not callback_data:            # url / web_app / login_url buttons
-        return URL_LABEL_STYLES.get(t)
-    cb = str(callback_data)
-    if cb in NEVER_CALLBACK_EXACT or cb.startswith(NEVER_PREFIX):
-        return None
-    pair = INLINE_PAIR_STYLES.get((t, cb))
-    if pair is not None:
-        return pair
-    return _lookup(cb, CALLBACK_EXACT, _PREFIX_SORTED)
+    return palette_role(text, callback_data, kind=kind)[0]
+
+
+def palette_row_styles(row) -> tuple:
+    """Styles for one keyboard row, with the row rule applied.
+
+    ``row`` items are ``(text, callback_data, kind, explicit_style)`` — or
+    None for a non-button. Explicit styles are returned unchanged; an
+    unstyled EXIT next to a DESTRUCTIVE button becomes PRIMARY.
+    """
+    styles, roles = [], []
+    for item in row:
+        if item is None:
+            styles.append(None)
+            roles.append((None, True))
+            continue
+        text, cb, kind, explicit = item
+        if explicit in VALID_STYLES:
+            role = EXIT if is_exit_text(text) else (DESTRUCTIVE if explicit == DANGER else None)
+            styles.append(explicit)
+            roles.append((role, True))
+        else:
+            style, role = palette_role(text, cb, kind=kind)
+            styles.append(style)
+            roles.append((role, False))
+    if any(role == DESTRUCTIVE for role, _ in roles):
+        styles = [PRIMARY if (role == EXIT and not fixed) else s
+                  for s, (role, fixed) in zip(styles, roles)]
+    return tuple(styles)
 
 
 __all__ = [
-    "PRIMARY", "SUCCESS", "DANGER", "VALID_STYLES",
+    "PRIMARY", "SUCCESS", "DANGER", "VALID_STYLES", "EXIT", "DESTRUCTIVE",
     "REPLY_LABEL_STYLES", "EXPLICIT_NONE_REPLY_LABELS", "URL_LABEL_STYLES",
     "INLINE_PAIR_STYLES", "CALLBACK_EXACT", "CALLBACK_PREFIX",
-    "NEVER_PREFIX", "NEVER_CALLBACK_EXACT", "NEVER_TEXT_PREFIX",
-    "NEVER_TEXT_EXACT", "palette_style",
+    "NEVER_PREFIX", "NEVER_CALLBACK_EXACT", "EXIT_CALLBACK_EXACT", "EXIT_PREFIX",
+    "EXIT_TEXT_PREFIX", "EXIT_WORDS", "SELECTED_TEXT_PREFIX", "DANGER_TEXT_PREFIX",
+    "is_exit_text", "palette_role", "palette_style", "palette_row_styles",
 ]

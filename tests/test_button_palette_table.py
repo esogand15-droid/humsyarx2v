@@ -174,7 +174,7 @@ def test_staff_labels_contain_zwj_and_are_danger():
     assert admin in REPLY_LABEL_STYLES and "\u200d" in admin
     assert REPLY_LABEL_STYLES[admin] == DANGER
     assert REPLY_LABEL_STYLES["🎓 پنل محتوا"] == DANGER
-    assert "💍 رینگ استریت" not in REPLY_LABEL_STYLES
+    assert REPLY_LABEL_STYLES["💍 رینگ استریت"] == PRIMARY
 
 
 # ── no styled entry may touch quiz / back / cancel callbacks ────
@@ -194,11 +194,13 @@ def test_styled_entries_not_shadowed_by_never():
     assert not dead, dead
 
 
-def test_scanned_protected_callbacks_resolve_to_none():
-    # Using a neutral label: any scanned back/cancel/quiz callback is uncoloured.
-    styled = [cb for cb in PROTECTED
-              if palette_style("x", cb + "1", kind="inline") is not None
-              or palette_style("x", cb, kind="inline") is not None]
+def test_scanned_protected_callbacks_follow_the_exit_rule():
+    # quiz answers stay plain; a back/cancel label is red whatever the callback.
+    answers = [cb for cb in PROTECTED if cb.startswith(QUIZ_ANSWER_PREFIXES)]
+    assert answers
+    assert all(palette_style("x", cb + "1", kind="inline") is None for cb in answers)
+    others = [cb for cb in PROTECTED if not cb.startswith(QUIZ_ANSWER_PREFIXES)]
+    styled = [cb for cb in others if palette_style("🔙 بازگشت", cb, kind="inline") != DANGER]
     assert not styled, styled
 
 
@@ -206,17 +208,62 @@ def test_scanned_protected_callbacks_resolve_to_none():
 @pytest.mark.parametrize("cb", [
     "answer:0:1", "questions:exam_answer:3", "questions:ai_personal_answer:2",
     "exam_answer:1", "ai_personal_answer:0", "btn_disabled:x",
-    "resources:term:1", "faq:item:4", "admin:users:2",
-    "admin:bc_cancel", "register:cancel", "ring:t:no", "ls:cancel:9",
 ])
-def test_never_cases_return_none(cb):
+def test_quiz_answers_are_never_coloured(cb):
     assert palette_style("✅ تایید", cb, kind="inline") is None
+    assert palette_style("🔙 بازگشت", cb, kind="inline") is None
 
 
-@pytest.mark.parametrize("text", ["🔙 بازگشت", "🏠 منوی اصلی", "❌ لغو", "❌ انصراف", "◀️ قبلی"])
-def test_never_text_wins_over_styled_callback(text):
-    assert palette_style(text, "admin:delete_user:1", kind="inline") is None
-    assert palette_style(text, "sub:back", kind="inline") is None
+@pytest.mark.parametrize("cb", [
+    "resources:term:1", "bs:term:2", "faq:item:4", "admin:users:2", "unknown:cb",
+])
+def test_lists_and_unknown_buttons_default_to_blue(cb):
+    assert palette_style("📘 ترم ۱", cb, kind="inline") == PRIMARY
+
+
+@pytest.mark.parametrize("cb", [
+    "admin:bc_cancel", "register:cancel", "ring:t:no", "ls:cancel:9", "sub:gskip",
+])
+def test_cancel_callbacks_are_red_exits(cb):
+    assert bp.palette_role("هر چیز", cb, kind="inline") == (DANGER, bp.EXIT)
+
+
+@pytest.mark.parametrize("text", [
+    "🔙 بازگشت", "🏠 منوی اصلی", "❌ لغو", "❌ انصراف", "↩️ بازگشت", "🔙",
+    "بی\u200cخیال پیام ✋", "🙏 نه", "🔒 بازگشت به مدیریت کانال", "خیر",
+])
+def test_back_and_cancel_labels_are_red(text):
+    for cb in ("sub:back", "ring:p:done", "quiz:start:abc", "dashboard:refresh"):
+        assert bp.palette_role(text, cb, kind="inline") == (DANGER, bp.EXIT)
+    assert palette_style(text, None, kind="reply") == DANGER
+    assert palette_style(text, None, kind="inline") == DANGER
+
+
+@pytest.mark.parametrize("text", [
+    "💾 ذخیره و بازگشت", "◀️ قبلی", "بعدی ▶️", "▶️ ادامه تمرین", "🔒 ناشناس", "📘 ترم ۱",
+])
+def test_only_a_leading_exit_word_counts(text):
+    assert not bp.is_exit_text(text)
+
+
+@pytest.mark.parametrize("text, cb, kind, expected", [
+    ("🚫 بلاک", None, "reply", DANGER),               # ring reply controls
+    ("⏹ پایان گفتگو", None, "reply", DANGER),
+    ("🛑 توقف پاسخ", "aiu:stop:1:2", "inline", DANGER),
+    ("⛔️ پایان و گزارش", "quiz:stop:abc", "inline", DANGER),
+    ("📴 خروج هوشیار از ویس‌چت", "aiu:vc_leave", "inline", DANGER),
+    ("🚫 لیست مسدودها (بلک‌لیست)", "admin:blacklist_view", "inline", PRIMARY),
+    ("🔔 لغو بی‌صدا", "admin:att_wallet_unmute", "inline", PRIMARY),
+    ("✏️ ویرایش", "ticket:preview_cancel", "inline", PRIMARY),
+    ("✅ بله، نفر بعدی", None, "reply", SUCCESS),
+])
+def test_stop_icons_lists_and_edge_labels(text, cb, kind, expected):
+    assert palette_style(text, cb, kind=kind) == expected
+
+
+def test_destructive_callback_wins_over_exit_label():
+    assert bp.palette_role("↩️ لغو دسترسی محتوا", "admin:ca_remove:1",
+                           kind="inline") == (DANGER, bp.DESTRUCTIVE)
 
 
 def test_never_prefix_wins_over_styled_prefix():
@@ -228,8 +275,8 @@ def test_exact_beats_prefix_and_basic_lookups():
     assert palette_style("x", "ring:block:yes", kind="inline") == DANGER
     assert palette_style("x", "sub:plan:monthly", kind="inline") == SUCCESS
     assert palette_style("x", "questions:weak", kind="inline") == PRIMARY
-    assert palette_style("x", "unknown:cb", kind="inline") is None
-    assert palette_style("x", "", kind="inline") is None
+    assert palette_style("x", "unknown:cb", kind="inline") == PRIMARY
+    assert palette_style("✅ ورودی ۱۴۰۲", "profile:set_intake:3", kind="inline") == SUCCESS
 
 
 def test_longest_prefix_wins():
@@ -247,43 +294,66 @@ def test_longest_prefix_wins():
 def test_reply_and_url_lookups():
     assert palette_style("🩺 داشبورد", None, kind="reply") == PRIMARY
     assert palette_style("💎 اشتراک ویژه", None, kind="reply") == SUCCESS
-    assert palette_style("💍 رینگ استریت", None, kind="reply") is None
-    assert palette_style("📅 برنامه", None, kind="reply") is None
-    # reply lookup ignores callbacks; inline lookup ignores reply table
-    assert palette_style("🩺 داشبورد", None, kind="inline") is None
+    assert palette_style("📅 برنامه", None, kind="reply") == PRIMARY
+    assert palette_style("ترم ۱", None, kind="reply") == PRIMARY
+    assert palette_style("❌ لغو", None, kind="reply") == DANGER
     assert palette_style("💙 حمایت مالی", None, kind="inline") == SUCCESS
-    assert palette_style("🌐 سایت", None, kind="inline") is None
+    assert palette_style("🌐 سایت", None, kind="inline") == PRIMARY
     assert palette_style("🩺 داشبورد", None, kind="other") is None
 
 
 def test_pair_styles_for_shared_callbacks():
     assert palette_style("💳 خرید اشتراک", "sub:back", kind="inline") == PRIMARY
     assert palette_style("🔄 تمدید کن", "sub:back", kind="inline") == SUCCESS
-    assert palette_style("🔙 بازگشت به پلن" + "\u200c" + "ها", "sub:back", kind="inline") is None
-    assert palette_style("هر چیز", "sub:back", kind="inline") is None
-    assert palette_style("هر چیز", "ca:main", kind="inline") is None
+    assert palette_style("🔙 بازگشت به پلن" + "\u200c" + "ها", "sub:back", kind="inline") == DANGER
+    assert palette_style("هر چیز", "sub:back", kind="inline") == PRIMARY
 
 
 def test_total_for_odd_inputs():
     assert palette_style(None, None, kind="inline") is None  # type: ignore[arg-type]
     assert palette_style("", "answer:1", kind="inline") is None
+    assert palette_style("   ", "x:1", kind="inline") is None
+
+
+# ── row rule: exit next to destructive turns blue ───────────────
+def _row(*items):
+    return tuple((t, cb, "inline", None) for t, cb in items)
+
+
+def test_exit_next_to_destructive_turns_blue():
+    assert bp.palette_row_styles(_row(("🗑 بله، حذف کن", "ca:confirm_del_lesson:3"),
+                                      ("🔙 انصراف", "ca:lesson:3"))) == (DANGER, PRIMARY)
+    assert bp.palette_row_styles(_row(("↩️", "ca:unfork_session:1"),
+                                      ("🗑", "ca:del_session:1"))) == (PRIMARY, DANGER)
+
+
+def test_exit_alone_or_next_to_non_destructive_stays_red():
+    assert bp.palette_row_styles(_row(("🔙 بازگشت", "dashboard:refresh"))) == (DANGER,)
+    assert bp.palette_row_styles(_row(("✅ تأیید", "questions:cx_confirm"),
+                                      ("❌ انصراف", "ca:main"))) == (SUCCESS, DANGER)
+
+
+def test_row_rule_keeps_explicit_styles_and_skips_non_buttons():
+    row = (("❌ رد شد", "rep:x", "inline", DANGER), ("🗑 حذف", "quiz:del:1", "inline", None), None)
+    assert bp.palette_row_styles(row) == (DANGER, DANGER, None)
 
 
 # ── lead audit regressions (shared callbacks / selection lists) ──
 @pytest.mark.parametrize("text, cb, expected", [
-    ("↩️ بازگشت", "ring:p:done", None),               # back shares ring:p:done with «💾 ذخیره»
+    ("↩️ بازگشت", "ring:p:done", DANGER),             # back shares ring:p:done with «💾 ذخیره»
     ("💾 ذخیره و بازگشت", "ring:p:done", SUCCESS),
-    ("↩️ بازگشت", "quiz:start:abc", None),            # back shares quiz:start: with «🎯 شروع آزمون»
+    ("↩️ بازگشت", "quiz:start:abc", DANGER),          # back shares quiz:start: with «🎯 شروع آزمون»
     ("🎯 شروع آزمون", "quiz:start:abc", PRIMARY),
-    ("↩️", "ca:unfork_session:1", None),              # per-row unfork icon: no wall of red
+    ("↩️", "ca:unfork_session:1", DANGER),            # alone = exit; next to 🗑 the row rule → blue
     ("↩️ بله، بازگشت به سراسری", "ca:confirm_unfork_session:1", DANGER),
-    ("Ali (@a) — 5", "sub:grsel:5", None),            # recipient LIST is a selection
-    ("🤖 تحلیل صوتی توسط هوشیار", "ls:smart_ai", None),  # one blue per lecture keyboard
+    ("Ali (@a) — 5", "sub:grsel:5", PRIMARY),          # recipient list item
+    ("🤖 تحلیل صوتی توسط هوشیار", "ls:smart_ai", PRIMARY),
     ("📄 تدوین جزوه کامل PDF", "ls:smart_scribe", PRIMARY),
     ("↩️ لغو دسترسی محتوا", "admin:ca_remove:1", DANGER),
 ])
 def test_lead_audit_regressions(text, cb, expected):
     assert palette_style(text, cb, kind="inline") == expected
+
 
 
 def test_exam_abandon_is_danger_but_answers_stay_plain():
