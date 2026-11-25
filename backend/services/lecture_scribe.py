@@ -803,17 +803,36 @@ async def run_lecture_processing_worker(
     )
     from backend.services.telegram_downloader import download_telegram_media
 
-    async def _update_status(text: str, force: bool = False):
-        if status_updater:
-            if callable(status_updater):
-                await status_updater(text, force=force)
-            elif hasattr(status_updater, 'update'):
-                await status_updater.update(text, force=force)
-        elif bot and chat_id and status_msg_id:
-            try:
+    async def _update_status(text: str, force: bool = False) -> bool:
+        """ویرایش پیام وضعیت؛ True یعنی ویرایش انجام شد (یا بیضرر رد شد)."""
+        try:
+            if status_updater:
+                if callable(status_updater):
+                    return (await status_updater(text, force=force)) is not False
+                if hasattr(status_updater, 'update'):
+                    return (await status_updater.update(text, force=force)) is not False
+                return False
+            if bot and chat_id and status_msg_id:
                 await bot.edit_message_text(chat_id=chat_id, message_id=status_msg_id, text=text, parse_mode='HTML')
-            except Exception:
-                pass
+                return True
+        except Exception as edit_err:
+            logger.warning("ویرایش پیام وضعیت جزوه ناموفق بود: %s", edit_err)
+        return False
+
+    async def _notify_user(text: str) -> None:
+        """پیام نهایی (خطا) هرگز گم نشود: اگر پیام وضعیت حذف شده یا قابل ویرایش
+        نیست، یک پیام تازه ارسال میشود."""
+        if await _update_status(text, force=True):
+            return
+        if not (bot and chat_id):
+            return
+        try:
+            await bot.send_message(chat_id=chat_id, text=text, parse_mode='HTML')
+        except Exception:
+            try:
+                await bot.send_message(chat_id=chat_id, text=re.sub(r'<[^>]+>', '', text))
+            except Exception as send_err:
+                logger.error("ارسال پیام خطای جزوه به کاربر %s ناموفق بود: %s", uid, send_err)
 
     # بازیابی اطلاعات سشن
     if session is None:
@@ -845,7 +864,7 @@ async def run_lecture_processing_worker(
                 except Exception as ref_err:
                     logger.error("Failed to refund lecture quota for user %s: %s", uid, ref_err)
                 quota_consumed = False
-            await _update_status("⚠️ اطلاعات فایل‌های جلسه یافت نشد یا منقضی شده است.", force=True)
+            await _notify_user("⚠️ اطلاعات فایل‌های جلسه یافت نشد یا منقضی شده است.")
             return False
 
         job_temp_dir = tempfile.mkdtemp(prefix=f"lecture_{sess_id}_")
@@ -859,7 +878,7 @@ async def run_lecture_processing_worker(
                     except Exception as ref_err:
                         logger.error("Failed to refund lecture quota for user %s: %s", uid, ref_err)
                     quota_consumed = False
-                await _update_status("⏳ لطفاً تا اتمام پردازش درخواست فعلی خود صبر فرمایید.", force=True)
+                await _notify_user("⏳ لطفاً تا اتمام پردازش درخواست فعلی خود صبر فرمایید.")
                 return False
         cfg = await get_ai_config()
 
@@ -1161,22 +1180,10 @@ async def run_lecture_processing_worker(
         safe_name = re.sub(r'[\/:*?"<>| ]+', '_', title)[:40].strip('_') or 'Lecture'
         filename = f"HamsYar_{safe_name}.pdf"
 
-        # پاک کردن پیام وضعیت در صورت امکان
-        if status_msg_id and bot and chat_id:
-            try:
-                await bot.delete_message(chat_id=chat_id, message_id=status_msg_id)
-            except Exception:
-                pass
-
-        # ارسال پیام خلاصه با فال‌بک متن ساده
+        # ترتیب تحویل: اول PDF، بعد پیام خلاصه، در آخر حذف پیام وضعیت.
+        # پیام وضعیت تا تحویل موفق PDF باقی میماند تا هر خطایی همانجا دیده شود
+        # (قبلاً پیام وضعیت اول حذف میشد و خطای بعدی بیصدا گم میشد).
         if bot and chat_id:
-            try:
-                await bot.send_message(chat_id=chat_id, text=caption_msg, parse_mode='HTML')
-            except Exception as html_err:
-                logger.warning("خطا در ارسال HTML پیام خلاصه تلگرام، ارسال به صورت متن خام: %s", html_err)
-                plain_caption = re.sub(r'<[^>]+>', '', caption_msg)
-                await bot.send_message(chat_id=chat_id, text=plain_caption)
-
             # ارسال فایل PDF با retry مکانیزم و ریست مطمئن بافر
             doc_sent = False
             last_doc_err = None
@@ -1201,6 +1208,25 @@ async def run_lecture_processing_worker(
             if not doc_sent:
                 raise last_doc_err or Exception("عدم موفقیت در ارسال سند PDF تلگرام پس از ۳ تلاش")
 
+            # PDF تحویل شد ⇒ از اینجا به بعد هیچ خطایی نباید کار را «ناموفق» کند.
+            # پیام خلاصه با فالبک متن ساده (غیرکشنده)
+            try:
+                await bot.send_message(chat_id=chat_id, text=caption_msg, parse_mode='HTML')
+            except Exception as html_err:
+                logger.warning("خطا در ارسال HTML پیام خلاصه تلگرام، ارسال به صورت متن خام: %s", html_err)
+                try:
+                    plain_caption = re.sub(r'<[^>]+>', '', caption_msg)
+                    await bot.send_message(chat_id=chat_id, text=plain_caption)
+                except Exception as plain_err:
+                    logger.warning("ارسال پیام خلاصه جزوه ناموفق بود (PDF تحویل شده): %s", plain_err)
+
+            # پاک کردن پیام وضعیت در صورت امکان
+            if status_msg_id:
+                try:
+                    await bot.delete_message(chat_id=chat_id, message_id=status_msg_id)
+                except Exception:
+                    pass
+
         # پاکسازی سشن و تثبیت سهمیه
         quota_consumed = False
         _LECTURE_SESSIONS.pop(sess_id, None)
@@ -1215,7 +1241,7 @@ async def run_lecture_processing_worker(
                 logger.error("Failed to refund lecture quota for user %s: %s", uid, ref_err)
             quota_consumed = False
         persian_err = format_persian_lecture_error(exc)
-        await _update_status(persian_err, force=True)
+        await _notify_user(persian_err)
         return False
 
     finally:
