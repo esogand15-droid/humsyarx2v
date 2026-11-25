@@ -22,6 +22,7 @@ import {
 import {
   useAuthStore,
 } from './stores/authStore';
+import { useUIStore } from './stores/uiStore';
 
 import BottomNav from './components/layout/BottomNav';
 import SwipeBack from './components/layout/SwipeBack';
@@ -874,6 +875,10 @@ export default function App() {
     (state) => state.forceError
   );
 
+  /* حداکثر یک پیام «نشست» در دقیقه — ده درخواست همزمانِ ۴۰۱ نباید
+     ده پیام روی هم بسازند. */
+  const lastAuthToastAt = useRef(0);
+
 
   useEffect(() => {
     const EVENT_TO_STATE = {
@@ -891,8 +896,29 @@ export default function App() {
     const listeners = Object.entries(
       EVENT_TO_STATE
     ).map(([event, code]) => {
-      const handler = () =>
+      const handler = () => {
+        /* 🎬 ۴۰۱ وسط کار (پخش ویدیو، خواندن PDF، دانلود) هرگز کل صفحه
+           را عوض نمیکند: api.js قبلاً یک بار بیصدا نشست را تازه کرده؛
+           اگر باز هم نشد، فقط یک پیام کوچک نشان میدهیم. */
+        if (
+          event === 'auth:invalid' &&
+          useAuthStore.getState().user
+        ) {
+          const now = Date.now();
+          if (now - lastAuthToastAt.current > 60000) {
+            lastAuthToastAt.current = now;
+            useUIStore.getState().toast(
+              IS_PWA
+                ? 'نشست شما تمام شده است. برای ادامه، یک بار دوباره وارد شوید.'
+                : 'ارتباط با سرور لحظه‌ای قطع شد. اگر چیزی باز نشد، مینی‌اپ را ببندید و دوباره باز کنید.',
+              'warning',
+              6000
+            );
+          }
+          return;
+        }
         forceError(code);
+      };
 
       window.addEventListener(
         event,

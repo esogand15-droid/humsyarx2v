@@ -67,7 +67,19 @@ def _auth_error(detail: str = "invalid_init_data") -> HTTPException:
     return HTTPException(status_code=401, detail=detail)
 
 
-def verify_telegram_init_data(init_data: str) -> dict:
+def init_data_exchange_max_age() -> int:
+    """حداکثر عمر initData برای «تبدیل به نشست» (پیشفرض ۲۴ ساعت).
+
+    مینیاپ ممکن است در WebView تلگرام بعد از چند ساعت دوباره بارگذاری
+    شود و همان initData قدیمی را داشته باشد؛ امضا همچنان چک میشود.
+    """
+    try:
+        return max(INIT_DATA_MAX_AGE, min(int(os.getenv("INIT_DATA_EXCHANGE_MAX_AGE_SEC", "86400") or 86400), 7 * 86400))
+    except (TypeError, ValueError):
+        return max(INIT_DATA_MAX_AGE, 86400)
+
+
+def verify_telegram_init_data(init_data: str, max_age: int | None = None) -> dict:
     """Validate Telegram WebApp initData and return its user object.
 
     Telegram signs the decoded query-string values.  ``parse_qsl`` is used
@@ -96,7 +108,8 @@ def verify_telegram_init_data(init_data: str) -> dict:
         raise _auth_error()
 
     now = int(time.time())
-    if auth_date <= 0 or auth_date > now + 60 or now - auth_date > INIT_DATA_MAX_AGE:
+    limit = INIT_DATA_MAX_AGE if max_age is None else int(max_age)
+    if auth_date <= 0 or auth_date > now + 60 or now - auth_date > limit:
         raise _auth_error("init_data_expired")
 
     data_check_string = "\n".join(
@@ -174,6 +187,40 @@ async def resolve_web_session(token: str) -> dict | None:
     return doc
 
 
+#: 📱 هدر نشست مینیاپ: initData تلگرام فقط یک ساعت اعتبار دارد و
+#: auth_date با باز شدن مینیاپ ثابت میماند؛ پس مینیاپ هنگام باز شدن
+#: initData را یک بار با یک نشست سروری طولانی (همان web_user_sessions)
+#: عوض میکند و بعد از آن با این هدر درخواست میفرستد.
+APP_SESSION_HEADER = "X-App-Session"
+#: تمدید خودکار نشست (sliding) — حداکثر یک بار در ساعت نوشته میشود.
+WEB_USER_SESSION_TTL_DAYS = 30
+_SLIDE_EVERY = timedelta(hours=1)
+
+
+def demo_sessions_enabled() -> bool:
+    """نشست آزمایشی `demo_*` فقط برای توسعهٔ محلی؛ در production خاموش."""
+    return os.getenv("WEB_DEMO_ENABLED", "0").strip().lower() in ("1", "true", "yes", "on")
+
+
+async def _slide_web_user_session(doc: dict) -> None:
+    """اگر از آخرین تمدید بیش از یک ساعت گذشته، انقضا را ۳۰ روز جلو میبرد."""
+    try:
+        last = parse_machine_datetime(doc.get("last_active") or doc.get("created_at"))
+        if last and utc_now() - last < _SLIDE_EVERY:
+            return
+    except (TimeContractError, TypeError, ValueError):
+        pass
+    now = utc_now()
+    try:
+        await db.client["medicalbot"]["web_user_sessions"].update_one(
+            {"_id": doc["_id"]},
+            {"$set": {"last_active": now,
+                      "expires_at": now + timedelta(days=WEB_USER_SESSION_TTL_DAYS)}},
+        )
+    except Exception:
+        pass
+
+
 async def resolve_web_user_session(token: str) -> dict | None:
     """📲 توکن کوکی کاربر وب → سند نشست معتبر (انقضا/revoke چک‌شده).
 
@@ -182,7 +229,7 @@ async def resolve_web_user_session(token: str) -> dict | None:
     """
     if not token:
         return None
-    if token.startswith("demo_"):
+    if token.startswith("demo_") and demo_sessions_enabled():
         return {
             "_id": "demo_hash",
             "uid": 99999999,
@@ -200,13 +247,41 @@ async def resolve_web_user_session(token: str) -> dict | None:
         return None
     if not doc or expiry_is_past(doc.get("expires_at")):
         return None
+    await _slide_web_user_session(doc)
     return doc
+
+
+async def _user_from_web_session(request: Request, sess: dict) -> dict:
+    """سند نشست معتبر web_user_sessions → dict کاربر (همان گاردهای initData)."""
+    uid = int(sess.get("uid") or 0)
+    try:
+        request.state.user_id = uid
+    except Exception:
+        pass
+    db_user = await db.get_user(uid)
+    if not db_user:
+        raise HTTPException(status_code=403, detail="not_registered")
+    if not db_user.get("approved"):
+        raise HTTPException(status_code=403, detail="pending_approval")
+    if db_user.get("suspended") or db_user.get("blacklisted"):
+        raise HTTPException(status_code=403, detail="suspended")
+    return {"id": uid, "first_name": db_user.get("name", ""),
+            "_db": db_user, "_web_session": sess}
 
 
 async def get_current_user(
     request: Request,
     x_init_data: str = Header(default="", alias="X-Init-Data"),
 ) -> dict:
+    # 📱 نشست مینیاپ: initData یک بار با نشست ۳۰روزه عوض شده است، پس
+    # گذشت یک ساعت از باز شدن مینیاپ دیگر وسط PDF یا ویدیو ۴۰۱ نمیدهد.
+    app_tok = (request.headers.get(APP_SESSION_HEADER) or "").strip()
+    if app_tok:
+        app_sess = await resolve_web_user_session(app_tok)
+        if app_sess:
+            return await _user_from_web_session(request, app_sess)
+        if not x_init_data:
+            raise _auth_error("session_expired")
     if not x_init_data:
         # 🖥️ WA — fallback سشن وب‌ادمین (فقط وقتی هدر غایب است)
         # 📲 PWA — fallback سشن وب کاربر (ورود با کد تلگرام) — قبل از
@@ -219,7 +294,7 @@ async def get_current_user(
                 request.state.user_id = uid
             except Exception:
                 pass
-            if uid == 99999999:
+            if uid == 99999999 and demo_sessions_enabled():
                 demo_db_user = {
                     "user_id": 99999999,
                     "name": "دکتر علی رضایی",

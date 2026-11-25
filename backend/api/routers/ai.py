@@ -2059,6 +2059,24 @@ async def generate_image_ep(body: ImageGenBody,
 
 async def _authenticate_live_ws(websocket: WebSocket) -> dict | None:
     """احراز هویت اتصال WebSocket تماس صوتی زنده (از MiniApp یا WebAdmin)."""
+    # 📱 نشست طولانی مینیاپ — initData یک ساعت بعد از باز شدن منقضی میشود
+    app_tok = (
+        websocket.query_params.get("app_session")
+        or websocket.headers.get("x-app-session")
+        or ""
+    ).strip()
+    if app_tok:
+        try:
+            from api.auth import resolve_web_user_session
+            sess = await resolve_web_user_session(app_tok)
+            if sess:
+                uid = int(sess.get("uid") or 0)
+                db_user = await db.get_user(uid)
+                if db_user and db_user.get("approved") and not db_user.get("suspended"):
+                    return {"id": uid, "name": db_user.get("name", ""), "_db": db_user}
+        except Exception:
+            pass
+
     init_data = (
         websocket.query_params.get("init_data")
         or websocket.headers.get("x-init-data")

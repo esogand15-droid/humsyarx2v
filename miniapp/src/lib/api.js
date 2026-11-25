@@ -1,5 +1,11 @@
 import axios from 'axios';
 import { getInitData } from './telegram';
+import {
+  APP_SESSION_HEADER,
+  clearAppSession,
+  exchangeAppSession,
+  getAppSession,
+} from './appSession';
 
 /* ─────────────────────────────────────────────────────────────
    🚂 مهاجرت Railway — مبدأ API «هم‌ریشه» (same-origin) است
@@ -67,9 +73,16 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const initData = getInitData();
+  config.headers = config.headers || {};
+
+  /* 📱 نشست طولانی مینیاپ اولویت دارد؛ initData فقط پشتیبان است
+     (اگر تبادل نشست هنوز انجام نشده یا شکست خورده باشد). */
+  const appSession = getAppSession();
+  if (appSession && !config.headers[APP_SESSION_HEADER]) {
+    config.headers[APP_SESSION_HEADER] = appSession;
+  }
 
   if (initData) {
-    config.headers = config.headers || {};
     config.headers['X-Init-Data'] = initData;
   }
 
@@ -88,6 +101,25 @@ api.interceptors.response.use(
     const config = error.config || {};
     const status = error.response?.status;
     const detail = error.response?.data?.detail;
+
+    /* خودِ درخواست تبادل نشست رویداد سراسری نمیسازد؛ نتیجهاش را
+       authStore و همین interceptor تصمیم میگیرند. */
+    if (config.__skipAuthRetry) {
+      return Promise.reject(error);
+    }
+
+    /* 📱 ۴۰۱ در مینیاپ: یک بار بیصدا نشست تازه میگیریم و همان
+       درخواست را تکرار میکنیم؛ کاربر چیزی نمیبیند. */
+    if (status === 401 && !config.__authRetried && getInitData()) {
+      config.__authRetried = true;
+      clearAppSession();
+      const fresh = await exchangeAppSession(api);
+      if (fresh) {
+        config.headers = config.headers || {};
+        config.headers[APP_SESSION_HEADER] = fresh;
+        return api(config);
+      }
+    }
 
     if (detail === 'not_registered') {
       window.dispatchEvent(new CustomEvent('auth:not_registered'));

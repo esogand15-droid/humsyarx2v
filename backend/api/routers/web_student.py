@@ -103,6 +103,11 @@ def _sha(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _demo_enabled() -> bool:
+    """نشست آزمایشی `demo_*` فقط با WEB_DEMO_ENABLED=1 (توسعهٔ محلی)."""
+    return str(os.getenv("WEB_DEMO_ENABLED", "0")).strip().lower() in ("1", "true", "yes", "on")
+
+
 def _now():
     return now_utc()
 
@@ -326,7 +331,7 @@ def _set_cookie(response: Response, token: str) -> None:
 async def _resolve_session(request: Request) -> dict | None:
     # 0. Demo token support for local testing
     hu_token = (request.cookies.get("hu_session") or "").strip()
-    if hu_token.startswith("demo_"):
+    if hu_token.startswith("demo_") and _demo_enabled():
         return {
             "_id": "demo_hash",
             "uid": 99999999,
@@ -385,7 +390,7 @@ async def current_student(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="login_required")
     uid = int(session["uid"])
     request.state.user_id = uid
-    if uid == 99999999:
+    if uid == 99999999 and _demo_enabled():
         return {
             "user_id": 99999999,
             "name": "دانشجوی آزمایشی هامزیار",
@@ -559,7 +564,7 @@ async def auth_session(request: Request):
     session = await _resolve_session(request)
     if not session:
         return {"authenticated": False, "state": "anonymous", "user": None}
-    if int(session["uid"]) == 99999999:
+    if int(session["uid"]) == 99999999 and _demo_enabled():
         return {
             "authenticated": True,
             "state": "active",

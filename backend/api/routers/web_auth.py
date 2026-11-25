@@ -105,12 +105,22 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def _demo_enabled() -> bool:
+    """ورود آزمایشی (ch_demo / demo_*) فقط با WEB_DEMO_ENABLED=1 در توسعهٔ محلی.
+
+    قبلاً همیشه روشن بود: هر کسی با کوکی `demo_...` بدون ورود واقعی
+    به‌عنوان «دانشجوی آزمایشی» احراز می‌شد.
+    """
+    from api.auth import demo_sessions_enabled
+    return demo_sessions_enabled()
+
+
 async def _resolve_current_user(request: Request) -> Optional[dict]:
     """Resolve authenticated user from hu_session cookie."""
     token = request.cookies.get(COOKIE_NAME, "").strip()
     if not token:
         return None
-    if token.startswith("demo_"):
+    if token.startswith("demo_") and _demo_enabled():
         return {
             "user_id": 99999999,
             "name": "دانشجوی آزمایشی هامزیار",
@@ -246,7 +256,7 @@ async def create_challenge(body: CreateChallengeRequest, request: Request):
 @router.get("/challenge/{challenge_id}")
 async def poll_challenge(challenge_id: str, request: Request, response: Response):
     """Polls status of pending login challenge and establishes session upon approval."""
-    if challenge_id.startswith("ch_demo"):
+    if challenge_id.startswith("ch_demo") and _demo_enabled():
         response.set_cookie(
             COOKIE_NAME,
             "demo_local_token_12345",
@@ -543,6 +553,74 @@ async def session_state(request: Request):
             "subscription_active": sub_active,
         },
     }
+
+
+# ── 8. Mini App: initData → long-lived sliding session ──────────
+class MiniappExchangeRequest(BaseModel):
+    init_data: str = Field(default="", max_length=8192)
+
+
+@router.post("/miniapp/exchange")
+async def miniapp_exchange(body: MiniappExchangeRequest, request: Request):
+    """📱 initData تلگرام را یک بار با یک نشست ۳۰روزهٔ تمدیدشونده عوض میکند.
+
+    initData فقط یک ساعت معتبر است و auth_date با باز شدن مینیاپ ثابت
+    میماند؛ بدون این تبادل، بعد از ۶۰ دقیقه وسط PDF یا ویدیو همهٔ
+    درخواستها ۴۰۱ میگرفتند. توکن خام فقط در پاسخ برمیگردد و در
+    دیتابیس فقط hash آن ذخیره میشود (همان کالکشن web_user_sessions).
+    """
+    from api.auth import (APP_SESSION_HEADER, init_data_exchange_max_age,
+                          verify_telegram_init_data)
+
+    init_data = (body.init_data or request.headers.get("X-Init-Data") or "").strip()
+    tg_user = verify_telegram_init_data(init_data, max_age=init_data_exchange_max_age())
+    try:
+        uid = int(tg_user["id"])
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=401, detail="invalid_user_data")
+
+    user = await db.get_user(uid)
+    if not user:
+        raise HTTPException(status_code=403, detail="not_registered")
+    if not user.get("approved"):
+        raise HTTPException(status_code=403, detail="pending_approval")
+    if user.get("suspended") or user.get("blacklisted"):
+        raise HTTPException(status_code=403, detail="suspended")
+
+    now = _now_utc()
+
+    # اگر مینیاپ هنوز نشست معتبرِ همین کاربر را دارد، همان را تمدید کن
+    # تا با هر بار باز شدن یک نشست تازه در «دستگاههای من» ساخته نشود.
+    current = (request.headers.get(APP_SESSION_HEADER) or "").strip()
+    if current:
+        h = _hash_token(current)
+        existing = await _sessions().find_one({"_id": h, "revoked": False})
+        exp = (existing or {}).get("expires_at")
+        if exp is not None and getattr(exp, "tzinfo", None) is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if existing and int(existing.get("uid") or 0) == uid and (exp is None or exp > now):
+            await _sessions().update_one(
+                {"_id": h},
+                {"$set": {"last_active": now,
+                          "expires_at": now + timedelta(days=SESSION_TTL_DAYS)}},
+            )
+            return {"session": current, "expires_in_days": SESSION_TTL_DAYS, "reused": True}
+
+    token = secrets.token_hex(32)
+    await _sessions().insert_one({
+        "_id": _hash_token(token),
+        "session_id": secrets.token_hex(8),
+        "uid": uid,
+        "kind": "miniapp",
+        "device_name": "مینی‌اپ تلگرام",
+        "peer_ip": ((getattr(request, "client", None) and request.client.host) or "")[:64],
+        "user_agent": (request.headers.get("user-agent") or "")[:200],
+        "created_at": now,
+        "last_active": now,
+        "expires_at": now + timedelta(days=SESSION_TTL_DAYS),
+        "revoked": False,
+    })
+    return {"session": token, "expires_in_days": SESSION_TTL_DAYS, "reused": False}
 
 
 # ── Backward Compatibility Delegations ───────────────────────────

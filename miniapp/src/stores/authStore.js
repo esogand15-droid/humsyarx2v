@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '../lib/api';
+import { exchangeAppSession } from '../lib/appSession';
 import { getTgUser, isTelegram } from '../lib/telegram';
 import { IS_PWA } from '../lib/appMode';
 
@@ -48,6 +49,12 @@ export const useAuthStore = create((set, get) => ({
     }
 
     try {
+      /* 📱 initData → نشست ۳۰روزه، قبل از اولین درخواست. اگر نشد، همان
+         initData پشتیبان است و api.js با اولین ۴۰۱ دوباره تلاش میکند. */
+      if (!IS_PWA && isTelegram) {
+        await exchangeAppSession(api);
+      }
+
       const response = await api.get('/api/profile');
 
       set({

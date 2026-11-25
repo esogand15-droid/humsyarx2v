@@ -22,6 +22,7 @@ import {
   hapticNotif,
 } from '../../lib/telegram';
 import { Glyph } from '../../components/ui/Icon';
+import { getAppSession } from '../../lib/appSession';
 
 /* ─────────────────────────────────────────────────────────────
     م9.5 — موتور صوتی سطح استودیویی تماس زنده با هوشیار (Google Gemini Live API)
@@ -976,6 +977,7 @@ export default function AiLive() {
     const hostPart = origin.replace(/^https?:\/\//i, '');
     const qs = new URLSearchParams({
       init_data: getInitData() || '',
+      app_session: getAppSession() || '',
       voice: voice || liveCfg?.voice || 'Sulafat',
       target_language: targetLang || 'fa',
       binary: '1',
