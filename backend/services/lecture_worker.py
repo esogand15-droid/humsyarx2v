@@ -16,6 +16,7 @@ import asyncio
 from dataclasses import dataclass, field
 import logging
 import os
+import re
 import time
 from typing import Any, Callable, Dict, Optional
 
@@ -393,9 +394,10 @@ class LectureWorkerQueue:
 
         except (Exception, asyncio.CancelledError) as exc:
             logger.exception("Lecture job %s failed: %s", job.job_id, exc)
-            await self._recover_failed_job(job, exc)
+            await self._recover_failed_job(job, exc, updater=updater)
 
-    async def _recover_failed_job(self, job: LectureJob, exc: BaseException) -> None:
+    async def _recover_failed_job(self, job: LectureJob, exc: BaseException,
+                                  updater: Optional[ThrottledStatusUpdater] = None) -> None:
         """Atomically refunds quota, releases inflight lock, and notifies user in Persian."""
         # 1. Quota Refund
         if job.quota_consumed:
@@ -419,13 +421,23 @@ class LectureWorkerQueue:
             "✅ <b>سهمیهٔ شما محفوظ ماند:</b> سهمیهٔ مصرف‌شده برای این جلسه برگردانده شد و کسر نگردید.\n"
             "لطفاً مجدداً فایل خود را ارسال فرمایید یا در صورت تکرار خطا، با پشتیبانی مطرح فرمایید."
         )
-        if job.updater:
-            updated = await job.updater.update(error_msg, force=True)
-            if not updated and job.bot and job.chat_id:
+        # بیصدا تمام نشود: اول ویرایش پیام وضعیت، وگرنه پیام تازه.
+        # قبلاً اگر job.updater خالی بود، هیچ پیامی ارسال نمیشد.
+        updated = False
+        status = job.updater or updater
+        if status is not None:
+            try:
+                updated = bool(await status.update(error_msg, force=True))
+            except Exception:
+                updated = False
+        if not updated and job.bot and job.chat_id:
+            try:
+                await job.bot.send_message(chat_id=job.chat_id, text=error_msg, parse_mode="HTML")
+            except Exception:
                 try:
-                    await job.bot.send_message(chat_id=job.chat_id, text=error_msg, parse_mode="HTML")
-                except Exception:
-                    pass
+                    await job.bot.send_message(chat_id=job.chat_id, text=re.sub(r"<[^>]+>", "", error_msg))
+                except Exception as send_err:
+                    logger.error("Lecture failure notice to user %s failed: %s", job.user_id, send_err)
 
         # 4. Cleanup session
         try:

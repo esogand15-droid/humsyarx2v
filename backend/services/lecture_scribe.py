@@ -1410,7 +1410,14 @@ async def run_lecture_processing_worker(
             except Exception as ref_err:
                 logger.error("Failed to refund lecture quota for user %s: %s", uid, ref_err)
             quota_consumed = False
-        persian_err = format_persian_lecture_error(exc)
+        try:
+            persian_err = format_persian_lecture_error(exc)
+        except Exception as fmt_err:  # پیام خطا هرگز نباید خودش خطا شود
+            logger.error("format_persian_lecture_error failed: %s", fmt_err)
+            persian_err = (
+                "⚠️ <b>در تولید جزوه خطایی رخ داد.</b>\n\n"
+                "سهمیهٔ این جلسه برگردانده شد. لطفاً دوباره فایل را بفرستید."
+            )
         await _notify_user(persian_err)
         await _lj_finish('timeout' if isinstance(exc, LectureDeadlineError) else 'failed', exc)
         return False
