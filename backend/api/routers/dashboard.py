@@ -41,10 +41,19 @@ def _exam_item(exam: Mapping[str, Any], today: date) -> dict:
     }
 
 
+def _demo_enabled() -> bool:
+    """دادهٔ نمایشی فقط برای نشست آزمایشی محلی (WEB_DEMO_ENABLED=1).
+
+    شناسهٔ 99999999 میتواند شناسهٔ واقعی یک کاربر تلگرام باشد؛ بدون
+    این شرط، آن کاربر بهجای دادهٔ خودش آمار ساختگی میدید."""
+    from api.auth import demo_sessions_enabled
+    return demo_sessions_enabled()
+
+
 @router.get("")
 async def get_dashboard(user=Depends(get_current_user)):
     uid = user["id"]
-    if uid == 99999999:
+    if uid == 99999999 and _demo_enabled():
         return {
             "user": {
                 "name": "دکتر علی رضایی",
@@ -144,7 +153,7 @@ async def get_dashboard(user=Depends(get_current_user)):
 
 @router.get("/weekly")
 async def weekly(user=Depends(get_current_user)):
-    if user["id"] == 99999999:
+    if user["id"] == 99999999 and _demo_enabled():
         return {
             "weekly": [
                 {"date": "1405-08-15", "day": "sat", "count": 14},

@@ -260,7 +260,8 @@ async def get_status(
     ),
 ):
     user_id = user["id"]
-    if user_id == 99999999:
+    from api.auth import demo_sessions_enabled
+    if user_id == 99999999 and demo_sessions_enabled():
         return {
             "active": True,
             "days_left": 180,
