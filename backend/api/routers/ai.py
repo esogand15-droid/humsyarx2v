@@ -986,7 +986,10 @@ async def history(
 
 CONV_MAX_ITEMS = 120       # سقف پیام‌های ذخیره‌شده در هر گفت‌وگو
 CONV_CONTEXT_ITEMS = 10    # ۵ دورِ آخر → کانتکست مدل
-DEFAULT_CONV_TITLE = "گفتوگوی جدید"
+DEFAULT_CONV_TITLE = "گفت‌وگوی جدید"  # همان املای ai_conv_create (با نیمفاصله)
+# عنوانهایی که «هنوز نامگذاری نشده» حساب میشوند — هر دو املا، چون دادهی قدیمی
+# ممکن است بدون نیمفاصله ذخیره شده باشد.
+_UNTITLED = {"", DEFAULT_CONV_TITLE, DEFAULT_CONV_TITLE.replace("‌", "")}
 CONV_PAGE_MAX = 200        # سقفِ فعلیِ ai_conv_list — صفحهبندی روی همین برش
 
 
@@ -1357,7 +1360,7 @@ async def ask(
         stream_title = (
             _auto_title(message)
             if conv_doc and not _safe_int(conv_doc.get("msg_count"))
-            and str(conv_doc.get("title") or "") in ("", DEFAULT_CONV_TITLE)
+            and str(conv_doc.get("title") or "").strip() in _UNTITLED
             else None
         )
 

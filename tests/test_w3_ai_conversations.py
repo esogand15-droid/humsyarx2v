@@ -32,6 +32,7 @@ import backend.api.routers.ai as ai_router  # noqa: E402
 from backend.database.core import DBCore  # noqa: E402
 
 CID = str(ObjectId())
+DB_DEFAULT_TITLE = "گفت‌وگوی جدید"  # what ai_conv_create stores
 
 
 def parse_sse(text: str) -> list[tuple[str, dict]]:
@@ -92,6 +93,15 @@ class TestAutoTitle(unittest.TestCase):
         self.assertTrue(t.endswith("…"))
         self.assertLessEqual(len(t), 41)
         self.assertNotIn("  ", t)
+
+    def test_default_title_matches_db_default(self):
+        """Regression: the router's 'untitled' constant must equal the title
+        ai_conv_create actually stores (with ZWNJ), or auto-title never fires."""
+        import inspect
+        db_default = inspect.signature(DBCore.ai_conv_create).parameters["title"].default
+        self.assertEqual(ai_router.DEFAULT_CONV_TITLE, db_default)
+        self.assertIn("‌", ai_router.DEFAULT_CONV_TITLE)
+        self.assertIn(db_default.replace("‌", ""), ai_router._UNTITLED)
 
     def test_empty_falls_back_to_default(self):
         self.assertEqual(ai_router._auto_title("   "), ai_router.DEFAULT_CONV_TITLE)
@@ -194,7 +204,7 @@ class TestMessages(_Base):
 class TestStream(_Base):
     def setUp(self):
         super().setUp()
-        self.conv_doc = {"_id": CID, "user_id": 1001, "title": ai_router.DEFAULT_CONV_TITLE, "items": [], "msg_count": 0}
+        self.conv_doc = {"_id": CID, "user_id": 1001, "title": DB_DEFAULT_TITLE, "items": [], "msg_count": 0}
         self._p = [
             patch.object(ai_router.db, "ai_conv_get", new_callable=AsyncMock, side_effect=lambda *_: self.conv_doc),
             patch.object(ai_router.db, "ai_conv_append", new_callable=AsyncMock, return_value=True),
