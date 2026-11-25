@@ -9,7 +9,8 @@
     "build": "tsc -b && vite build && node scripts/check-nodemo.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "check:nodemo": "node scripts/check-nodemo.mjs"
+    "check:nodemo": "node scripts/check-nodemo.mjs",
+    "ds:ratchet": "node scripts/ds-ratchet.mjs"
   },
   "dependencies": {
     "pdfjs-dist": "^4.8.69",
