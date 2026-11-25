@@ -5195,6 +5195,45 @@ class DBCore:
         return r.matched_count == 1
 
 
+    async def ai_conv_pop_last_turn(self, cid: str, uid: int,
+                                    user_text: str | None = None) -> bool:
+        """W3 — «پاسخ دوباره»: آخرین دورِ پرسش/پاسخ را برمیدارد.
+
+        فقط وقتی دو آیتمِ آخر [user, assistant] باشند (و اگر user_text
+        داده شده، متنِ پرسش با آن یکی باشد). بهروزرسانی با شرطِ
+        msg_count قبلی انجام میشود تا دو درخواستِ همزمان دو دور را پاک
+        نکنند. خروجی True یعنی دقیقاً یک دور برداشته شد."""
+        try:
+            oid = ObjectId(cid)
+        except Exception:
+            return False
+        doc = await self.ai_conversations.find_one(
+            {'_id': oid, 'user_id': uid},
+            {'items': 1, 'msg_count': 1},
+        )
+        if not doc:
+            return False
+        items = list(doc.get('items') or [])
+        if len(items) < 2:
+            return False
+        last_user, last_ai = items[-2], items[-1]
+        if last_user.get('r') != 'user' or last_ai.get('r') not in ('assistant', 'model'):
+            return False
+        if user_text is not None and str(last_user.get('t') or '').strip() != str(user_text).strip():
+            return False
+        kept = items[:-2]
+        prev_count = doc.get('msg_count')
+        r = await self.ai_conversations.update_one(
+            {'_id': oid, 'user_id': uid, 'msg_count': prev_count},
+            {'$set': {
+                'items': kept,
+                'msg_count': max(0, int(prev_count or len(items)) - 2),
+                'preview': (str(kept[-1].get('t') or '')[:90] if kept else ''),
+            }},
+        )
+        return r.matched_count == 1
+
+
     # ══════════════════════════════════════════════════
     #  سندِ مرجعِ فعال — ⚠️ قابلیتِ جدید: وقتی دانشجو یه PDF می‌فرسته،
     #  خودِ فایل روی سرورهای گوگل (Files API، رایگان، ۴۸ ساعت نگه‌داری)
