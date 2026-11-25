@@ -1015,7 +1015,7 @@ async def _manifest():
 @app.get("/sw.js", include_in_schema=False)
 async def _sw():
     from fastapi.responses import FileResponse, Response
-    sw_file = os.path.join(_PUBLIC_DIR, "sw.js")
+    sw_file = os.path.join(_MA_DIST, "sw.js")   # 🧭 خروجی بیلد (منبع واحد: miniapp/sw/sw.js)
     if os.path.isfile(sw_file):
         return FileResponse(sw_file, media_type="application/javascript")
     return Response(status_code=204)
@@ -1036,13 +1036,13 @@ async def _spa_cache_headers(request, call_next):
         path = ""
     if (path.startswith("/app/assets/") or path.startswith("/admin/assets/")
             or path.startswith("/landing-assets/") or path.startswith("/app/landing-assets/")
-            or path.startswith("/student/assets/")):
+            or path.startswith("/student/assets/") or path.startswith("/pwa/assets/")):
         resp.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
     elif path == "/" or path == "/index.html":
         # لندینگ: همیشه تازه چک شود تا لینک‌های تازه سریع دیده شوند
         if resp.headers.get("Cache-Control") is None and resp.status_code == 200:
             resp.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
-    elif path in ("/app", "/admin", "/student") or path.startswith(("/app/", "/admin/", "/student/")):
+    elif path in ("/app", "/admin", "/student", "/pwa") or path.startswith(("/app/", "/admin/", "/student/", "/pwa/")):
         if resp.headers.get("Cache-Control") is None and resp.status_code == 200:
             resp.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
     # 📱 Telegram Mini App در WebView باز می‌شود ⇒ هرگز نباید

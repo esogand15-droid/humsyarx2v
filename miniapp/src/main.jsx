@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { ROUTER_BASENAME, APP_BASE } from './lib/base';
 import { IS_PWA } from './lib/appMode';
+import { registerServiceWorker } from './lib/swUpdate';
 import './styles/tokens.css';
 import './styles/globals.css';
 import './styles/v3-home.css';
@@ -17,17 +18,9 @@ if (typeof document !== 'undefined' && IS_PWA) {
   document.documentElement.classList.add('is-pwa');
 }
 
-// 🌊 W4 — PWA offline cache (best-effort) — only in production
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    const swUrl = (APP_BASE || '/app/') === '/' ? '/sw.js' : (APP_BASE || '/app/').replace(/\/$/, '') + '/sw.js';
-    navigator.serviceWorker.register(swUrl).catch(()=>{});
-    // auto-reload on new SW
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // debounced reload to avoid loop
-      if (!window.__swReloaded) { window.__swReloaded = true; window.location.reload(); }
-    });
-  });
+// 🧭 سرویس‌ورکر واحد — نسخهٔ تازه فقط با تأیید کاربر فعال می‌شود
+if (import.meta.env.PROD && typeof window !== 'undefined') {
+  window.addEventListener('load', registerServiceWorker);
 }
 
 const queryClient = new QueryClient({

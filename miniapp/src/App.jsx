@@ -27,6 +27,7 @@ import { useUIStore } from './stores/uiStore';
 import BottomNav from './components/layout/BottomNav';
 import SwipeBack from './components/layout/SwipeBack';
 import Toast from './components/shared/Toast';
+import UpdatePrompt from './components/shared/UpdatePrompt';
 
 import ErrorBoundary from './components/shared/ErrorBoundary';
 
@@ -991,6 +992,7 @@ export default function App() {
       <ScrollRestoration />
 
       <Toast />
+      <UpdatePrompt />
 
       {/* معرفی اولین ورود — بعد از
           تأیید حساب نمایش داده می‌شود */}

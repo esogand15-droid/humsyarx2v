@@ -250,7 +250,7 @@ class PwaBuildContractTests(unittest.TestCase):
             self.assertTrue((icons / name).is_file(), f"آیکون نیست: {name}")
 
     def test_service_worker_is_offline_aware(self):
-        sw = read("miniapp", "public-pwa", "sw.js")
+        sw = read("miniapp", "sw", "sw.js")
         self.assertIn("offline.html", sw)
         self.assertIn("addEventListener('fetch'", sw)
         # دادهٔ کاربر هرگز کش نشود

@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 /* ─────────────────────────────────────────────────────────────
    📲 بیلد PWA — بازنویسی «پوستهٔ نصب» روی خروجی
@@ -32,6 +33,48 @@ function landingAssets() {
       // ورودی بیلد `landing.html` است ولی روی دامنه باید `/` باشد
       const built = path.join(to, 'landing.html');
       if (fs.existsSync(built)) fs.renameSync(built, path.join(to, 'index.html'));
+    },
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────
+   🧭 سرویسورکر واحد — `sw/sw.js` تنها منبع است
+
+   هنگام بیلد، شناسهٔ بیلد (hash نام همهٔ فایلهای خروجی) و فهرست
+   پیشکش در آن جایگزین و در ریشهٔ همان خروجی نوشته میشود. پس با
+   هر deploy نام کش عوض میشود و کشهای قدیمی پاک میشوند، بدون اینکه
+   کسی نسخه را دستی بالا ببرد. این plugin بعد از pwaShell اجرا میشود.
+   لندینگ سرویسورکر ندارد.
+   ───────────────────────────────────────────────────────────── */
+function unifiedServiceWorker({ isPwa }) {
+  const names = [];
+  return {
+    name: 'humsyar-unified-sw',
+    apply: 'build',
+    generateBundle(_opts, bundle) {
+      names.push(...Object.keys(bundle));
+    },
+    closeBundle() {
+      const root = process.cwd();
+      const outDir = path.resolve(root, process.env.VITE_OUT_DIR || (isPwa ? 'dist-pwa' : 'dist'));
+      if (!fs.existsSync(outDir)) return;
+      const buildId = crypto.createHash('sha256')
+        .update(names.sort().join('|'))
+        .digest('hex')
+        .slice(0, 12);
+      const precache = [
+        './',
+        './manifest.webmanifest',
+        './icons/icon-192.png',
+        './icons/icon-512.png',
+        './icons/maskable-512.png',
+        './icons/apple-touch-icon.png',
+        ...(isPwa ? ['./offline.html'] : []),
+      ];
+      const src = fs.readFileSync(path.join(root, 'sw', 'sw.js'), 'utf8')
+        .replace("'__BUILD_ID__'", JSON.stringify(buildId))
+        .replace('__PRECACHE__', JSON.stringify(precache));
+      fs.writeFileSync(path.join(outDir, 'sw.js'), src);
     },
   };
 }
@@ -81,6 +124,7 @@ export default defineConfig(({ mode }) => {
       react(),
       ...(env.VITE_APP_MODE === 'pwa' ? [pwaShell()] : []),
       ...(isLanding ? [landingAssets()] : []),
+      ...(isLanding ? [] : [unifiedServiceWorker({ isPwa: env.VITE_APP_MODE === 'pwa' })]),
     ],
     // لندینگ نباید manifest/sw مینی‌اپ را روی ریشه ببیند
     publicDir: isLanding ? false : 'public',
