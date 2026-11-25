@@ -740,10 +740,72 @@ async def handle_lecture_callback(update: Update, context: ContextTypes.DEFAULT_
         return await run_lecture_processing(update, context, session_id)
 
 
+# ── سقفهای ایمن پایپلاین جزوه ──
+# base64 حجم را ~۱.۳۷ برابر میکند و سقف هر درخواست Gemini ۲۰ مگابایت است؛
+# پس صوت خام فقط تا ۸ مگابایت inline میرود و بزرگترها از Files API.
+LECTURE_INLINE_AUDIO_MAX_BYTES = 8 * 1024 * 1024
+LECTURE_INLINE_PDF_MAX_BYTES = 6 * 1024 * 1024
+# جزوهی کامل فارسی (JSON) بهراحتی از ۸۱۹۲ توکن بیشتر میشود.
+LECTURE_DEFAULT_OUTPUT_TOKENS = 32768
+LECTURE_MAX_OUTPUT_TOKENS_CAP = 65536
+
+
+class LectureOutputTooLongError(Exception):
+    """خروجی مدل حتی با سقف حداکثری توکن ناقص ماند.
+
+    عمداً زیرکلاس AIError نیست تا run_with_key_failover آن را «چرخشپذیر»
+    حساب نکند — با کلید دیگر هم همین نتیجه تکرار میشود."""
+
+
+def _lecture_output_tokens(cfg: dict | None) -> int:
+    try:
+        val = int((cfg or {}).get('lecture_max_output_tokens') or LECTURE_DEFAULT_OUTPUT_TOKENS)
+    except (TypeError, ValueError):
+        val = LECTURE_DEFAULT_OUTPUT_TOKENS
+    return max(4096, min(val, LECTURE_MAX_OUTPUT_TOKENS_CAP))
+
+
+def _gemini_finish_reason(data: dict) -> str:
+    try:
+        return (data.get('candidates') or [{}])[0].get('finishReason') or ''
+    except (AttributeError, IndexError, TypeError):
+        return ''
+
+
+async def _lecture_digest_from_response(res, payload: dict, url: str, headers: dict) -> dict:
+    """پاسخ 200 را به digest تبدیل میکند. اگر مدل به سقف توکن خورده باشد، یک بار
+    با سقف حداکثری روی همان مدل تکرار میکند؛ در غیر این صورت خطای غیرچرخشی میدهد."""
+    from backend.services.ai_solver import _extract_gemini_text
+
+    data = res.json()
+    if _gemini_finish_reason(data) == 'MAX_TOKENS':
+        gen_cfg = dict(payload.get('generationConfig') or {})
+        if int(gen_cfg.get('maxOutputTokens') or 0) < LECTURE_MAX_OUTPUT_TOKENS_CAP:
+            logger.warning("خروجی جزوه به سقف توکن رسید؛ تکرار روی همان مدل با سقف %d...", LECTURE_MAX_OUTPUT_TOKENS_CAP)
+            gen_cfg['maxOutputTokens'] = LECTURE_MAX_OUTPUT_TOKENS_CAP
+            bigger = dict(payload)
+            bigger['generationConfig'] = gen_cfg
+            async with httpx.AsyncClient(timeout=300) as client:
+                res2 = await client.post(url, headers=headers, json=bigger)
+            if res2.status_code == 200:
+                data = res2.json()
+        if _gemini_finish_reason(data) == 'MAX_TOKENS':
+            raise LectureOutputTooLongError("Lecture digest exceeded the maximum output token budget")
+    raw_text = _extract_gemini_text(data, "جزوه")
+    return _parse_json_from_text(raw_text)
+
+
 def format_persian_lecture_error(exc: Exception) -> str:
     """Format reassuring Persian error message mapped to error category."""
     from backend.services.ai_solver import AIQuotaError
     err_str = str(exc).lower() if exc else ""
+    if isinstance(exc, LectureOutputTooLongError):
+        return (
+            "📚 <b>محتوای این جلسه برای یک جزوهٔ واحد بیش از حد طولانی است</b>\n\n"
+            "هوش مصنوعی نتوانست جزوهٔ کامل را در یک مرحله تدوین کند.\n\n"
+            "✅ <b>سهمیه شما بازگردانده شد:</b> سهمیهٔ مصرفشده برای این جلسه برگردانده شد و کسر نگردید.\n"
+            "پیشنهاد میشود فایل را به دو بخش کوتاهتر (مثلاً هر بخش حدود ۴۵ دقیقه) تقسیم و جداگانه ارسال فرمایید."
+        )
     if isinstance(exc, AIQuotaError) or "429" in err_str or "quota" in err_str or "سقف" in str(exc):
         return (
             "⚠️ <b>تکمیل موقت ظرفیت پردازش هوش مصنوعی</b>\n\n"
@@ -982,7 +1044,7 @@ async def run_lecture_processing_worker(
             parts = []
 
             if audio_bytes:
-                if len(audio_bytes) < 15 * 1024 * 1024:
+                if len(audio_bytes) <= LECTURE_INLINE_AUDIO_MAX_BYTES:
                     b64_audio = base64.b64encode(audio_bytes).decode('utf-8')
                     parts.append({
                         'inline_data': {
@@ -1013,7 +1075,7 @@ async def run_lecture_processing_worker(
                         raise AIError(f"فایل صوتی بارگذاری‌شده در گوگل در وضعیت فعال قرار نگرفت (state={state or 'UNKNOWN'}).")
 
             if pdf_bytes:
-                if len(pdf_bytes) < 10 * 1024 * 1024:
+                if len(pdf_bytes) <= LECTURE_INLINE_PDF_MAX_BYTES:
                     b64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
                     parts.append({
                         'inline_data': {
@@ -1055,7 +1117,7 @@ async def run_lecture_processing_worker(
                 gen_cfg = _no_thinking({
                     'responseMimeType': 'application/json',
                     'responseSchema': LECTURE_DIGEST_SCHEMA,
-                    'maxOutputTokens': 8192,
+                    'maxOutputTokens': _lecture_output_tokens(cfg),
                     'temperature': 0.2,
                 }, model=model_cand)
 
@@ -1065,6 +1127,7 @@ async def run_lecture_processing_worker(
                     'generationConfig': gen_cfg
                 }
 
+                sent_payload = payload
                 async with httpx.AsyncClient(timeout=240) as client:
                     res = await client.post(url, headers=headers, json=payload)
 
@@ -1073,14 +1136,15 @@ async def run_lecture_processing_worker(
                     fallback_cfg = auto_repair_generation_config(gen_cfg)
                     fallback_payload = dict(payload)
                     fallback_payload['generationConfig'] = fallback_cfg
+                    sent_payload = fallback_payload
                     async with httpx.AsyncClient(timeout=240) as client:
                         res = await client.post(url, headers=headers, json=fallback_payload)
 
                 if res.status_code == 200:
                     try:
-                        data = res.json()
-                        raw_text = _extract_gemini_text(data, "جزوه")
-                        return _parse_json_from_text(raw_text)
+                        return await _lecture_digest_from_response(res, sent_payload, url, headers)
+                    except LectureOutputTooLongError:
+                        raise
                     except Exception as parse_err:
                         logger.warning("خطا در پردازش JSON دریافتی از مدل %s: %s", model_cand, parse_err)
                         last_model_error = AIError(f"JSON parse error from {model_cand}: {parse_err}")
@@ -1107,9 +1171,9 @@ async def run_lecture_processing_worker(
                         retry_res = await retry_client.post(url, headers=headers, json=payload)
                     if retry_res.status_code == 200:
                         try:
-                            data = retry_res.json()
-                            raw_text = _extract_gemini_text(data, "جزوه")
-                            return _parse_json_from_text(raw_text)
+                            return await _lecture_digest_from_response(retry_res, payload, url, headers)
+                        except LectureOutputTooLongError:
+                            raise
                         except Exception as parse_err:
                             logger.warning("خطا در پردازش JSON بعد از retry مدل %s: %s", model_cand, parse_err)
                     logger.warning("مدل %s بعد از retry هم %d داد؛ سوئیچ به مدل بعدی...", model_cand, retry_res.status_code)
