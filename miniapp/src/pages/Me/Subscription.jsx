@@ -796,8 +796,7 @@ export default function Subscription() {
                             data.days_left
                           )
                         } روز باقی‌مانده • تا ${
-                          data.expires ||
-                          '—'
+                          data.expires_fa || data.expires || '—'
                         }`
 
                       : 'پلن مناسب را انتخاب و رسید پرداخت را ارسال کنید.'}

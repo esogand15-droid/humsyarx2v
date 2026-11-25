@@ -737,19 +737,7 @@ export default function Dashboard() {
       <Header
         title="داشبورد"
         back={false}
-        /* 🎨 v3 — زیرنویس هدر فقط وقتی معنا دارد ساخته می‌شود؛
-           الگوی قبلی «ورودی — • گروه —» با خط‌تیره‌های خالی
-           ناقص به‌نظر می‌رسید. */
-        subtitle={[
-          user.intake
-            ? `ورودی ${user.intake}`
-            : '',
-          user.group
-            ? `گروه ${user.group}`
-            : '',
-        ]
-          .filter(Boolean)
-          .join(' • ')}
+
         onRefresh={refetch}
         refreshing={isRefetching}
       />

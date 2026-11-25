@@ -66,6 +66,10 @@ def _tehran_today() -> "datetime.date":
     return (datetime.now(timezone.utc) + timedelta(hours=3, minutes=30)).date()
 
 
+_MEDIA_KINDS = {"video", "audio", "voice", "media"}
+_MEDIA_EXTS = {"mp4", "mkv", "mov", "webm", "mp3", "m4a", "ogg", "oga", "wav", "aac"}
+
+
 @router.get("/continue-reading")
 async def continue_reading(user: dict = Depends(get_current_user)):
     """آخرین فایل‌های نیمه‌خواندهٔ همین کاربر.
@@ -92,6 +96,10 @@ async def continue_reading(user: dict = Depends(get_current_user)):
         return {"items": []}
 
     for doc in docs:
+        name = str(doc.get("name") or doc.get("file_name") or "").strip()
+        kind = str(doc.get("kind") or "other").lower()
+        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        media = kind in _MEDIA_KINDS or ext in _MEDIA_EXTS
         total = int(doc.get("total") or 0)
         page = int(doc.get("page") or 0)
         percent = max(0, min(100, int(round(100 * page / total)))) if total > 0 else 0
@@ -100,8 +108,10 @@ async def continue_reading(user: dict = Depends(get_current_user)):
             {
                 "scope": str(doc.get("scope") or "res"),
                 "id": str(doc.get("file_id") or ""),
-                "name": str(doc.get("name") or doc.get("file_name") or "").strip() or "فایل درسی",
-                "kind": str(doc.get("kind") or "other"),
+                "name": name or "فایل درسی",
+                "kind": kind,
+                "media": media,
+                "position": float(doc.get("position") or 0.0),
                 "page": page,
                 "total": total,
                 "percent": percent,

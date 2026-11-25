@@ -44,6 +44,31 @@ def _role_for(uid: int, db_user: Mapping[str, Any]) -> str:
     return role if role in _VALID_ROLES else "student"
 
 
+_JALALI_MONTHS = {
+    "farvardin": "فروردین", "ordibehesht": "اردیبهشت", "khordad": "خرداد",
+    "tir": "تیر", "mordad": "مرداد", "shahrivar": "شهریور", "mehr": "مهر",
+    "aban": "آبان", "azar": "آذر", "dey": "دی", "bahman": "بهمن", "esfand": "اسفند",
+}
+
+
+async def _intake_label(code: str) -> str:
+    """برچسب ورودی همانطور که ادمین در ربات ثبت کرده؛ وگرنه حدس از کد."""
+    if not code:
+        return ""
+    try:
+        row = await db.intakes.find_one({"code": code}, {"label": 1})
+        label = _text((row or {}).get("label"))
+        if label:
+            return label
+    except Exception:
+        pass
+    month, _, year = code.partition("_")
+    fa = _JALALI_MONTHS.get(month.lower())
+    if fa and year.isdigit():
+        return f"{fa} {year.translate(str.maketrans('0123456789', '۰۱۲۳۴۵۶۷۸۹'))}"
+    return "" if "_" in code else code
+
+
 @router.get("")
 async def get_profile(user=Depends(get_current_user)):
     uid = user["id"]
@@ -75,6 +100,7 @@ async def get_profile(user=Depends(get_current_user)):
         "user": {
             "name": _text(db_user.get("name")),
             "intake": _text(db_user.get("intake")),
+            "intake_label": await _intake_label(_text(db_user.get("intake"))),
             "group": _text(db_user.get("computed_group") or db_user.get("group")),
             "computed_group": _text(db_user.get("computed_group") or db_user.get("group")),
             "registered_group": _text(db_user.get("registered_group") or db_user.get("group")),

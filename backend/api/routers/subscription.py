@@ -253,6 +253,13 @@ def normalize_payment(
     }
 
 
+def _expires_fa(subscription) -> str:
+    if not subscription or not subscription.get("end_date"):
+        return ""
+    from time_utils import format_date_fa
+    return format_date_fa(subscription["end_date"], long=True, fallback="")
+
+
 @router.get("/status")
 async def get_status(
     user=Depends(
@@ -365,6 +372,15 @@ async def get_status(
             )[:10]
             if subscription
             else ""
+        ),
+
+        # 📅 افزایشی: تاریخ پایان به شمسی، و اینکه روزها از چند تمدید
+        # روی هم جمع شدهاند (آنوقت نام آخرین پلن گمراهکننده است).
+        "expires_fa": _expires_fa(subscription),
+        "stacked": bool(
+            active
+            and subscription
+            and days_left > int(subscription.get("last_plan_days") or 0) + 1
         ),
 
         "has_pending_payment":

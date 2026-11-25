@@ -31,8 +31,17 @@ function firstName(user) {
 
 /* هویت تحصیلی: «علوم پایه · پزشکی · نیم‌سال دوم ۱۴۰۴–۱۴۰۵»
    فقط بخش‌های موجود؛ بدون جای‌نگهدار «—» */
+/* کد خام ورودی (مثل bahman_1404) هرگز به کاربر نشان داده نمیشود */
+export function intakeText(user) {
+  const label = String(user?.intake_label || '').trim();
+  if (label) return label;
+  const code = String(user?.intake || '').trim();
+  return code && !code.includes('_') ? code : '';
+}
+
 function identityLine(user) {
-  return [user?.grade, user?.field, user?.group, user?.intake]
+  const intake = intakeText(user);
+  return [user?.grade, user?.field, user?.group && `گروه ${user.group}`, intake && `ورودی ${intake}`]
     .map((part) => String(part || '').trim())
     .filter(Boolean)
     .join(' · ');
@@ -197,6 +206,25 @@ export default HomeGreeting;
    ───────────────────────────────────────────────────────────── */
 
 
+const MEDIA_EXT = /\.(mp4|mkv|mov|webm|mp3|m4a|ogg|oga|wav|aac)$/i;
+
+function isMedia(item) {
+  return Boolean(item?.media) || ['video', 'audio', 'voice', 'media'].includes(item?.kind) || MEDIA_EXT.test(item?.name || '');
+}
+
+/* فقط چیزی که واقعاً نیمهکاره است: سند با صفحهٔ معتبر، یا رسانه با نقطهٔ توقف */
+function isResumable(item) {
+  if (!item) return false;
+  if (isMedia(item)) return Number(item.position) > 0 || Number(item.percent) > 0;
+  return Number(item.total) > 0 && Number(item.page) > 0;
+}
+
+function clock(seconds) {
+  const s = Math.floor(Number(seconds) || 0);
+  const m = Math.floor(s / 60);
+  return faNum(`${m}:${String(s % 60).padStart(2, '0')}`);
+}
+
 /* کارت «ادامهٔ مطالعه» — درصد پیشرفت از progress واقعی ریدر */
 export function ContinueCard({ onOpen }) {
   const { data } = useQuery({
@@ -206,28 +234,34 @@ export function ContinueCard({ onOpen }) {
     retry: false,
   });
 
-  const item = (data?.items || [])[0];
-  if (!item || !item.percent) return null;
+  const item = (data?.items || []).find(isResumable);
+  if (!item) return null;
+  const media = isMedia(item);
+  const pct = Math.max(0, Math.min(100, Number(item.percent) || 0));
 
   return (
     <button type="button" className="v3-continue" onClick={() => onOpen?.(item)}>
       <span className="v3-continue__top">
-        <Icon name="book" size={14} />
-        ادامهٔ مطالعه
-        <span className="v3-continue__pct">{faNum(item.percent)}٪</span>
+        <Icon name={media ? 'play' : 'book'} size={14} />
+        {media ? 'ادامهٔ پخش' : 'ادامهٔ مطالعه'}
+        {pct > 0 && <span className="v3-continue__pct">{faNum(pct)}٪</span>}
       </span>
 
       <b className="v3-continue__title">{item.name}</b>
 
       <span className="v3-continue__meta">
-        {item.total > 0
-          ? `صفحهٔ ${faNum(item.page)} از ${faNum(item.total)}`
-          : 'نقطهٔ توقف ذخیره شده'}
+        {media
+          ? item.position > 0
+            ? `از دقیقهٔ ${clock(item.position)}`
+            : 'نقطهٔ توقف ذخیره شده'
+          : `صفحهٔ ${faNum(Math.min(item.page, item.total))} از ${faNum(item.total)}`}
       </span>
 
-      <span className="v3-continue__bar">
-        <i style={{ width: `${item.percent}%` }} />
-      </span>
+      {pct > 0 && (
+        <span className="v3-continue__bar">
+          <i style={{ width: `${pct}%` }} />
+        </span>
+      )}
     </button>
   );
 }

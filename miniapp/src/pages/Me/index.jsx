@@ -4,6 +4,8 @@ import { number, percent } from '../../lib/format';
 
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+
+import { intakeText } from '../../components/home/HomeV3';
 import api from '../../lib/api';
 import Header from '../../components/layout/Header';
 import PageError from '../../components/shared/PageError';
@@ -344,8 +346,7 @@ export default function Me() {
                   >
                     <span className="badge b-acc">
                       ورودی{' '}
-                      {user.intake ||
-                        '—'}
+                      {intakeText(user) || '—'}
                     </span>
 
                     <span className="badge b-acc">
@@ -536,9 +537,7 @@ export default function Me() {
                     >
                       اشتراک{' '}
 
-                      {subscription
-                        .plan_name ||
-                        'هامزیار'}{' '}
+                      {(!subscription.stacked && subscription.plan_name) || 'هامزیار'}{' '}
 
                       فعال است
                     </b>
@@ -561,9 +560,8 @@ export default function Me() {
 
                       روز باقی‌مانده
 
-                      {subscription
-                        .expires
-                        ? ` • تا ${subscription.expires}`
+                      {subscription.expires_fa || subscription.expires
+                        ? ` • تا ${subscription.expires_fa || subscription.expires}`
                         : ''}
                     </div>
                   </div>
