@@ -26,6 +26,7 @@ PUB = os.path.join(ROOT, "miniapp", "public")
 MANIFEST = os.path.join(PUB, "manifest.webmanifest")
 INDEX = os.path.join(ROOT, "miniapp", "index.html")
 MAIN = os.path.join(ROOT, "miniapp", "src", "main.jsx")
+SW_UPDATE = os.path.join(ROOT, "miniapp", "src", "lib", "swUpdate.js")
 
 
 class PwaContractTests(unittest.TestCase):
@@ -88,9 +89,12 @@ class PwaContractTests(unittest.TestCase):
 
     def test_service_worker_is_registered(self):
         with open(MAIN, encoding="utf-8") as f:
-            src = f.read()
-        self.assertIn("serviceWorker", src)
-        self.assertIn("register", src)
+            main = f.read()
+        with open(SW_UPDATE, encoding="utf-8") as f:
+            sw = f.read()
+        self.assertIn("registerServiceWorker", main)
+        self.assertIn("serviceWorker", sw)
+        self.assertIn("register(", sw)
 
 
 if __name__ == "__main__":

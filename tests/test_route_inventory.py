@@ -26,8 +26,8 @@ os.environ.setdefault("ADMIN_ID", "1")
 os.environ.setdefault("TELEGRAM_TOKEN", "123:TEST")
 
 #: خط‌مب — با هر تغییر عمدی در سطح API آگاهانه به‌روز شود
-EXPECTED_OPENAPI_OPERATIONS = 761
-EXPECTED_ROUTE_OBJECTS = 768
+EXPECTED_OPENAPI_OPERATIONS = 762
+EXPECTED_ROUTE_OBJECTS = 769
 
 
 def _load_app():
