@@ -748,6 +748,26 @@ LECTURE_INLINE_PDF_MAX_BYTES = 6 * 1024 * 1024
 # جزوهی کامل فارسی (JSON) بهراحتی از ۸۱۹۲ توکن بیشتر میشود.
 LECTURE_DEFAULT_OUTPUT_TOKENS = 32768
 LECTURE_MAX_OUTPUT_TOKENS_CAP = 65536
+# هر چند ثانیه یک بار پیام وضعیت «زنده بودن» در طول انتظار هوش مصنوعی
+LECTURE_HEARTBEAT_SEC = 30
+
+# ارجاع به تسکهای پسزمینه تا GC آنها را وسط کار جمع نکند
+_LECTURE_BG_TASKS: set = set()
+
+
+class LectureDeadlineError(Exception):
+    """مرحلهی هوش مصنوعی از سقف زمانی کل کار (LECTURE_AI_DEADLINE_SEC) گذشت."""
+
+
+def _lecture_ai_deadline_sec() -> float:
+    try:
+        return max(60.0, float(os.getenv('LECTURE_AI_DEADLINE_SEC', '900')))
+    except ValueError:
+        return 900.0
+
+
+def _lecture_jobs_enabled() -> bool:
+    return os.getenv('LECTURE_JOBS_ENABLED', '1').strip().lower() not in ('0', 'false', 'no', 'off')
 
 
 class LectureOutputTooLongError(Exception):
@@ -799,6 +819,13 @@ def format_persian_lecture_error(exc: Exception) -> str:
     """Format reassuring Persian error message mapped to error category."""
     from backend.services.ai_solver import AIQuotaError
     err_str = str(exc).lower() if exc else ""
+    if isinstance(exc, LectureDeadlineError):
+        return (
+            "⏱ <b>پردازش این جلسه بیش از زمان مجاز طول کشید</b>\n\n"
+            "سرورهای هوش مصنوعی در زمان مقرر پاسخ کامل ندادند و پردازش متوقف شد.\n\n"
+            "✅ <b>سهمیه شما بازگردانده شد:</b> سهمیهٔ مصرف\u200cشده برای این جلسه برگردانده شد و کسر نگردید.\n"
+            "لطفاً چند دقیقه دیگر دوباره تلاش فرمایید؛ برای جلسات بسیار طولانی، ارسال فایل در دو بخش توصیه می\u200cشود."
+        )
     if isinstance(exc, LectureOutputTooLongError):
         return (
             "📚 <b>محتوای این جلسه برای یک جزوهٔ واحد بیش از حد طولانی است</b>\n\n"
@@ -857,7 +884,7 @@ async def run_lecture_processing_worker(
     """
     from backend.services.ai_solver import (
         ai_claim_inflight, ai_release_inflight, refund_lecture_quota, get_ai_config,
-        sanitize_api_key, ordered_keys, run_with_key_failover,
+        sanitize_api_key, ordered_keys, run_with_key_failover, masked_key,
         _gemini_upload_file, _gemini_wait_file_active,
         _extract_gemini_text, _raise_gemini_status_error,
         AIConfigError, AIQuotaError, AIError, _no_thinking,
@@ -916,6 +943,41 @@ async def run_lecture_processing_worker(
         session['files'] = files
 
     job_temp_dir = None
+    _lj_state = {'id': '', 'stage': 'started', 'started': False, 'done': False, 't0': time.monotonic()}
+
+    async def _lj_stage(stage: str, **extra) -> None:
+        """ثبت مرحلهی کار در lecture_jobs — هرگز خطا به بیرون نمیدهد."""
+        _lj_state['stage'] = stage
+        if not (_lj_state['started'] and _lecture_jobs_enabled()):
+            return
+        try:
+            from backend.services import lecture_jobs as _lj
+            await _lj.job_stage(_lj_state['id'], stage, **extra)
+        except Exception as lj_err:
+            logger.debug("lecture_jobs stage skipped: %s", lj_err)
+
+    async def _lj_finish(outcome: str, err: Optional[BaseException] = None) -> None:
+        """پایان کار + هشدار ادمین در شکست — هرگز خطا به بیرون نمیدهد."""
+        if not _lj_state['started'] or _lj_state['done']:
+            return
+        _lj_state['done'] = True
+        if not _lecture_jobs_enabled():
+            return
+        try:
+            from backend.services import lecture_jobs as _lj
+            await _lj.job_finished(_lj_state['id'], outcome, err)
+            if outcome != 'success' and bot is not None:
+                alert = _lj.failure_alert_text(
+                    _lj_state['id'], uid, _lj_state['stage'], err,
+                    time.monotonic() - _lj_state['t0'],
+                )
+                task = asyncio.create_task(_lj.alert_admins(
+                    bot, alert, error_type=type(err).__name__ if err else outcome,
+                ))
+                _LECTURE_BG_TASKS.add(task)
+                task.add_done_callback(_LECTURE_BG_TASKS.discard)
+        except Exception as lj_err:
+            logger.warning("lecture_jobs finish failed: %s", lj_err)
     quota_consumed = kwargs.get('quota_consumed', True)
 
     try:
@@ -942,6 +1004,14 @@ async def run_lecture_processing_worker(
                     quota_consumed = False
                 await _notify_user("⏳ لطفاً تا اتمام پردازش درخواست فعلی خود صبر فرمایید.")
                 return False
+        _lj_state['id'] = f"{sess_id}:{int(time.time())}"
+        _lj_state['started'] = True
+        if _lecture_jobs_enabled():
+            try:
+                from backend.services import lecture_jobs as _lj
+                await _lj.job_started(_lj_state['id'], uid, files)
+            except Exception as lj_err:
+                logger.debug("lecture_jobs start skipped: %s", lj_err)
         cfg = await get_ai_config()
 
         # مرحله ۱: دانلود فایل‌ها از سرور تلگرام به صورت دیسک-به-دیسک
@@ -952,6 +1022,7 @@ async def run_lecture_processing_worker(
         audio_mime = None
         pdf_bytes = None
 
+        await _lj_stage('download')
         if audio_file_info:
             file_name = audio_file_info.get('name') or 'lecture_media.m4a'
             safe_audio_fn = sanitize_filename_for_disk(file_name, "lecture_media.m4a")
@@ -973,6 +1044,7 @@ async def run_lecture_processing_worker(
                 "⚡️ <b>در حال بهینه‌سازی صوت و فشرده‌سازی برای پردازش فوق‌سریع هوش مصنوعی...</b>",
                 force=True
             )
+            await _lj_stage('transcode')
             out_mp3_path = os.path.join(job_temp_dir, "optimized_lecture.mp3")
             optimized_path = await transcode_audio_file(
                 input_path=raw_audio_path,
@@ -1111,6 +1183,7 @@ async def run_lecture_processing_worker(
                     f"🎧 <b>در حال شنیدن دقیق صوت و نگارش جزوه با هوش چندرسانه‌ای ({model_cand})...</b>",
                     force=False
                 )
+                await _lj_stage('ai_call', model=model_cand, key_masked=masked_key(key))
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_cand}:generateContent"
                 headers = {'Content-Type': 'application/json', 'x-goog-api-key': key}
 
@@ -1186,9 +1259,39 @@ async def run_lecture_processing_worker(
                 raise last_model_error
             raise AIError("هیچ‌کدام از مدل‌های هوش مصنوعی فعال نبودند.")
 
-        digest = await run_with_key_failover(
-            'gemini', gemini_keys, _process_with_gemini_key, label='lecture-gemini-pipeline'
-        )
+        await _lj_stage('ai')
+        _hb_stop = asyncio.Event()
+
+        async def _heartbeat() -> None:
+            """هر LECTURE_HEARTBEAT_SEC ثانیه وضعیت را تازه میکند تا کاربر بداند کار ادامه دارد."""
+            hb_t0 = time.monotonic()
+            while not _hb_stop.is_set():
+                try:
+                    await asyncio.wait_for(_hb_stop.wait(), timeout=LECTURE_HEARTBEAT_SEC)
+                except asyncio.TimeoutError:
+                    elapsed = int(time.monotonic() - hb_t0)
+                    await _update_status(
+                        "🧠 <b>هوش مصنوعی در حال شنیدن صوت و نگارش جزوه است...</b>\n"
+                        f"⏳ زمان سپری\u200cشده: <code>{elapsed // 60}:{elapsed % 60:02d}</code>\n"
+                        "<i>جلسات طولانی ممکن است چند دقیقه زمان ببرند؛ لطفاً صبور باشید.</i>",
+                        force=True,
+                    )
+
+        hb_task = asyncio.create_task(_heartbeat())
+        try:
+            digest = await asyncio.wait_for(
+                run_with_key_failover(
+                    'gemini', gemini_keys, _process_with_gemini_key, label='lecture-gemini-pipeline'
+                ),
+                timeout=_lecture_ai_deadline_sec(),
+            )
+        except asyncio.TimeoutError as deadline_exc:
+            raise LectureDeadlineError(
+                f"lecture AI stage exceeded {int(_lecture_ai_deadline_sec())}s"
+            ) from deadline_exc
+        finally:
+            _hb_stop.set()
+            hb_task.cancel()
 
         # مرحله ۵: تدوین سند آکادمیک PDF با فونت فارسی وزیر
         await _update_status(
@@ -1197,7 +1300,9 @@ async def run_lecture_processing_worker(
         )
 
         from lecture_notes_pdf import generate_lecture_pdf
+        await _lj_stage('pdf')
         pdf_buffer = await asyncio.to_thread(generate_lecture_pdf, digest)
+        await _lj_stage('deliver')
 
         # مرحله ۶: ارسال خروجی نهایی به کاربر در تلگرام با پاکسازی HTML
         title = digest.get('title') or 'جزوه کلاسی'
@@ -1294,6 +1399,7 @@ async def run_lecture_processing_worker(
         # پاکسازی سشن و تثبیت سهمیه
         quota_consumed = False
         _LECTURE_SESSIONS.pop(sess_id, None)
+        await _lj_finish('success')
         return True
 
     except Exception as exc:
@@ -1306,9 +1412,15 @@ async def run_lecture_processing_worker(
             quota_consumed = False
         persian_err = format_persian_lecture_error(exc)
         await _notify_user(persian_err)
+        await _lj_finish('timeout' if isinstance(exc, LectureDeadlineError) else 'failed', exc)
         return False
 
     finally:
+        if _lj_state['started'] and not _lj_state['done']:
+            try:
+                await _lj_finish('failed')
+            except BaseException:
+                pass
         try:
             await ai_release_inflight(uid)
         except Exception:
