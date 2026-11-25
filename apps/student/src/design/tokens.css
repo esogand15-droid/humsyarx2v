@@ -213,7 +213,7 @@
   /* Text */
   --hym-text-primary:      #0F172A;
   --hym-text-secondary:    #334155;
-  --hym-text-muted:        #64748B;
+  --hym-text-muted:        #56657A; /* v2: 5.7:1 on page, 5.4:1 on inset (was #64748B 4.3:1 on inset) */
   --hym-text-disabled:     #94A3B8;
   --hym-text-inverse:      #F8FAFC;
   --hym-text-link:         #2563EB;
@@ -318,8 +318,8 @@ html.dark {
 
   /* Text */
   --hym-text-primary:      #F8FAFC; /* Pure Ice White */
-  --hym-text-secondary:    #94A3B8; /* Cool Slate 400 */
-  --hym-text-muted:        #64748B; /* Cool Slate 500 */
+  --hym-text-secondary:    #CBD5E1; /* v2: Slate 300, 12:1 — keeps secondary above muted */
+  --hym-text-muted:        #94A3B8; /* v2: Slate 400, 7.5:1 on page, 5.7:1 on raised (was 3.75:1) */
   --hym-text-disabled:     #475569; /* Cool Slate 600 */
   --hym-text-inverse:      #0F172A;
   --hym-text-link:         #38BDF8;

@@ -118,7 +118,7 @@ export function SearchScreen() {
                 borderRadius: 13,
                 border: '1px solid var(--line)',
                 background: 'var(--paper-2)',
-                fontSize: 15,
+                fontSize: 'var(--hym-fs-input)',
                 fontFamily: 'inherit',
                 outline: 'none',
               }}

@@ -45,6 +45,13 @@ img, svg {
   display: block;
 }
 
+/* v2: form controls default to the input size (16px on touch: iOS zooms below that;
+   14.5px with a fine pointer on desktop). Zero specificity, so sized classes still win —
+   any class that sets a smaller size must use var(--hym-fs-input). */
+:where(input, textarea, select) {
+  font-size: var(--hym-fs-input);
+}
+
 /* Icons: stroke-based, currentColor, no fill */
 svg {
   fill: none;
@@ -145,7 +152,7 @@ code, .mono {
 .eyebrow {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: .16em;
+  letter-spacing: 0; /* v2: no tracking on Persian */
   color: var(--hym-warm-default);
   text-transform: none;
 }

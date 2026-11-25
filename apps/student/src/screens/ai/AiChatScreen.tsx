@@ -393,7 +393,7 @@ export function AiChatScreen() {
                 background: 'transparent',
                 resize: 'none',
                 padding: '6px 4px',
-                fontSize: 14,
+                fontSize: 'var(--hym-fs-input)',
                 lineHeight: 1.5,
                 outline: 'none',
                 color: 'var(--ink)',
