@@ -416,9 +416,42 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     } else {
       code = `http_${res.status}`;
     }
+    if (res.status === 401 && !isAuthProbePath(path)) emitSessionExpired(path);
     throw new ApiError(code, res.status, false, extra);
   }
   return (body ?? {}) as T;
+}
+
+/* ── T3: global 401 handling ─────────────────────────────────────────
+   A 401 from any API call must not wipe the current screen or interrupt
+   the reader/player. The network layer only reports it; SessionProvider
+   shows a non-blocking banner with a re-login action. No hard redirect
+   ever happens here. Auth routes (session check, login, challenge) are
+   expected to return 401 and do not count as "session expired". */
+type ExpiredListener = (path: string) => void;
+const expiredListeners = new Set<ExpiredListener>();
+
+/** Subscribe to "session expired" (401 outside auth routes). Returns an unsubscribe function. */
+export function onSessionExpired(cb: ExpiredListener): () => void {
+  expiredListeners.add(cb);
+  return () => {
+    expiredListeners.delete(cb);
+  };
+}
+
+function emitSessionExpired(path: string): void {
+  expiredListeners.forEach((cb) => {
+    try {
+      cb(path);
+    } catch {
+      /* one listener's error must not break the others */
+    }
+  });
+}
+
+function isAuthProbePath(path: string): boolean {
+  const p = path.split('?')[0];
+  return p.startsWith('/auth/') || p.startsWith('/api/web-auth/') || p.startsWith('/api/web/auth/');
 }
 
 /** همان لایهٔ شبکه برای ماژول‌های دیگر (کتابخانه) — مسیر نسبی به /api/web. */

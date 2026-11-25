@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { api, ApiError } from './api';
+import { api, ApiError, onSessionExpired } from './api';
 import type { AccountState, AuthConfig, PublicUser } from './api-types';
 
 /** وضعیت نشست در کل اپ — تنها منبع حقیقت برای گارد مسیرها. */
@@ -10,9 +10,12 @@ export type SessionStatus = AccountState | 'loading';
 interface SessionValue {
   status: SessionStatus;
   user: PublicUser | null;
-  /** true وقتی سرور جواب نداده؛ ورود هنوز قابل تلاش است، فقط هشدار نشان می‌دهیم. */
+  /** true وقتی سرور جواب نداده؛ ورود هنوز قابل تلاش است، فقط هشدار نشان میدهیم. */
   offline: boolean;
   config: AuthConfig | null;
+  /** T3: an API call got 401 mid-use. The current screen stays; only a banner shows. */
+  expired: boolean;
+  dismissExpired: () => void;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -24,6 +27,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [offline, setOffline] = useState(false);
   const [config, setConfig] = useState<AuthConfig | null>(null);
+  const [expired, setExpired] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -31,9 +35,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setOffline(false);
       setUser(res.user);
       setStatus(res.authenticated ? res.state : 'anonymous');
+      if (res.authenticated) setExpired(false);
     } catch (err) {
-      // سرور در دسترس نیست → کاربر را پشت صفحه‌ی خطای بن‌بست حبس نمی‌کنیم؛
-      // فرم ورود می‌ماند و هشدار «اتصال برقرار نشد» کنارش می‌آید.
+      // سرور در دسترس نیست → کاربر را پشت صفحهی خطای بنبست حبس نمیکنیم؛
+      // فرم ورود میماند و هشدار «اتصال برقرار نشد» کنارش میآید.
       setOffline(err instanceof ApiError ? err.offline : false);
       setUser(null);
       setStatus('anonymous');
@@ -54,19 +59,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh]);
 
+  // T3: a 401 from any API call does NOT change status (that would unmount the
+  // screen via Gate and throw the user out of the reader/player). We only flag
+  // it; SessionExpiredBanner offers re-login in an overlay above the screen.
+  useEffect(
+    () =>
+      onSessionExpired(() => {
+        setExpired(true);
+      }),
+    [],
+  );
+
+  const dismissExpired = useCallback(() => setExpired(false), []);
+
   const signOut = useCallback(async () => {
     try {
       await api.logout();
     } catch {
-      // حتی اگر شبکه خطا داد، سمت کلاینت خارج می‌شویم؛ کوکی منقضی می‌ماند
+      // حتی اگر شبکه خطا داد، سمت کلاینت خارج میشویم؛ کوکی منقضی میماند
     }
+    setExpired(false);
     setUser(null);
     setStatus('anonymous');
   }, []);
 
   const value = useMemo<SessionValue>(
-    () => ({ status, user, offline, config, refresh, signOut }),
-    [status, user, offline, config, refresh, signOut],
+    () => ({ status, user, offline, config, expired, dismissExpired, refresh, signOut }),
+    [status, user, offline, config, expired, dismissExpired, refresh, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

@@ -145,10 +145,13 @@ async def _resolve_current_user(request: Request) -> Optional[dict]:
             if expires_at < _now_utc():
                 return None
 
-        # Touch last_active
+        # Touch last_active and slide expiry in the same write. Writing
+        # last_active alone would stop web_student's hourly slide check from
+        # ever firing for a user who keeps hitting web-auth endpoints.
         await _sessions().update_one(
             {"_id": token_hash},
-            {"$set": {"last_active": _now_utc()}}
+            {"$set": {"last_active": _now_utc(),
+                      "expires_at": _now_utc() + timedelta(days=SESSION_TTL_DAYS)}}
         )
         user = await db.users.find_one({"user_id": int(session["uid"])})
         if user:
