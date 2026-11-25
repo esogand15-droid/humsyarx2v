@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { AppBar } from '../components/AppBar';
 import { ErrorBlock, LoadingBlock } from '../components/AccessStates';
 import { Button } from '../components/Button';
@@ -35,7 +36,16 @@ export function TicketsScreen() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // TK2: the open ticket lives in the URL (/tickets/:id), so refresh, back and deep links work.
+  const { id: idParam } = useParams();
+  const navigate = useNavigate();
+  const parsedId = idParam != null && /^\d+$/.test(idParam) ? Number(idParam) : null;
+  const selectedId = parsedId;
+  const badParam = idParam != null && parsedId == null;
+  const setSelectedId = useCallback(
+    (id: number | null) => navigate(id == null ? '/tickets' : `/tickets/${id}`),
+    [navigate],
+  );
   const [detail, setDetail] = useState<TicketDetail | null>(null);
   const [detailError, setDetailError] = useState<unknown>(null);
   const [replyText, setReplyText] = useState('');
@@ -57,6 +67,7 @@ export function TicketsScreen() {
     setDetailError(null);
     try {
       const res = await ticketsApi.get(id);
+      if (!res?.ticket) throw new Error('ticket missing');
       setDetail(res.ticket);
     } catch (err) {
       setDetailError(err);
@@ -67,11 +78,11 @@ export function TicketsScreen() {
     void loadList();
   }, [loadList]);
 
-  // ?t=123 (notification link /me/tickets?t=…) opens that ticket directly
+  // Old in-app links (/tickets?t=123) land on the detail route.
   useEffect(() => {
-    const t = Number(new URLSearchParams(window.location.search).get('t'));
-    if (t > 0) setSelectedId(t);
-  }, []);
+    const t = new URLSearchParams(window.location.search).get('t');
+    if (idParam == null && t && /^\d+$/.test(t)) navigate(`/tickets/${t}`, { replace: true });
+  }, [idParam, navigate]);
 
   useEffect(() => {
     if (selectedId == null) {
@@ -135,10 +146,12 @@ export function TicketsScreen() {
   return (
     <>
       <AppBar
-        title="پشتیبانی و تیکت‌ها"
+        title={selectedId != null ? `تیکت #${fa(selectedId)}` : 'پشتیبانی و تیکتها'}
         sub="پاسخگویی به سؤالات فنی و آموزشی"
+        back={idParam != null}
+        onBack={idParam != null ? () => setSelectedId(null) : undefined}
         actions={
-          !showNewTicket && selectedId == null ? (
+          !showNewTicket && idParam == null ? (
             <Button variant="primary" size="sm" onClick={() => setShowNewTicket(true)}>
               تیکت جدید
             </Button>
@@ -147,7 +160,18 @@ export function TicketsScreen() {
       />
 
       <div className="page">
-        {selectedId != null ? (
+        {badParam ? (
+          <EmptyState
+            icon="i-message-circle"
+            title="این تیکت پیدا نشد"
+            text="نشانی تیکت معتبر نیست. از فهرست تیکتها یکی را انتخاب کن."
+            action={
+              <Button variant="primary" size="sm" onClick={() => setSelectedId(null)}>
+                فهرست تیکتها
+              </Button>
+            }
+          />
+        ) : selectedId != null ? (
           <div>
             <div className="row row--between mb-16" style={{ alignItems: 'center' }}>
               <button type="button" className="btn btn--sm btn--ghost" onClick={() => setSelectedId(null)}>
