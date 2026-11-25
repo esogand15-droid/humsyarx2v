@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { AppBar, Button, Card, Chip, EmptyState } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
+import { DsButton } from '../../design/components';
 import { ApiError } from '../../lib/api';
 import { fa } from '../../lib/library';
 import { exam, mockExam, type LessonItem, type MockPreview, type MockSummary, type TopicItem } from '../../lib/exam';
@@ -264,15 +265,16 @@ export function ExamSetup() {
                   </Card>
                 )}
 
-                <div className="row gap-8 mt-16">
-                  <Button
-                    variant="primary"
+                <div className="exam-actions">
+                  <DsButton
+                    size="lg"
                     onClick={() => void start()}
-                    disabled={!pickedLesson || busy || (preview?.available_count ?? 0) === 0}
-                    aria-busy={busy}
+                    disabled={!pickedLesson || (preview?.available_count ?? 0) === 0}
+                    loading={busy}
                   >
                     {busy ? 'در حال ساخت آزمون…' : 'شروع آزمون'}
-                  </Button>
+                  </DsButton>
+                  {!pickedLesson && <span className="exam-actions__hint">برای شروع، یک درس انتخاب کن</span>}
                 </div>
                 <p className="tiny mt-8">
                   در جریان آزمون پاسخ صحیح نمایش داده نمی‌شود؛ کارنامه و بازبینی بعد از پایان می‌آید.

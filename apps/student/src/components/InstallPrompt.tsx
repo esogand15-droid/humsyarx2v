@@ -1,156 +1,154 @@
-/* InstallPrompt — دکمهٔ نصب PWA + راهنمای افزودن به صفحهٔ اصلی (iOS)
-   - Android/Chrome: BeforeInstallPromptEvent -> prompt().prompt()
-   - iOS Safari: prompt وجود ندارد؛ یک کارت راهنمای «افزودن به صفحهٔ اصلی»
-     که یک بار در هر نشست (sessionStorage) نمایش داده می‌شود.
-   - حالت standalone: هیچ چیزی نمایش داده نمی‌شود (کاربر برنامهٔ نصب‌شده را باز کرده). */
+/* InstallCard: the one place the app suggests "install to home screen".
+   - Inline, opaque card rendered only by HomeScreen. It never floats over another screen
+     (audit G1/LG1/AI1/SB2/ES2: the old fixed bottom sheet covered the pay button, the chat
+     composer and exam submit on every route).
+   - iOS Safari has no install prompt: the card shows the two Share-sheet steps and links to
+     the full guide (/install).
+   - Android / desktop Chrome: `beforeinstallprompt` is captured at module load (it can fire
+     before Home mounts) and the card offers a real "install" button.
+   - Never shown in standalone mode. Dismissal is permanent (localStorage). */
 
 import { useCallback, useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { DsButton } from '../design/components';
+import { Icon } from '../icons/Icon';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly prompt: () => Promise<void>;
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-const IOS_PROMO_KEY = 'humsyar-ios-add-to-home-dismissed';
+const DISMISS_KEY = 'humsyar.install-card.dismissed';
 
-/** آیا کاربر در حالت «استندالون» (برنامهٔ نصب‌شده) است؟ */
-function isStandalone(): boolean {
-  const mm = window.matchMedia('(display-mode: standalone)').matches;
-  const standalone = (window.navigator as unknown as { standalone?: boolean }).standalone;
-  return mm || standalone === true;
+let deferredPrompt: BeforeInstallPromptEvent | null = null;
+const subscribers = new Set<() => void>();
+const notify = () => subscribers.forEach((fn) => fn());
+
+function readDismissed(): boolean {
+  try {
+    return localStorage.getItem(DISMISS_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
-/** آیا کاربر iOS است؟ (Safari: beforeinstallprompt هرگز نمی‌آید) */
+function writeDismissed() {
+  try {
+    localStorage.setItem(DISMISS_KEY, '1');
+  } catch {
+    /* private mode: the card simply comes back next launch */
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e as BeforeInstallPromptEvent;
+    notify();
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+    writeDismissed();
+    notify();
+  });
+}
+
+/** Running as the installed app (home-screen icon / installed PWA)? */
+export function isStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  const mm = window.matchMedia?.('(display-mode: standalone)').matches ?? false;
+  const iosStandalone = (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+  return mm || iosStandalone;
+}
+
+/** iOS / iPadOS Safari, where beforeinstallprompt never fires. */
 function isIOS(): boolean {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'Macintosh' && navigator.maxTouchPoints > 1);
-}
-
-/**
- * ShowAddToHome — راهنمای iOS: یک بار در هر نشست، در پایین صفحه با انیمیشن.
- */
-export function ShowAddToHome() {
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    if (!isIOS() || isStandalone()) return;
-    if (sessionStorage.getItem(IOS_PROMO_KEY)) return;
-    setIsVisible(true);
-
-    const t = setTimeout(() => setIsVisible(false), 8000);
-    return () => clearTimeout(t);
-  }, []);
-
-  const dismiss = () => {
-    sessionStorage.setItem(IOS_PROMO_KEY, '1');
-    setIsVisible(false);
-  };
-
-  // روی خودِ صفحهٔ راهنمای نصب، همان راهنما تکرار نمی‌شود
-  if (!isVisible || pathname.startsWith('/install')) return null;
-
+  if (typeof navigator === 'undefined') return false;
   return (
-    <div className="install-prompt install-prompt--ios" role="banner" aria-label="راهنمای افزودن به صفحهٔ اصلی">
-      <div className="install-prompt__body">
-        <p>
-          <strong>هامزیار</strong> را به صفحهٔ اصلی دستگاه خود اضافه کنید تا مانند یک برنامهٔ مستقل
-          باز شود.
-        </p>
-        <ol className="install-prompt__steps">
-          <li>روی دکمهٔ <strong>اشتراک‌گذاری</strong> (Share — مربع با فلش رو به بالا) بزنید.</li>
-          <li>گزینهٔ <strong>Add to Home Screen</strong> را انتخاب کنید.</li>
-        </ol>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
-          <button
-            type="button"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--cyan, #38BDF8)',
-              textDecoration: 'underline',
-              fontSize: '12px',
-              cursor: 'pointer',
-              padding: 0,
-              fontFamily: 'inherit',
-            }}
-            onClick={() => {
-              dismiss();
-              navigate('/install');
-            }}
-          >
-            مشاهده راهنمای تصویری کامل
-          </button>
-          <button type="button" className="install-prompt__close" onClick={dismiss} aria-label="بستن راهنما">
-            فهمیدم
-          </button>
-        </div>
-      </div>
-    </div>
+    /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   );
 }
 
-/**
- * InstallPrompt — دکمهٔ «نصب» برای دسکتاپ و اندروید.
- * اگر مرورگر `beforeinstallprompt` پشتیبانی نمی‌کند، رندر نمی‌شود.
- */
-export function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showButton, setShowButton] = useState(false);
+export function InstallCard() {
+  const [dismissed, setDismissed] = useState(readDismissed);
+  const [canPrompt, setCanPrompt] = useState(() => deferredPrompt !== null);
+  const [ios] = useState(isIOS);
+  const [standalone] = useState(isStandalone);
 
   useEffect(() => {
-    if (isStandalone()) return;
-
-    const onBeforeInstallPrompt = (e: Event) => {
-      // جلوگیری از نمایش خودکار prompt؛ ما خودمان CTA را نشان می‌دهیم
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setShowButton(true);
+    const sync = () => {
+      setCanPrompt(deferredPrompt !== null);
+      setDismissed(readDismissed());
     };
-
-    const onAppInstalled = () => {
-      setDeferredPrompt(null);
-      setShowButton(false);
-    };
-
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-    window.addEventListener('appinstalled', onAppInstalled);
-
+    subscribers.add(sync);
     return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', onAppInstalled);
+      subscribers.delete(sync);
     };
   }, []);
 
-  const handleInstall = useCallback(async () => {
-    if (!deferredPrompt) return;
+  const dismiss = useCallback(() => {
+    writeDismissed();
+    setDismissed(true);
+  }, []);
 
+  const install = useCallback(async () => {
+    const ev = deferredPrompt;
+    if (!ev) return;
     try {
-      await deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        /* کاربر نصب کرد */
-      }
+      await ev.prompt();
+      const { outcome } = await ev.userChoice;
+      if (outcome === 'accepted') writeDismissed();
     } catch {
-      /* کاربر prompt را لغو کرد */
+      /* the user closed the browser prompt */
     } finally {
-      setDeferredPrompt(null);
-      setShowButton(false);
+      deferredPrompt = null;
+      notify();
     }
-  }, [deferredPrompt]);
+  }, []);
 
-  if (!showButton) return null;
+  if (standalone || dismissed || (!ios && !canPrompt)) return null;
 
   return (
-    <button
-      type="button"
-      className="install-prompt__cta"
-      onClick={handleInstall}
-      aria-label="نصب هامزیار روی دستگاه"
-      title="نصب هامزیار"
-    >
-      نصب برنامه
-    </button>
+    <section className="ds-card install-card" aria-labelledby="install-card-title">
+      <div className="install-card__head">
+        <span className="install-card__icon" aria-hidden="true">
+          <Icon name="i-smartphone" size={22} />
+        </span>
+        <div className="install-card__titles">
+          <h2 id="install-card-title" className="install-card__title">
+            هامزیار را روی صفحهٔ اصلی نصب کن
+          </h2>
+          <p className="install-card__sub">تمامصفحه و سریعتر باز میشود، مثل یک برنامهٔ واقعی.</p>
+        </div>
+      </div>
+
+      {ios && !canPrompt && (
+        <ol className="install-card__steps">
+          <li>
+            در Safari دکمهٔ <b>اشتراکگذاری</b> را بزن (مربع با فلش رو به بالا).
+          </li>
+          <li>
+            گزینهٔ <b>افزودن به صفحهٔ اصلی</b> (<bdi>Add to Home Screen</bdi>) را انتخاب کن.
+          </li>
+        </ol>
+      )}
+
+      <div className="install-card__actions">
+        {canPrompt ? (
+          <DsButton onClick={() => void install()}>
+            <Icon name="i-download" size={18} />
+            نصب برنامه
+          </DsButton>
+        ) : (
+          <Link to="/install" className="ds-btn ds-btn--secondary">
+            راهنمای تصویری
+          </Link>
+        )}
+        <DsButton variant="ghost" onClick={dismiss}>
+          فهمیدم، نشان نده
+        </DsButton>
+      </div>
+    </section>
   );
 }

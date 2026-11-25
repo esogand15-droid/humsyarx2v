@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { AppBar, Button, Chip, EmptyState } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
+import { DsButton } from '../../design/components';
 import { Icon } from '../../icons';
 import { fa } from '../../lib/library';
 import {
@@ -254,23 +255,18 @@ export function PracticeScreen() {
                 </div>
               )}
 
-              <div className="row gap-8 mt-16">
+              <div className="exam-actions">
                 {!result ? (
-                  <Button
-                    variant="primary"
-                    onClick={() => void submit()}
-                    disabled={selected === null || busy}
-                    aria-busy={busy}
-                  >
+                  <DsButton size="lg" onClick={() => void submit()} disabled={selected === null} loading={busy}>
                     {busy ? 'در حال ثبت…' : 'ثبت پاسخ'}
-                  </Button>
+                  </DsButton>
                 ) : (
-                  <Button variant="primary" onClick={next}>
+                  <DsButton size="lg" onClick={next}>
                     سؤال بعدی
-                  </Button>
+                  </DsButton>
                 )}
-                <span className="grow" />
-                <span className="tiny">با کلیدهای ۱ تا ۴ انتخاب، Enter ثبت</span>
+                {!result && selected === null && !busy && <span className="exam-actions__hint">یک گزینه را انتخاب کن</span>}
+                <span className="exam-actions__hint kbd-hint">با کلیدهای ۱ تا ۴ انتخاب، Enter ثبت</span>
               </div>
             </article>
           </>

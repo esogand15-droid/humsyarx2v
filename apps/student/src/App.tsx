@@ -1,7 +1,8 @@
-import { Route, Routes, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
+import { Suspense, lazy, useEffect } from 'react';
 
 import { Shell } from './layout/Shell';
+import { sectionFor } from './layout/section';
 import { LoginScreen } from './screens/LoginScreen';
 import { BlockedScreen, PendingScreen, SplashScreen } from './screens/GateScreens';
 import { HomeScreen } from './screens/HomeScreen';
@@ -22,11 +23,9 @@ import {
   TermScreen,
 } from './screens/library/LibraryScreens';
 import { MeScreen } from './screens/MeScreen';
-import { Placeholder } from './screens/Placeholder';
+import { NotFoundScreen } from './screens/NotFoundScreen';
 import { SearchScreen } from './screens/SearchScreen';
 import { ScheduleScreen } from './screens/ScheduleScreen';
-import { StatesScreen } from './screens/StatesScreen';
-import { SystemScreen } from './screens/SystemScreen';
 import { AiChatScreen } from './screens/ai/AiChatScreen';
 import { GradesScreen } from './screens/GradesScreen';
 import { SubscriptionScreen } from './screens/SubscriptionScreen';
@@ -34,8 +33,17 @@ import { NotificationsScreen } from './screens/NotificationsScreen';
 import { TicketsScreen } from './screens/TicketsScreen';
 import { InstallGuideScreen } from './screens/InstallGuideScreen';
 import { useSession } from './lib/session';
-import { InstallPrompt, ShowAddToHome } from './components/InstallPrompt';
 import { SessionExpiredBanner } from './components/SessionExpiredBanner';
+
+/* SY1: the design-system showcase and states gallery are engineering tools. They exist only in
+   `vite dev`; in a production build the branch is constant-false, so neither the route nor the
+   chunk ships and /system, /states fall through to the 404 screen. */
+const SystemScreen = import.meta.env.DEV
+  ? lazy(() => import('./screens/SystemScreen').then((m) => ({ default: m.SystemScreen })))
+  : null;
+const StatesScreen = import.meta.env.DEV
+  ? lazy(() => import('./screens/StatesScreen').then((m) => ({ default: m.StatesScreen })))
+  : null;
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -46,9 +54,9 @@ function ScrollToTop() {
   return null;
 }
 
-/** گارد — تنها جایی که «وضعیت حساب» به مسیر تبدیل می‌شود.
-    سه وضعیت مستقل (نشست، تأیید، اشتراک) اینجا از هم جدا می‌مانند:
-    این گارد فقط دو تای اول را می‌بیند؛ اشتراک در خود صفحه‌ها تصمیم می‌گیرد. */
+/** گارد — تنها جایی که «وضعیت حساب» به مسیر تبدیل میشود.
+    سه وضعیت مستقل (نشست، تأیید، اشتراک) اینجا از هم جدا میمانند:
+    این گارد فقط دو تای اول را میبیند؛ اشتراک در خود صفحهها تصمیم میگیرد. */
 function Gate({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
   if (status === 'loading') return <SplashScreen />;
@@ -58,20 +66,27 @@ function Gate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/** صفحه‌های مرجع طراحی: بدون گارد، تا در بازبینی P0/P1 قابل دیدن باشند. */
-const PUBLIC_PATHS = ['/system', '/states', '/install'];
+/** Legacy notification links from the bot and API: /me/tickets?t=123 → /tickets/123. */
+function LegacyTicketsRedirect() {
+  const [params] = useSearchParams();
+  const t = params.get('t');
+  return <Navigate to={t ? `/tickets/${encodeURIComponent(t)}` : '/tickets'} replace />;
+}
 
-/** پوسته بر اساس وضعیت واقعی نشست: تب‌بار فقط وقتی معنا دارد که
-    کاربر وارد و تأییدشده باشد و در صفحه‌های مرجع نباشد. */
+/** صفحههای بدون گارد و بدون نوار ناوبری. */
+const PUBLIC_PATHS = import.meta.env.DEV ? ['/system', '/states', '/install'] : ['/install'];
+
+/** پوسته بر اساس وضعیت واقعی نشست: تببار فقط وقتی معنا دارد که
+    کاربر وارد و تأییدشده باشد و در صفحههای مرجع نباشد. */
 function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const { status } = useSession();
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
-  // ریدر فضای بیشتری می‌خواهد؛ تب‌بار پایین در آن پنهان می‌شود
+  // ریدر فضای بیشتری میخواهد؛ تببار پایین در آن پنهان میشود
   const immersive = pathname.startsWith('/read/');
   const variant = immersive ? 'reader' : status === 'active' && !isPublic ? 'default' : 'bare';
   return (
-    <Shell tabs={status === 'active' && !isPublic && !immersive} variant={variant}>
+    <Shell tabs={status === 'active' && !isPublic && !immersive} variant={variant} section={sectionFor(pathname)}>
       {children}
     </Shell>
   );
@@ -81,9 +96,6 @@ export function App() {
   return (
     <Layout>
       <ScrollToTop />
-      {/* CTA نصب PWA (اندروید/دسکتاپ) + راهنمای افزودن به صفحهٔ اصلی (iOS) */}
-      <InstallPrompt />
-      <ShowAddToHome />
       {/* T3: session expired mid-use, non-blocking banner (screen stays) */}
       <SessionExpiredBanner />
       <Routes>
@@ -95,8 +107,12 @@ export function App() {
             </Gate>
           }
         />
-        <Route path="/system" element={<SystemScreen />} />
-        <Route path="/states" element={<StatesScreen />} />
+        {SystemScreen && (
+          <Route path="/system" element={<Suspense fallback={null}><SystemScreen /></Suspense>} />
+        )}
+        {StatesScreen && (
+          <Route path="/states" element={<Suspense fallback={null}><StatesScreen /></Suspense>} />
+        )}
         <Route path="/install" element={<InstallGuideScreen />} />
         <Route
           path="/"
@@ -121,6 +137,7 @@ export function App() {
         <Route path="/library/book/:id" element={<Gate><BookScreen /></Gate>} />
         <Route path="/read/:scope/:id" element={<Gate><ReaderScreen /></Gate>} />
         <Route path="/me/notes" element={<Gate><NotesScreen /></Gate>} />
+        <Route path="/me/tickets" element={<LegacyTicketsRedirect />} />
         <Route path="/exam" element={<Gate><ExamHome /></Gate>} />
         <Route path="/exam/practice" element={<Gate><PracticeScreen /></Gate>} />
         <Route path="/exam/history" element={<Gate><HistoryScreen /></Gate>} />
@@ -135,6 +152,7 @@ export function App() {
         <Route path="/subscription" element={<Gate><SubscriptionScreen /></Gate>} />
         <Route path="/notifications" element={<Gate><NotificationsScreen /></Gate>} />
         <Route path="/tickets" element={<Gate><TicketsScreen /></Gate>} />
+        <Route path="/tickets/:id" element={<Gate><TicketsScreen /></Gate>} />
         <Route
           path="/me"
           element={
@@ -147,13 +165,7 @@ export function App() {
           path="*"
           element={
             <Gate>
-              <Placeholder
-                title="پیدا نشد"
-                sub="مسیر نامعتبر"
-                phase="—"
-                icon="i-search"
-                note="این مسیر وجود ندارد. از تب پایین به یکی از پنج ناحیه برگردید."
-              />
+              <NotFoundScreen />
             </Gate>
           }
         />

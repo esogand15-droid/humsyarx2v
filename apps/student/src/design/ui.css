@@ -50,40 +50,6 @@
 .content::-webkit-scrollbar-thumb{background:rgba(56, 189, 248, 0.22);border-radius:999px;transition:background .15s}
 .content::-webkit-scrollbar-thumb:hover{background:rgba(0, 242, 254, 0.55)}
 
-/* تب‌بار ثابت شیشه‌ای با ساپورت safe-area */
-.tabbar{
-  position:fixed;bottom:0;left:0;right:0;z-index:50;
-  display:grid;grid-template-columns:repeat(5,1fr);
-  padding:8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
-  border-top:1px solid var(--line);
-  background:var(--glass-bg);
-  backdrop-filter:blur(24px) saturate(160%);
-  -webkit-backdrop-filter:blur(24px) saturate(160%);
-  box-shadow:0 -4px 20px rgba(0, 0, 0, 0.18);
-}
-.tab{
-  display:flex;flex-direction:column;align-items:center;gap:2px;
-  padding:5px 2px 4px;border:0;background:none;cursor:pointer;border-radius:16px;
-  color:var(--ink-3);font-size:10.5px;font-weight:600;line-height:1.2;
-  position:relative;
-  transition:color var(--t-fast) var(--ease),transform 110ms cubic-bezier(.34, 1.56, .64, 1);
-}
-.tab:active{transform:scale(.92)}
-.tab__icon-wrap{position:relative;display:grid;place-items:center;width:32px;height:26px}
-.tab svg{width:22px;height:22px;stroke-width:1.7;transition:transform 180ms cubic-bezier(.34, 1.56, .64, 1), color var(--t-fast)}
-.tab[aria-current="page"],
-.tab.active{color:var(--cyan-ink, var(--brand));font-weight:700}
-.tab[aria-current="page"] svg,
-.tab.active svg{transform:translateY(-1px) scale(1.08);filter:drop-shadow(0 0 8px var(--cyan-subtle))}
-.tab__indicator{display:none}
-.tab[aria-current="page"] .tab__indicator,
-.tab.active .tab__indicator{
-  display:block;position:absolute;bottom:-3px;width:14px;height:2.5px;border-radius:2px;
-  background:linear-gradient(90deg, var(--brand), var(--cyan));
-  box-shadow:0 0 8px var(--cyan);
-  animation:tab-pop 200ms ease-out;
-}
-@keyframes tab-pop{from{transform:scaleX(0.2);opacity:0}to{transform:scaleX(1);opacity:1}}
 
 /* ═══════════════════════════════════════════════
    اجزای پایه
@@ -349,7 +315,6 @@ html[data-theme="dark"] .rtool button[aria-pressed="true"]{color:var(--on-brand-
    ═══════════════════════════════════════════════ */
 @container app-frame (min-width:760px){
   .content{padding:22px 26px 110px}
-  .tabbar{grid-template-columns:repeat(5,1fr);padding-inline:14%}
   .dash-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start}
   .lib-grid{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start}
   .lib-side{position:sticky;top:0}
@@ -846,6 +811,7 @@ a:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:
 .app-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--hym-bg-page);
   color: var(--hym-text-primary);
   direction: rtl;
@@ -855,6 +821,7 @@ a:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:
 .app-shell--reader {
   display: block;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--paper-read);
 }
 
@@ -980,10 +947,9 @@ a:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:
 }
 
 .sidebar__sub {
-  font-size: 10px;
-  font-family: var(--hym-font-mono, monospace);
-  color: var(--ink-3);
-  letter-spacing: .08em;
+  font-size: var(--hym-fs-caption);
+  line-height: var(--hym-lh-ui);
+  color: var(--hym-text-muted);
 }
 
 .sidebar__nav {
@@ -1243,6 +1209,7 @@ a:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:
   flex-direction: column;
   background: var(--hym-bg-page);
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1396,16 +1363,7 @@ html[data-theme="light"] .desktop-header {
 
 @media (max-width: 767px) {
   .stage-content {
-    padding: 16px 16px 96px;
-  }
-  .tabbar {
-    display: grid;
-  }
-}
-
-@media (min-width: 768px) {
-  .tabbar {
-    display: none !important;
+    padding: 16px 16px 0;
   }
 }
 
@@ -4422,38 +4380,6 @@ html[data-theme="light"] .desktop-header {
   transform: translateX(-3px);
 }
 
-/* ═══════════════════════════════════════════════════════════
-   📲 بنر «افزودن به صفحهٔ اصلی» (iOS) و دکمهٔ نصب (اندروید/دسکتاپ)
-   قبلاً هیچ استایلی نداشتند: بنر به‌صورت متن خام بالای صفحه و کنار
-   کارت ورود می‌نشست. حالا شناور، بالای تببار و جدا از جریان صفحه است.
-   ═══════════════════════════════════════════════════════════ */
-.install-prompt{
-  position:fixed;inset-inline:12px;bottom:calc(84px + env(safe-area-inset-bottom, 0px));
-  z-index:60;max-width:440px;margin-inline:auto;padding:14px 16px;
-  border-radius:18px;border:1px solid var(--line);
-  background:var(--glass-bg);
-  backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);
-  box-shadow:var(--hym-shadow-lg);
-  color:var(--ink);font-size:13px;line-height:1.8;direction:rtl;
-  animation:install-prompt-in 240ms var(--ease, ease-out) both;
-}
-.install-prompt__body p{margin:0}
-.install-prompt__steps{margin:6px 0 0;padding-inline-start:18px;display:grid;gap:2px;color:var(--ink-2)}
-.install-prompt__close{
-  min-height:36px;padding:0 16px;border-radius:12px;border:0;
-  background:var(--brand);color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;
-}
-.install-prompt__cta{
-  position:fixed;inset-inline-start:16px;bottom:calc(88px + env(safe-area-inset-bottom, 0px));
-  z-index:60;min-height:44px;padding:0 18px;border-radius:999px;border:0;
-  background:var(--brand);color:#fff;font:inherit;font-size:13.5px;font-weight:700;
-  box-shadow:var(--hym-shadow-lg);cursor:pointer;
-}
-@media (min-width:1024px){
-  .install-prompt,.install-prompt__cta{bottom:24px}
-}
-@keyframes install-prompt-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion: reduce){ .install-prompt{animation:none} }
 
 /* 🔢 خانه‌های کد ورود — سیال؛ روی iPhone SE (۳۷۵px) هشت خانهٔ ۳۴px ثابت
    از کارت بیرون می‌زد. حالا خانه‌ها با عرض کارت کوچک می‌شوند. */
@@ -4463,8 +4389,6 @@ html[data-theme="light"] .desktop-header {
 .login-slots-separator{flex:0 0 auto}
 .login-crockford-label{gap:8px;flex-wrap:wrap}
 .login-prefix-tag{white-space:nowrap}
-/* صفحه‌های بی‌تب‌بار (ورود/راهنما): بنر به لبهٔ پایین می‌چسبد تا روی فرم کد ننشیند */
-.app-shell--bare .install-prompt{bottom:calc(12px + env(safe-area-inset-bottom, 0px))}
 
 /* T3: session-expired banner, non-blocking: sits above the screen, never replaces it */
 .session-banner{

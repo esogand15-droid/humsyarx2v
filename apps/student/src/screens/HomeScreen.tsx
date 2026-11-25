@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { AppBar, Card, Chip, ProgressBar, SkeletonStack } from '../components';
+import { InstallCard } from '../components/InstallPrompt';
 import { Icon } from '../icons';
 import type { IconName } from '../icons/sprite';
 import { dashboard } from '../lib/dashboard';
@@ -761,6 +762,9 @@ export function HomeScreen() {
 
         {/* ۲. کارت هوشمند ادامه مطالعه جزوه و کتاب */}
         <ContinueReadingCard item={recent.length > 0 ? recent[0] : null} />
+
+        {/* install to home screen: here only, once, never in standalone (audit G1) */}
+        <InstallCard />
 
         {/* ۳. گرید ۴ ویجت آنالیتیکس بالینی و استریک پیوستگی */}
         <ClinicalAnalyticsGrid

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { AppBar, Button, Chip } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
+import { DsButton } from '../../design/components';
 import { Icon } from '../../icons';
 import { ApiError } from '../../lib/api';
 import { fa } from '../../lib/library';
@@ -256,12 +257,12 @@ export function MockRun() {
                   </li>
                 ))}
               </ul>
-              <div className="row gap-8 mt-16">
-                <Button variant="primary" onClick={() => void submit()} disabled={selected === null || busy} aria-busy={busy}>
+              <div className="exam-actions">
+                <DsButton size="lg" onClick={() => void submit()} disabled={selected === null} loading={busy}>
                   {busy ? 'در حال ثبت…' : progress >= total ? 'ثبت و پایان آزمون' : 'ثبت و سؤال بعدی'}
-                </Button>
-                <span className="grow" />
-                <span className="tiny">۱ تا ۴ انتخاب، Enter ثبت</span>
+                </DsButton>
+                {selected === null && !busy && <span className="exam-actions__hint">یک گزینه را انتخاب کن</span>}
+                <span className="exam-actions__hint kbd-hint">۱ تا ۴ انتخاب، Enter ثبت</span>
               </div>
             </article>
           </>
