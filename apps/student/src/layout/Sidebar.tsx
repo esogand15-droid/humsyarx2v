@@ -62,7 +62,7 @@ export function Sidebar() {
                   <span className="hums">هامز</span>
                   <span className="yar">یار</span>
                 </div>
-                <span className="sidebar__sub">HUMSYARX · هوش پزشکی</span>
+                <span className="sidebar__sub">دستیار هوشمند پزشکی</span>
               </div>
             </div>
 

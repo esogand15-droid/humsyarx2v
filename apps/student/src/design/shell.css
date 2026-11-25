@@ -1,0 +1,130 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   App shell (Wave 3, w3-shell). Reads tokens and .ds-* only (docs/design/DS_V2.md §4):
+   no hex, no rgba, no physical left/right, no !important.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Install card: inline on home only, opaque, one-time (audit G1) ───── */
+.install-card {
+  display: grid;
+  gap: var(--hym-space-3);
+  margin-block: var(--hym-space-4);
+  background: var(--hym-surface-1);
+}
+.install-card__head { display: flex; align-items: flex-start; gap: var(--hym-space-3); }
+.install-card__icon {
+  flex: 0 0 auto;
+  display: grid; place-items: center;
+  width: 40px; height: 40px;
+  border-radius: var(--hym-radius-control);
+  border: 1px solid var(--hym-accent-border);
+  background: var(--hym-accent-subtle);
+  color: var(--hym-accent-text);
+}
+.install-card__titles { min-width: 0; }
+.install-card__title {
+  margin: 0;
+  font-size: var(--hym-fs-h3);
+  font-weight: var(--hym-fw-bold);
+  line-height: var(--hym-lh-ui);
+  color: var(--hym-text-primary);
+}
+.install-card__sub {
+  margin: var(--hym-space-1) 0 0;
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-ui);
+  color: var(--hym-text-secondary);
+}
+.install-card__steps {
+  margin: 0;
+  padding-inline-start: var(--hym-space-5);
+  display: grid; gap: var(--hym-space-1);
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-body);
+  color: var(--hym-text-secondary);
+}
+.install-card__actions { display: flex; flex-wrap: wrap; gap: var(--hym-space-2); }
+
+/* ── Bottom tab bar (audit G3) ──────────────────────────────────────────
+   Markup: <nav class="ds-tabbar ds-tabbar--blur app-tabbar">. Each item has its own
+   data-section, so the active pill/label take that section's accent. Mobile only:
+   from 768px the sidebar rail + desktop header take over (PD1). */
+.app-tabbar .ds-tabbar__item { font-size: var(--hym-fs-caption); }
+.app-tabbar .ds-tabbar__label { white-space: nowrap; }
+@media (min-width: 768px) {
+  .app-tabbar { display: none; }
+}
+
+/* Content never hides behind the bar: one clearance, owned by the shell. */
+@media (max-width: 767px) {
+  .app-shell--nav .stage-content {
+    padding-block-end: calc(var(--hym-app-tab-bar-height) + env(safe-area-inset-bottom, 0px) + var(--hym-space-4));
+  }
+  .app-shell--nav .page { padding-block-end: var(--hym-space-4); }
+}
+@media (min-width: 768px) {
+  .app-shell--nav .page { padding-block-end: var(--hym-space-8); }
+}
+
+/* No horizontal overflow at 360–430 (iOS rubber-band sideways scroll). */
+.main-stage { min-width: 0; overflow-x: clip; }
+
+/* ── Desktop / tablet header (PD1) ──────────────────────────────────── */
+.desktop-header { padding-block-start: env(safe-area-inset-top, 0px); }
+.desktop-header__search span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.desktop-header__kbd {
+  margin-inline-start: auto;
+  padding: 2px 6px;
+  border-radius: var(--hym-radius-sm, 4px);
+  border: 1px solid var(--hym-hairline);
+  background: var(--hym-surface-sunken);
+  color: var(--hym-text-muted);
+  font-family: var(--hym-font-mono);
+  font-size: var(--hym-fs-caption);
+  line-height: var(--hym-lh-tight);
+}
+@media (hover: none) {
+  .desktop-header__kbd { display: none; }
+}
+
+/* ── Exam answer bar (audit E1) ─────────────────────────────────────────
+   Sticky above the tab bar and the home indicator, so "ثبت پاسخ" is always reachable;
+   the button itself is a .ds-btn (qbank accent when enabled, sunken well when not). */
+.exam-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hym-space-2) var(--hym-space-3);
+  margin-block-start: var(--hym-space-4);
+}
+.exam-actions__hint {
+  font-size: var(--hym-fs-caption);
+  line-height: var(--hym-lh-ui);
+  color: var(--hym-text-muted);
+}
+@media (max-width: 767px) {
+  .exam-actions {
+    position: sticky;
+    inset-block-end: calc(var(--hym-app-tab-bar-height) + env(safe-area-inset-bottom, 0px) + var(--hym-space-2));
+    z-index: var(--hym-z-sticky);
+    margin-inline: calc(var(--hym-space-2) * -1);
+    padding: var(--hym-space-2);
+    border-radius: var(--hym-radius-card);
+    border: 1px solid var(--hym-hairline);
+    background: var(--hym-surface-2);
+    box-shadow: var(--hym-elev-2);
+  }
+  .exam-actions .ds-btn { flex: 1 1 auto; }
+}
+/* Keyboard shortcuts mean nothing on a touch screen. */
+@media (hover: none) {
+  .kbd-hint { display: none; }
+}
+
+/* ── 404 (audit NF1) ─────────────────────────────────────────────────── */
+.not-found { display: grid; place-items: center; min-height: 50vh; min-height: 50dvh; }
+.not-found__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--hym-space-2); }

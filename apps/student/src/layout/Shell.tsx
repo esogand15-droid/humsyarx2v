@@ -4,24 +4,30 @@ import { Sidebar } from './Sidebar';
 import { DesktopHeader } from './DesktopHeader';
 import { HeaderProvider } from './HeaderContext';
 import { SidebarProvider } from './SidebarContext';
+import type { DsSection } from '../design/components';
 
 export type ShellVariant = 'default' | 'bare' | 'reader';
 
 /**
  * پوستهٔ تطبیقی ۳ سطحی:
  * - موبایل (<768px): نوار تب پایین (TabBar)
- * - تبلت (768-1023px): ریل ناوبری فشرده + محتوای تطبیقی
- * - دسکتاپ (>=1024px): سایدبار راست (با قابلیت جمع‌شدن به ریل شناور) + هدر دسکتاپ + بوم محتوای عریض
- * - حالت خواندن (reader): بوم تمام‌عرض بدون کروم‌های مزاحم
+ * - تبلت (768-1023px): ریل ناوبری فشرده + هدر بالا
+ * - دسکتاپ (>=1024px): سایدبار راست (با قابلیت جمعشدن به ریل شناور) + هدر دسکتاپ + بوم محتوای عریض
+ * - حالت خواندن (reader): بوم تمامعرض بدون کرومهای مزاحم
+ *
+ * `section` is the DS v2 role of the current route; it lands on the screen root
+ * (`data-section`), so each screen re-themes without touching its own markup.
  */
 export function Shell({
   children,
   tabs,
   variant = 'default',
+  section = 'brand',
 }: {
   children: ReactNode;
   tabs?: boolean;
   variant?: ShellVariant;
+  section?: DsSection;
 }) {
   const showNav = tabs ?? true;
 
@@ -29,7 +35,9 @@ export function Shell({
     return (
       <HeaderProvider>
         <SidebarProvider>
-          <div className="app-shell app-shell--reader">{children}</div>
+          <div className="app-shell app-shell--reader" data-section={section}>
+            {children}
+          </div>
         </SidebarProvider>
       </HeaderProvider>
     );
@@ -48,11 +56,13 @@ export function Shell({
   return (
     <HeaderProvider>
       <SidebarProvider>
-        <div className="app-shell">
+        <div className={`app-shell${showNav ? ' app-shell--nav' : ''}`}>
           {showNav && <Sidebar />}
           <div className="main-stage">
             {showNav && <DesktopHeader />}
-            <main className="stage-content">{children}</main>
+            <main className="stage-content" data-section={section}>
+              {children}
+            </main>
             {showNav && <TabBar />}
           </div>
         </div>
@@ -60,4 +70,3 @@ export function Shell({
     </HeaderProvider>
   );
 }
-

@@ -15,8 +15,6 @@ const ROUTE_TITLES: Record<string, string> = {
   '/me': 'پروفایل و حساب کاربری',
   '/search': 'جستجوی سراسری',
   '/notifications': 'مرکز اعلان‌ها',
-  '/system': 'سیستم دیزاین هامزیار',
-  '/states': 'وضعیت‌های سیستمی',
 };
 
 export function DesktopHeader() {
@@ -93,20 +91,6 @@ export function DesktopHeader() {
         >
           <Icon name="i-search" size={16} />
           <span>جستجوی منابع، آزمون...</span>
-          <kbd
-            style={{
-              marginInlineStart: 'auto',
-              fontSize: '10px',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              background: 'var(--paper-3)',
-              border: '1px solid var(--line)',
-              fontFamily: 'var(--hym-font-mono)',
-              color: 'var(--ink-3)',
-            }}
-          >
-            ⌘K
-          </kbd>
         </button>
 
         <button
