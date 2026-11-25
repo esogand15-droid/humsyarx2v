@@ -7,7 +7,6 @@ import { Card } from '../components/Card';
 import { Chip } from '../components/Chip';
 import { EmptyState } from '../components/EmptyState';
 import { Input } from '../components/Input';
-import { Icon } from '../icons';
 import { errorText } from '../lib/api';
 import { fa } from '../lib/library';
 import {
@@ -173,13 +172,11 @@ export function TicketsScreen() {
           />
         ) : selectedId != null ? (
           <div>
-            <div className="row row--between mb-16" style={{ alignItems: 'center' }}>
-              <button type="button" className="btn btn--sm btn--ghost" onClick={() => setSelectedId(null)}>
-                <Icon name="i-chevron-r" size={16} />
-                بازگشت به فهرست
-              </button>
-              {detail && <Chip variant={statusTone(detail.status)}>{STATUS_LABEL[detail.status] ?? detail.status}</Chip>}
-            </div>
+            {detail && (
+              <div className="row mb-16">
+                <Chip variant={statusTone(detail.status)}>{STATUS_LABEL[detail.status] ?? detail.status}</Chip>
+              </div>
+            )}
 
             {detailError != null ? (
               <ErrorBlock error={detailError} onRetry={() => void loadDetail(selectedId)} />

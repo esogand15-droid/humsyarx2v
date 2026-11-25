@@ -74,7 +74,7 @@ function LegacyTicketsRedirect() {
 }
 
 /** صفحههای بدون گارد و بدون نوار ناوبری. */
-const PUBLIC_PATHS = ['/system', '/states', '/install'];
+const PUBLIC_PATHS = import.meta.env.DEV ? ['/system', '/states', '/install'] : ['/install'];
 
 /** پوسته بر اساس وضعیت واقعی نشست: تببار فقط وقتی معنا دارد که
     کاربر وارد و تأییدشده باشد و در صفحههای مرجع نباشد. */
