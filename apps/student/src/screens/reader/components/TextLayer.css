@@ -76,7 +76,7 @@
   padding: 6px 12px;
   border: 1px solid var(--line-2, #cbd5e1);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--hym-fs-input);
   background: var(--paper, #fff);
   color: var(--ink, #0f172a);
   outline: none;

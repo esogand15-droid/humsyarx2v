@@ -40,6 +40,21 @@
   --hym-cyan-900:  #164E63;
   --hym-neon-cyan: #00F2FE; /* Vivid Core Glow */
   --hym-neon-aqua: #0EA5E9; /* Sky Aqua Highlight */
+  --hym-neon-400:  #00F2FE; /* v2: the one neon literal; replace raw #00F2FE with this, later with --hym-role-ai-* */
+
+  /* v2: Sky (the light-theme face of the AI/cyan accent; values the v1 cyan semantic already used) */
+  --hym-sky-50:    #F0F9FF;
+  --hym-sky-100:   #E0F2FE;
+  --hym-sky-200:   #BAE6FD;
+  --hym-sky-300:   #7DD3FC;
+  --hym-sky-400:   #38BDF8;
+  --hym-sky-500:   #0EA5E9;
+  --hym-sky-600:   #0284C7;
+  --hym-sky-700:   #0369A1;
+  --hym-sky-800:   #075985;
+  --hym-sky-900:   #0C4A6E;
+  --hym-sky-950:   #082F49;
+  --hym-cyan-950:  #083344;
 
   /* Teal compatibility aliases */
   --hym-teal-50:   var(--hym-cyan-50);
@@ -198,7 +213,7 @@
   /* Text */
   --hym-text-primary:      #0F172A;
   --hym-text-secondary:    #334155;
-  --hym-text-muted:        #64748B;
+  --hym-text-muted:        #56657A; /* v2: 5.7:1 on page, 5.4:1 on inset (was #64748B 4.3:1 on inset) */
   --hym-text-disabled:     #94A3B8;
   --hym-text-inverse:      #F8FAFC;
   --hym-text-link:         #2563EB;
@@ -220,9 +235,7 @@
 
   /* Accent (Cyan) semantic */
   --hym-accent-default:    #0284C7;
-  --hym-accent-hover:      #0369A1;
   --hym-accent-active:     #075985;
-  --hym-accent-subtle:     #E0F2FE;
   --hym-accent-muted:      #BAE6FD;
   --hym-cyan-default:      #00F2FE;
   --hym-cyan-subtle:       rgba(0, 242, 254, 0.12);
@@ -305,8 +318,8 @@ html.dark {
 
   /* Text */
   --hym-text-primary:      #F8FAFC; /* Pure Ice White */
-  --hym-text-secondary:    #94A3B8; /* Cool Slate 400 */
-  --hym-text-muted:        #64748B; /* Cool Slate 500 */
+  --hym-text-secondary:    #CBD5E1; /* v2: Slate 300, 12:1 — keeps secondary above muted */
+  --hym-text-muted:        #94A3B8; /* v2: Slate 400, 7.5:1 on page, 5.7:1 on raised (was 3.75:1) */
   --hym-text-disabled:     #475569; /* Cool Slate 600 */
   --hym-text-inverse:      #0F172A;
   --hym-text-link:         #38BDF8;
@@ -328,9 +341,7 @@ html.dark {
 
   /* Accent (Neon Cyan) — dark */
   --hym-accent-default:    #00F2FE;
-  --hym-accent-hover:      #38BDF8;
   --hym-accent-active:     #06B6D4;
-  --hym-accent-subtle:     rgba(0, 242, 254, 0.15);
   --hym-accent-muted:      rgba(0, 242, 254, 0.30);
   --hym-cyan-default:      #00F2FE;
   --hym-cyan-subtle:       rgba(0, 242, 254, 0.15);
@@ -391,6 +402,411 @@ html.dark {
   --hym-chart-7:           var(--hym-slate-400);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   v2 LAYERS — DS v2 (docs/design/DS_V2.md)
+   Layer 1  primitives : OKLCH ramps, theme-agnostic, never read by components
+   Layer 2  roles      : six-token contract per role, light (:root) + dark
+   Layer 3  accent     : --hym-accent-*, chosen per screen by [data-section]
+   Components read ONLY --hym-accent-* + semantic tokens (surface/text/elev…).
+   Additive: nothing here changes how v1 screens render.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── v2 · Layer 1 · OKLCH primitive ramps ── */
+:root {
+  /* Indigo — resources / library */
+  --hym-indigo-50:  oklch(.962 .018 272.3);
+  --hym-indigo-100: oklch(.930 .034 272.8);
+  --hym-indigo-200: oklch(.870 .065 274.0);
+  --hym-indigo-300: oklch(.785 .115 274.7);
+  --hym-indigo-400: oklch(.673 .182 276.9);
+  --hym-indigo-500: oklch(.585 .233 277.1);
+  --hym-indigo-600: oklch(.511 .262 277.0);
+  --hym-indigo-700: oklch(.457 .240 277.0);
+  --hym-indigo-800: oklch(.398 .195 277.4);
+  --hym-indigo-900: oklch(.359 .144 278.7);
+  --hym-indigo-950: oklch(.257 .090 281.3);
+
+  /* Violet — question bank / exams */
+  --hym-violet-50:  oklch(.969 .016 293.8);
+  --hym-violet-100: oklch(.943 .029 294.6);
+  --hym-violet-200: oklch(.894 .057 293.3);
+  --hym-violet-300: oklch(.811 .111 293.6);
+  --hym-violet-400: oklch(.702 .183 293.5);
+  --hym-violet-500: oklch(.606 .250 292.7);
+  --hym-violet-600: oklch(.541 .281 293.0);
+  --hym-violet-700: oklch(.491 .270 292.6);
+  --hym-violet-800: oklch(.432 .232 292.8);
+  --hym-violet-900: oklch(.380 .189 293.7);
+  --hym-violet-950: oklch(.283 .141 291.1);
+
+  /* Emerald — grades */
+  --hym-emerald-50:  oklch(.979 .021 166.1);
+  --hym-emerald-100: oklch(.950 .052 163.1);
+  --hym-emerald-200: oklch(.905 .093 164.2);
+  --hym-emerald-300: oklch(.845 .143 165.0);
+  --hym-emerald-400: oklch(.765 .177 163.2);
+  --hym-emerald-500: oklch(.696 .170 162.5);
+  --hym-emerald-600: oklch(.596 .145 163.2);
+  --hym-emerald-700: oklch(.508 .118 165.6);
+  --hym-emerald-800: oklch(.432 .095 166.9);
+  --hym-emerald-900: oklch(.378 .077 168.9);
+  --hym-emerald-950: oklch(.262 .051 172.6);
+
+  /* Green — money / subscription */
+  --hym-green-50:  oklch(.982 .018 155.8);
+  --hym-green-100: oklch(.962 .044 156.7);
+  --hym-green-200: oklch(.925 .084 156.0);
+  --hym-green-300: oklch(.871 .150 154.4);
+  --hym-green-400: oklch(.792 .209 151.7);
+  --hym-green-500: oklch(.723 .219 149.6);
+  --hym-green-600: oklch(.627 .194 149.2);
+  --hym-green-700: oklch(.527 .154 150.1);
+  --hym-green-800: oklch(.448 .119 151.3);
+  --hym-green-900: oklch(.393 .095 152.5);
+  --hym-green-950: oklch(.266 .065 152.9);
+
+  /* Honey — notes */
+  --hym-honey-50:  oklch(.987 .026 102.2);
+  --hym-honey-100: oklch(.973 .071 103.2);
+  --hym-honey-200: oklch(.945 .129 101.5);
+  --hym-honey-300: oklch(.905 .182 98.1);
+  --hym-honey-400: oklch(.852 .199 91.9);
+  --hym-honey-500: oklch(.795 .184 86.0);
+  --hym-honey-600: oklch(.681 .162 75.8);
+  --hym-honey-700: oklch(.554 .135 66.4);
+  --hym-honey-800: oklch(.476 .114 61.9);
+  --hym-honey-900: oklch(.421 .095 57.7);
+  --hym-honey-950: oklch(.286 .066 53.8);
+
+  /* Rose — danger / exam alerts */
+  --hym-rose-50:  oklch(.969 .015 12.4);
+  --hym-rose-100: oklch(.941 .030 12.6);
+  --hym-rose-200: oklch(.892 .058 10.0);
+  --hym-rose-300: oklch(.810 .117 11.6);
+  --hym-rose-400: oklch(.712 .194 13.4);
+  --hym-rose-500: oklch(.645 .246 16.4);
+  --hym-rose-600: oklch(.586 .253 17.6);
+  --hym-rose-700: oklch(.514 .222 16.9);
+  --hym-rose-800: oklch(.455 .188 13.7);
+  --hym-rose-900: oklch(.410 .159 10.3);
+  --hym-rose-950: oklch(.271 .105 12.1);
+
+  /* Ramp completions for the kept v1 ramps */
+  --hym-amber-950: #451A03;
+  --hym-brand-on-dark: #FFFFFF;
+}
+
+/* ── v2 · Layer 2 · roles — LIGHT ──
+   Contract per role: -solid, -solid-hover, -on-solid, -subtle, -subtle-border, -text.
+   Rule: -on-solid on -solid ≥ 4.5:1 and -text on -subtle ≥ 4.5:1 (printed in ds-preview.html). */
+:root {
+  --hym-role-brand-solid:         var(--hym-brand-600);
+  --hym-role-brand-solid-hover:   var(--hym-brand-700);
+  --hym-role-brand-on-solid:      var(--hym-slate-0);
+  --hym-role-brand-subtle:        var(--hym-brand-50);
+  --hym-role-brand-subtle-border: var(--hym-brand-200);
+  --hym-role-brand-text:          var(--hym-brand-700);
+
+  --hym-role-resources-solid:         var(--hym-indigo-600);
+  --hym-role-resources-solid-hover:   var(--hym-indigo-700);
+  --hym-role-resources-on-solid:      var(--hym-slate-0);
+  --hym-role-resources-subtle:        var(--hym-indigo-50);
+  --hym-role-resources-subtle-border: var(--hym-indigo-200);
+  --hym-role-resources-text:          var(--hym-indigo-700);
+
+  --hym-role-qbank-solid:         var(--hym-violet-600);
+  --hym-role-qbank-solid-hover:   var(--hym-violet-700);
+  --hym-role-qbank-on-solid:      var(--hym-slate-0);
+  --hym-role-qbank-subtle:        var(--hym-violet-50);
+  --hym-role-qbank-subtle-border: var(--hym-violet-200);
+  --hym-role-qbank-text:          var(--hym-violet-700);
+
+  /* amber-600 fails white text (3.2:1) → solid steps down to 700 */
+  --hym-role-schedule-solid:         var(--hym-amber-700);
+  --hym-role-schedule-solid-hover:   var(--hym-amber-800);
+  --hym-role-schedule-on-solid:      var(--hym-slate-0);
+  --hym-role-schedule-subtle:        var(--hym-amber-50);
+  --hym-role-schedule-subtle-border: var(--hym-amber-200);
+  --hym-role-schedule-text:          var(--hym-amber-800);
+
+  /* ai: sky in light, neon cyan in dark. -vivid = decorative accent (icons, bars, glow) — the v1 --cyan */
+  --hym-role-ai-solid:         var(--hym-sky-700);
+  --hym-role-ai-solid-hover:   var(--hym-sky-800);
+  --hym-role-ai-on-solid:      var(--hym-slate-0);
+  --hym-role-ai-subtle:        var(--hym-sky-100);
+  --hym-role-ai-subtle-border: var(--hym-sky-200);
+  --hym-role-ai-text:          var(--hym-sky-700);
+  --hym-role-ai-vivid:         var(--hym-sky-600);
+  --hym-role-ai-vivid-hover:   var(--hym-sky-700);
+  --hym-role-ai-gradient:      linear-gradient(135deg, var(--hym-cyan-400), var(--hym-brand-600)); /* decorative only: never put text on it */
+
+  /* emerald-600 fails white text (3.7:1) → solid 700 */
+  --hym-role-grades-solid:         var(--hym-emerald-700);
+  --hym-role-grades-solid-hover:   var(--hym-emerald-800);
+  --hym-role-grades-on-solid:      var(--hym-slate-0);
+  --hym-role-grades-subtle:        var(--hym-emerald-50);
+  --hym-role-grades-subtle-border: var(--hym-emerald-200);
+  --hym-role-grades-text:          var(--hym-emerald-700);
+
+  --hym-role-money-solid:         var(--hym-green-700);
+  --hym-role-money-solid-hover:   var(--hym-green-800);
+  --hym-role-money-on-solid:      var(--hym-slate-0);
+  --hym-role-money-subtle:        var(--hym-green-50);
+  --hym-role-money-subtle-border: var(--hym-green-200);
+  --hym-role-money-text:          var(--hym-green-800);
+
+  /* notes: honey-400 is 1.4:1 against the light canvas → light solid steps down to 700 + white */
+  --hym-role-notes-solid:         var(--hym-honey-700);
+  --hym-role-notes-solid-hover:   var(--hym-honey-800);
+  --hym-role-notes-on-solid:      var(--hym-slate-0);
+  --hym-role-notes-subtle:        var(--hym-honey-50);
+  --hym-role-notes-subtle-border: var(--hym-honey-200);
+  --hym-role-notes-text:          var(--hym-honey-800);
+
+  --hym-role-danger-solid:         var(--hym-rose-600);
+  --hym-role-danger-solid-hover:   var(--hym-rose-700);
+  --hym-role-danger-on-solid:      var(--hym-slate-0);
+  --hym-role-danger-subtle:        var(--hym-rose-50);
+  --hym-role-danger-subtle-border: var(--hym-rose-200);
+  --hym-role-danger-text:          var(--hym-rose-700);
+}
+
+/* ── v2 · Layer 2 · roles — DARK ──
+   Generic rule: solid 400, hover 300, on-solid 950, subtle 400@16%, border 400@32%, text 300.
+   Exception: brand keeps royal 600 + white (5.2:1) — it is the logo colour and v1 used it. */
+html[data-theme="dark"],
+html.dark {
+  --hym-role-brand-solid:         var(--hym-brand-600);
+  --hym-role-brand-solid-hover:   var(--hym-brand-500);
+  --hym-role-brand-on-solid:      var(--hym-brand-on-dark);
+  --hym-role-brand-subtle:        var(--hym-brand-subtle);
+  --hym-role-brand-subtle-border: color-mix(in oklch, var(--hym-brand-400) 32%, transparent);
+  --hym-role-brand-text:          var(--hym-brand-300);
+
+  --hym-role-resources-solid:         var(--hym-indigo-400);
+  --hym-role-resources-solid-hover:   var(--hym-indigo-300);
+  --hym-role-resources-on-solid:      var(--hym-indigo-950);
+  --hym-role-resources-subtle:        color-mix(in oklch, var(--hym-indigo-400) 16%, transparent);
+  --hym-role-resources-subtle-border: color-mix(in oklch, var(--hym-indigo-400) 32%, transparent);
+  --hym-role-resources-text:          var(--hym-indigo-300);
+
+  --hym-role-qbank-solid:         var(--hym-violet-400);
+  --hym-role-qbank-solid-hover:   var(--hym-violet-300);
+  --hym-role-qbank-on-solid:      var(--hym-violet-950);
+  --hym-role-qbank-subtle:        color-mix(in oklch, var(--hym-violet-400) 16%, transparent);
+  --hym-role-qbank-subtle-border: color-mix(in oklch, var(--hym-violet-400) 32%, transparent);
+  --hym-role-qbank-text:          var(--hym-violet-300);
+
+  --hym-role-schedule-solid:         var(--hym-amber-400);
+  --hym-role-schedule-solid-hover:   var(--hym-amber-300);
+  --hym-role-schedule-on-solid:      var(--hym-amber-950);
+  --hym-role-schedule-subtle:        color-mix(in oklch, var(--hym-amber-400) 16%, transparent);
+  --hym-role-schedule-subtle-border: color-mix(in oklch, var(--hym-amber-400) 32%, transparent);
+  --hym-role-schedule-text:          var(--hym-amber-300);
+
+  --hym-role-ai-solid:         var(--hym-neon-400);
+  --hym-role-ai-solid-hover:   var(--hym-sky-400);
+  --hym-role-ai-on-solid:      var(--hym-cyan-950);
+  --hym-role-ai-subtle:        rgba(0, 242, 254, 0.15);
+  --hym-role-ai-subtle-border: color-mix(in oklch, var(--hym-neon-400) 32%, transparent);
+  --hym-role-ai-text:          var(--hym-cyan-300);
+  --hym-role-ai-vivid:         var(--hym-neon-400);
+  --hym-role-ai-vivid-hover:   var(--hym-sky-400);
+
+  --hym-role-grades-solid:         var(--hym-emerald-400);
+  --hym-role-grades-solid-hover:   var(--hym-emerald-300);
+  --hym-role-grades-on-solid:      var(--hym-emerald-950);
+  --hym-role-grades-subtle:        color-mix(in oklch, var(--hym-emerald-400) 16%, transparent);
+  --hym-role-grades-subtle-border: color-mix(in oklch, var(--hym-emerald-400) 32%, transparent);
+  --hym-role-grades-text:          var(--hym-emerald-300);
+
+  --hym-role-money-solid:         var(--hym-green-400);
+  --hym-role-money-solid-hover:   var(--hym-green-300);
+  --hym-role-money-on-solid:      var(--hym-green-950);
+  --hym-role-money-subtle:        color-mix(in oklch, var(--hym-green-400) 16%, transparent);
+  --hym-role-money-subtle-border: color-mix(in oklch, var(--hym-green-400) 32%, transparent);
+  --hym-role-money-text:          var(--hym-green-300);
+
+  --hym-role-notes-solid:         var(--hym-honey-400);
+  --hym-role-notes-solid-hover:   var(--hym-honey-300);
+  --hym-role-notes-on-solid:      var(--hym-honey-950);
+  --hym-role-notes-subtle:        color-mix(in oklch, var(--hym-honey-400) 16%, transparent);
+  --hym-role-notes-subtle-border: color-mix(in oklch, var(--hym-honey-400) 32%, transparent);
+  --hym-role-notes-text:          var(--hym-honey-300);
+
+  --hym-role-danger-solid:         var(--hym-rose-400);
+  --hym-role-danger-solid-hover:   var(--hym-rose-300);
+  --hym-role-danger-on-solid:      var(--hym-rose-950);
+  --hym-role-danger-subtle:        color-mix(in oklch, var(--hym-rose-400) 16%, transparent);
+  --hym-role-danger-subtle-border: color-mix(in oklch, var(--hym-rose-400) 32%, transparent);
+  --hym-role-danger-text:          var(--hym-rose-300);
+}
+
+/* ── v2 · Layer 3 · accent — what components read ──
+   <main data-section="qbank"> re-themes every component inside it. Default = brand.
+   Re-declared on [data-section] because var() resolves where it is declared. */
+:root,
+[data-section="brand"] {
+  --hym-accent:        var(--hym-role-brand-solid);
+  --hym-accent-hover:  var(--hym-role-brand-solid-hover);
+  --hym-accent-on:     var(--hym-role-brand-on-solid);
+  --hym-accent-subtle: var(--hym-role-brand-subtle);
+  --hym-accent-border: var(--hym-role-brand-subtle-border);
+  --hym-accent-text:   var(--hym-role-brand-text);
+}
+[data-section="resources"] {
+  --hym-accent:        var(--hym-role-resources-solid);
+  --hym-accent-hover:  var(--hym-role-resources-solid-hover);
+  --hym-accent-on:     var(--hym-role-resources-on-solid);
+  --hym-accent-subtle: var(--hym-role-resources-subtle);
+  --hym-accent-border: var(--hym-role-resources-subtle-border);
+  --hym-accent-text:   var(--hym-role-resources-text);
+}
+[data-section="qbank"] {
+  --hym-accent:        var(--hym-role-qbank-solid);
+  --hym-accent-hover:  var(--hym-role-qbank-solid-hover);
+  --hym-accent-on:     var(--hym-role-qbank-on-solid);
+  --hym-accent-subtle: var(--hym-role-qbank-subtle);
+  --hym-accent-border: var(--hym-role-qbank-subtle-border);
+  --hym-accent-text:   var(--hym-role-qbank-text);
+}
+[data-section="schedule"] {
+  --hym-accent:        var(--hym-role-schedule-solid);
+  --hym-accent-hover:  var(--hym-role-schedule-solid-hover);
+  --hym-accent-on:     var(--hym-role-schedule-on-solid);
+  --hym-accent-subtle: var(--hym-role-schedule-subtle);
+  --hym-accent-border: var(--hym-role-schedule-subtle-border);
+  --hym-accent-text:   var(--hym-role-schedule-text);
+}
+[data-section="ai"] {
+  --hym-accent:        var(--hym-role-ai-solid);
+  --hym-accent-hover:  var(--hym-role-ai-solid-hover);
+  --hym-accent-on:     var(--hym-role-ai-on-solid);
+  --hym-accent-subtle: var(--hym-role-ai-subtle);
+  --hym-accent-border: var(--hym-role-ai-subtle-border);
+  --hym-accent-text:   var(--hym-role-ai-text);
+}
+[data-section="grades"] {
+  --hym-accent:        var(--hym-role-grades-solid);
+  --hym-accent-hover:  var(--hym-role-grades-solid-hover);
+  --hym-accent-on:     var(--hym-role-grades-on-solid);
+  --hym-accent-subtle: var(--hym-role-grades-subtle);
+  --hym-accent-border: var(--hym-role-grades-subtle-border);
+  --hym-accent-text:   var(--hym-role-grades-text);
+}
+[data-section="money"] {
+  --hym-accent:        var(--hym-role-money-solid);
+  --hym-accent-hover:  var(--hym-role-money-solid-hover);
+  --hym-accent-on:     var(--hym-role-money-on-solid);
+  --hym-accent-subtle: var(--hym-role-money-subtle);
+  --hym-accent-border: var(--hym-role-money-subtle-border);
+  --hym-accent-text:   var(--hym-role-money-text);
+}
+[data-section="notes"] {
+  --hym-accent:        var(--hym-role-notes-solid);
+  --hym-accent-hover:  var(--hym-role-notes-solid-hover);
+  --hym-accent-on:     var(--hym-role-notes-on-solid);
+  --hym-accent-subtle: var(--hym-role-notes-subtle);
+  --hym-accent-border: var(--hym-role-notes-subtle-border);
+  --hym-accent-text:   var(--hym-role-notes-text);
+}
+[data-section="danger"] {
+  --hym-accent:        var(--hym-role-danger-solid);
+  --hym-accent-hover:  var(--hym-role-danger-solid-hover);
+  --hym-accent-on:     var(--hym-role-danger-on-solid);
+  --hym-accent-subtle: var(--hym-role-danger-subtle);
+  --hym-accent-border: var(--hym-role-danger-subtle-border);
+  --hym-accent-text:   var(--hym-role-danger-text);
+}
+
+/* ── v2 · surfaces & elevation ──
+   Light gets real depth: neutral grey canvas (surface-0), white cards (1),
+   raised sheets (2) separated by hairline + soft two-layer shadow — not flat beige.
+   Dark separates by lighter surface + hairline, shadows are secondary. */
+:root {
+  --hym-surface-0:       #F3F5F8;  /* canvas */
+  --hym-surface-1:       #FFFFFF;  /* cards, lists */
+  --hym-surface-2:       #FFFFFF;  /* raised: sheets, popovers, sticky bars */
+  --hym-surface-sunken:  #F1F5F9;  /* inputs, tracks, segmented wells (link 4.7:1, muted 5.4:1) */
+  --hym-hairline:        rgba(15, 23, 42, 0.08);
+  --hym-hairline-strong: rgba(15, 23, 42, 0.16);
+
+  --hym-elev-0: none;
+  --hym-elev-1: 0 0 0 1px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 6px -2px rgba(15, 23, 42, 0.08);
+  --hym-elev-2: 0 0 0 1px rgba(15, 23, 42, 0.05), 0 4px 8px -2px rgba(15, 23, 42, 0.08), 0 12px 24px -8px rgba(15, 23, 42, 0.14);
+  --hym-elev-3: 0 0 0 1px rgba(15, 23, 42, 0.05), 0 8px 16px -4px rgba(15, 23, 42, 0.10), 0 24px 48px -12px rgba(15, 23, 42, 0.22);
+  --hym-elev-nav: 0 -1px 0 rgba(15, 23, 42, 0.08), 0 -8px 24px -12px rgba(15, 23, 42, 0.14);
+
+  --hym-bar-bg:          rgba(255, 255, 255, 0.92);
+  --hym-bar-bg-opaque:   #FFFFFF;
+  --hym-bar-blur:        blur(20px) saturate(180%);
+
+  --hym-focus-ring-v2:   0 0 0 2px var(--hym-surface-1), 0 0 0 4px var(--hym-accent);
+}
+html[data-theme="dark"],
+html.dark {
+  --hym-surface-0:       #0B0F19;
+  --hym-surface-1:       #0F172A;
+  --hym-surface-2:       #1E293B;
+  --hym-surface-sunken:  #070B13;
+  --hym-hairline:        rgba(148, 163, 184, 0.14);
+  --hym-hairline-strong: rgba(148, 163, 184, 0.26);
+
+  --hym-elev-1: 0 0 0 1px rgba(148, 163, 184, 0.10), 0 1px 2px rgba(0, 0, 0, 0.50);
+  --hym-elev-2: 0 0 0 1px rgba(148, 163, 184, 0.12), 0 8px 20px -6px rgba(0, 0, 0, 0.60);
+  --hym-elev-3: 0 0 0 1px rgba(148, 163, 184, 0.14), 0 20px 40px -12px rgba(0, 0, 0, 0.70);
+  --hym-elev-nav: 0 -1px 0 rgba(148, 163, 184, 0.12);
+
+  --hym-bar-bg:          rgba(15, 23, 42, 0.92);
+  --hym-bar-bg-opaque:   #0F172A;
+}
+
+/* ── v2 · shape, size, spacing, type ── */
+:root {
+  --hym-radius-control: 12px;   /* buttons, inputs, segmented */
+  --hym-radius-card:    16px;
+  --hym-radius-sheet:   24px;
+
+  --hym-control-h-sm: 36px;
+  --hym-control-h-md: 44px;     /* = touch minimum */
+  --hym-control-h-lg: 52px;
+
+  --hym-space-page:    var(--hym-space-4);
+  --hym-space-section: var(--hym-space-6);
+  --hym-space-stack:   var(--hym-space-3);
+  --hym-space-inline:  var(--hym-space-2);
+
+  /* Type scale. Persian: no letter-spacing, no uppercase, body line-height ≥ 1.6.
+     12px is the floor for Persian copy. */
+  --hym-fs-caption: 12px;
+  --hym-fs-small:   13px;
+  --hym-fs-body:    15px;
+  --hym-fs-input:   16px;   /* iOS zooms on anything smaller */
+  --hym-fs-lead:    16px;
+  --hym-fs-h3:      17px;
+  --hym-fs-h2:      20px;
+  --hym-fs-h1:      24px;
+  --hym-fs-display: 30px;
+
+  --hym-lh-tight: 1.4;
+  --hym-lh-ui:    1.5;
+  --hym-lh-body:  1.8;
+
+  --hym-fw-regular:  400;
+  --hym-fw-medium:   500;
+  --hym-fw-semibold: 600;
+  --hym-fw-bold:     700;
+  --hym-fw-heavy:    800;
+}
+/* Desktop pointer: denser body (14–15px); inputs may follow since there is no zoom */
+@media (min-width: 1024px) and (pointer: fine) {
+  :root {
+    --hym-fs-body:  14.5px;
+    --hym-fs-input: 14.5px;
+    --hym-space-page: var(--hym-space-6);
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────────────
    4. LEGACY COMPATIBILITY ALIASES
    Map old token names to new unified tokens so existing components
@@ -408,15 +824,15 @@ html.dark {
   --line:         var(--hym-border-default);
   --line-2:       var(--hym-border-strong);
 
-  --brand:        var(--hym-brand-default);
-  --brand-deep:   var(--hym-brand-hover);
-  --brand-soft:   var(--hym-brand-subtle);
-  --brand-ink:    var(--hym-brand-default);
+  --brand:        var(--hym-accent);              /* v2: via accent layer (= role-brand at root) */
+  --brand-deep:   var(--hym-accent-hover);
+  --brand-soft:   var(--hym-accent-subtle);
+  --brand-ink:    var(--hym-accent);              /* v1 used the solid as text; v2 components use --hym-accent-text */
 
-  --cyan:         var(--hym-accent-default);
-  --cyan-deep:    var(--hym-accent-hover);
-  --cyan-soft:    var(--hym-accent-subtle);
-  --cyan-ink:     var(--hym-accent-default);
+  --cyan:         var(--hym-role-ai-vivid);
+  --cyan-deep:    var(--hym-role-ai-vivid-hover);
+  --cyan-soft:    var(--hym-role-ai-subtle);
+  --cyan-ink:     var(--hym-role-ai-vivid);
 
   --amber:        var(--hym-warm-default);
   --amber-deep:   var(--hym-warm-hover);
@@ -428,7 +844,7 @@ html.dark {
   --ok:           var(--hym-success-default);
   --ok-soft:      var(--hym-success-subtle);
 
-  --on-brand:     var(--hym-text-on-brand);
+  --on-brand:     var(--hym-accent-on);
   --on-brand-dark: var(--hym-text-on-brand);
   --midnight:     #0B0F19;
 
@@ -489,6 +905,15 @@ html.dark {
   --dash:         var(--hym-slate-300);
   --wm-ink:       var(--hym-slate-400);
   --read-rule:    rgba(15, 23, 42, .045);
+}
+
+/* v2: a [data-section] subtree re-themes legacy --brand* consumers too (var() resolves where declared) */
+[data-section] {
+  --brand:      var(--hym-accent);
+  --brand-deep: var(--hym-accent-hover);
+  --brand-soft: var(--hym-accent-subtle);
+  --brand-ink:  var(--hym-accent);
+  --on-brand:   var(--hym-accent-on);
 }
 
 html[data-theme="dark"],

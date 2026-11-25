@@ -18,7 +18,7 @@
   position:relative;z-index:5;
 }
 .appbar__title{font-size:15px;font-weight:700;line-height:1.4;margin:0}
-.appbar__sub{font-size:11px;color:var(--ink-3);letter-spacing:.06em}
+.appbar__sub{font-size:11px;color:var(--ink-3)}
 .iconbtn{
   width:38px;height:38px;flex:0 0 auto;display:grid;place-items:center;
   border:1px solid var(--line);background:var(--paper-2);border-radius:12px;
@@ -146,7 +146,7 @@
   -webkit-text-fill-color: transparent;
 }
 
-.eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--amber);text-transform:uppercase;margin:0 0 6px}
+.eyebrow{font-size:11px;font-weight:700;color:var(--amber);margin:0 0 6px}
 .h1{font-size:26px;font-weight:800;line-height:1.4;letter-spacing:-.01em;margin:0}
 .h2{font-size:19px;font-weight:800;line-height:1.5;margin:0}
 .h3{font-size:15.5px;font-weight:700;line-height:1.55;margin:0}
@@ -3845,7 +3845,7 @@ html[data-theme="light"] .desktop-header {
   padding: 0 12px;
   color: #ffffff;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--hym-fs-input);
 }
 .embedded-ai-input::placeholder {
   color: #64748b;

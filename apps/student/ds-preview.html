@@ -1,0 +1,245 @@
+<!doctype html>
+<!-- DS v2 living style guide. Dev-only: not a build input (vite builds index.html only).
+     Open with `npm run dev` at /student/ds-preview.html.
+     ?theme=light|dark renders one theme; no query renders both side by side. -->
+<html lang="fa" dir="rtl" data-theme="dark" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Humsyar DS v2</title>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var t = q.get('theme');
+    window.__DS_SINGLE = t === 'light' || t === 'dark';
+    var theme = t === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  })();
+</script>
+<link rel="stylesheet" href="./src/design/tokens.css" />
+<link rel="stylesheet" href="./src/design/base.css" />
+<link rel="stylesheet" href="./src/design/components.css" />
+<style>
+  body { background: var(--hym-surface-0); color: var(--hym-text-primary); font-size: var(--hym-fs-body); line-height: var(--hym-lh-body); }
+  .pv { max-width: 1120px; margin-inline: auto; padding: var(--hym-space-6) var(--hym-space-page) var(--hym-space-16); }
+  .pv h1 { font-size: var(--hym-fs-h1); font-weight: 800; line-height: var(--hym-lh-tight); margin: 0; }
+  .pv h2 { font-size: var(--hym-fs-h2); font-weight: 800; line-height: var(--hym-lh-tight); margin: var(--hym-space-10) 0 var(--hym-space-2); }
+  .pv h3 { font-size: var(--hym-fs-h3); font-weight: 700; margin: var(--hym-space-6) 0 var(--hym-space-2); }
+  .pv .lede { color: var(--hym-text-secondary); margin: var(--hym-space-1) 0 0; }
+  .pv .note { color: var(--hym-text-muted); font-size: var(--hym-fs-small); margin: 0 0 var(--hym-space-3); }
+  .pv .stack { display: flex; flex-direction: column; gap: var(--hym-space-3); }
+  .pv .wrap { display: flex; flex-wrap: wrap; gap: var(--hym-space-2); align-items: center; }
+  .pv .grid { display: grid; gap: var(--hym-space-3); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .ramp { display: grid; grid-template-columns: 84px repeat(11, 1fr); gap: 2px; align-items: stretch; margin-block-end: 2px; }
+  .ramp__name { font-size: var(--hym-fs-caption); font-weight: 700; color: var(--hym-text-secondary); display: flex; align-items: center; direction: ltr; justify-content: flex-end; padding-inline-end: var(--hym-space-2); font-family: var(--hym-font-mono); }
+  .sw { height: 40px; border-radius: 4px; display: flex; align-items: flex-end; justify-content: center; font-size: 10px; font-family: var(--hym-font-mono); padding-block-end: 2px; box-shadow: inset 0 0 0 1px var(--hym-hairline); }
+  .sw--empty { box-shadow: none; background: transparent; }
+  .ratio { display: inline-flex; gap: 4px; align-items: center; font-family: var(--hym-font-mono); font-size: 11px; direction: ltr; padding: 1px 6px; border-radius: 999px; background: var(--hym-surface-sunken); color: var(--hym-text-secondary); white-space: nowrap; }
+  .ratio.fail { background: var(--hym-role-danger-solid); color: var(--hym-role-danger-on-solid); }
+  .pairs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--hym-space-2); }
+  .pair { display: flex; align-items: center; justify-content: space-between; gap: var(--hym-space-2); padding: var(--hym-space-2) var(--hym-space-3); border-radius: var(--hym-radius-control); box-shadow: inset 0 0 0 1px var(--hym-hairline); }
+  .pair b { font-weight: 700; }
+  .tok { font-family: var(--hym-font-mono); font-size: 10.5px; color: var(--hym-text-muted); direction: ltr; display: block; }
+  .role { padding: var(--hym-space-4); }
+  .role__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--hym-space-2); margin-block-end: var(--hym-space-3); }
+  .role__head h3 { margin: 0; color: var(--hym-accent-text); }
+  .role__sw { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-block-end: var(--hym-space-3); }
+  .role__sw div { height: 34px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--hym-hairline); }
+  .role__sw span { display: block; font-size: 9.5px; font-family: var(--hym-font-mono); color: var(--hym-text-muted); text-align: center; direction: ltr; margin-block-start: 2px; }
+  .role__ratios { display: flex; flex-direction: column; gap: 4px; margin-block-end: var(--hym-space-3); font-size: var(--hym-fs-caption); }
+  .role__ratios div { display: flex; justify-content: space-between; gap: var(--hym-space-2); align-items: center; }
+  .elev-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--hym-space-4); padding: var(--hym-space-4); border-radius: var(--hym-radius-card); background: var(--hym-surface-0); box-shadow: inset 0 0 0 1px var(--hym-hairline); }
+  .type-row { display: grid; grid-template-columns: 120px 1fr; gap: var(--hym-space-3); align-items: baseline; padding-block: var(--hym-space-2); border-block-end: 1px solid var(--hym-hairline); }
+  .type-row .tok { text-align: end; }
+  .phone { max-width: 420px; }
+  .pv-split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; min-height: 100vh; }
+  .pv-split iframe { width: 100%; border: 0; display: block; }
+  .pv-split > div { border-inline-end: 1px solid var(--hym-hairline-strong); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function () {
+  if (!window.__DS_SINGLE) {
+    document.getElementById('app').innerHTML =
+      '<div class="pv-split"><div><iframe id="fl" title="روشن" src="?theme=light"></iframe></div>' +
+      '<div><iframe id="fd" title="تاریک" src="?theme=dark"></iframe></div></div>';
+    window.addEventListener('message', function (e) {
+      if (!e.data || !e.data.dsHeight) return;
+      var f = e.data.theme === 'light' ? document.getElementById('fl') : document.getElementById('fd');
+      f.style.height = e.data.dsHeight + 'px';
+    });
+    return;
+  }
+
+  var theme = document.documentElement.dataset.theme;
+  var STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+  var RAMPS = ['brand', 'cyan', 'sky', 'indigo', 'violet', 'emerald', 'green', 'honey', 'amber', 'rose', 'slate'];
+  var ROLES = [
+    ['brand', 'برند', 'دکمهٔ اصلی، پیوندها'],
+    ['resources', 'منابع و کتابخانه', 'جزوه، کتاب، ویدیو'],
+    ['qbank', 'بانک سؤال و آزمون', 'تمرین و آزمون زمان‌دار'],
+    ['schedule', 'برنامه و تقویم', 'کلاس‌ها و امتحان‌ها'],
+    ['ai', 'هوش‌یار بالینی', 'دستیار هوش مصنوعی'],
+    ['grades', 'کارنامه', 'نمره و معدل'],
+    ['money', 'اشتراک و پرداخت', 'تمدید و فاکتور'],
+    ['notes', 'یادداشت‌ها', 'حاشیه‌نویسی و برگه'],
+    ['danger', 'هشدار و خطا', 'حذف، خطا، مهلت نزدیک']
+  ];
+  var ICON = {
+    book: '<svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/></svg>',
+    search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+    home: '<svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>',
+    cal: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    flask: '<svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/></svg>',
+    user: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+    chev: '<svg class="ds-row__chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>',
+    inbox: '<svg viewBox="0 0 24 24"><path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/></svg>',
+    x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>'
+  };
+  function R(fg, bg, under, min) {
+    return '<span class="ratio" data-fg="' + fg + '" data-bg="' + bg + '"' + (under ? ' data-under="' + under + '"' : '') + ' data-min="' + (min == null ? 4.5 : min) + '">…</span>';
+  }
+
+  var h = '';
+  h += '<main class="pv"><h1>سامانهٔ طراحی هامزیار · نسخهٔ ۲</h1>';
+  h += '<p class="lede">تم ' + (theme === 'dark' ? 'تاریک' : 'روشن') + ' — هر نسبت کنتراست از رنگ واقعیِ محاسبه‌شده در همین مرورگر خوانده می‌شود (WCAG 2.x؛ متن ۴٫۵، اجزای غیرمتنی ۳).</p>';
+
+  /* ramps */
+  h += '<h2>پالت‌های پایه</h2><p class="note">لایهٔ ۱ — فقط نقش‌ها این‌ها را می‌خوانند، نه اجزا. پالت‌های جدید در OKLCH تعریف شده‌اند.</p>';
+  RAMPS.forEach(function (r) {
+    h += '<div class="ramp"><div class="ramp__name">' + r + '</div>';
+    STEPS.forEach(function (s) {
+      var v = '--hym-' + r + '-' + s;
+      h += '<div class="sw" data-var="' + v + '" style="background:var(' + v + ')"><span data-label="' + s + '"></span></div>';
+    });
+    h += '</div>';
+  });
+
+  /* text on surfaces */
+  h += '<h2>متن روی سطوح</h2><p class="note">کم‌رنگ (muted) در هر دو تم باید ≥ ۴٫۵:۱ باشد.</p><div class="pairs">';
+  [['--hym-text-primary', 'متن اصلی'], ['--hym-text-secondary', 'متن ثانویه'], ['--hym-text-muted', 'متن کم‌رنگ'], ['--hym-text-link', 'پیوند']].forEach(function (t) {
+    [['--hym-surface-0', 'بوم'], ['--hym-surface-1', 'کارت'], ['--hym-surface-2', 'برجسته'], ['--hym-surface-sunken', 'فرورفته']].forEach(function (s) {
+      h += '<div class="pair" style="background:var(' + s[0] + ');color:var(' + t[0] + ')"><span><b>' + t[1] + '</b> روی ' + s[1] + '<span class="tok">' + t[0].replace('--hym-', '') + ' / ' + s[0].replace('--hym-', '') + '</span></span>' + R(t[0], s[0]) + '</div>';
+    });
+  });
+  h += '<div class="pair" style="background:var(--hym-surface-1);color:var(--hym-text-disabled)"><span><b>غیرفعال</b> روی کارت<span class="tok">text-disabled (معاف از ۴٫۵)</span></span>' + R('--hym-text-disabled', '--hym-surface-1', '', 0) + '</div>';
+  h += '</div>';
+
+  /* roles */
+  h += '<h2>نقش‌ها و بخش‌ها</h2><p class="note">لایهٔ ۲ و ۳ — هر کارت <code>data-section</code> خودش را دارد؛ همان اجزا بدون هیچ قانون اختصاصی رنگ عوض می‌کنند.</p><div class="grid">';
+  ROLES.forEach(function (r) {
+    var k = r[0], p = '--hym-role-' + k + '-';
+    h += '<section class="ds-card role" data-section="' + k + '"><div class="role__head"><h3>' + r[1] + '</h3><span class="tok">data-section="' + k + '"</span></div>';
+    h += '<div class="role__sw">';
+    ['solid', 'solid-hover', 'on-solid', 'subtle', 'subtle-border', 'text'].forEach(function (s) {
+      h += '<div><div style="background:var(' + p + s + ')"></div><span>' + s + '</span></div>';
+    });
+    h += '</div><div class="role__ratios">';
+    h += '<div><span>متن روی دکمه</span>' + R(p + 'on-solid', p + 'solid', '--hym-surface-1') + '</div>';
+    h += '<div><span>متن روی زمینهٔ ملایم</span>' + R(p + 'text', p + 'subtle', '--hym-surface-1') + '</div>';
+    h += '<div><span>متن نقش روی کارت</span>' + R(p + 'text', '--hym-surface-1') + '</div>';
+    h += '<div><span>رنگ پُر روی بوم (غیرمتنی)</span>' + R(p + 'solid', '--hym-surface-0', '', 3) + '</div>';
+    h += '</div>';
+    h += '<div class="wrap"><button class="ds-btn ds-btn--sm">' + r[2].split('،')[0] + '</button><button class="ds-btn ds-btn--secondary ds-btn--sm">ثانویه</button><button class="ds-chip" aria-pressed="true">انتخاب‌شده</button><span class="ds-badge ds-badge--accent">۱۲ مورد</span></div>';
+    h += '<ul class="ds-list" style="margin-block-start:var(--hym-space-3)"><li><a class="ds-row" href="#" style="padding-inline:0"><span class="ds-row__icon">' + ICON.book + '</span><span class="ds-row__body"><span class="ds-row__title">' + r[2] + '</span><span class="ds-row__sub">زیرعنوان کم‌رنگ</span></span>' + ICON.chev + '</a></li></ul>';
+    h += '</section>';
+  });
+  h += '</div>';
+
+  /* components */
+  h += '<h2>اجزای پایه</h2>';
+  h += '<h3>دکمه</h3><p class="note">حالت غیرفعال عمداً متفاوت است: زمینهٔ فرورفته، حاشیهٔ خط‌چین، بدون سایه — نه فقط کم‌رنگ‌تر.</p><div class="stack">';
+  h += '<div class="wrap"><button class="ds-btn">شروع آزمون</button><button class="ds-btn ds-btn--secondary">ذخیره برای بعد</button><button class="ds-btn ds-btn--ghost">انصراف</button><button class="ds-btn ds-btn--danger">حذف یادداشت</button></div>';
+  h += '<div class="wrap"><button class="ds-btn" disabled>شروع آزمون</button><button class="ds-btn ds-btn--secondary" disabled>ذخیره</button><button class="ds-btn ds-btn--ghost" disabled>انصراف</button><button class="ds-btn" aria-busy="true"><span class="ds-btn__spin" aria-hidden="true"></span>در حال ارسال…</button></div>';
+  h += '<div class="wrap"><button class="ds-btn ds-btn--sm">کوچک ۳۶</button><button class="ds-btn">متوسط ۴۴</button><button class="ds-btn ds-btn--lg">بزرگ ۵۲</button><button class="ds-btn ds-btn--ghost ds-btn--icon" aria-label="جستجو">' + ICON.search + '</button></div>';
+  h += '<div class="phone"><button class="ds-btn ds-btn--lg ds-btn--block">پرداخت و فعال‌سازی اشتراک</button></div></div>';
+
+  h += '<h3>چیپ و کنترل تکه‌ای</h3><div class="stack"><div class="wrap"><button class="ds-chip" aria-pressed="true">همه</button><button class="ds-chip" aria-pressed="false">فیزیولوژی</button><button class="ds-chip" aria-pressed="false">بیوشیمی</button><button class="ds-chip" disabled>آناتومی (به‌زودی)</button></div>';
+  h += '<div class="phone"><div class="ds-seg ds-seg--block" role="tablist" aria-label="هفته"><button class="ds-seg__item" role="tab" aria-selected="false">هفتهٔ قبل</button><button class="ds-seg__item" role="tab" aria-selected="true">این هفته</button><button class="ds-seg__item" role="tab" aria-selected="false">هفتهٔ بعد</button></div></div></div>';
+
+  h += '<h3>کارت و سطوح ارتفاع</h3><div class="elev-row">';
+  [['ds-card--flat', 'تخت', 'elev-0 + خط'], ['', 'پیش‌فرض', 'elev-1'], ['ds-card--raised', 'برجسته', 'elev-2'], ['ds-card--float', 'شناور', 'elev-3'], ['ds-card--sunken', 'فرورفته', 'sunken'], ['ds-card--accent', 'تأکیدی', 'accent-subtle']].forEach(function (c) {
+    h += '<div class="ds-card ' + c[0] + '"><p class="ds-card__title">' + c[1] + '</p><p class="ds-card__sub">' + c[2] + '</p></div>';
+  });
+  h += '</div>';
+
+  h += '<h3>ردیف فهرست</h3><div class="ds-card ds-card--flush phone"><ul class="ds-list">';
+  h += '<li><a class="ds-row" href="#"><span class="ds-row__icon">' + ICON.book + '</span><span class="ds-row__body"><span class="ds-row__title">جزوهٔ فیزیولوژی قلب</span><span class="ds-row__sub">صفحهٔ ۱۲ از ۴۰ · ۳۰٪</span></span>' + ICON.chev + '</a></li>';
+  h += '<li><a class="ds-row" href="#" data-section="qbank"><span class="ds-row__icon">' + ICON.flask + '</span><span class="ds-row__body"><span class="ds-row__title">بانک سؤال بیوشیمی — <bdi>MED-101</bdi></span><span class="ds-row__sub">۴۲۸ سؤال</span></span><span class="ds-badge ds-badge--accent">جدید</span></a></li>';
+  h += '<li><a class="ds-row" href="#" data-section="schedule"><span class="ds-row__icon">' + ICON.cal + '</span><span class="ds-row__body"><span class="ds-row__title">میان‌ترم بیوشیمی</span><span class="ds-row__sub">شنبه ۶ آذر · ساعت ۹:۰۰</span></span><span class="ds-badge ds-badge--danger">۲ روز</span></a></li>';
+  h += '<li><div class="ds-row"><span class="ds-row__body"><span class="ds-row__title">داروی <bdi>Metformin 500mg</bdi> — کد درس <bdi>MED-101</bdi> (۳ واحد)</span><span class="ds-row__sub">رشتهٔ آزمون دوجهته</span></span><span class="ds-row__meta">۱۴۰۴/۰۹/۰۴</span></div></li>';
+  h += '</ul></div>';
+
+  h += '<h3>ورودی و جستجو</h3><p class="note">اندازهٔ قلم ورودی ' + (matchMedia('(min-width: 1024px) and (pointer: fine)').matches ? '۱۴٫۵px (اشاره‌گر دقیق دسکتاپ)' : '۱۶px (لمسی — iOS بزرگ‌نمایی نمی‌کند)') + '.</p><div class="stack phone">';
+  h += '<div class="ds-search"><span class="ds-search__icon">' + ICON.search + '</span><input class="ds-input" type="search" placeholder="جستجو در منابع، سؤالات، برنامه…" aria-label="جستجو" /><button class="ds-search__clear" aria-label="پاک کردن">' + ICON.x + '</button></div>';
+  h += '<div class="ds-field"><label class="ds-field__label" for="p1">شمارهٔ دانشجویی</label><input id="p1" class="ds-input ds-input--ltr" inputmode="numeric" value="40312345" /><div class="ds-field__hint">همان شماره‌ای که در کارت دانشجویی آمده است.</div></div>';
+  h += '<div class="ds-field"><label class="ds-field__label" for="p2">نام و نام خانوادگی</label><input id="p2" class="ds-input" aria-invalid="true" value="سارا" /><div class="ds-field__error">نام خانوادگی را هم بنویسید.</div></div>';
+  h += '<div class="ds-field"><label class="ds-field__label" for="p3">کد معرف</label><input id="p3" class="ds-input" disabled placeholder="غیرفعال" /></div>';
+  h += '<div class="ds-field"><label class="ds-field__label" for="p4">پیام</label><textarea id="p4" class="ds-input" rows="3" placeholder="سؤال پزشکی یا بالینی خود را بنویسید…"></textarea></div></div>';
+
+  h += '<h3>نشان</h3><div class="wrap"><span class="ds-badge">خنثی</span><span class="ds-badge ds-badge--accent">تأکیدی</span><span class="ds-badge ds-badge--solid">پُر</span><span class="ds-badge ds-badge--success">قبول</span><span class="ds-badge ds-badge--warning">نزدیک</span><span class="ds-badge ds-badge--danger">مردود</span><span class="ds-badge ds-badge--count">۹</span></div>';
+
+  h += '<h3>حالت خالی و اسکلت</h3><div class="grid"><div class="ds-card"><div class="ds-empty"><div class="ds-empty__icon">' + ICON.inbox + '</div><h3 class="ds-empty__title">هنوز یادداشتی ندارید</h3><p class="ds-empty__body">روی هر صفحهٔ جزوه بنویسید یا هایلایت کنید تا این‌جا جمع شود.</p><div class="ds-empty__action"><button class="ds-btn ds-btn--secondary">رفتن به کتابخانه</button></div></div></div>';
+  h += '<div class="ds-card stack" aria-hidden="true"><span class="ds-skel ds-skel--title"></span><span class="ds-skel ds-skel--text"></span><span class="ds-skel ds-skel--text" style="width:80%"></span><span class="ds-skel ds-skel--row"></span><div class="wrap"><span class="ds-skel ds-skel--circle"></span><span class="ds-skel ds-skel--text" style="flex:1"></span></div><span class="ds-skel ds-skel--card"></span></div></div>';
+
+  h += '<h3>نوار زبانه‌ها</h3><p class="note">پیش‌فرض مات است (متن پشت برچسب‌ها دیده نمی‌شود)؛ <code>--blur</code> فقط با پشتیبانی واقعی از blur. فاصلهٔ ناحیهٔ امن پایین با <code>env(safe-area-inset-bottom)</code>.</p><div class="stack phone">';
+  [['', 'مات'], ['ds-tabbar--blur', 'شیشه‌ای']].forEach(function (v) {
+    h += '<nav class="ds-tabbar ds-tabbar--static ' + v[0] + '" aria-label="ناوبری ' + v[1] + '" style="border-radius:var(--hym-radius-card)">';
+    [['home', 'خانه', 1], ['book', 'کتابخانه'], ['flask', 'بانک سؤال'], ['cal', 'برنامه'], ['user', 'من']].forEach(function (t) {
+      h += '<a class="ds-tabbar__item" href="#"' + (t[2] ? ' aria-current="page"' : '') + '><span class="ds-tabbar__icon">' + ICON[t[0]] + '</span>' + t[1] + '</a>';
+    });
+    h += '</nav>';
+  });
+  h += '</div>';
+
+  /* type */
+  h += '<h2>مقیاس حروف</h2><p class="note">بدون فاصله‌گذاری حروف و بدون حروف بزرگ روی متن فارسی؛ ارتفاع خط متن ≥ ۱٫۶.</p>';
+  [['display', 'هامزیار، همراه درس پزشکی', 800], ['h1', 'برنامهٔ امتحانات این ترم', 800], ['h2', 'ادامهٔ مطالعه', 800], ['h3', 'جزوهٔ فیزیولوژی قلب', 700], ['lead', 'هر جا ماندید، از همان‌جا ادامه دهید.', 400], ['body', 'دانشجوی گرامی، اشتراک شما تا ۲۸ آذر ۱۴۰۴ فعال است. برای تمدید، از بخش اشتراک اقدام کنید.', 400], ['small', 'به‌روزرسانی: ۵ دقیقه پیش', 400], ['caption', 'متن راهنما و برچسب', 600]].forEach(function (t) {
+    h += '<div class="type-row"><span class="tok">fs-' + t[0] + '</span><span style="font-size:var(--hym-fs-' + t[0] + ');font-weight:' + t[2] + ';line-height:' + (t[0] === 'body' || t[0] === 'lead' ? 'var(--hym-lh-body)' : 'var(--hym-lh-tight)') + '">' + t[1] + '</span></div>';
+  });
+  h += '</main>';
+  document.getElementById('app').innerHTML = h;
+
+  /* ── resolve colours and contrast in this browser ── */
+  var cv = document.createElement('canvas'); cv.width = cv.height = 1;
+  var g = cv.getContext('2d', { willReadFrequently: true });
+  var probe = document.createElement('i'); probe.style.display = 'none';
+  function computed(v, ctx) { (ctx || document.body).appendChild(probe); probe.style.color = 'var(' + v + ')'; return getComputedStyle(probe).color; }
+  function paint(colors) {
+    g.globalCompositeOperation = 'source-over';
+    g.fillStyle = 'rgb(255,255,255)'; g.fillRect(0, 0, 1, 1);
+    colors.forEach(function (c) { if (c) { g.fillStyle = c; g.fillRect(0, 0, 1, 1); } });
+    var d = g.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]];
+  }
+  function lum(c) { return c.map(function (x) { x /= 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }).reduce(function (a, x, i) { return a + x * [0.2126, 0.7152, 0.0722][i]; }, 0); }
+  function ratio(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  var canvasBg = computed('--hym-surface-0');
+  document.querySelectorAll('.ratio').forEach(function (el) {
+    var ctx = el.closest('[data-section]') || document.body;
+    var under = el.dataset.under ? computed(el.dataset.under, ctx) : null;
+    var bg = paint([canvasBg, under, computed(el.dataset.bg, ctx)]);
+    var fgCss = computed(el.dataset.fg, ctx);
+    var fg = paint([g.fillStyle = 'rgb(' + bg.join(',') + ')', fgCss]);
+    var r = ratio(fg, bg), min = parseFloat(el.dataset.min);
+    var ok = !min || r >= min;
+    el.textContent = r.toFixed(2) + ':1 ' + (min ? (ok ? (min === 3 ? '≥3' : (r >= 7 ? 'AAA' : 'AA')) : '✗ <' + min) : '');
+    if (!ok) el.classList.add('fail');
+  });
+  document.querySelectorAll('.sw[data-var]').forEach(function (el) {
+    var c = paint([computed(el.dataset.var)]);
+    var span = el.querySelector('span');
+    span.textContent = span.dataset.label;
+    span.style.color = lum(c) > 0.35 ? 'var(--hym-slate-900)' : 'var(--hym-slate-0)';
+  });
+  /* tell the side-by-side parent our height; also exposed for the screenshot script */
+  function report() { var hh = document.documentElement.scrollHeight; window.__DS_HEIGHT = hh; if (parent !== window) parent.postMessage({ dsHeight: hh, theme: theme }, '*'); }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(report); else report();
+  window.addEventListener('load', report);
+  window.__DS_READY = true;
+})();
+</script>
+</body>
+</html>

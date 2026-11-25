@@ -40,9 +40,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       document.documentElement.classList.remove('dark');
     }
     localStorage.setItem(KEY, mode);
-    const meta = document.querySelector('meta[name="theme-color"]');
+    // index.html ships a light/dark pair of theme-color metas; a manual theme overrides the OS, so set both.
     const pageBg = resolved === 'dark' ? '#0B0F19' : '#F8FAFC';
-    if (meta) meta.setAttribute('content', pageBg);
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', pageBg));
   }, [mode, resolved]);
 
   const value = useMemo(() => ({ mode, resolved, setMode }), [mode, resolved]);
