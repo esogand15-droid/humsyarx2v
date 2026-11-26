@@ -655,7 +655,8 @@ html.dark .reader-workspace {
   backdrop-filter: var(--hym-bar-blur);
   -webkit-backdrop-filter: var(--hym-bar-blur);
   border: 1px solid var(--hym-hairline-strong);
-  box-shadow: var(--hym-elev-3);
+  /* no drop shadow: the 1px border already separates the bar from the page */
+  box-shadow: none;
   max-width: 100%;
   flex-wrap: nowrap;
 }
@@ -958,7 +959,7 @@ html.dark .reader-workspace {
   backdrop-filter: var(--hym-bar-blur);
   -webkit-backdrop-filter: var(--hym-bar-blur);
   border: 1px solid var(--hym-hairline-strong);
-  box-shadow: var(--hym-elev-3);
+  box-shadow: none;
   color: var(--hym-text-primary);
   display: flex;
   align-items: center;

@@ -147,7 +147,7 @@
 }
 .aic-older { align-self: center; }
 .aic-loading { display: flex; flex-direction: column; gap: var(--hym-space-3); }
-.aic-loading__u { align-self: flex-end; width: 46%; height: 36px; border-radius: var(--hym-radius-xl); }
+.aic-loading__u { align-self: flex-start; width: 46%; height: 36px; border-radius: var(--hym-radius-xl); }
 .aic-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--hym-space-2); }
 
 /* حالت خالی */
@@ -182,9 +182,9 @@
 .aic-starter__tag { display: inline-flex; align-items: center; gap: var(--hym-space-1); font-size: var(--hym-fs-caption); font-weight: var(--hym-fw-bold); color: var(--hym-accent-text); }
 .aic-starter__text { font-size: var(--hym-fs-small); line-height: 1.7; }
 
-/* پیام کاربر */
+/* پیام کاربر: سمت راست صفحه. در RTL «start» یعنی راست؛ flex-end حباب را به چپ میبرد. */
 .aic-msg { display: flex; flex-direction: column; min-width: 0; }
-.aic-msg--user { align-items: flex-end; gap: var(--hym-space-1); }
+.aic-msg--user { align-items: flex-start; gap: var(--hym-space-1); }
 .aic-bubble {
   max-width: min(85%, 560px);
   padding: var(--hym-space-3) var(--hym-space-4);
@@ -197,8 +197,11 @@
 .aic-bubble__img { display: block; max-width: 100%; max-height: 200px; margin-block-end: var(--hym-space-2); border-radius: var(--hym-radius-md); object-fit: contain; }
 .aic-msg__time { font-size: var(--hym-fs-caption); color: var(--hym-text-muted); font-variant-numeric: tabular-nums; }
 
-/* پیام هوشیار */
-.aic-msg--ai { gap: var(--hym-space-2); }
+/* پیام هوشیار: سمت چپ صفحه (انتهای خط در RTL)، آواتار در لبهٔ بیرونی چپ */
+.aic-msg--ai { gap: var(--hym-space-2); align-items: flex-end; }
+.aic-msg--ai > * { max-width: 100%; }
+.aic-msg--ai .aic-avatar { order: 1; }
+.aic-msg--ai .aic-msg__time { order: -1; }
 .aic-msg__head { display: flex; align-items: center; gap: var(--hym-space-2); }
 .aic-avatar {
   display: grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px;
@@ -207,7 +210,7 @@
 .aic-msg__name { font-size: var(--hym-fs-small); font-weight: var(--hym-fw-bold); }
 .aic-msg__body { display: flex; flex-direction: column; gap: var(--hym-space-3); min-width: 0; }
 @media (min-width: 768px) {
-  .aic-msg__body, .aic-msg--ai .aic-actions { padding-inline-start: 36px; }
+  .aic-msg__body, .aic-msg--ai .aic-actions { padding-inline-end: 36px; }
 }
 
 .aic-typing { display: inline-flex; gap: 5px; padding-block: var(--hym-space-2); }

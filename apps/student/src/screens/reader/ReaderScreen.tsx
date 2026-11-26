@@ -40,7 +40,8 @@ export function ReaderScreen() {
   const [startAt, setStartAt] = useState(0);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
-  const [saved, setSaved] = useState(false);
+  // progress saves silently; only a failed save is worth showing
+  const [saveFailed, setSaveFailed] = useState(false);
 
   // محیط مطالعه چندپنله (Desktop Multi-Panel Workspace)
   const [sidePanel, setSidePanel] = useState<StudySidePanel>('none');
@@ -69,11 +70,8 @@ export function ReaderScreen() {
             position: latest.current.position,
             kind,
           })
-          .then(() => {
-            setSaved(true);
-            window.setTimeout(() => setSaved(false), 1600);
-          })
-          .catch(() => undefined);
+          .then(() => setSaveFailed(false))
+          .catch(() => setSaveFailed(true));
       }, 700);
     },
     [scopeTyped, id],
@@ -213,15 +211,7 @@ export function ReaderScreen() {
     <>
       <AppBar
         title={info?.name ?? 'در حال باز کردن…'}
-        sub={
-          saved
-            ? 'پیشرفت ذخیره شد'
-            : kind === 'video' || kind === 'audio'
-              ? 'پخش داخل هامزیار'
-              : kind === 'image'
-                ? 'مشاهده داخل هامزیار'
-                : 'خواندن داخل هامزیار'
-        }
+        sub={saveFailed ? 'پیشرفت ذخیره نشد' : undefined}
         back
         onBack={() => navigate(-1)}
         actions={

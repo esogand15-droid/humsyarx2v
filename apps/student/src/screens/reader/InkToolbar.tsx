@@ -820,6 +820,21 @@ export function InkToolbar({
               <Icon name="i-more" size={14} />
             </div>
 
+            {/* دست: the way out of pen mode; Esc does the same */}
+            <button
+              type="button"
+              className={`ink-dock__btn${tool === null ? ' is-on' : ''}`}
+              aria-pressed={tool === null}
+              onClick={() => {
+                closeMenus();
+                setTool(null);
+              }}
+              title="دست: پیمایش و انتخاب (Esc)"
+            >
+              <Icon name="i-hand" size={16} />
+              <span className="ink-dock__btn-label">دست</span>
+            </button>
+
             {/* قلم */}
             <div className="ink-dock__wrap">
               <button

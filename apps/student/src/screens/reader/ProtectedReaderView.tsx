@@ -41,6 +41,11 @@ export interface DocumentManifest {
 /** چند ثانیه قبل از انقضا مانیفست بیصدا تازه شود. */
 const MANIFEST_REFRESH_LEAD_SEC = 120;
 
+/** One zoom range for wheel, pinch, keys and buttons; before this, '+' above 2.0 zoomed out. */
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3;
+const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
+
 /** زمان تازهسازی (ms در ساعت همین مرورگر) از روی مانیفست.
     از expires_in نسبی استفاده میکنیم تا اختلاف ساعت دستگاه با سرور مهم نباشد؛
     سرور قدیمی که expires_in نمیفرستد، از پارامتر expires آدرس صفحه خوانده میشود. */
@@ -100,7 +105,7 @@ export function ProtectedReaderView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(startPage || 1);
-  const [zoom, setZoom] = useState(1.0); // 0.6 to 2.0
+  const [zoom, setZoom] = useState(1.0); // ZOOM_MIN..ZOOM_MAX
   const [baseWidth, setBaseWidth] = useState(720);
 
   // لایه ابزارهای نوت‌برداری
@@ -140,23 +145,32 @@ export function ProtectedReaderView({
 
   // ── لنگرگاه هوشمند زوم (Zoom Anchor Preservation) ──
   // جلوگیری از جهش صفحه به اول جزوه هنگام بزرگ‌نمایی
-  const zoomAnchorRef = useRef<{ page: number; ratio: number } | null>(null);
+  const zoomAnchorRef = useRef<{ page: number; rx: number; ry: number; px: number; py: number } | null>(null);
   const isZoomingRef = useRef(false);
   const zoomResetTimerRef = useRef<number | null>(null);
 
-  const captureZoomAnchor = useCallback(() => {
+  const captureZoomAnchor = useCallback((clientX?: number, clientY?: number) => {
     const scroller = scrollRef.current;
     if (!scroller) return;
-    const targetPage = currentPage;
-    const pageEl = pageRefs.current.get(targetPage);
+    const sr = scroller.getBoundingClientRect();
+    const px = (clientX ?? sr.left + sr.width / 2) - sr.left;
+    const py = (clientY ?? sr.top + sr.height / 2) - sr.top;
+    // anchor on the page under the pointer; in the gap between pages use the current one
+    const hit = Array.from(pageRefs.current.entries()).find(([, el]) => {
+      const r = el.getBoundingClientRect();
+      return r.top - sr.top <= py && r.bottom - sr.top >= py;
+    });
+    const page = hit ? hit[0] : currentPage;
+    const pageEl = pageRefs.current.get(page);
     if (pageEl) {
-      const scrollerRect = scroller.getBoundingClientRect();
-      const pageRect = pageEl.getBoundingClientRect();
-      const relativeTop = scrollerRect.top - pageRect.top;
-      const ratio = Math.max(0, Math.min(1, relativeTop / Math.max(1, pageEl.offsetHeight)));
-      zoomAnchorRef.current = { page: targetPage, ratio };
-    } else {
-      zoomAnchorRef.current = { page: targetPage, ratio: 0 };
+      const r = pageEl.getBoundingClientRect();
+      zoomAnchorRef.current = {
+        page,
+        rx: (px - (r.left - sr.left)) / Math.max(1, r.width),
+        ry: (py - (r.top - sr.top)) / Math.max(1, r.height),
+        px,
+        py,
+      };
     }
     isZoomingRef.current = true;
     if (zoomResetTimerRef.current) window.clearTimeout(zoomResetTimerRef.current);
@@ -165,21 +179,18 @@ export function ProtectedReaderView({
     }, 350);
   }, [currentPage]);
 
+  // After the new sizes commit and before paint, scroll so the anchored point stays under the
+  // pointer on both axes. Deltas, not absolute scrollLeft, so RTL's negative scrollLeft is moot.
   useLayoutEffect(() => {
-    const anchor = zoomAnchorRef.current;
-    if (!anchor) return;
+    const a = zoomAnchorRef.current;
+    zoomAnchorRef.current = null;
     const scroller = scrollRef.current;
-    if (!scroller) return;
-
-    const frame = requestAnimationFrame(() => {
-      const pageEl = pageRefs.current.get(anchor.page);
-      if (pageEl && scroller) {
-        const newPageTop = pageEl.offsetTop;
-        const newScrollTop = Math.max(0, newPageTop + anchor.ratio * pageEl.offsetHeight);
-        scroller.scrollTop = newScrollTop;
-      }
-    });
-    return () => cancelAnimationFrame(frame);
+    const pageEl = a ? pageRefs.current.get(a.page) : undefined;
+    if (!a || !scroller || !pageEl) return;
+    const sr = scroller.getBoundingClientRect();
+    const r = pageEl.getBoundingClientRect();
+    scroller.scrollTop += r.top - sr.top + a.ry * r.height - a.py;
+    scroller.scrollLeft += r.left - sr.left + a.rx * r.width - a.px;
   }, [zoom]);
 
   // ── کنترل بزرگ‌نمایی چندلمسی طبیعی با دو انگشت (2-Finger Multi-Touch Pinch to Zoom) ──
@@ -201,10 +212,9 @@ export function ProtectedReaderView({
       const p2 = e.touches[1];
       const curDist = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
       if (touchDistRef.current > 10) {
-        captureZoomAnchor();
+        captureZoomAnchor((p1.clientX + p2.clientX) / 2, (p1.clientY + p2.clientY) / 2);
         const factor = curDist / touchDistRef.current;
-        const nextZoom = Math.min(2.5, Math.max(0.6, Math.round(touchStartZoomRef.current * factor * 100) / 100));
-        setZoom(nextZoom);
+        setZoom(clampZoom(touchStartZoomRef.current * factor));
       }
     }
   };
@@ -220,11 +230,11 @@ export function ProtectedReaderView({
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey) {
         e.preventDefault();
-        captureZoomAnchor();
+        captureZoomAnchor(e.clientX, e.clientY);
         // ضریب حساسیت نرم و بهینه برای تاچ‌پد ویندوز و موس با محدودسازی شیب
         const delta = -e.deltaY * 0.006;
         const clampedDelta = Math.max(-0.25, Math.min(0.25, delta));
-        setZoom((z) => Math.min(2.5, Math.max(0.6, Math.round((z + clampedDelta) * 100) / 100)));
+        setZoom((z) => clampZoom(z + clampedDelta));
       }
     };
     window.addEventListener('wheel', onWheel, { passive: false });
@@ -234,7 +244,7 @@ export function ProtectedReaderView({
   // کنترل پیوسته بزرگ‌نمایی چندلمسی مستقیم روی بوم (2-Finger Multi-Touch Canvas Pinch)
   const handlePinchZoom = useCallback((factor: number) => {
     captureZoomAnchor();
-    setZoom((z) => Math.min(2.5, Math.max(0.6, Math.round(z * factor * 100) / 100)));
+    setZoom((z) => clampZoom(z * factor));
   }, [captureZoomAnchor]);
 
   // ── تازهسازی بیصدای آدرسهای امضاشده (T1) ──
@@ -434,11 +444,11 @@ export function ProtectedReaderView({
       }
       if (e.key === '+' || e.key === '=') {
         captureZoomAnchor();
-        setZoom((z) => Math.min(2.0, Math.round((z + 0.1) * 10) / 10));
+        setZoom((z) => clampZoom(z + 0.1));
       }
       if (e.key === '-') {
         captureZoomAnchor();
-        setZoom((z) => Math.max(0.6, Math.round((z - 0.1) * 10) / 10));
+        setZoom((z) => clampZoom(z - 0.1));
       }
       if (e.key === 'f' || e.key === 'F') {
         setFocusMode((v) => !v);

@@ -86,7 +86,8 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === '/'}
+            // '/me' must not match '/me/notes', or «دفترچه من» and «پروفایل» light up together
+            end={item.to === '/' || item.to === '/me'}
             data-section={sectionFor(item.to)}
             className={({ isActive }) => `sidebar__link ${isActive ? 'active' : ''}`}
             title={item.label}
@@ -101,6 +102,7 @@ export function Sidebar() {
       <div className="sidebar__footer">
         <NavLink
           to="/me"
+          end
           className="sidebar__user"
           title={collapsed ? `${user?.name || 'دانشجو'} · حساب کاربری` : undefined}
         >
