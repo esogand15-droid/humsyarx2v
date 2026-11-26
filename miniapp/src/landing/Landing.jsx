@@ -342,6 +342,40 @@ export default function Landing() {
     });
   }, [theme]);
 
+  // Scroll reveal: blocks below the hero rise in once as they enter the viewport.
+  // Classes are added from JS, so with JS off (or no IntersectionObserver) nothing is hidden.
+  useEffect(() => {
+    if (!('IntersectionObserver' in window)) return undefined;
+    const els = Array.from(
+      document.querySelectorAll(
+        'main section:not(.lp-hero) .lp-wrap > *:not([class*="-grid"]), main section:not(.lp-hero) [class*="-grid"] > *',
+      ),
+    );
+    els.forEach((el) => {
+      el.classList.add('lp-reveal');
+      const parent = el.parentElement;
+      if (parent && /-grid/.test(parent.className)) {
+        // short stagger inside a grid, capped so the last card never waits long
+        el.style.setProperty('--lp-i', String(Math.min(6, Array.prototype.indexOf.call(parent.children, el))));
+      }
+    });
+    document.documentElement.classList.add('lp-js');
+    // threshold 0: a block taller than the screen must still reveal
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('is-in');
+            io.unobserve(e.target);
+          }
+        });
+      },
+      { rootMargin: '0px 0px -8% 0px', threshold: 0 },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
   useEffect(() => {
     if (!window.matchMedia) return undefined;
     const mq = window.matchMedia('(prefers-color-scheme: light)');

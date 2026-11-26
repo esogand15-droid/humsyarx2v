@@ -324,6 +324,44 @@ main {
   overflow-x: clip;
 }
 
+/* Scroll reveal (Landing.jsx adds .lp-js and .lp-reveal). One-time, transform + opacity only. */
+html.lp-js .lp-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 560ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 560ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-delay: calc(var(--lp-i, 0) * 60ms);
+}
+html.lp-js .lp-reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.lp-js .lp-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* The hero emblem drifts slower than the page as you scroll: the one depth cue on the page. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-hero__emblem-frame {
+      animation: lp-hero-drift linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 100vh;
+    }
+    @keyframes lp-hero-drift {
+      to {
+        transform: translateY(56px) scale(0.96);
+        opacity: 0.55;
+      }
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
