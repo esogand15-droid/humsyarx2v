@@ -1,8 +1,8 @@
 {
   "$comment": "Max allowed counts in apps/student/src (tokens.css excluded). Only ever lower these. See docs/design/DS_V2.md.",
-  "hex": 333,
-  "rgba": 410,
+  "hex": 332,
+  "rgba": 406,
   "important": 312,
-  "inline": 266,
+  "inline": 235,
   "physical": 83
 }

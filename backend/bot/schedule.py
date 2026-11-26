@@ -11,6 +11,7 @@ import asyncio
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.ext import ContextTypes
+from backend.database.content import _normalize_term
 from database import db
 from bson import ObjectId
 from utils import (fmt_jalali, days_until, exam_countdown, ADMIN_ID,
@@ -827,7 +828,7 @@ async def _handle_cohort_preset_bot(query, context, uid: int, cohort_key: str):
                 draft[lesson] = target_group
 
     payload = [{'lesson': l, 'group': g} for l, g in draft.items() if g in ('1', '2', '3', '4')]
-    res = await db.save_student_course_selections(uid, payload, term=info.get('term'))
+    res = await db.save_student_course_selections(uid, payload, term=_normalize_term(info.get('term')) or None)
     context.user_data['cs_draft'] = draft
 
     res['cohort_label'] = cohort['label']
@@ -893,7 +894,7 @@ async def _handle_cs_save_bot(query, context, uid: int):
         for lesson, g in draft.items()
         if g in ('1', '2', '3', '4')
     ]
-    res = await db.save_student_course_selections(uid, payload, term=info.get('term'))
+    res = await db.save_student_course_selections(uid, payload, term=_normalize_term(info.get('term')) or None)
     await _show_group_schedule(
         query,
         res.get('computed_group') or '1',
@@ -1913,7 +1914,7 @@ async def _show_portal_scan_menu(query, context):
     raw_items = context.user_data.get('portal_scan_items') or []
     imgs = context.user_data.get('portal_scan_images') or []
     term_cfg = await db.get_current_term_config()
-    active_term = term_cfg.get('term', '')
+    active_term = _normalize_term(term_cfg.get('term', ''))
     reconciled = db.reconcile_staged_course_extractions(raw_items, academic_term=active_term) if raw_items else None
     summary = (reconciled or {}).get('summary') or {}
 
@@ -1969,7 +1970,7 @@ async def _finalize_portal_scan_bot(query, context, uid: int, publish_now: bool 
         )
         return
     term_cfg = await db.get_current_term_config()
-    active_term = term_cfg.get('term', '')
+    active_term = _normalize_term(term_cfg.get('term', ''))
     batch = await db.create_course_import_staging_batch(
         raw_items=raw_items,
         academic_term=active_term,
@@ -2124,7 +2125,7 @@ async def handle_schedule_scan_photo(update: Update, context: ContextTypes.DEFAU
             imgs_so_far = list(context.user_data.get('portal_scan_images') or [])
             src_name = f"bot_img_{len(imgs_so_far) + 1}_{edu_grp}"
             term_cfg = await db.get_current_term_config()
-            active_term = term_cfg.get('term', '')
+            active_term = _normalize_term(term_cfg.get('term', ''))
             parsed = await scan_course_selection_image(
                 image_bytes, mime,
                 educational_group=edu_grp,
