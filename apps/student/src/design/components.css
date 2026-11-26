@@ -353,3 +353,70 @@ textarea.ds-input { padding-block: var(--hym-space-3); resize: vertical; }
 .ds-tabbar__item[aria-current="page"] svg { stroke-width: 2.1; }
 .ds-tabbar__item:focus-visible { outline: none; }
 .ds-tabbar__item:focus-visible .ds-tabbar__icon { box-shadow: 0 0 0 2px var(--hym-accent); }
+
+/* ── Route loading skeleton fallback ────────────────────────────────── */
+.ds-route-fallback {
+  display: grid;
+  gap: var(--hym-space-4);
+  padding-block: var(--hym-space-5);
+  padding-inline: var(--hym-space-4);
+  max-width: 960px;
+  margin-inline: auto;
+}
+.ds-route-fallback__head {
+  display: grid;
+  gap: var(--hym-space-2);
+}
+.ds-route-fallback__sub {
+  width: 38%;
+}
+.ds-route-fallback__card {
+  display: grid;
+  gap: var(--hym-space-3);
+}
+.ds-route-fallback__rows {
+  display: grid;
+  gap: var(--hym-space-2);
+}
+
+/* ── Service worker update banner ───────────────────────────────────── */
+.ds-sw-banner-wrap {
+  position: fixed;
+  inset-inline: var(--hym-space-3);
+  inset-block-end: calc(var(--hym-app-tab-bar-height) + env(safe-area-inset-bottom, 0px) + var(--hym-space-3));
+  z-index: var(--hym-z-overlay);
+  max-width: 480px;
+  margin-inline: auto;
+  pointer-events: none;
+}
+@media (min-width: 768px) {
+  .ds-sw-banner-wrap {
+    inset-block-end: var(--hym-space-5);
+  }
+}
+.ds-sw-banner {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-3);
+  padding-block: var(--hym-space-3);
+  padding-inline: var(--hym-space-4);
+  border: 1px solid var(--hym-accent-border);
+  border-inline-start: 4px solid var(--hym-accent);
+  background: var(--hym-surface-2);
+}
+.ds-sw-banner__text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--hym-fs-small);
+  font-weight: var(--hym-fw-bold);
+  line-height: var(--hym-lh-ui);
+  color: var(--hym-text-primary);
+}
+.ds-sw-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--hym-space-2);
+  flex-shrink: 0;
+}

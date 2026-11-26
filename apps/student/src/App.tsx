@@ -5,35 +5,36 @@ import { Shell } from './layout/Shell';
 import { sectionFor } from './layout/section';
 import { LoginScreen } from './screens/LoginScreen';
 import { BlockedScreen, PendingScreen, SplashScreen } from './screens/GateScreens';
-import { HomeScreen } from './screens/HomeScreen';
-import { LibraryScreen } from './screens/library/LibraryScreen';
-import { ExamHome } from './screens/exam/ExamHome';
-import { ExamResult } from './screens/exam/ExamResult';
-import { ExamSetup, MockExamHistory } from './screens/exam/ExamSetup';
-import { MockRun } from './screens/exam/MockRun';
-import { HistoryScreen } from './screens/exam/HistoryScreen';
-import { PracticeScreen } from './screens/exam/PracticeScreen';
-import { NotesScreen } from './screens/notes/NotesScreen';
-import { ReaderScreen } from './screens/reader/ReaderScreen';
-import {
-  BookScreen,
-  LessonScreen,
-  SessionScreen,
-  SubjectScreen,
-  TermScreen,
-} from './screens/library/LibraryScreens';
-import { MeScreen } from './screens/MeScreen';
-import { NotFoundScreen } from './screens/NotFoundScreen';
-import { SearchScreen } from './screens/SearchScreen';
-import { ScheduleScreen } from './screens/ScheduleScreen';
-import { AiChatScreen } from './screens/ai/AiChatScreen';
-import { GradesScreen } from './screens/GradesScreen';
-import { SubscriptionScreen } from './screens/SubscriptionScreen';
-import { NotificationsScreen } from './screens/NotificationsScreen';
-import { TicketsScreen } from './screens/TicketsScreen';
-import { InstallGuideScreen } from './screens/InstallGuideScreen';
 import { useSession } from './lib/session';
 import { SessionExpiredBanner } from './components/SessionExpiredBanner';
+import { SwUpdateBanner } from './components/SwUpdateBanner';
+
+const HomeScreen = lazy(() => import('./screens/HomeScreen').then((m) => ({ default: m.HomeScreen })));
+const LibraryScreen = lazy(() => import('./screens/library/LibraryScreen').then((m) => ({ default: m.LibraryScreen })));
+const TermScreen = lazy(() => import('./screens/library/LibraryScreens').then((m) => ({ default: m.TermScreen })));
+const LessonScreen = lazy(() => import('./screens/library/LibraryScreens').then((m) => ({ default: m.LessonScreen })));
+const SessionScreen = lazy(() => import('./screens/library/LibraryScreens').then((m) => ({ default: m.SessionScreen })));
+const SubjectScreen = lazy(() => import('./screens/library/LibraryScreens').then((m) => ({ default: m.SubjectScreen })));
+const BookScreen = lazy(() => import('./screens/library/LibraryScreens').then((m) => ({ default: m.BookScreen })));
+const ReaderScreen = lazy(() => import('./screens/reader/ReaderScreen').then((m) => ({ default: m.ReaderScreen })));
+const NotesScreen = lazy(() => import('./screens/notes/NotesScreen').then((m) => ({ default: m.NotesScreen })));
+const ExamHome = lazy(() => import('./screens/exam/ExamHome').then((m) => ({ default: m.ExamHome })));
+const PracticeScreen = lazy(() => import('./screens/exam/PracticeScreen').then((m) => ({ default: m.PracticeScreen })));
+const HistoryScreen = lazy(() => import('./screens/exam/HistoryScreen').then((m) => ({ default: m.HistoryScreen })));
+const ExamSetup = lazy(() => import('./screens/exam/ExamSetup').then((m) => ({ default: m.ExamSetup })));
+const MockExamHistory = lazy(() => import('./screens/exam/ExamSetup').then((m) => ({ default: m.MockExamHistory })));
+const MockRun = lazy(() => import('./screens/exam/MockRun').then((m) => ({ default: m.MockRun })));
+const ExamResult = lazy(() => import('./screens/exam/ExamResult').then((m) => ({ default: m.ExamResult })));
+const SearchScreen = lazy(() => import('./screens/SearchScreen').then((m) => ({ default: m.SearchScreen })));
+const ScheduleScreen = lazy(() => import('./screens/ScheduleScreen').then((m) => ({ default: m.ScheduleScreen })));
+const AiChatScreen = lazy(() => import('./screens/ai/AiChatScreen').then((m) => ({ default: m.AiChatScreen })));
+const GradesScreen = lazy(() => import('./screens/GradesScreen').then((m) => ({ default: m.GradesScreen })));
+const SubscriptionScreen = lazy(() => import('./screens/SubscriptionScreen').then((m) => ({ default: m.SubscriptionScreen })));
+const NotificationsScreen = lazy(() => import('./screens/NotificationsScreen').then((m) => ({ default: m.NotificationsScreen })));
+const TicketsScreen = lazy(() => import('./screens/TicketsScreen').then((m) => ({ default: m.TicketsScreen })));
+const MeScreen = lazy(() => import('./screens/MeScreen').then((m) => ({ default: m.MeScreen })));
+const InstallGuideScreen = lazy(() => import('./screens/InstallGuideScreen').then((m) => ({ default: m.InstallGuideScreen })));
+const NotFoundScreen = lazy(() => import('./screens/NotFoundScreen').then((m) => ({ default: m.NotFoundScreen })));
 
 /* SY1: the design-system showcase and states gallery are engineering tools. They exist only in
    `vite dev`; in a production build the branch is constant-false, so neither the route nor the
@@ -44,6 +45,25 @@ const SystemScreen = import.meta.env.DEV
 const StatesScreen = import.meta.env.DEV
   ? lazy(() => import('./screens/StatesScreen').then((m) => ({ default: m.StatesScreen })))
   : null;
+
+function RouteFallback() {
+  return (
+    <div className="page ds-route-fallback" aria-busy="true" aria-label="در حال بارگذاری صفحه">
+      <div className="ds-route-fallback__head">
+        <span className="ds-skel ds-skel--title" aria-hidden="true" />
+        <span className="ds-skel ds-skel--text ds-route-fallback__sub" aria-hidden="true" />
+      </div>
+      <div className="ds-card ds-route-fallback__card">
+        <span className="ds-skel ds-skel--card" aria-hidden="true" />
+        <div className="ds-route-fallback__rows">
+          <span className="ds-skel ds-skel--row" aria-hidden="true" />
+          <span className="ds-skel ds-skel--row" aria-hidden="true" />
+          <span className="ds-skel ds-skel--row" aria-hidden="true" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -98,7 +118,9 @@ export function App() {
       <ScrollToTop />
       {/* T3: session expired mid-use, non-blocking banner (screen stays) */}
       <SessionExpiredBanner />
-      <Routes>
+      <SwUpdateBanner />
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
         <Route
           path="/login"
           element={
@@ -170,7 +192,8 @@ export function App() {
             </Gate>
           }
         />
-      </Routes>
+        </Routes>
+      </Suspense>
     </Layout>
   );
 }

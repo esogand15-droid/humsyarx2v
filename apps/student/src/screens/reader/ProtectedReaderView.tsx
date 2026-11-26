@@ -240,11 +240,48 @@ export function ProtectedReaderView({
   // دست نمیخورند و صفحاتی که قبلاً نمایش داده شدهاند دوباره دانلود نمیشوند.
   const refreshAtRef = useRef(0);
   const inflightRef = useRef<Promise<DocumentManifest | null> | null>(null);
+  const prefetchedUrlsRef = useRef<Set<string>>(new Set());
+  const [prefetchTick, setPrefetchTick] = useState(0);
 
   const acceptManifest = useCallback((data: DocumentManifest) => {
     refreshAtRef.current = manifestRefreshAt(data);
+    prefetchedUrlsRef.current.clear();
     setManifest(data);
   }, []);
+
+  const handlePageLoaded = useCallback(() => {
+    setPrefetchTick((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    prefetchedUrlsRef.current.clear();
+  }, [scope, id]);
+
+  // پیش‌بارگذاری آرام صفحات همسایه (+1، +2، -1) با احترام به Save-Data
+  useEffect(() => {
+    if (!manifest || !manifest.page_dimensions?.length) return;
+    const conn =
+      typeof navigator !== 'undefined'
+        ? (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+        : undefined;
+    if (conn?.saveData) return;
+
+    const timer = window.setTimeout(() => {
+      const targets = [currentPage + 1, currentPage + 2, currentPage - 1];
+      for (const p of targets) {
+        if (p < 1 || p > manifest.total_pages) continue;
+        const dim = manifest.page_dimensions.find((d) => d.page === p);
+        const pageUrl = dim?.url;
+        if (!pageUrl || prefetchedUrlsRef.current.has(pageUrl)) continue;
+        prefetchedUrlsRef.current.add(pageUrl);
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = pageUrl;
+      }
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [manifest, currentPage, prefetchTick]);
 
   const silentRefresh = useCallback((): Promise<DocumentManifest | null> => {
     if (inflightRef.current) return inflightRef.current;
@@ -577,6 +614,7 @@ export function ProtectedReaderView({
                     onTextSelection={handleTextSelection}
                     onAnchorAnnotation={handleAnchorAnnotation}
                     enableTextSelection={true}
+                    onPageLoaded={handlePageLoaded}
                   />
                 );
               })}
@@ -708,6 +746,7 @@ interface VirtualPageContainerProps {
   onAnchorAnnotation?: (pageX: number, pageY: number, text: string) => void;
   enableTextSelection?: boolean;
   textLayerRef?: React.RefObject<any>;
+  onPageLoaded?: () => void;
 }
 
 function VirtualPageContainer({
@@ -746,6 +785,7 @@ function VirtualPageContainer({
   onAnchorAnnotation,
   enableTextSelection = true,
   textLayerRef,
+  onPageLoaded,
 }: VirtualPageContainerProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [isNearViewport, setIsNearViewport] = useState(page <= 2);
@@ -913,11 +953,13 @@ function VirtualPageContainer({
               transition: 'opacity 0.15s ease-in',
             }}
             loading="lazy"
+            decoding="async"
             draggable={false}
             onLoad={() => {
               loadedRef.current = true;
               retriedRef.current = false;
               setImgLoaded(true);
+              onPageLoaded?.();
             }}
             onError={handleImgError}
           />
