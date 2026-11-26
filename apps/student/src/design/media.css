@@ -76,6 +76,27 @@
   background:linear-gradient(to top, rgba(2,6,23,.88) 0%, rgba(2,6,23,.35) 26%, transparent 46%, transparent 78%, rgba(2,6,23,.55) 100%);
   transition:opacity .25s ease;
 }
+.vstage__poster{
+  position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:
+    radial-gradient(62% 62% at 50% 46%, color-mix(in srgb, var(--hym-brand-500) 26%, transparent), transparent 72%),
+    radial-gradient(44% 44% at 54% 44%, color-mix(in srgb, var(--hym-cyan-400) 14%, transparent), transparent 65%),
+    linear-gradient(160deg, var(--hym-slate-900), var(--hym-slate-950));
+}
+.vstage__poster-badge{
+  position:absolute;inset-block-start:var(--hym-space-3);inset-inline:var(--hym-space-3);
+  display:inline-flex;align-items:center;gap:var(--hym-space-2);
+  max-width:calc(100% - var(--hym-space-6));width:fit-content;
+  padding-block:var(--hym-space-1);padding-inline:var(--hym-space-3);
+  border-radius:var(--hym-radius-pill);
+  background:color-mix(in srgb, var(--hym-slate-950) 76%, transparent);
+  border:1px solid color-mix(in srgb, var(--hym-cyan-400) 24%, transparent);
+  color:var(--hym-slate-50);
+}
+.vstage__poster-ic{display:inline-flex;align-items:center;justify-content:center;color:var(--hym-cyan-400);flex:0 0 auto}
+.vstage__poster-title{font-size:var(--hym-fs-small);font-weight:var(--hym-fw-bold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.vstage__poster-dur{font-size:var(--hym-fs-caption);font-weight:var(--hym-fw-semibold);color:var(--hym-slate-300);flex:0 0 auto}
+.vstage.is-fs .vstage__poster-badge{display:none}
 .vstage__title{
   position:absolute;inset-inline:18px;top:14px;margin:0;z-index:3;
   font-size:15px;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.6);
@@ -134,8 +155,8 @@
   width:44px;height:44px;flex:0 0 auto;border-radius:12px;display:grid;place-items:center;
   color:var(--cyan);background:var(--cyan-soft, rgba(6,182,212,.12));
 }
-.minfo__body{flex:1;min-width:0}
-.minfo__t{margin:0;font-size:16px;font-weight:800;color:var(--ink);line-height:1.5;overflow-wrap:anywhere}
+.minfo__body{flex:1 1 min(200px, calc(100% - 56px));min-width:0}
+.minfo__t{margin:0;font-size:16px;font-weight:800;color:var(--ink);line-height:1.5;overflow-wrap:break-word}
 .minfo__s{margin:2px 0 0;font-size:12.5px;color:var(--ink-3)}
 
 .mchip{
@@ -166,7 +187,7 @@
 .mfail__x{margin:3px 0 0;font-size:12.5px;line-height:1.8;color:var(--ink-2)}
 .mfail__btn{
   display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:0 16px;border:0;border-radius:12px;
-  background:var(--brand);color:#fff;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;
+  background:var(--brand);color:var(--hym-accent-on);font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;
 }
 .mfail__btn:active{transform:scale(.97)}
 .mfail--overlay{
@@ -241,6 +262,11 @@
   .vtime{font-size:12px;padding-inline:4px}
   .vctl__opt{display:none}
   .vbig{width:66px;height:66px}
+  .mfail--overlay{top:38%;padding:10px 12px;gap:8px;max-height:calc(100% - 70px);overflow:auto}
+  .mfail--overlay .mfail__ic{width:32px;height:32px}
+  .mfail--overlay .mfail__t{font-size:13.5px}
+  .mfail--overlay .mfail__x{font-size:12px;line-height:1.45}
+  .mfail--overlay .mfail__btn{min-height:44px;padding:0 12px;font-size:12.5px}
   .mhint{display:none}
   .mplayer--audio{padding:14px 12px 0}
   .aplayer__art{width:116px;height:116px}

@@ -1,8 +1,9 @@
+import { useState } from 'react';
+
 export type BrandSize = 'sm' | 'md' | 'lg' | 'xl';
 export type BrandVariant = 'app-icon' | 'emblem';
 
 const PX: Record<BrandSize, number> = { sm: 34, md: 44, lg: 64, xl: 84 };
-const R: Record<BrandSize, number> = { sm: 9, md: 12, lg: 18, xl: 24 };
 
 interface BrandProps {
   size?: BrandSize;
@@ -26,60 +27,38 @@ export function Brand({
   style,
 }: BrandProps) {
   const px = PX[size];
-  const r = R[size];
 
   // مسیر از base بیلد (/student/) ساخته می‌شود، نه نسبی: در مسیرهای تودرتو
   // مثل /me/notes آدرس نسبی به /student/me/… می‌رسید و ۴۰۴ می‌داد.
   const base = (import.meta.env.BASE_URL || '/student/').replace(/\/?$/, '/');
-  const primarySrc =
-    variant === 'emblem' ? `${base}brand-emblem-transparent.png` : `${base}brand-app-icon.png`;
-  const fallbackSrc =
-    variant === 'emblem'
-      ? '/student/brand-emblem-transparent.png'
-      : '/student/brand-app-icon.png';
-  const legacyFallback = `${base}brand-logo.png`;
+  const stem = variant === 'emblem' ? 'brand-emblem-transparent' : 'brand-app-icon';
+  const [fbStep, setFbStep] = useState<0 | 1 | 2>(0);
+
+  const webpSrc = `${base}${stem}.webp`;
+  const pngSrc =
+    fbStep === 0 ? `${base}${stem}.png` : fbStep === 1 ? `/student/${stem}.png` : `${base}brand-logo.png`;
 
   return (
     <div
-      className={`mark mark--brand ${className}`}
-      style={{
-        width: px,
-        height: px,
-        position: 'relative',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        filter:
-          variant === 'emblem'
-            ? 'drop-shadow(0 2px 8px rgba(0, 242, 254, 0.25))'
-            : 'drop-shadow(0 3px 10px rgba(0, 242, 254, 0.3))',
-        transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease',
-        ...style,
-      }}
+      className={`mark mark--brand mark--brand--${size} mark--brand--${variant} ${className}`.trim()}
+      style={style}
       role="img"
       aria-label="هامزیار"
     >
-      <img
-        src={primarySrc}
-        alt="HumsYar"
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain',
-          display: 'block',
-          borderRadius: variant === 'app-icon' ? r : undefined,
-          imageRendering: 'auto',
-        }}
-        onError={(e) => {
-          const img = e.currentTarget as HTMLImageElement;
-          if (img.src !== fallbackSrc && !img.src.endsWith(fallbackSrc)) {
-            img.src = fallbackSrc;
-          } else {
-            img.src = legacyFallback;
-          }
-        }}
-      />
+      <picture className="mark--brand__pic">
+        {fbStep === 0 && <source srcSet={webpSrc} type="image/webp" />}
+        <img
+          className="mark--brand__img"
+          src={pngSrc}
+          alt="HumsYar"
+          width={px}
+          height={px}
+          decoding="async"
+          onError={() => {
+            setFbStep((s) => (s < 2 ? ((s + 1) as 1 | 2) : s));
+          }}
+        />
+      </picture>
     </div>
   );
 }

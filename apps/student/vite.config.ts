@@ -1,5 +1,6 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin, type ResolvedConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -21,50 +22,77 @@ import path from 'node:path';
    ───────────────────────────────────────────────────────────── */
 /* ─────────────────────────────────────────────────────────────────────
    hook بیلد: لیست دقیق دارایی‌های استاتیک را می‌نویسد تا SW بتواند
-   آن‌ها را پیش‌کش (precache) کند. پوشهٔ /api/* حذف می‌شود — API نباید
-   جزو دارایی‌های استاتیک باشد (دادهٔ پویا).
+   آن‌ها را مدیریت کند و یک شناسهٔ بیلد SHA-256 برای sw.js می‌سازد.
    ───────────────────────────────────────────────────────────────────── */
-function swAssetManifestPlugin() {
+function swAssetManifestPlugin(): Plugin {
+  let publicDir = '';
+  const EXCLUDED = new Set(['sw.js', 'sw-assets.json', 'ds-preview.html']);
+
   return {
     name: 'vite-sw-asset-manifest',
+    configResolved(config: ResolvedConfig) {
+      publicDir = config.publicDir;
+    },
     async writeBundle(outputOptions, bundle) {
       const distDir = outputOptions.dir;
-      const entries: string[] = [];
+      if (!distDir) return;
 
-      for (const fileName of Object.keys(bundle)) {
-        if (fileName.endsWith('.map')) continue; // skip sourcemaps from SW
-        if (/\.js$/.test(fileName) || /\.css$/.test(fileName) || fileName.includes('assets/')) {
-          entries.push(path.join('assets', path.relative(distDir, path.join(outputOptions.dir, fileName))));
-        }
+      const entries: string[] = [];
+      const hashEntries: Array<[string, Buffer | string]> = [];
+
+      for (const [rawName, chunk] of Object.entries(bundle)) {
+        const norm = rawName.replace(/\\/g, '/').replace(/^\/+/, '');
+        if (norm.endsWith('.map')) continue;
+        const body = chunk.type === 'chunk' ? chunk.code : chunk.source;
+        hashEntries.push([norm, typeof body === 'string' ? body : Buffer.from(body)]);
+        if (EXCLUDED.has(norm) || norm === 'index.html') continue;
+        entries.push(norm);
       }
 
-      // افزون بر assetها، public/ (manifest, icons, favicon) هم وارد فهرست می‌شود.
-      const publicDir = path.join(process.cwd(), 'public');
-      const walk = (dir: string, rel: string) => {
-        const files = fs.readdirSync(dir, { withFileTypes: true });
-        for (const f of files) {
-          const p = path.join(dir, f.name);
-          if (f.isDirectory()) walk(p, path.join(rel, f.name));
-          else entries.push(path.join('public', rel, f.name));
-        }
-      };
-      walk(publicDir, '');
+      // افزون بر assetها، public/ (manifest, icons, favicon, brand) هم وارد فهرست می‌شود.
+      if (publicDir && fs.existsSync(publicDir)) {
+        const walk = (dir: string, rel: string) => {
+          const files = fs.readdirSync(dir, { withFileTypes: true });
+          for (const f of files) {
+            const p = path.join(dir, f.name);
+            const nextRel = rel ? `${rel}/${f.name}` : f.name;
+            if (f.isDirectory()) {
+              walk(p, nextRel);
+            } else {
+              const norm = nextRel.replace(/\\/g, '/').replace(/^\/+/, '');
+              if (norm.endsWith('.map')) continue;
+              hashEntries.push([norm, fs.readFileSync(p)]);
+              if (EXCLUDED.has(norm)) continue;
+              entries.push(norm);
+            }
+          }
+        };
+        walk(publicDir, '');
+      }
 
-      // normalize: مسیرهای نسبی -> مسیرهای ریشه‌ای
-      const manifest = entries.map((e) => {
-        if (e.startsWith('assets/') || e.startsWith('public/')) {
-          const name = e.replace(/^assets\//, 'assets/').replace(/^public\//, '/');
-          return name;
-        }
-        return e;
-      });
-
-      const sorted = [...new Set(manifest)].sort();
+      const sorted = [...new Set(entries)].sort();
       fs.writeFileSync(
         path.join(distDir, 'sw-assets.json'),
-        JSON.stringify(sorted, null, 2),
+        JSON.stringify(sorted, null, 2) + '\n',
         'utf8',
       );
+
+      hashEntries.sort((a, b) => a[0].localeCompare(b[0]));
+      const hasher = crypto.createHash('sha256');
+      for (const [name, content] of hashEntries) {
+        hasher.update(name);
+        hasher.update('\0');
+        hasher.update(content);
+        hasher.update('\n');
+      }
+      const buildHash = hasher.digest('hex').slice(0, 8);
+
+      const distSwPath = path.join(distDir, 'sw.js');
+      const srcSwPath = publicDir ? path.join(publicDir, 'sw.js') : distSwPath;
+      const swTemplate = fs.existsSync(srcSwPath)
+        ? fs.readFileSync(srcSwPath, 'utf8')
+        : fs.readFileSync(distSwPath, 'utf8');
+      fs.writeFileSync(distSwPath, swTemplate.replace(/__SW_BUILD_ID__/g, buildHash), 'utf8');
     },
   };
 }
@@ -81,5 +109,23 @@ export default defineConfig({
     proxy: { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: false } },
   },
   preview: { host: '0.0.0.0', port: 4173, allowedHosts: true },
-  build: { target: 'es2020', assetsInlineLimit: 0 },
+  build: {
+    target: 'es2020',
+    assetsInlineLimit: 0,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const norm = id.replace(/\\/g, '/');
+          if (
+            norm.includes('/node_modules/react/') ||
+            norm.includes('/node_modules/react-dom/') ||
+            norm.includes('/node_modules/scheduler/')
+          ) {
+            return 'react-vendor';
+          }
+          return undefined;
+        },
+      },
+    },
+  },
 });

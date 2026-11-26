@@ -73,11 +73,14 @@ const FAIL: Record<Fail, { title: string; text: string }> = {
 /** <video>/<audio> کد HTTP را نمیگوید؛ با یک درخواست یکبایتی علت را میفهمیم. */
 async function probe(url: string): Promise<Fail> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'network';
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctrl ? window.setTimeout(() => ctrl.abort(), 5000) : 0;
   try {
     const res = await fetch(url, {
       headers: { Range: 'bytes=0-0' },
       credentials: 'same-origin',
       cache: 'no-store',
+      signal: ctrl?.signal,
     });
     try {
       await res.body?.cancel();
@@ -91,6 +94,8 @@ async function probe(url: string): Promise<Fail> {
     return 'upstream';
   } catch {
     return 'network';
+  } finally {
+    if (timer) window.clearTimeout(timer);
   }
 }
 
@@ -339,6 +344,8 @@ function useMediaEngine(opts: EngineOpts) {
   const [muted, setMuted] = useState(false);
   const [fail, setFail] = useState<Fail | null>(null);
   const [resumed, setResumed] = useState(0);
+  const [metaLoaded, setMetaLoaded] = useState(false);
+  const [playAttempt, setPlayAttempt] = useState(0);
 
   const resumeAt = useRef(opts.startAt >= 3 ? opts.startAt : 0);
   const firstLoad = useRef(true);
@@ -346,6 +353,9 @@ function useMediaEngine(opts: EngineOpts) {
   const swapping = useRef(false);
   const lastSaved = useRef(0);
   const autoTries = useRef(0);
+  const retryTimer = useRef<number | null>(null);
+  const waitingRef = useRef(waiting);
+  waitingRef.current = waiting;
   const rateRef = useRef(rate);
   rateRef.current = rate;
   const failRef = useRef(fail);
@@ -372,6 +382,7 @@ function useMediaEngine(opts: EngineOpts) {
     pendingSrc.current = null;
     forceSwap.current = false;
     swapping.current = true;
+    setMetaLoaded(false);
     setFail(null);
     setSrc(next);
   }, []);
@@ -424,6 +435,10 @@ function useMediaEngine(opts: EngineOpts) {
 
   const reload = useCallback(
     async (auto: boolean) => {
+      if (retryTimer.current) {
+        window.clearTimeout(retryTimer.current);
+        retryTimer.current = null;
+      }
       const el = ref.current;
       if (el) {
         if (el.currentTime > 1) resumeAt.current = el.currentTime;
@@ -431,19 +446,72 @@ function useMediaEngine(opts: EngineOpts) {
       }
       if (!auto) autoTries.current = 0;
       setFail(null);
+      setMetaLoaded(false);
       setWaiting(true);
+      setPlayAttempt((n) => n + 1);
       if (pendingSrc.current) {
         applySwap(pendingSrc.current);
         return;
       }
       swapping.current = true;
       forceSwap.current = true;
-      const fresh = expCb.current ? await expCb.current() : null;
+      let fresh: string | null = null;
+      try {
+        fresh = expCb.current ? await expCb.current() : null;
+      } catch {
+        fresh = null;
+      }
       if (fresh && fresh !== src) return; // اثر بالا src را عوض میکند
       forceSwap.current = false;
       ref.current?.load();
     },
     [src, applySwap],
+  );
+
+  const onTimeout = useCallback(async () => {
+    const el = ref.current;
+    if (failRef.current) return;
+    if (el && el.readyState >= 3 && !el.paused) {
+      setWaiting(false);
+      return;
+    }
+    const targetSrc = el?.currentSrc || src;
+    let why = await probe(targetSrc);
+    if (why === 'format' && (!el || el.readyState === 0)) {
+      why = 'upstream';
+    }
+    swapping.current = false;
+    wantPlay.current = false;
+    setWaiting(false);
+    setPlaying(false);
+    setFail(why);
+  }, [src]);
+
+  // M1: اگر بافر/انتظار بیش از ۱۲ ثانیه طول کشید، چرخش متوقف و خطای قابل تلاش دوباره نشان داده شود
+  useEffect(() => {
+    if (!waiting || fail) return;
+    const t = window.setTimeout(() => void onTimeout(), 12_000);
+    return () => window.clearTimeout(t);
+  }, [waiting, fail, onTimeout]);
+
+  // M1: اگر متادیتای اولیه بعد از ۱۰ ثانیه نرسید (پخش زده شده یا NETWORK_LOADING گیر کرده)، متوقف شو
+  useEffect(() => {
+    if (metaLoaded || fail || !src) return;
+    const t = window.setTimeout(() => {
+      const el = ref.current;
+      if (!el || el.readyState >= 1) return;
+      if (wantPlay.current || waitingRef.current || el.networkState === HTMLMediaElement.NETWORK_LOADING) {
+        void onTimeout();
+      }
+    }, 10_000);
+    return () => window.clearTimeout(t);
+  }, [metaLoaded, fail, src, playAttempt, onTimeout]);
+
+  useEffect(
+    () => () => {
+      if (retryTimer.current) window.clearTimeout(retryTimer.current);
+    },
+    [],
   );
 
   const onError = useCallback(async () => {
@@ -459,7 +527,8 @@ function useMediaEngine(opts: EngineOpts) {
     if (autoTries.current < 2 && (why === 'expired' || why === 'upstream' || why === 'network')) {
       autoTries.current += 1;
       const delay = why === 'expired' ? 0 : 1500 * autoTries.current;
-      window.setTimeout(() => void reload(true), delay);
+      if (retryTimer.current) window.clearTimeout(retryTimer.current);
+      retryTimer.current = window.setTimeout(() => void reload(true), delay);
       return;
     }
     swapping.current = false;
@@ -486,6 +555,7 @@ function useMediaEngine(opts: EngineOpts) {
     }
     if (el.paused) {
       wantPlay.current = true;
+      setPlayAttempt((n) => n + 1);
       // A fresh link is waiting (refreshed while paused): mount it now, before play makes a new request
       if (pendingSrc.current) {
         setWaiting(true);
@@ -696,6 +766,7 @@ function useMediaEngine(opts: EngineOpts) {
     onLoadedMetadata: (e: SyntheticEvent<HTMLMediaElement>) => {
       const el = e.currentTarget;
       const d = Number.isFinite(el.duration) ? el.duration : 0;
+      setMetaLoaded(true);
       setDur(d);
       el.defaultPlaybackRate = rateRef.current;
       el.playbackRate = rateRef.current;
@@ -720,6 +791,7 @@ function useMediaEngine(opts: EngineOpts) {
     },
     onCanPlay: () => {
       autoTries.current = 0;
+      setMetaLoaded(true);
       if (!wantPlay.current) setWaiting(false);
     },
     onWaiting: () => setWaiting(true),
@@ -728,6 +800,7 @@ function useMediaEngine(opts: EngineOpts) {
       if (pendingSrc.current) applySwap(pendingSrc.current);
     },
     onPlaying: () => {
+      setMetaLoaded(true);
       setWaiting(false);
       setPlaying(true);
       autoTries.current = 0;
@@ -959,6 +1032,21 @@ function VideoPlayer(p: PlayerProps) {
         </video>
 
         <div className="vstage__shade" aria-hidden="true" />
+        {!m.playing && !m.waiting && !m.fail && m.time === 0 && (
+          <div className="vstage__poster" aria-hidden="true">
+            <div className="vstage__poster-badge">
+              <span className="vstage__poster-ic">
+                <Icon name="i-video" size={18} />
+              </span>
+              <span className="vstage__poster-title">{p.name}</span>
+              {m.dur > 0 && (
+                <span className="vstage__poster-dur num" dir="ltr">
+                  {clock(m.dur)}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
         {fs && <p className="vstage__title">{p.name}</p>}
 
         {flash && (
