@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 CLOUD_GETFILE_LIMIT = 20 * 1024 * 1024   # سقف getFile در Bot API ابری
 MTPROTO_CHUNK = 1024 * 1024              # اندازهی ثابت chunk در stream_media
 _UNKNOWN_SIZE_WAIT_SEC = 180             # فایل بیاندازه: صبر برای دانلود کامل
+_CHUNK_TIMEOUT_SEC = float(os.getenv("MEDIA_CHUNK_TIMEOUT_SEC", "20"))  # deadline per 1MB chunk
+_STREAM_RETRIES = 3                       # resumes after a stalled/failed chunk
 
 # ─────────────────────────────────────────────────────────────
 #  MIME — Safari با nosniff روی نوع اشتباه پخش نمیکند
@@ -275,21 +277,48 @@ def file_response(path: str, mime: str, name: str):
 
 
 async def _iter_range(client: Any, file_id: str, start: int, end: int) -> AsyncIterator[bytes]:
-    """chunkهای ۱MB تلگرام را میگیرد و دقیقاً بایتهای [start, end] را میدهد."""
+    """chunkهای ۱MB تلگرام را میگیرد و دقیقاً بایتهای [start, end] را میدهد.
+
+    A Telegram chunk fetch can stall (slow DC, FloodWait sleep). Before, one stall froze the
+    response forever: headers were sent, so the player spun with no error ("sometimes it just
+    never loads"). Each chunk now has a deadline; on stall/error the stream resumes from the
+    chunk it was on, a few times with backoff, then ends so the player can surface an error."""
     first = start // MTPROTO_CHUNK
     last = end // MTPROTO_CHUNK
-    pos = first * MTPROTO_CHUNK
-    try:
-        async for chunk in client.stream_media(file_id, limit=last - first + 1, offset=first):
-            c_start, pos = pos, pos + len(chunk)
-            lo = max(start, c_start) - c_start
-            hi = min(end + 1, pos) - c_start
-            if hi > lo:
-                yield bytes(chunk[lo:hi])
-            if pos > end:
-                break
-    except Exception as exc:  # هدرها رفتهاند؛ فقط قطع و لاگ
-        logger.warning("MEDIA_MTPROTO_STREAM_FAILED err=%s range=%d-%d", type(exc).__name__, start, end)
+    idx = first
+    attempts = 0
+    while idx <= last:
+        pos = idx * MTPROTO_CHUNK
+        agen = client.stream_media(file_id, limit=last - idx + 1, offset=idx).__aiter__()
+        try:
+            while idx <= last:
+                chunk = await asyncio.wait_for(agen.__anext__(), timeout=_CHUNK_TIMEOUT_SEC)
+                c_start, pos = pos, pos + len(chunk)
+                lo = max(start, c_start) - c_start
+                hi = min(end + 1, pos) - c_start
+                if hi > lo:
+                    yield bytes(chunk[lo:hi])
+                idx += 1
+                attempts = 0
+                if pos > end:
+                    return
+            return
+        except StopAsyncIteration:
+            return
+        except Exception as exc:  # هدرها رفتهاند؛ ادامه از همان chunk یا قطع و لاگ
+            attempts += 1
+            logger.warning("MEDIA_MTPROTO_STREAM_RETRY err=%s chunk=%d attempt=%d range=%d-%d",
+                           type(exc).__name__, idx, attempts, start, end)
+            if attempts > _STREAM_RETRIES:
+                return
+            await asyncio.sleep(min(4.0, 0.5 * (2 ** attempts)))
+        finally:
+            aclose = getattr(agen, "aclose", None)
+            if aclose is not None:
+                try:
+                    await aclose()
+                except Exception:
+                    pass
 
 
 async def mtproto_response(file_id: str, mime: str, name: str,

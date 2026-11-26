@@ -150,6 +150,48 @@ class TestMtprotoStreaming(unittest.TestCase):
             left = [f for f in os.listdir(self.tmp.name) if f.endswith(".bin")]
             self.assertEqual(left, [os.path.basename(ms.cache_path("c"))])
 
+    def test_stalled_chunk_resumes_instead_of_hanging(self):
+        """Telegram stalls once on chunk 1: the stream must resume there, not freeze forever."""
+        data, n = self.data, ms.MTPROTO_CHUNK
+        state = {"stalled": False}
+
+        class Stalling:
+            calls = []
+
+            async def stream_media(self, file_id, limit=0, offset=0):
+                Stalling.calls.append(offset)
+                i = offset
+                while i * n < len(data) and (limit == 0 or i - offset < limit):
+                    if i == 1 and not state["stalled"]:
+                        state["stalled"] = True
+                        await asyncio.sleep(3600)  # never answers
+                    yield data[i * n:(i + 1) * n]
+                    i += 1
+
+        async def go():
+            with patch.object(ms, "_CHUNK_TIMEOUT_SEC", 0.05), patch.object(ms.asyncio, "sleep", wraps=asyncio.sleep) as _:
+                out = b""
+                async for part in ms._iter_range(Stalling(), "FID", 0, len(data) - 1):
+                    out += part
+                return out
+
+        body = _run(asyncio.wait_for(go(), timeout=10))
+        self.assertEqual(body, data)
+        self.assertEqual(Stalling.calls, [0, 1])  # resumed from the stalled chunk, not from 0
+
+    def test_stream_gives_up_after_retries(self):
+        """A source that never answers must end the response (so the player can show an error)."""
+        class Dead:
+            async def stream_media(self, file_id, limit=0, offset=0):
+                await asyncio.sleep(3600)
+                yield b""
+
+        async def go():
+            with patch.object(ms, "_CHUNK_TIMEOUT_SEC", 0.02), patch.object(ms, "_STREAM_RETRIES", 2):
+                return [p async for p in ms._iter_range(Dead(), "FID", 0, 10)]
+
+        self.assertEqual(_run(asyncio.wait_for(go(), timeout=15)), [])
+
 
 class TestProxyRouting(unittest.TestCase):
     """proxy_telegram_preview: کش ⇒ دیسک، >۲۰MB ⇒ MTProto، getFile شکستخورده ⇒ MTProto."""

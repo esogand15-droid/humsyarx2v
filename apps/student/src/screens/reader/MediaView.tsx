@@ -497,12 +497,19 @@ function useMediaEngine(opts: EngineOpts) {
     if (why === 'format' && (!el || el.readyState === 0)) {
       why = 'upstream';
     }
+    // A stall is usually one slow Telegram chunk, not a dead file: reconnect from the same
+    // second twice before showing an error (before, the first stall went straight to «خطا»).
+    if (autoTries.current < 2 && (why === 'expired' || why === 'upstream' || why === 'network')) {
+      autoTries.current += 1;
+      void reload(true);
+      return;
+    }
     swapping.current = false;
     wantPlay.current = false;
     setWaiting(false);
     setPlaying(false);
     setFail(why);
-  }, [src]);
+  }, [src, reload]);
 
   // M1: اگر بافر/انتظار بیش از ۱۲ ثانیه طول کشید، چرخش متوقف و خطای قابل تلاش دوباره نشان داده شود
   useEffect(() => {
