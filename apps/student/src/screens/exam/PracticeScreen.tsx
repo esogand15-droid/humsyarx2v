@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { AppBar, Button, Chip, EmptyState } from '../../components';
+import './exam.css';
+import { AppBar } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
-import { DsButton } from '../../design/components';
+import { DsButton, DsCard, DsEmpty } from '../../design/components';
 import { Icon } from '../../icons';
-import { fa } from '../../lib/library';
 import {
   OPTION_LETTERS,
   exam,
@@ -13,14 +13,9 @@ import {
   type NextPayload,
   type Question,
 } from '../../lib/exam';
+import { faNum } from '../../lib/fa';
 
-/** تمرین یک‌سؤالی.
- *
- *  قرارداد مهم: **پاسخ صحیح قبل از پاسخ‌دادن در مرورگر نیست.** کلید
- *  درست فقط از `/exam/answer` می‌آید. انتخاب کاربر تا لحظهٔ ثبت، فقط
- *  در حافظهٔ همین صفحه است (پس با رفرش، انتخاب نیمه‌کاره از بین می‌رود —
- *  همان رفتاری که مینی‌اپ دارد و از ثبت پاسخ بدون قصد جلوگیری می‌کند).
- */
+/** تمرین یک‌سؤالی — پاسخ صحیح فقط پس از ثبت از سرور می‌آید. */
 export function PracticeScreen() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -34,15 +29,18 @@ export function PracticeScreen() {
   const [selected, setSelected] = useState<number | null>(null);
   const [result, setResult] = useState<AnswerPayload | null>(null);
   const [busy, setBusy] = useState(false);
-  const [answered, setAnswered] = useState(0); // شمار پاسخ‌های همین نشست
+  const [answered, setAnswered] = useState(0);
   const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
   const [flagging, setFlagging] = useState(false);
   const inFlight = useRef(false);
 
   useEffect(() => {
-    void exam.flagged().then((res) => {
-      if (Array.isArray(res.flagged_ids)) setFlaggedIds(new Set(res.flagged_ids));
-    }).catch(() => {});
+    void exam
+      .flagged()
+      .then((res) => {
+        if (Array.isArray(res.flagged_ids)) setFlaggedIds(new Set(res.flagged_ids));
+      })
+      .catch(() => {});
   }, []);
 
   const toggleFlag = async () => {
@@ -52,10 +50,10 @@ export function PracticeScreen() {
     try {
       const res = await exam.flag(q.id);
       setFlaggedIds((prev) => {
-        const next = new Set(prev);
-        if (res.flagged) next.add(q.id);
-        else next.delete(q.id);
-        return next;
+        const nextSet = new Set(prev);
+        if (res.flagged) nextSet.add(q.id);
+        else nextSet.delete(q.id);
+        return nextSet;
       });
     } catch {
       // ignore
@@ -93,7 +91,6 @@ export function PracticeScreen() {
       setResult(res);
       setAnswered((n) => n + 1);
     } catch (err) {
-      // خطای شبکه: انتخاب کاربر حفظ می‌شود تا دوباره بزند
       setError(err);
       setState('error');
     } finally {
@@ -104,7 +101,6 @@ export function PracticeScreen() {
 
   const next = () => void load();
 
-  // کیبورد: ۱..۴ انتخاب، Enter ثبت/بعدی
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!data?.question) return;
@@ -126,95 +122,102 @@ export function PracticeScreen() {
 
   const q = data?.question ?? null;
   const progress = data?.progress;
-  const scopeLabel = [lesson, topic].filter(Boolean).join(' · ') || 'تمرین آزاد';
+  const title = topic ? `${topic} · ${lesson}` : lesson || 'تمرین آزاد';
+  const metaParts = q
+    ? [q.difficulty_label || 'متوسط', q.topic || q.lesson, q.exam_session_label].filter(Boolean)
+    : [];
+  const isFlagged = q ? flaggedIds.has(q.id) : false;
 
   return (
     <>
       <AppBar
-        title={scopeLabel}
+        title={title}
         sub={
-          progress
-            ? `${fa(progress.solved_unique)} از ${fa(progress.total)} سؤال حل شده`
+          progress && progress.total > 0
+            ? `${faNum(progress.solved_unique)} از ${faNum(progress.total)} سؤال حل شده`
             : 'در حال آماده‌سازی'
         }
         back
         onBack={() => navigate(-1)}
       />
 
-      <div className="page">
+      <div className="page page-enter exam-page">
         {state === 'loading' && <LoadingBlock rows={3} />}
         {state === 'error' && <ErrorBlock error={error} onRetry={() => void load()} />}
 
         {state === 'ready' && !q && (
-          <EmptyState
-            icon="i-check"
-            title="این بخش را تمام کردی"
-            text={
-              progress && progress.total > 0
-                ? `همهٔ ${fa(progress.total)} سؤال این محدوده را پاسخ داده‌ای. برای ادامه، درس یا مبحث دیگری انتخاب کن.`
-                : 'در این محدوده سؤالی برای ورودی و اشتراک فعلی تو ثبت نشده است.'
-            }
-            action={
-              <Button variant="primary" size="sm" onClick={() => navigate('/exam')}>
-                انتخاب درس دیگر
-              </Button>
-            }
-          />
+          <DsCard>
+            <DsEmpty
+              icon={<Icon name="i-check" size={28} />}
+              title="این بخش را تمام کردید"
+              body={
+                progress && progress.total > 0
+                  ? `همهٔ ${faNum(progress.total)} سؤال این محدوده را پاسخ داده‌اید. برای ادامه، درس یا مبحث دیگری انتخاب کنید.`
+                  : 'در این محدوده سؤالی برای ورودی و اشتراک فعلی شما ثبت نشده است.'
+              }
+              action={
+                <DsButton variant="primary" onClick={() => navigate('/exam')}>
+                  انتخاب درس دیگر
+                </DsButton>
+              }
+            />
+          </DsCard>
         )}
 
         {state === 'ready' && q && (
-          <>
-            {progress && progress.total > 0 && (
-              <div
-                className="mt-12"
-                role="progressbar"
-                aria-valuenow={progress.solved_unique}
-                aria-valuemin={0}
-                aria-valuemax={progress.total}
-                aria-label="پیشرفت در این محدوده"
-              >
-                <div className="bar">
-                  <i style={{ width: `${Math.round((100 * progress.solved_unique) / progress.total)}%` }} />
-                </div>
-              </div>
-            )}
-
-            <article className="q-card mt-16">
-              <div className="row gap-8" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                <Chip variant="quiet">{q.difficulty_label || 'متوسط'}</Chip>
-                {q.topic && <Chip variant="quiet">{q.topic}</Chip>}
-                {q.exam_session_label && <Chip variant="quiet">{q.exam_session_label}</Chip>}
-                <span className="grow" />
-                <button
-                  type="button"
-                  onClick={() => void toggleFlag()}
-                  disabled={flagging}
-                  className={`btn btn--sm ${flaggedIds.has(q.id) ? 'btn--ink' : 'btn--ghost'}`}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    color: flaggedIds.has(q.id) ? 'var(--hym-neon-cyan)' : undefined,
-                    borderColor: flaggedIds.has(q.id) ? 'var(--hym-neon-cyan)' : undefined,
-                    padding: '3px 10px',
-                    borderRadius: '8px',
-                  }}
-                  title={flaggedIds.has(q.id) ? 'حذف از نشان‌شده‌ها' : 'نشان‌کردن سوال'}
-                  aria-label={flaggedIds.has(q.id) ? 'حذف از نشان‌شده‌ها' : 'نشان‌کردن سوال'}
+          <div className="exam-focus">
+            {progress && progress.total > 0 && (() => {
+              const pct = Math.min(100, Math.max(0, Math.round((progress.solved_unique / progress.total) * 100)));
+              return (
+                <div
+                  className="exam-progress"
+                  role="progressbar"
+                  aria-valuenow={progress.solved_unique}
+                  aria-valuemin={0}
+                  aria-valuemax={progress.total}
+                  aria-label="پیشرفت در این محدوده"
                 >
-                  <Icon name="i-bookmark" size={16} />
-                  <span style={{ fontSize: 12 }}>{flaggedIds.has(q.id) ? 'نشان‌شده' : 'نشان‌کردن سوال'}</span>
-                </button>
-                {answered > 0 && <span className="tiny">این نشست: {fa(answered)} پاسخ</span>}
+                  <svg className="exam-progress__svg" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+                    <rect className="exam-progress__fill" x={100 - pct} y={0} width={pct} height={8} rx={4} />
+                  </svg>
+                </div>
+              );
+            })()}
+
+            <article className="exam-q-card">
+              <div className="exam-q-header">
+                <span className="exam-q-meta">{metaParts.join(' · ')}</span>
+                <div className="exam-run-meta">
+                  {answered > 0 && (
+                    <span className="exam-q-meta">این نشست: {faNum(answered)} پاسخ</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void toggleFlag()}
+                    disabled={flagging}
+                    className={`exam-flag-btn${isFlagged ? ' is-flagged' : ''}`}
+                    title={isFlagged ? 'حذف از نشان‌شده‌ها' : 'نشان‌کردن سؤال'}
+                    aria-label={isFlagged ? 'حذف از نشان‌شده‌ها' : 'نشان‌کردن سؤال'}
+                    aria-pressed={isFlagged}
+                  >
+                    <Icon name="i-bookmark" size={16} />
+                    <span>{isFlagged ? 'نشان‌شده' : 'نشان‌کردن'}</span>
+                  </button>
+                </div>
               </div>
 
               {q.image_url && (
-                <img className="q-img mt-12" src={q.image_url} alt={q.image.alt_text || 'تصویر سؤال'} loading="lazy" />
+                <img
+                  className="exam-q-img"
+                  src={q.image_url}
+                  alt={q.image.alt_text || 'تصویر سؤال'}
+                  loading="lazy"
+                />
               )}
 
-              <p className="q-stem mt-12">{q.question}</p>
+              <p className="exam-q-stem">{q.question}</p>
 
-              <ul className="q-options" role="radiogroup" aria-label="گزینه‌ها">
+              <ul className="exam-options" role="radiogroup" aria-label="گزینه‌ها">
                 {q.options.map((opt, i) => {
                   const isPicked = selected === i;
                   const isRight = result && result.correct_answer === i;
@@ -225,17 +228,19 @@ export function PracticeScreen() {
                         type="button"
                         role="radio"
                         aria-checked={isPicked}
-                        className={`q-opt${isPicked ? ' is-picked' : ''}${isRight ? ' is-right' : ''}${
-                          isWrongPick ? ' is-wrong' : ''
-                        }`}
+                        className={`exam-opt${isPicked ? ' is-picked' : ''}${
+                          isRight ? ' is-right' : ''
+                        }${isWrongPick ? ' is-wrong' : ''}`}
                         onClick={() => !result && setSelected(i)}
                         disabled={!!result}
                       >
-                        <span className="q-opt__l" aria-hidden="true">
-                          {OPTION_LETTERS[i] ?? i + 1}
+                        <span className="exam-opt__letter" aria-hidden="true">
+                          {OPTION_LETTERS[i] ?? faNum(i + 1)}
                         </span>
-                        <span className="q-opt__t">{opt}</span>
-                        {isRight && <Icon name="i-check" size={16} />}
+                        <span className="exam-opt__text">{opt}</span>
+                        {isRight && (
+                          <Icon name="i-check" size={18} className="exam-opt__status" />
+                        )}
                       </button>
                     </li>
                   );
@@ -243,21 +248,29 @@ export function PracticeScreen() {
               </ul>
 
               {result && (
-                <div className={`q-feedback ${result.is_correct ? 'is-ok' : 'is-no'}`} role="status">
-                  <p className="h3">
-                    {result.is_correct ? 'درست بود' : `پاسخ درست: ${OPTION_LETTERS[result.correct_answer] ?? ''}`}
+                <div
+                  className={`exam-feedback ${result.is_correct ? 'is-ok' : 'is-no'}`}
+                  role="status"
+                >
+                  <p className="exam-feedback__title">
+                    {result.is_correct
+                      ? 'پاسخ درست بود'
+                      : `پاسخ درست: گزینهٔ ${OPTION_LETTERS[result.correct_answer] ?? ''}`}
                   </p>
-                  {result.explanation ? (
-                    <p className="small mt-8">{result.explanation}</p>
-                  ) : (
-                    <p className="small mt-8">برای این سؤال توضیحی ثبت نشده است.</p>
-                  )}
+                  <p className="exam-feedback__body">
+                    {result.explanation || 'برای این سؤال توضیحی ثبت نشده است.'}
+                  </p>
                 </div>
               )}
 
               <div className="exam-actions">
                 {!result ? (
-                  <DsButton size="lg" onClick={() => void submit()} disabled={selected === null} loading={busy}>
+                  <DsButton
+                    size="lg"
+                    onClick={() => void submit()}
+                    disabled={selected === null}
+                    loading={busy}
+                  >
                     {busy ? 'در حال ثبت…' : 'ثبت پاسخ'}
                   </DsButton>
                 ) : (
@@ -265,11 +278,15 @@ export function PracticeScreen() {
                     سؤال بعدی
                   </DsButton>
                 )}
-                {!result && selected === null && !busy && <span className="exam-actions__hint">یک گزینه را انتخاب کن</span>}
-                <span className="exam-actions__hint kbd-hint">با کلیدهای ۱ تا ۴ انتخاب، Enter ثبت</span>
+                {!result && selected === null && !busy && (
+                  <span className="exam-actions__hint">یک گزینه را انتخاب کنید</span>
+                )}
+                <span className="exam-actions__hint kbd-hint">
+                  با کلیدهای ۱ تا ۴ انتخاب، Enter ثبت
+                </span>
               </div>
             </article>
-          </>
+          </div>
         )}
       </div>
     </>

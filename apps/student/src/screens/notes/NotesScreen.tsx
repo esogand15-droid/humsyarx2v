@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
-import { AppBar, Card, EmptyState, ListRow, Pagination } from '../../components';
-import type { IconName } from '../../icons';
+import '../account.css';
+import { AppBar, Pagination } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
-import { fa } from '../../lib/library';
+import { DsBadge, DsButton, DsCard, DsEmpty } from '../../design/components';
+import { Icon } from '../../icons';
+import type { IconName } from '../../icons';
+import { faNum } from '../../lib/fa';
 import { ink, type NoteItem } from '../../lib/ink';
 import { readerPath } from '../../lib/reader';
 
@@ -15,18 +18,17 @@ const ICON: Record<string, IconName> = {
   image: 'i-doc',
 };
 
-/** دفتر من — فایل‌هایی که روی آن‌ها نوشته‌ام (`/me/notes`، SC-061).
+const PAGE_SIZE = 10;
+
+/** دفتر من — فایل‌هایی که روی آن‌ها یادداشت نوشته‌اید (`/me/notes`).
  *
- *  عددها از خودِ استروک‌ها می‌آید (تعداد صفحه و خط)، نه تخمین درصد.
- *  اگر فایلی از دسترس خارج شده باشد، ردیف با برچسب «در دسترس نیست»
- *  می‌ماند تا یادداشت‌ها به‌کلی ناپدید نشوند.
+ *  Audit N1: حالت خالی با دکمهٔ اقدام اصلی «رفتن به کتابخانه».
  */
 export function NotesScreen() {
   const navigate = useNavigate();
   const [items, setItems] = useState<NoteItem[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
 
   const load = useCallback(async () => {
     setState('loading');
@@ -43,6 +45,14 @@ export function NotesScreen() {
     void load();
   }, [load]);
 
+  const totalAnnotatedPages = useMemo(
+    () => items.reduce((acc, item) => acc + (item.pages || 0), 0),
+    [items],
+  );
+  const totalStrokes = useMemo(
+    () => items.reduce((acc, item) => acc + (item.strokes || 0), 0),
+    [items],
+  );
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const displayedItems = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
@@ -52,37 +62,84 @@ export function NotesScreen() {
   return (
     <>
       <AppBar title="دفتر من" sub="هر چیزی که روی آن نوشته‌ای" back onBack={() => navigate(-1)} />
-      <div className="page page-enter">
+      <div className="page page-enter acct-page">
         {state === 'loading' && <LoadingBlock rows={3} />}
-
         {state === 'error' && <ErrorBlock error={null} onRetry={() => void load()} />}
 
         {state === 'ready' && items.length === 0 && (
-          <EmptyState
-            icon="i-doc"
-            title="هنوز یادداشتی نداری"
-            text="داخل یک جزوه، قلم را از نوار پایین انتخاب کن؛ هر خطی که بکشی همین‌جا فهرست می‌شود و روی هر دستگاهی دوباره دیده می‌شود."
-          />
+          <DsCard>
+            <DsEmpty
+              icon={<Icon name="i-pen" size={28} />}
+              title="هنوز یادداشتی ندارید"
+              body="داخل هر جزوه، قلم را از نوار ابزار انتخاب کنید؛ هر خط و علامتی که بکشید اینجا فهرست می‌شود و روی همهٔ دستگاه‌ها همگام می‌ماند."
+              action={
+                <DsButton variant="primary" size="lg" onClick={() => navigate('/library')}>
+                  رفتن به کتابخانه
+                </DsButton>
+              }
+            />
+          </DsCard>
         )}
 
         {state === 'ready' && items.length > 0 && (
-          <>
-            <Card variant="flush" className="mt-16">
-              {displayedItems.map((n) => (
-                <ListRow
-                  key={`${n.scope}:${n.id}`}
-                  icon={ICON[n.kind] ?? 'i-doc'}
-                  title={n.name}
-                  sub={
-                    n.available
-                      ? `${fa(n.pages)} صفحه · ${fa(n.strokes)} خط · آخرین صفحه ${fa(n.last_page)}`
-                      : 'این فایل دیگر در دسترس نیست — یادداشت‌ها محفوظ‌اند'
-                  }
-                  to={n.available ? `${readerPath(n.scope, n.id)}?p=${n.last_page}` : undefined}
-                  chevron={n.available}
-                />
-              ))}
-            </Card>
+          <div className="acct-stack">
+            <div className="acct-kpi-strip" aria-label="خلاصهٔ یادداشت‌ها">
+              <div className="acct-kpi-tile">
+                <span className="acct-kpi-tile__val">{faNum(items.length)}</span>
+                <span className="acct-kpi-tile__lbl">جزوه و فایل</span>
+              </div>
+              <div className="acct-kpi-tile">
+                <span className="acct-kpi-tile__val">{faNum(totalAnnotatedPages)}</span>
+                <span className="acct-kpi-tile__lbl">صفحهٔ یادداشت‌دار</span>
+              </div>
+              <div className="acct-kpi-tile">
+                <span className="acct-kpi-tile__val">{faNum(totalStrokes)}</span>
+                <span className="acct-kpi-tile__lbl">کل خطوط</span>
+              </div>
+            </div>
+
+            <div className="acct-notes-grid">
+              {displayedItems.map((n) => {
+                const iconName = ICON[n.kind] ?? 'i-doc';
+                const inner = (
+                  <>
+                    <span className="ds-row__icon" aria-hidden="true">
+                      <Icon name={iconName} size={20} />
+                    </span>
+                    <span className="ds-row__body">
+                      <span className="ds-row__title">
+                        <bdi dir="auto">{n.name}</bdi>
+                      </span>
+                      <span className="ds-row__sub">
+                        {n.available
+                          ? `${faNum(n.pages)} صفحه · ${faNum(n.strokes)} خط · آخرین صفحه ${faNum(n.last_page)}`
+                          : 'این فایل دیگر در دسترس نیست — یادداشت‌ها محفوظ‌اند'}
+                      </span>
+                    </span>
+                    {n.available ? (
+                      <Icon name="i-chevron-r" size={18} className="ds-row__chev" />
+                    ) : (
+                      <DsBadge tone="warning">آرشیو</DsBadge>
+                    )}
+                  </>
+                );
+
+                return (
+                  <DsCard key={`${n.scope}:${n.id}`} flush className="acct-note-card">
+                    {n.available ? (
+                      <Link
+                        className="ds-row acct-note-row"
+                        to={`${readerPath(n.scope, n.id)}?p=${n.last_page}`}
+                      >
+                        {inner}
+                      </Link>
+                    ) : (
+                      <div className="ds-row acct-note-row">{inner}</div>
+                    )}
+                  </DsCard>
+                );
+              })}
+            </div>
 
             {totalPages > 1 && (
               <Pagination
@@ -94,10 +151,9 @@ export function NotesScreen() {
                   setCurrentPage(p);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="mt-16"
               />
             )}
-          </>
+          </div>
         )}
       </div>
     </>

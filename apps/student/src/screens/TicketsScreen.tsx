@@ -1,28 +1,31 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+
+import './account.css';
 import { AppBar } from '../components/AppBar';
 import { ErrorBlock, LoadingBlock } from '../components/AccessStates';
-import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { Chip } from '../components/Chip';
-import { EmptyState } from '../components/EmptyState';
-import { Input } from '../components/Input';
+import { DsBadge, DsButton, DsCard, DsEmpty, DsInput } from '../design/components';
+import { Icon } from '../icons';
 import { errorText } from '../lib/api';
-import { fa } from '../lib/library';
+import { faNum } from '../lib/fa';
 import {
   STATUS_LABEL,
   TICKET_MIN_MESSAGE,
-  statusTone,
   ticketTime,
   tickets as ticketsApi,
   type TicketDetail,
   type TicketMessage,
+  type TicketStatus,
   type TicketSummary,
 } from '../lib/tickets';
 
-/** Support tickets: real data from /api/web/tickets (the same tickets the bot and admin panel see).
-    It used to ship a hardcoded fake conversation and kept new tickets only in
-    component state; they never reached support. */
+function ticketBadgeTone(status: TicketStatus): 'accent' | 'success' | 'neutral' {
+  if (status === 'waiting_user') return 'success';
+  if (status === 'resolved' || status === 'closed') return 'neutral';
+  return 'accent';
+}
+
+/** پشتیبانی و تیکت‌ها — مسیر عمیق `/tickets/:id` + اینباکس دوتایی در دسکتاپ (TK1, TK2, D1). */
 export function TicketsScreen() {
   const [list, setList] = useState<TicketSummary[] | null>(null);
   const [subjects, setSubjects] = useState<string[]>([]);
@@ -35,7 +38,6 @@ export function TicketsScreen() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
-  // TK2: the open ticket lives in the URL (/tickets/:id), so refresh, back and deep links work.
   const { id: idParam } = useParams();
   const navigate = useNavigate();
   const parsedId = idParam != null && /^\d+$/.test(idParam) ? Number(idParam) : null;
@@ -45,6 +47,7 @@ export function TicketsScreen() {
     (id: number | null) => navigate(id == null ? '/tickets' : `/tickets/${id}`),
     [navigate],
   );
+
   const [detail, setDetail] = useState<TicketDetail | null>(null);
   const [detailError, setDetailError] = useState<unknown>(null);
   const [replyText, setReplyText] = useState('');
@@ -77,7 +80,6 @@ export function TicketsScreen() {
     void loadList();
   }, [loadList]);
 
-  // Old in-app links (/tickets?t=123) land on the detail route.
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get('t');
     if (idParam == null && t && /^\d+$/.test(t)) navigate(`/tickets/${t}`, { replace: true });
@@ -94,13 +96,18 @@ export function TicketsScreen() {
     void loadDetail(selectedId);
   }, [selectedId, loadDetail]);
 
+  const openNewTicketForm = () => {
+    setShowNewTicket(true);
+    if (selectedId != null) setSelectedId(null);
+  };
+
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     const s = subject.trim();
     const m = message.trim();
     if (!s || !m || creating) return;
     if (m.length < TICKET_MIN_MESSAGE) {
-      setCreateError(`متن پیام باید دست‌کم ${fa(TICKET_MIN_MESSAGE)} حرف باشد.`);
+      setCreateError(`متن پیام باید دست‌کم ${faNum(TICKET_MIN_MESSAGE)} حرف باشد.`);
       return;
     }
     setCreating(true);
@@ -141,129 +148,135 @@ export function TicketsScreen() {
     ? [{ text: detail.message, sender: 'user', at: detail.created_at }, ...(detail.replies || [])]
     : [];
   const closed = detail?.status === 'closed';
+  const mobileDetailActive = showNewTicket || selectedId != null || badParam;
 
   return (
     <>
       <AppBar
-        title={selectedId != null ? `تیکت ${fa(selectedId)}` : 'پشتیبانی و تیکت‌ها'}
-        sub="پاسخ‌گویی به سؤالات فنی و آموزشی"
-        back={idParam != null}
-        onBack={idParam != null ? () => setSelectedId(null) : undefined}
+        title={selectedId != null ? `تیکت ${faNum(selectedId)}` : 'پشتیبانی و تیکت‌ها'}
+        sub="پشتیبانی فنی و آموزشی"
+        back={idParam != null || showNewTicket}
+        onBack={
+          idParam != null
+            ? () => setSelectedId(null)
+            : showNewTicket
+              ? () => setShowNewTicket(false)
+              : undefined
+        }
         actions={
-          !showNewTicket && idParam == null ? (
-            <Button variant="primary" size="sm" onClick={() => setShowNewTicket(true)}>
+          !showNewTicket ? (
+            <DsButton
+              variant="primary"
+              size="sm"
+              className="acct-btn-tall"
+              onClick={openNewTicketForm}
+            >
               تیکت جدید
-            </Button>
+            </DsButton>
           ) : undefined
         }
       />
 
-      <div className="page">
-        {badParam ? (
-          <EmptyState
-            icon="i-message-circle"
-            title="این تیکت پیدا نشد"
-            text="نشانی تیکت معتبر نیست. از فهرست تیکت‌ها یکی را انتخاب کن."
-            action={
-              <Button variant="primary" size="sm" onClick={() => setSelectedId(null)}>
-                فهرست تیکت‌ها
-              </Button>
-            }
-          />
-        ) : selectedId != null ? (
-          <div>
-            {detail && (
-              <div className="row mb-16">
-                <Chip variant={statusTone(detail.status)}>{STATUS_LABEL[detail.status] ?? detail.status}</Chip>
-              </div>
-            )}
-
-            {detailError != null ? (
-              <ErrorBlock error={detailError} onRetry={() => void loadDetail(selectedId)} />
-            ) : !detail ? (
-              <LoadingBlock rows={3} />
-            ) : (
-              <>
-                <Card className="card--glass mb-16">
-                  <div className="h3">{detail.subject}</div>
-                  <div className="tiny color-muted mt-2">
-                    شناسه: {fa(detail.id)}
-                    {detail.created_at ? ` · ${ticketTime(detail.created_at)}` : ''}
-                  </div>
-                </Card>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-                  {messages.map((m, idx) => {
-                    const isUser = m.sender === 'user';
-                    return (
-                      <div key={idx} style={{ alignSelf: isUser ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
-                        <div
-                          className="card"
-                          style={{
-                            background: isUser ? 'var(--brand-soft)' : 'var(--paper-2)',
-                            border: isUser ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid var(--line)',
-                            borderRadius: isUser ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
-                            padding: '12px 14px',
-                          }}
-                        >
-                          <div className="tiny color-muted mb-4">{isUser ? 'شما' : 'کارشناس پشتیبانی هامزیار'}</div>
-                          <p className="body" style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>
-                            {m.text}
-                          </p>
-                          {m.at && <div className="tiny color-muted mt-4">{ticketTime(m.at, true)}</div>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {closed ? (
-                  <p className="small color-muted" style={{ textAlign: 'center' }}>
-                    این تیکت بسته شده است؛ برای موضوع تازه، تیکت جدید ثبت کنید.
-                  </p>
-                ) : (
-                  <Card className="card--glass">
-                    <div className="row gap-8">
-                      <input
-                        className="input grow"
-                        placeholder="پاسخ خود را بنویسید…"
-                        value={replyText}
-                        disabled={sending}
-                        onChange={(e) => setReplyText(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && void handleSendReply()}
-                      />
-                      <Button variant="primary" size="sm" loading={sending} onClick={() => void handleSendReply()}>
-                        ارسال
-                      </Button>
-                    </div>
-                    {replyError && <p className="tiny mt-8" style={{ color: 'var(--danger, #dc2626)' }}>{replyError}</p>}
-                  </Card>
-                )}
-              </>
-            )}
-          </div>
-        ) : showNewTicket ? (
-          <div>
-            <div className="row row--between mb-16" style={{ alignItems: 'center' }}>
-              <span className="h3">ارسال درخواست جدید</span>
-              <button type="button" className="btn btn--sm btn--ghost" onClick={() => setShowNewTicket(false)}>
-                انصراف
-              </button>
+      <div className="page page-enter acct-page">
+        <div className={`acct-tickets-split${mobileDetailActive ? ' is-detail-open' : ''}`}>
+          {/* ستون فهرست تیکت‌ها */}
+          <aside className="acct-tickets-list-pane" aria-label="فهرست تیکت‌ها">
+            <div className="acct-sec-head">
+              <h2 className="acct-sec-head__title">تیکت‌های شما</h2>
+              {list && <span className="acct-sec-head__sub">{faNum(list.length)} مورد</span>}
             </div>
 
-            <Card className="card--glass">
-              <form onSubmit={(e) => void handleCreateTicket(e)}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {listError != null ? (
+              <ErrorBlock error={listError} onRetry={() => void loadList()} />
+            ) : list == null ? (
+              <LoadingBlock rows={3} />
+            ) : list.length === 0 ? (
+              <DsCard>
+                <DsEmpty
+                  icon={<Icon name="i-message-circle" size={28} />}
+                  title="تیکتی ثبت نشده است"
+                  body="در صورت نیاز به راهنمایی یا گزارش مشکل، تیکت جدید ارسال کنید."
+                  action={
+                    <DsButton variant="primary" size="md" onClick={openNewTicketForm}>
+                      ارسال تیکت جدید
+                    </DsButton>
+                  }
+                />
+              </DsCard>
+            ) : (
+              <div className="acct-ticket-list">
+                {list.map((t) => {
+                  const isActive = selectedId === t.id && !showNewTicket;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`acct-ticket-item${isActive ? ' is-active' : ''}`}
+                      onClick={() => {
+                        setShowNewTicket(false);
+                        setSelectedId(t.id);
+                      }}
+                    >
+                      <div className="acct-ticket-item__top">
+                        <span className="acct-ticket-item__subject">{t.subject}</span>
+                        <DsBadge tone={ticketBadgeTone(t.status)}>
+                          {STATUS_LABEL[t.status] ?? t.status}
+                        </DsBadge>
+                      </div>
+                      <div className="acct-ticket-item__meta">
+                        <span>
+                          تیکت {faNum(t.id)}
+                          {t.reply_count > 0 ? ` · ${faNum(t.reply_count)} پاسخ` : ''}
+                        </span>
+                        <span>{ticketTime(t.created_at)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </aside>
+
+          {/* ستون گفتگو یا فرم تیکت جدید */}
+          <section className="acct-tickets-detail-pane" aria-label="جزئیات تیکت">
+            {badParam ? (
+              <DsCard>
+                <DsEmpty
+                  icon={<Icon name="i-message-circle" size={28} />}
+                  title="این تیکت پیدا نشد"
+                  body="نشانی تیکت معتبر نیست. از فهرست تیکت‌ها یکی را انتخاب کنید."
+                  action={
+                    <DsButton variant="primary" size="md" onClick={() => setSelectedId(null)}>
+                      فهرست تیکت‌ها
+                    </DsButton>
+                  }
+                />
+              </DsCard>
+            ) : showNewTicket ? (
+              <DsCard className="acct-card-stack">
+                <div className="acct-sec-head">
+                  <h2 className="acct-sec-head__title">ارسال درخواست جدید</h2>
+                  <DsButton
+                    variant="ghost"
+                    size="sm"
+                    className="acct-btn-tall"
+                    onClick={() => setShowNewTicket(false)}
+                  >
+                    انصراف
+                  </DsButton>
+                </div>
+
+                <form className="acct-form-stack" onSubmit={(e) => void handleCreateTicket(e)}>
                   {subjects.length > 0 && (
-                    <div>
-                      <label className="tiny color-muted" style={{ display: 'block', marginBottom: 6 }}>
-                        دسته‌بندی:
+                    <div className="ds-field">
+                      <label className="ds-field__label" htmlFor="ticket-category">
+                        دسته‌بندی
                       </label>
                       <select
-                        className="input"
+                        id="ticket-category"
+                        className="ds-input"
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
-                        style={{ width: '100%', height: 42 }}
                       >
                         <option value="">انتخاب کنید (اختیاری)</option>
                         {subjects.map((s) => (
@@ -275,7 +288,8 @@ export function TicketsScreen() {
                     </div>
                   )}
 
-                  <Input
+                  <DsInput
+                    name="ticket-subject"
                     label="موضوع درخواست"
                     placeholder="مثال: مشکل در باز شدن فایل کتابخوان"
                     value={subject}
@@ -283,75 +297,125 @@ export function TicketsScreen() {
                     required
                   />
 
-                  <div>
-                    <label className="tiny color-muted" style={{ display: 'block', marginBottom: 6 }}>
-                      متن پیام:
+                  <div className="ds-field">
+                    <label className="ds-field__label" htmlFor="ticket-message">
+                      متن پیام
                     </label>
                     <textarea
-                      className="input"
+                      id="ticket-message"
+                      className="ds-input acct-textarea"
                       rows={4}
                       placeholder="توضیحات کامل مشکل یا درخواست خود را بنویسید…"
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       required
-                      style={{ width: '100%', resize: 'vertical' }}
                     />
                   </div>
 
-                  {createError && <p className="tiny" style={{ color: 'var(--danger, #dc2626)' }}>{createError}</p>}
+                  {createError && (
+                    <p className="ds-field__error" role="alert">
+                      {createError}
+                    </p>
+                  )}
 
-                  <div className="mt-8">
-                    <Button type="submit" variant="primary" block loading={creating}>
-                      ثبت و ارسال تیکت
-                    </Button>
+                  <DsButton type="submit" variant="primary" size="lg" block loading={creating}>
+                    ثبت و ارسال تیکت
+                  </DsButton>
+                </form>
+              </DsCard>
+            ) : selectedId != null ? (
+              detailError != null ? (
+                <ErrorBlock error={detailError} onRetry={() => void loadDetail(selectedId)} />
+              ) : !detail ? (
+                <LoadingBlock rows={3} />
+              ) : (
+                <div className="acct-stack">
+                  <DsCard className="acct-card-stack">
+                    <div className="acct-sec-head">
+                      <h2 className="acct-sec-head__title">{detail.subject}</h2>
+                      <DsBadge tone={ticketBadgeTone(detail.status)}>
+                        {STATUS_LABEL[detail.status] ?? detail.status}
+                      </DsBadge>
+                    </div>
+                    <span className="acct-sec-head__sub">
+                      تیکت {faNum(detail.id)}
+                      {detail.created_at ? ` · ${ticketTime(detail.created_at)}` : ''}
+                    </span>
+                  </DsCard>
+
+                  <div className="acct-thread">
+                    {messages.map((m, idx) => {
+                      const isUser = m.sender === 'user';
+                      return (
+                        <div
+                          key={idx}
+                          className={`acct-msg ${isUser ? 'acct-msg--user' : 'acct-msg--support'}`}
+                        >
+                          <span className="acct-msg__sender">
+                            {isUser ? 'شما' : 'کارشناس پشتیبانی هامزیار'}
+                          </span>
+                          <p className="acct-msg__text">{m.text}</p>
+                          {m.at && <span className="acct-msg__time">{ticketTime(m.at, true)}</span>}
+                        </div>
+                      );
+                    })}
                   </div>
+
+                  {closed ? (
+                    <DsCard level="sunken">
+                      <p className="acct-closed-note">
+                        این تیکت بسته شده است؛ برای موضوع تازه، تیکت جدید ثبت کنید.
+                      </p>
+                    </DsCard>
+                  ) : (
+                    <DsCard className="acct-card-stack">
+                      <div className="acct-reply-bar">
+                        <input
+                          type="text"
+                          className="ds-input acct-reply-bar__input"
+                          placeholder="پاسخ خود را بنویسید…"
+                          aria-label="پاسخ به تیکت"
+                          value={replyText}
+                          disabled={sending}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && void handleSendReply()}
+                        />
+                        <DsButton
+                          variant="primary"
+                          size="md"
+                          className="acct-btn-tall"
+                          loading={sending}
+                          onClick={() => void handleSendReply()}
+                        >
+                          <Icon name="i-send" size={16} />
+                          <span>ارسال</span>
+                        </DsButton>
+                      </div>
+                      {replyError && (
+                        <p className="ds-field__error" role="alert">
+                          {replyError}
+                        </p>
+                      )}
+                    </DsCard>
+                  )}
                 </div>
-              </form>
-            </Card>
-          </div>
-        ) : listError != null ? (
-          <ErrorBlock error={listError} onRetry={() => void loadList()} />
-        ) : list == null ? (
-          <LoadingBlock rows={3} />
-        ) : list.length === 0 ? (
-          <div className="mt-20">
-            <EmptyState
-              icon="i-message-circle"
-              title="تیکتی ثبت نشده است"
-              text="در صورت نیاز به راهنمایی یا گزارش مشکل، تیکت جدید ارسال کنید."
-              action={
-                <Button variant="primary" size="sm" onClick={() => setShowNewTicket(true)}>
-                  ارسال تیکت جدید
-                </Button>
-              }
-            />
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-            {list.map((t) => (
-              <Card
-                key={t.id}
-                onClick={() => setSelectedId(t.id)}
-                className="card--glass"
-                style={{ cursor: 'pointer', padding: '14px 16px' }}
-              >
-                <div className="row row--between" style={{ alignItems: 'center' }}>
-                  <span className="h3" style={{ fontSize: 14.5 }}>
-                    {t.subject}
-                  </span>
-                  <Chip variant={statusTone(t.status)}>{STATUS_LABEL[t.status] ?? t.status}</Chip>
-                </div>
-                <div className="row row--between mt-8">
-                  <span className="tiny color-muted">
-                    #{fa(t.id)}
-                    {t.reply_count > 0 ? ` · ${fa(t.reply_count)} پاسخ` : ''}
-                  </span>
-                  <span className="tiny color-muted">{ticketTime(t.created_at)}</span>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
+              )
+            ) : (
+              <DsCard>
+                <DsEmpty
+                  icon={<Icon name="i-message-circle" size={28} />}
+                  title="یک تیکت را انتخاب کنید"
+                  body="برای مشاهدهٔ گفتگو از فهرست سمت راست یک تیکت را انتخاب کنید یا درخواست جدید بفرستید."
+                  action={
+                    <DsButton variant="primary" size="md" onClick={openNewTicketForm}>
+                      تیکت جدید
+                    </DsButton>
+                  }
+                />
+              </DsCard>
+            )}
+          </section>
+        </div>
       </div>
     </>
   );
