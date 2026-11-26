@@ -47,7 +47,9 @@ interface Props {
 const SAVE_DELAY = 900;
 const MAX_HISTORY = 50;
 const STYLUS_DECAY_MS = 750;
-const PALM_TOUCH_BOUND_PX = 25;
+// Fingertip contact on iPad/Android is commonly 30-50px, so the old 25px bound rejected
+// every finger stroke ("can't write with my finger"). A resting palm reports well above 70.
+const PALM_TOUCH_BOUND_PX = 70;
 
 function isPointInPolygon(point: { x: number; y: number }, polygon: Array<{ x: number; y: number }>): boolean {
   let inside = false;

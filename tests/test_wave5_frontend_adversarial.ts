@@ -67,7 +67,7 @@ function hitStroke(
 }
 
 // ── 3. Palm Rejection Simulator ─────────────────────────────
-const PALM_TOUCH_BOUND_PX = 25;
+const PALM_TOUCH_BOUND_PX = 70;
 const STYLUS_DECAY_MS = 750;
 
 class PalmRejectionHarness {

@@ -919,8 +919,10 @@ class TestCanvasPalmRejectionAndEraserGeometry(unittest.TestCase):
         self.assertLess(dist_crossing, 0.015)
 
     def test_palm_rejection_logic_oracle(self):
-        """Oracle testing palm rejection dimensions (> 25px) and stylus decay window (750ms)."""
-        PALM_TOUCH_BOUND_PX = 25
+        """Oracle for palm rejection (> 70px contact) and the stylus decay window (750ms).
+        2026-11-27: the bound was 25px, which rejected ordinary fingertips (30-50px on iPad/Android),
+        so finger writing drew nothing. A resting palm reports well above 70px."""
+        PALM_TOUCH_BOUND_PX = 70
         STYLUS_DECAY_MS = 750
 
         def is_palm_rejected(
@@ -948,16 +950,17 @@ class TestCanvasPalmRejectionAndEraserGeometry(unittest.TestCase):
         # 2. Touch within 750ms stylus window: rejected as palm
         self.assertTrue(is_palm_rejected("touch", 15, 15, 1, 300, True))
 
-        # 3. Touch after 750ms stylus window with normal fingertip: accepted
+        # 3. Ordinary fingertips (incl. the 30-50px iPad/Android report) draw
         self.assertFalse(is_palm_rejected("touch", 15, 15, 1, 800, False))
+        self.assertFalse(is_palm_rejected("touch", 32, 32, 1, 1000, False))
+        self.assertFalse(is_palm_rejected("touch", 45, 48, 1, 1000, False))
 
-        # 4. Large palm contact (> 25px) even after decay: rejected
-        self.assertTrue(is_palm_rejected("touch", 26, 20, 1, 1000, False))
-        self.assertTrue(is_palm_rejected("touch", 20, 25.1, 1, 1000, False))
-        self.assertTrue(is_palm_rejected("touch", 45, 45, 1, 1000, False))
+        # 4. Large palm contact (> 70px) even after decay: rejected
+        self.assertTrue(is_palm_rejected("touch", 71, 40, 1, 1000, False))
+        self.assertTrue(is_palm_rejected("touch", 110, 110, 1, 1000, False))
 
-        # 5. Exact boundary (25.0px): accepted
-        self.assertFalse(is_palm_rejected("touch", 25.0, 25.0, 1, 1000, False))
+        # 5. Exact boundary (70.0px): accepted
+        self.assertFalse(is_palm_rejected("touch", 70.0, 70.0, 1, 1000, False))
 
         # 6. Multi-touch gesture (>= 2 touches): rejected for drawing, passed to viewport
         self.assertTrue(is_palm_rejected("touch", 15, 15, 2, 1000, False))
@@ -973,7 +976,7 @@ class TestCanvasPalmRejectionAndEraserGeometry(unittest.TestCase):
 
         # Palm rejection constants
         self.assertIn("STYLUS_DECAY_MS = 750", code)
-        self.assertIn("PALM_TOUCH_BOUND_PX = 25", code)
+        self.assertIn("PALM_TOUCH_BOUND_PX = 70", code)
         self.assertIn("touchPointers.current.size >= 2", code)
 
         # Vector line segment projection
