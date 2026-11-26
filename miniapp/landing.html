@@ -1,15 +1,16 @@
 <!doctype html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="dark light" />
-    <meta name="theme-color" content="#060B16" />
+    <meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#090D16" media="(prefers-color-scheme: dark)" />
 
     <title>هامزیار — دستیار دانشجوی پزشکی</title>
     <meta
       name="description"
-      content="هامزیار: برنامهٔ هفتگی، بانک سؤال و آزمون، جزوه و منابع، دستیار هوشمند و پشتیبانی — برای دانشجویان پزشکی. با همان حساب تلگرام وارد شوید؛ نه رمز لازم است نه نصب از استور."
+      content="هامزیار: برنامهٔ هفتگی، بانک سؤال و آزمون، جزوه و منابع، دستیار هوشمند و پشتیبانی — برای دانشجویان پزشکی. با حساب تلگرام وارد شوید؛ نه رمز ثابت لازم است و نه اپ‌استور."
     />
 
     <!-- کارت اشتراک‌گذاری (og) — بدون اسکریپت سوم‌شخص -->
@@ -17,7 +18,7 @@
     <meta property="og:title" content="هامزیار — دستیار دانشجوی پزشکی" />
     <meta
       property="og:description"
-      content="برنامهٔ هفتگی، بانک سؤال، جزوه و منابع، دستیار هوشمند. ورود با کد تلگرام، روی هر دستگاهی."
+      content="برنامهٔ هفتگی، بانک سؤال، جزوه و منابع، دستیار هوشمند. ورود سریع با تلگرام، روی هر دستگاهی."
     />
     <meta property="og:locale" content="fa_IR" />
     <meta property="og:image" content="/icons/icon-512.png" />
@@ -28,11 +29,24 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
 
     <!--
-      ⚠️ عمداً no manifest و no service worker در این صفحه:
-      لندینگ «اپ» نیست؛ اگر manifest مینی‌اپ/پوستهٔ PWA را اینجا لود کنیم،
-      مرورگر برای همین صفحهٔ معرفی هم «نصب» پیشنهاد می‌دهد.
-      نصب‌پذیری فقط روی /pwa/ است.
+      عمداً manifest و service worker روی لندینگ لود نمی‌شود تا
+      نصب‌پذیری فقط روی نسخهٔ وب دانشجویی (/student/) فعال باشد.
     -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('humsyar.theme');
+          var sysLight =
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          var theme =
+            saved === 'light' || saved === 'dark' ? saved : sysLight ? 'light' : 'dark';
+          document.documentElement.dataset.theme = theme;
+          var metas = document.querySelectorAll('meta[name="theme-color"]');
+          var bg = theme === 'light' ? '#F8FAFC' : '#090D16';
+          for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', bg);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="landing-root"></div>
@@ -41,9 +55,9 @@
         <h1>هامزیار — دستیار دانشجوی پزشکی</h1>
         <p>
           برنامهٔ هفتگی، بانک سؤال و آزمون، جزوه و منابع، دستیار هوشمند و پشتیبانی.
-          برای استفاده از اپلیکیشن، جاوااسکریپت را فعال کنید یا از نسخهٔ تلگرام استفاده کنید.
+          برای استفاده از نسخهٔ وب، جاوااسکریپت را فعال کنید.
         </p>
-        <p><a href="https://t.me/">باز کردن در تلگرام</a></p>
+        <p><a href="/student/install">ورود به نسخهٔ وب هامزیار</a></p>
       </div>
     </noscript>
     <script type="module" src="/src/landing/main-landing.jsx"></script>

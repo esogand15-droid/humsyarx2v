@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 /* ─────────────────────────────────────────────────────────────
-   🏥 لندینگ اختصاصی پلتفرم هوشمند هامزیار — دستیار پزشک آینده
-   طراحی پیشرفته و رفرنس‌محور منطبق بر استانداردهای UI/UX و آموزش علوم پزشکی
-   • تم: Midnight Deep Navy + Clinical Glow Cyan & Emerald
-   • اکوسیستم ۴ گانه: ربات هوشمند تلگرام، شبیه‌ساز کشوری، هوش مصنوعی رفرنس‌محور، جوهر دیجیتال
+   لندینگ اختصاصی پلتفرم هوشمند هامزیار — دستیار دانشجوی پزشکی
+   • پشتیبانی کامل از تم روشن و تاریک هماهنگ با humsyar.theme
    • پایش زنده سلامت زیرساخت با پینگ مستقیم به /api/health
-   • هدایت صریح تمام نقاط ورود به نسخه وب اختصاصی (/pwa/)
+   • هدایت صریح ورود و نصب به /student/install
    ───────────────────────────────────────────────────────────── */
 
 const ICONS = {
@@ -15,9 +13,7 @@ const ICONS = {
   spark: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18',
   book: 'M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2V5ZM20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2V5Z',
   chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
-  support: 'M12 3a9 9 0 0 0-9 9v5a2 2 0 0 0 2 2h2v-7H5a7 7 0 0 1 14 0h-2v7h2a2 2 0 0 0 2-2v-5a9 9 0 0 0-9-9Z',
   shield: 'M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z',
-  key: 'M15 8a4 4 0 1 1-3.5 5.9L5 20.5H3v-3l6.6-6.6A4 4 0 0 1 15 8Z',
   phone: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm4 16h2',
   monitor: 'M3 5h18v11H3zM9 20h6M12 16v4',
   tablet: 'M5 3h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm6 15h2',
@@ -30,14 +26,13 @@ const ICONS = {
   refresh: 'M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2',
   stethoscope: 'M4.5 3v5a4.5 4.5 0 0 0 9 0V3M9 12.5v4a4.5 4.5 0 0 0 9 0v-2.5M18 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
   pencil: 'M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z',
-  bot: 'M12 2a2 2 0 0 1 2 2v2h4a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4V4a2 2 0 0 1 2-2zm-3 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-5 6h4a1 1 0 0 1 0 2h-4a1 1 0 0 1 0-2z',
   layers: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
-  activity: 'M22 12h-4l-3 9L9 3l-3 9H2',
-  cloud: 'M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z',
   clock: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 10.5V7a1 1 0 0 0-2 0v6a1 1 0 0 0 .5.86l4 2.5a1 1 0 1 0 1-1.72z',
   award: 'M12 15l-4 6 1.5-7.5L4 9h7L12 2l1 7h7l-5.5 4.5L16 21z',
   zap: 'M13 2L3 14h9l-1 8 10-12h-9l1-8z',
-  brain: 'M9.5 2A4.5 4.5 0 0 0 5 6.5c0 .77.2 1.5.55 2.14A4.5 4.5 0 0 0 3 12.5C3 15 5 17 7.5 17h.5v2.5a2.5 2.5 0 0 0 5 0V17h.5A4.5 4.5 0 0 0 18 12.5a4.5 4.5 0 0 0-2.55-3.86c.35-.64.55-1.37.55-2.14A4.5 4.5 0 0 0 11.5 2h-2z',
+  sun: 'M12 3v2M12 19v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M3 12h2M19 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z',
+  moon: 'M20 14.4A8 8 0 0 1 9.6 4 8.2 8.2 0 1 0 20 14.4z',
+  download: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
 };
 
 function Icon({ name, size = 20, className = '', strokeWidth = 1.8 }) {
@@ -60,34 +55,65 @@ function Icon({ name, size = 20, className = '', strokeWidth = 1.8 }) {
   );
 }
 
+const FA_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+function toFaDigits(value) {
+  return String(value).replace(/\d/g, (d) => FA_DIGITS[Number(d)]);
+}
+
+function detectPlatform() {
+  if (typeof window === 'undefined') return 'desktop';
+  const ua = navigator.userAgent || '';
+  const platform =
+    (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+  if (/iPad|iPhone|iPod/.test(ua) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+    return 'ios';
+  }
+  if (/Android/i.test(ua)) {
+    return 'android';
+  }
+  return 'desktop';
+}
+
+function getInitialTheme() {
+  if (typeof window === 'undefined') return 'dark';
+  try {
+    const saved = localStorage.getItem('humsyar.theme');
+    if (saved === 'light' || saved === 'dark') return saved;
+  } catch {
+    // ignore storage failures
+  }
+  const sysLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+  return sysLight ? 'light' : 'dark';
+}
+
 const STAT_METRICS = [
-  { value: '+۵۰,۰۰۰', label: 'تست طبقه‌بندی‌شده علوم پایه و پره‌انترنی', icon: 'exam' },
-  { value: '۱۰۰٪', label: 'پوشش سرفصل‌های مصوب وزارت بهداشت', icon: 'award' },
-  { value: '۳', label: 'بستر یکپارچه (ربات، مینی‌اپ، وب مستقل)', icon: 'layers' },
-  { value: '۲۴/۷', label: 'دسترسی برخط با احراز هویت فوری تلگرام', icon: 'zap' },
+  { value: '+۵۰,۰۰۰', label: 'تست طبقه‌بندی‌شده علوم پایه و پره‌انترنی', icon: 'exam', tone: 'violet' },
+  { value: '۱۰۰٪', label: 'پوشش سرفصل‌های مصوب وزارت بهداشت', icon: 'award', tone: 'emerald' },
+  { value: '۳', label: 'بستر یکپارچه (ربات، مینی‌اپ، نسخهٔ وب)', icon: 'layers', tone: 'indigo' },
+  { value: '۲۴/۷', label: 'دسترسی برخط با ورود امن و بدون رمز تلگرام', icon: 'zap', tone: 'sky' },
 ];
 
 const PILLARS = [
   {
     id: 'bot',
     title: 'ربات تعاملی تلگرام',
-    badge: 'Bot API 7.0+',
+    badge: 'دسترسی مستقیم در تلگرام',
     icon: 'telegram',
-    lead: 'دسترسی بدون وقفه به خدمات آموزشی بدون نیاز به نصب نرم‌افزار اضافی، در قلب پیام‌رسان محبوب شما.',
+    tone: 'sky',
+    lead: 'دسترسی سریع به خدمات آموزشی بدون نیاز به نصب نرم‌افزار اضافی، در کنار نسخهٔ کامل وب.',
     bullets: [
-      'منوهای غنی شیشه‌ای، دکمه‌های دو و سه‌ستونه و بازخورد صوتی',
-      'کوئیزهای خودکار روزانه با نمره‌دهی و بررسی کارنامه آنی',
-      'اتاق‌های گفتگوی صوتی گروهی برای مباحثه کیس‌ها و حل تست‌های جمعی',
-      'یادآوری‌های زمان‌بندی‌شده مرور فاصله‌دار و اعلام کشیک‌های بیمارستانی',
+      'منوهای سریع، دکمه‌های چندستونه و فایل‌های آموزشی در لحظه',
+      'کوئیزهای خودکار روزانه با نمره‌دهی و بررسی کارنامهٔ آنی',
+      'اتاق‌های گفتگوی صوتی گروهی برای مباحثه کیس‌ها و حل تست جمعی',
+      'یادآوری‌های زمان‌بندی‌شده مرور فاصله‌دار و کشیک‌های بیمارستانی',
     ],
     preview: {
-      type: 'telegram',
       title: 'مرکز آزمون روزانه ربات تلگرام',
-      badge: 'نسخه ۲.۴ فعال',
+      badge: 'نسخهٔ ۲.۴ فعال',
       meta: 'تست کیس بالینی روز · پره‌انترنی شهریور ۱۴۰۳',
       detailTitle: 'سناریوی شوک هایپوولمیک و مایع‌درمانی اولیه',
       detailSub: 'ارجاع به بخش اورژانس و اصول طب داخلی هاریسون',
-      actionLabel: 'مشاهده تحلیل تشریحی با نقل‌قول بازشونده',
+      actionLabel: 'مشاهده تحلیل تشریحی با استناد رفرنس',
     },
   },
   {
@@ -95,18 +121,18 @@ const PILLARS = [
     title: 'شبیه‌ساز آزمون‌های کشوری',
     badge: 'علوم پایه، پره‌انترنی، دستیاری',
     icon: 'exam',
-    lead: 'شبیه‌سازی شرایط واقعی آزمون با احتساب دقیق نمره منفی، کارنامه تحلیلی و رادار تفکیکی سیستم‌های بدن.',
+    tone: 'violet',
+    lead: 'شبیه‌سازی شرایط واقعی آزمون با احتساب دقیق نمره منفی، کارنامه تحلیلی و رادار سیستم‌های بدن.',
     bullets: [
-      'بانک سوالات جامع قطب‌های ده گانه کشوری و آزمون‌های جامع کشوری ادواری',
-      'محاسبه دقیق تراز و درصد با لحاظ ۱/۳ نمره منفی مشابه کنکور و آزمون‌های وزارت بهداشت',
-      'امکان علامت‌گذاری سوالات مشکوک، فیلتر تله‌های تستی و یادداشت‌نویسی اختصاصی',
-      'تحلیل کارنامه بر اساس تفکیک ماژول‌ها (قلب، ریه، گوارش، فارماکولوژی، پاتولوژی)',
+      'بانک سؤالات جامع قطب‌های ده‌گانه کشوری و آزمون‌های ادواری',
+      'محاسبه دقیق تراز و درصد با لحاظ یک‌سوم نمره منفی استاندارد',
+      'نشانه‌گذاری سؤالات چالشی، مرور تله‌های تستی و یادداشت شخصی',
+      'تحلیل کارنامه به تفکیک ماژول‌ها (قلب، ریه، گوارش، فارماکولوژی و پاتولوژی)',
     ],
     preview: {
-      type: 'exam',
-      title: 'شبیه‌ساز آزمون پیش‌کارورزی (جامع)',
-      badge: '۲۰۰ سوال زمان‌دار',
-      meta: 'تایمر معکوس استاندارد · ۴ ساعت زمان فعال',
+      title: 'شبیه‌ساز آزمون پیش‌کارورزی جامع',
+      badge: '۲۰۰ سؤال زمان‌دار',
+      meta: 'زمان‌سنج استاندارد · ۴ ساعت مهلت آزمون',
       detailTitle: 'کارنامه آزمون شبیه‌ساز قطب ۱ کشوری',
       detailSub: 'درصد کل: ۷۸.۵٪ · رتبه تخمینی: ۲۴ از ۱,۴۲۰ داوطلب',
       actionLabel: 'ورود به بانک تست و تحلیل مباحث ضعیف',
@@ -115,44 +141,44 @@ const PILLARS = [
   {
     id: 'ai',
     title: 'دستیار بالینی هوش مصنوعی',
-    badge: 'Harrison & Cecil Verified',
+    badge: 'مستند به هاریسون و سسیل',
     icon: 'spark',
-    lead: 'موتور تحلیلگر تشخیصی مجهز به هوش مصنوعی با استناد مستقیم به مراجع معتبر پزشکی جهان.',
+    tone: 'sky',
+    lead: 'موتور تحلیلگر تشخیصی مجهز به هوش مصنوعی با استناد مستقیم به مراجع معتبر پزشکی.',
     bullets: [
-      'پاسخ‌های تحلیلی و مستند به فصول هاریسون، سسیل، اصول جراحی شوارتز و فیزیولوژی گایتون',
-      'تولید بلادرنگ با کنترل‌های استریم و قابلیت توقف فوری پاسخ توسط کاربر',
-      'قالب‌بندی منحصربه‌فرد نقل‌قول‌های بالینی بازشونده (Expandable Blockquotes)',
-      'تبدیل و خلاصه‌سازی فایل‌های صوتی اساتید و اسلایدهای کلاسی به نکات طلایی',
+      'پاسخ‌های تحلیلی مستند به فصول هاریسون، سسیل، جراحی شوارتز و گایتون',
+      'نمایش زنده و مرحله‌به‌مرحلهٔ پاسخ با امکان توقف در هر لحظه',
+      'قالب‌بندی خوانا برای نقل‌قول‌های بالینی، دوز دارویی و تشخیص افتراقی',
+      'خلاصه‌سازی فایل‌های صوتی اساتید و اسلایدهای کلاسی به نکات کلیدی',
     ],
     preview: {
-      type: 'ai',
       title: 'تحلیلگر هوشمند کیس بالینی',
       badge: 'پاسخ زنده مستند',
       meta: 'مبحث تاکی‌آریتمی بطنی و مدیریت دارویی خط اول',
-      detailTitle: '«بر اساس هاریسون ۲۰۲۲ فصل ۲۴۸: استراتژی آمیودارون در برابر لیدوکائین»',
-      detailSub: 'تشخیص‌های افتراقی، دوز دارویی بر اساس GFR و احتیاطات بالینی',
+      detailTitle: '«بر اساس هاریسون ۲۰۲۲ فصل ۲۴۸: استراتژی آمیودارون و لیدوکائین»',
+      detailSub: 'تشخیص‌های افتراقی، دوز دارویی بر اساس عملکرد کلیه و احتیاطات بالینی',
       actionLabel: 'پرسش جدید از دستیار رفرنس‌محور',
     },
   },
   {
     id: 'ink',
     title: 'جوهر دیجیتال و مطالعه جزوه',
-    badge: 'Active Stylus & PDF Engine',
+    badge: 'پشتیبانی از قلم و لمس',
     icon: 'pencil',
-    lead: 'محیط روان یادداشت‌برداری، حاشیه‌نویسی اسلایدها و رفرنس‌ها با قلم نوری و همگام‌سازی ابری.',
+    tone: 'indigo',
+    lead: 'محیط روان یادداشت‌برداری، حاشیه‌نویسی اسلایدها و رفرنس‌ها با همگام‌سازی ابری بین دستگاه‌ها.',
     bullets: [
-      'موتور پیشرفته ترسیم بدون لگ برای تبلت‌ها و قلم‌های نوری (S-Pen، Apple Pencil و قلم‌های ویندوز)',
-      'هایلایت چند رنگه، برچسب‌گذاری ارگان‌ها و الصاق نشانه‌های صوتی به صفحات PDF',
-      'استخراج آنی نکات برجسته‌شده به صورت فلش‌کارت‌های مرور در جعبه لایتنر',
-      'دسترسی ابری دائمی به تمام جزوات حاشیه‌نویسی شده در نسخه وب و موبایل',
+      'ترسیم نرم و بدون تاخیر برای تبلت، قلم نوری و لمس انگشت',
+      'هایلایت چندرنگ، برچسب‌گذاری مباحث و افزودن یادداشت به صفحات جزوه',
+      'تبدیل سریع نکات برجسته به فلش‌کارت مرور در جعبه لایتنر',
+      'دسترسی ابری همیشگی به جزوه‌های حاشیه‌نویسی‌شده در نسخهٔ وب و موبایل',
     ],
     preview: {
-      type: 'ink',
-      title: 'ریدر تخصصی و جزوه‌خوان بالینی',
+      title: 'جزوه‌خوان اختصاصی و جوهر دیجیتال',
       badge: 'سازگار با قلم نوری',
-      meta: 'جزوه پاتولوژی اختصاصی دکتر میرزایی · ۵۸ صفحه با حاشیه‌نویسی',
+      meta: 'جزوه پاتولوژی بالینی · ۵۸ صفحه با حاشیه‌نویسی',
       detailTitle: 'لایه ترسیم برداری: دیاگرام‌های جریان خون کرونری',
-      detailSub: '۱۲ یادداشت دست‌نویس، ۴ نکته طلایی ذخیره شده در سرور ابری',
+      detailSub: '۱۲ یادداشت دست‌نویس و ۴ نکته طلایی ذخیره‌شده در حساب ابری',
       actionLabel: 'باز کردن کتابخانه اختصاصی جزوات',
     },
   },
@@ -161,107 +187,189 @@ const PILLARS = [
 const FEATURES = [
   {
     icon: 'exam',
-    title: 'بانک سوالات طبقه‌بندی‌شده کشوری',
+    tone: 'violet',
+    title: 'بانک سؤالات طبقه‌بندی‌شده کشوری',
     text: 'بیش از ۵۰ هزار تست استاندارد قطب‌های کشوری، ادواری علوم پایه، پره‌انترنی و دستیاری با پاسخ تشریحی جامع.',
     tag: 'بانک آزمون',
   },
   {
     icon: 'clock',
+    tone: 'violet',
     title: 'شبیه‌ساز آزمون‌های استاندارد زمان‌دار',
-    text: 'برگزاری آزمون شبیه‌ساز با محاسبه نمره منفی، کارنامه تحلیلی ارگان‌محور و رتبه‌بندی رقابتی در سطح کشور.',
+    text: 'برگزاری آزمون شبیه‌ساز با محاسبه نمره منفی، کارنامه تحلیلی ارگان‌محور و رتبه‌بندی رقابتی.',
     tag: 'شبیه‌ساز واقعی',
   },
   {
     icon: 'spark',
+    tone: 'sky',
     title: 'دستیار بالینی هوش مصنوعی رفرنس‌محور',
-    text: 'تشریح سناریوهای پیچیده با رفرنس‌دهی مستقیم به کتب مرجع هاریسون، سسیل، شوارتز و گایتون به زبان فارسی.',
-    tag: 'مجهز به AI',
+    text: 'تشریح سناریوهای پیچیده با استناد مستقیم به کتب مرجع هاریسون، سسیل، شوارتز و گایتون به زبان فارسی.',
+    tag: 'دستیار هوشمند',
   },
   {
     icon: 'pencil',
-    title: 'جوهر دیجیتال و ریدر اختصاصی PDF',
-    text: 'حاشیه‌نویسی روان اسلایدها با قلم نوری تبلت، هایلایت لایه‌ای و استخراج خودکار نکات کلیدی بدون افت کیفیت.',
+    tone: 'indigo',
+    title: 'جوهر دیجیتال و ریدر اختصاصی جزوه',
+    text: 'حاشیه‌نویسی روان اسلایدها با قلم نوری یا لمس، هایلایت لایه‌ای و نگهداری همیشگی در حساب شما.',
     tag: 'جوهر دیجیتال',
   },
   {
     icon: 'calendar',
+    tone: 'amber',
     title: 'برنامه‌ریزی روتیشن و تقویم بیمارستانی',
-    text: 'تنظیم کشیک‌ها، شیفت‌های بخش، جلسات ژورنال‌کلاب و فرجه امتحانات در یک نمای متمرکز بدون تداخل.',
-    tag: 'مدیریت بالینی',
+    text: 'تنظیم کشیک‌ها، شیفت‌های بخش، جلسات ژورنال‌کلاب و فرجه امتحانات در یک نمای متمرکز و بدون تداخل.',
+    tag: 'برنامهٔ بالینی',
   },
   {
     icon: 'telegram',
+    tone: 'sky',
     title: 'اتاق‌های مباحثه صوتی تلگرام',
-    text: 'برگزاری جلسات زنده حل تست جمعی و مرور کیس‌های بالینی اورژانس در قالب گروه‌های صوتی تلگرام.',
-    tag: 'یادگیری مشارکتی',
+    text: 'برگزاری جلسات زنده حل تست جمعی و مرور کیس‌های بالینی اورژانس در گروه‌های صوتی ربات.',
+    tag: 'یادگیری جمعی',
   },
   {
     icon: 'layers',
+    tone: 'emerald',
     title: 'فلش‌کارت و مرور فاصله‌دار لایتنر',
-    text: 'الگوریتم بازتنظیم حافظه بر اساس منحنی فراموشی ابینگ‌هاوس برای تثبیت داروها، دوزها و پاتولوژی‌ها.',
+    text: 'الگوریتم بازتنظیم حافظه بر اساس منحنی فراموشی برای تثبیت داروها، دوزها و نکات پاتولوژی.',
     tag: 'مرور علمی',
   },
   {
     icon: 'chart',
+    tone: 'emerald',
     title: 'کارنامه تحلیلی و رادار نقاط ضعف',
-    text: 'شناسایی مباحث کم‌تسلط با نمودارهای راداری، تحلیل درصد خطای تصادفی و اصلاح تله‌های تستی پرتکرار.',
-    tag: 'تحلیل هوشمند',
+    text: 'شناسایی مباحث کم‌تسلط با نمودارهای راداری، تحلیل خطاهای پرتکرار و هدفمندکردن مرور قبل از آزمون.',
+    tag: 'تحلیل پیشرفت',
   },
 ];
 
 const STEPS = [
   {
     n: '۱',
-    title: 'شروع در ربات تلگرام',
-    text: 'ربات هوشمند هامزیار را باز کنید و بدون فرم‌های پیچیده، حساب کاربری و مقطع تحصیلی خود را فعال سازید.',
+    title: 'دریافت کد کاربری از تلگرام',
+    text: 'ربات هوشمند هامزیار را باز کنید؛ کد اختصاصی ۸ کاراکتری شما در بخش پروفایل ربات آماده است.',
   },
   {
     n: '۲',
-    title: 'دریافت کد ورود سریع به وب',
-    text: 'روی دکمه «ورود به نسخهٔ وب» کلیک کنید و با کد ۶ رقمی امنی که ربات تلگرام برایتان ارسال می‌کند وارد شوید.',
+    title: 'ورود یک‌لمسی بدون رمز',
+    text: 'در نسخهٔ وب کد ۸ کاراکتری را وارد کنید و اعلان تأیید را در تلگرام لمس کنید؛ نیازی به حفظ رمز نیست.',
   },
   {
     n: '۳',
-    title: 'مطالعه و آزمون روی هر دستگاه',
-    text: 'روی لپ‌تاپ، تبلت و موبایل بدون فیلترشکن با نسخه مستقل PWA کار کنید و پیشرفت خود را لحظه‌ای همگام نگه دارید.',
+    title: 'مطالعه و نصب روی هر دستگاه',
+    text: 'برنامه را مستقیم روی صفحهٔ اصلی گوشی یا کامپیوتر اضافه کنید و تمام یادداشت‌ها را همگام نگه دارید.',
   },
 ];
 
+const PLATFORM_GUIDES = {
+  ios: {
+    label: 'آیفون',
+    icon: 'phone',
+    hint: 'در مرورگر سافاری باز کنید تا گزینهٔ نصب در دسترس باشد.',
+    steps: [
+      'در نوار پایین مرورگر سافاری، دکمهٔ اشتراک‌گذاری (Share) را لمس کنید.',
+      'به پایین فهرست بروید و گزینهٔ «Add to Home Screen» را انتخاب کنید.',
+      'در بالای صفحه دکمهٔ «Add» را بزنید تا آیکون هامزیار اضافه شود.',
+    ],
+  },
+  android: {
+    label: 'اندروید',
+    icon: 'tablet',
+    hint: 'روی مرورگر کروم با یک کلیک قابل نصب روی صفحهٔ اصلی است.',
+    steps: [
+      'در گوشهٔ بالای مرورگر کروم، منوی سه‌نقطه را باز کنید.',
+      'گزینهٔ «نصب برنامه» یا «افزودن به صفحهٔ اصلی» را انتخاب کنید.',
+      'در پنجرهٔ تایید روی «نصب» بزنید تا با آیکون مستقل اجرا شود.',
+    ],
+  },
+  desktop: {
+    label: 'کامپیوتر',
+    icon: 'monitor',
+    hint: 'در ویندوز و مک از مرورگر کروم یا اج در پنجرهٔ مستقل اجرا می‌شود.',
+    steps: [
+      'در نوار آدرس مرورگر، روی آیکون نصب (کنار نشانک) کلیک کنید.',
+      'یا از منوی مرورگر گزینهٔ «نصب هامزیار» را برگزینید.',
+      'دکمهٔ نصب را تایید کنید تا میانبر اختصاصی روی دسکتاپ ساخته شود.',
+    ],
+  },
+};
+
+const PLATFORM_ORDER = ['ios', 'android', 'desktop'];
+
 const FAQ = [
   {
-    q: 'تفاوت نسخهٔ وب (PWA) با مینی‌اپ داخل تلگرام چیست؟',
-    a: 'هر دو نسخه به دیتابیس مشترک متصل بوده و تمام نتایج، نشان‌ها و یادداشت‌های شما بلادرنگ همگام‌سازی می‌شوند. مینی‌اپ مستقیماً داخل پیام‌رسان تلگرام اجرا می‌شود، در حالی که نسخهٔ وب اختصاصی (PWA) بدون نیاز به تلگرام یا فیلترشکن، روی انواع مرورگرها (کروم، سافاری، اج) با تجربه تمام‌صفحه و سرعت حداکثری کار می‌کند.',
+    q: 'تفاوت نسخهٔ وب مستقل با مینی‌اپ داخل تلگرام چیست؟',
+    a: 'هر دو نسخه به حساب مشترک شما متصل هستند و تمام نتایج آزمون، نشان‌ها و یادداشت‌ها لحظه‌ای همگام‌سازی می‌شوند. نسخهٔ وب مستقیم در مرورگر یا به صورت برنامهٔ نصب‌شده روی گوشی و کامپیوتر اجرا می‌شود و نیازی به باز بودن تلگرام یا فیلترشکن ندارد.',
   },
   {
-    q: 'آیا برای ورود به نسخهٔ وب کلمه عبور لازم است؟',
-    a: 'خیر، هیچ رمز ثابتی وجود ندارد. سیستم امن ورود بدون رمز هامزیار با ارسال کد تأیید ۶ رقمی یک‌بارمصرف به تلگرام شخصی شما عمل می‌کند و نشست فعال شما تا ۳۰ روز روی دستگاه باقی می‌ماند.',
+    q: 'آیا برای ورود به نسخهٔ وب کلمهٔ عبور لازم است؟',
+    a: 'خیر، هیچ رمز ثابتی وجود ندارد. با وارد کردن کد ۸ کاراکتری حساب خود و تأیید آن در ربات تلگرام، نشست شما به‌صورت امن تا ۳۰ روز روی دستگاه فعال می‌ماند.',
   },
   {
     q: 'پاسخ‌های هوش مصنوعی تا چه حد برای امتحانات معتبر هستند؟',
-    a: 'دستیار هوش مصنوعی بالینی هامزیار بر پایه آخرین ویراست‌های مراجع استاندارد وزارت بهداشت (هاریسون ۲۰۲۲، شوارتز ۲۰۲۱، سسیل، گایتون و فارماکولوژی کاتزونگ) آموزش دیده و علت درستی یا نادرستی گزینه‌ها را با ذکر مستقیم فصل و مرجع تشریح می‌نماید.',
+    a: 'دستیار هوش مصنوعی بالینی هامزیار با تکیه بر آخرین ویراست‌های مراجع استاندارد وزارت بهداشت (هاریسون، شوارتز، سسیل، گایتون و فارماکولوژی کاتزونگ) پاسخ می‌دهد و علت درستی یا نادرستی گزینه‌ها را با ذکر فصل و مرجع تشریح می‌کند.',
   },
   {
-    q: 'چگونه می‌توانم نسخه PWA را روی تبلت یا رایانه نصب کنم؟',
-    a: 'در مرورگر خود (مانند کروم یا سافاری) روی گزینه Install یا «افزودن به صفحه اصلی (Add to Home Screen)» بزنید تا هامزیار مانند یک برنامه بومی با سرعت بارگذاری فوق‌العاده روی دستگاه شما مستقر شود.',
+    q: 'چگونه می‌توانم نسخهٔ وب را روی گوشی یا کامپیوتر نصب کنم؟',
+    a: 'روی گوشی و تبلت از مرورگر سافاری یا کروم گزینهٔ «افزودن به صفحهٔ اصلی» یا «نصب برنامه» را انتخاب کنید تا هامزیار بدون نیاز به اپ‌استور، با آیکون مستقل و سرعت بالا نصب شود.',
   },
   {
-    q: 'آیا موتور جوهر دیجیتال روی تبلت‌های معمولی کار می‌کند؟',
-    a: 'بله، هسته جوهر دیجیتال هامزیار به صورت مستقل طراحی شده و علاوه بر پشتیبانی کامل از قلم‌های فعال (Apple Pencil، S-Pen قلم‌های Surface)، با لمس انگشت و قلم‌های خازنی معمولی نیز برای هایلایت و یادداشت‌برداری هماهنگ است.',
+    q: 'آیا جوهر دیجیتال روی گوشی و تبلت‌های معمولی هم کار می‌کند؟',
+    a: 'بله، هستهٔ جوهر دیجیتال علاوه بر پشتیبانی کامل از قلم‌های نوری تبلت و آیپد، با لمس انگشت هم برای هایلایت و حاشیه‌نویسی سریع هماهنگ است.',
   },
   {
-    q: 'آیا پلتفرم در شرایط افت سرعت اینترنت پایدار است؟',
-    a: 'بله، معماری توزیع‌شده با میزبانی در مراکز داده پرسرعت داخلی، بهره‌گیری از فونت‌های محلی خودمیزبان (Vazirmatn) و سیستم کش هوشمند PWA این امکان را می‌دهد که با کمترین پهنای باند و بالاترین پایداری مطالعه کنید.',
+    q: 'آیا پلتفرم در زمان افت سرعت اینترنت پایدار می‌ماند؟',
+    a: 'بله، فایل‌ها و فونت‌های نسخهٔ وب به‌صورت محلی میزبانی می‌شوند و با سیستم کش هوشمند، هنگام افت سرعت هم بارگذاری سریع و پایدار دارید.',
   },
 ];
 
 export default function Landing() {
+  const [theme, setTheme] = useState(getInitialTheme);
   const [activePillar, setActivePillar] = useState('bot');
-  const [botUrl, setBotUrl] = useState('https://t.me/humsyar_bot');
+  const [detectedPlatform] = useState(detectPlatform);
+  const [selectedPlatform, setSelectedPlatform] = useState(detectedPlatform);
+  const [supportUrl, setSupportUrl] = useState(null);
   const [pingMs, setPingMs] = useState(null);
-  const [lastCheck, setLastCheck] = useState(null);
-  const [serviceStatus, setServiceStatus] = useState('checking'); // 'healthy', 'degraded', 'checking'
-  const [healthData, setHealthData] = useState(null);
+  const [serviceStatus, setServiceStatus] = useState('checking');
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // هماهنگ‌سازی تم صفحه با localStorage (مشترک با /student/*) و ترجیح سیستم
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    const bg = theme === 'light' ? '#F8FAFC' : '#090D16';
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+      m.setAttribute('content', bg);
+    });
+  }, [theme]);
+
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const onSystemChange = () => {
+      try {
+        const saved = localStorage.getItem('humsyar.theme');
+        if (saved !== 'light' && saved !== 'dark') {
+          setTheme(mq.matches ? 'light' : 'dark');
+        }
+      } catch {
+        setTheme(mq.matches ? 'light' : 'dark');
+      }
+    };
+    mq.addEventListener('change', onSystemChange);
+    return () => mq.removeEventListener('change', onSystemChange);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem('humsyar.theme', next);
+      } catch {
+        // ignore storage failures
+      }
+      return next;
+    });
+  }, []);
 
   // پینگ و دریافت وضعیت سلامت سرویس‌ها
   const checkHealth = useCallback(async () => {
@@ -272,14 +380,11 @@ export default function Landing() {
         headers: { Accept: 'application/json' },
         cache: 'no-store',
       });
-      const end = performance.now();
-      const latency = Math.round(end - start);
+      const latency = Math.round(performance.now() - start);
       setPingMs(latency);
-      setLastCheck(new Date());
 
       if (res.ok) {
         const data = await res.json();
-        setHealthData(data);
         setServiceStatus(data.status === 'ok' ? 'healthy' : 'degraded');
       } else {
         setServiceStatus('degraded');
@@ -292,45 +397,37 @@ export default function Landing() {
     }
   }, []);
 
-  // دریافت آدرس داینامیک ربات تلگرام و تنظیم پینگ دوره‌ای
+  // دریافت آدرس داینامیک ربات از کانفیگ سرور و پینگ دوره‌ای
   useEffect(() => {
     let alive = true;
     fetch('/api/web/auth/config', { headers: { Accept: 'application/json' } })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (alive && data && typeof data.support_url === 'string' && data.support_url.trim()) {
-          setBotUrl(data.support_url.trim());
+          setSupportUrl(data.support_url.trim());
         }
       })
       .catch(() => {});
 
     checkHealth();
-
-    const interval = setInterval(() => {
-      checkHealth();
-    }, 60000);
-
+    const interval = setInterval(checkHealth, 60000);
     return () => {
       alive = false;
       clearInterval(interval);
     };
   }, [checkHealth]);
 
-  // ۳۰ اسلات وضعیت پایداری روزانه
   const uptimeBars = useMemo(() => {
     return Array.from({ length: 30 }, (_, i) => {
       const isToday = i === 29;
       const status = isToday
-        ? serviceStatus === 'healthy'
-          ? 'up'
-          : serviceStatus === 'degraded'
+        ? serviceStatus === 'degraded'
           ? 'down'
           : 'up'
         : 'up';
       return {
-        day: 30 - i,
+        day: toFaDigits(30 - i),
         status,
-        uptime: '۱۰۰٪',
       };
     });
   }, [serviceStatus]);
@@ -339,13 +436,15 @@ export default function Landing() {
     return PILLARS.find((p) => p.id === activePillar) || PILLARS[0];
   }, [activePillar]);
 
+  const activeGuide = PLATFORM_GUIDES[selectedPlatform] || PLATFORM_GUIDES.desktop;
+
   return (
     <>
       <a className="lp-skip" href="#main">
         رفتن به محتوای اصلی
       </a>
 
-      {/* ── سربرگ چسبان شیشه‌ای ── */}
+      {/* ── سربرگ چسبان ── */}
       <header className="lp-header">
         <div className="lp-wrap lp-header__inner">
           <a className="lp-brand" href="/" aria-label="هامزیار — زیست‌بوم جامع آموزش پزشکی">
@@ -353,8 +452,8 @@ export default function Landing() {
               <img
                 className="lp-brand__logo"
                 src="/icons/icon-192.png"
-                width="38"
-                height="38"
+                width="36"
+                height="36"
                 alt="لوگوی هامزیار"
                 loading="eager"
                 decoding="async"
@@ -367,35 +466,46 @@ export default function Landing() {
           </a>
 
           <nav className="lp-nav" aria-label="ناوبری اصلی">
-            <a href="#pillars">چهار ستون هامزیار</a>
-            <a href="#features">قابلیت‌های بالینی</a>
-            <a href="#how">مسیر شروع</a>
-            <a href="#status">وضعیت سرویس‌ها</a>
-            <a href="#faq">پرسش‌های متداول</a>
+            <a href="#pillars">چهار ستون</a>
+            <a href="#features">قابلیت‌ها</a>
+            <a href="#platforms">نصب روی دستگاه</a>
+            <a href="#faq">پرسش‌ها</a>
           </nav>
 
-          <div className="lp-header__cta">
-            <a className="lp-btn lp-btn--primary" href="/student/install">
-              ورود به نسخهٔ وب (PWA)
-              <Icon name="arrow" size={16} />
-            </a>
+          <div className="lp-header__actions">
+            <button
+              type="button"
+              className="lp-theme-toggle"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'تغییر به تم روشن' : 'تغییر به تم تیره'}
+            >
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
+              <span className="lp-theme-toggle__label">{theme === 'dark' ? 'روشن' : 'تیره'}</span>
+            </button>
+
+            <div className="lp-header__cta">
+              <a className="lp-btn lp-btn--header" href="/student/install">
+                <span>ورود</span>
+                <span className="lp-header-cta-full"> به نسخهٔ وب</span>
+              </a>
+            </div>
           </div>
         </div>
       </header>
 
       <main id="main">
-        {/* ── ۱) Hero Section با نشان درخشان سه‌بعدی و تگ‌های شناور ── */}
+        {/* ── ۱) Hero Section ── */}
         <section className="lp-hero" aria-labelledby="hero-title">
           <div className="lp-wrap lp-hero__grid">
             <div className="lp-hero__copy">
               <div className="lp-badge-row">
                 <span className="lp-pill lp-pill--glow">
                   <span className="lp-pill__dot" />
-                  زیست‌بوم جامع آموزش و توانمندسازی پزشکی
+                  زیست‌بوم جامع آموزش پزشکی
                 </span>
                 <span className="lp-pill lp-pill--ghost">
                   <Icon name="shield" size={14} />
-                  احراز هویت بدون رمز تلگرام
+                  ورود امن بدون رمز عبور
                 </span>
               </div>
 
@@ -409,44 +519,54 @@ export default function Landing() {
                 شبیه‌ساز جامع آزمون‌های علوم پایه و پره‌انترنی، ربات تعاملی تلگرام، دستیار بالینی مستند به رفرنس‌های هاریسون و سسیل، و جوهر دیجیتال مطالعه جزوات — همه در یک اکوسیستم پیوسته.
               </p>
 
-              {/* دو دکمه اصلی جهت اتصال */}
               <div className="lp-hero__actions">
                 <div className="lp-cta-group">
                   <a className="lp-btn lp-btn--primary lp-btn--lg" href="/student/install">
-                    ورود به نسخهٔ وب (PWA)
+                    ورود به نسخهٔ وب
                     <Icon name="arrow" size={18} />
                   </a>
-                  <span className="lp-cta-hint">نسخه مستقل وب، قابل نصب روی ویندوز، iOS و اندروید</span>
+                  <span className="lp-cta-hint">
+                    نصب مستقیم روی گوشی و کامپیوتر، بدون نیاز به اپ‌استور
+                  </span>
                 </div>
 
-                <div className="lp-cta-group">
-                  <a
-                    className="lp-btn lp-btn--ghost lp-btn--lg"
-                    href={botUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Icon name="telegram" size={18} />
-                    ورود به ربات تلگرام
-                  </a>
-                  <span className="lp-cta-hint">کوئیزهای روزانه، روم‌های صوتی و فلش‌کارت‌ها</span>
-                </div>
+                {supportUrl ? (
+                  <div className="lp-cta-group">
+                    <a
+                      className="lp-btn lp-btn--ghost lp-btn--lg"
+                      href={supportUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Icon name="telegram" size={18} />
+                      ورود به ربات تلگرام
+                    </a>
+                    <span className="lp-cta-hint">کوئیزهای روزانه، اتاق‌های صوتی و فلش‌کارت‌ها</span>
+                  </div>
+                ) : (
+                  <div className="lp-cta-group">
+                    <a className="lp-btn lp-btn--ghost lp-btn--lg" href="#platforms">
+                      <Icon name="download" size={18} />
+                      راهنمای نصب روی گوشی
+                    </a>
+                    <span className="lp-cta-hint">قابل اجرا روی آیفون، اندروید و کامپیوتر</span>
+                  </div>
+                )}
               </div>
 
               <ul className="lp-hero__facts">
                 <li>
-                  <Icon name="check" size={15} /> ورود سریع با کد امن یک‌بارمصرف تلگرام
+                  <Icon name="check" size={15} /> ورود سریع با تأیید فوری از ربات تلگرام
                 </li>
                 <li>
-                  <Icon name="check" size={15} /> قابلیت نصب مستقیم بدون نیاز به اپ‌استور
+                  <Icon name="check" size={15} /> نصب مستقیم روی صفحهٔ اصلی بدون نیاز به اپ‌استور
                 </li>
                 <li>
-                  <Icon name="check" size={15} /> همگام‌سازی لحظه‌ای ابری میان ربات و وب
+                  <Icon name="check" size={15} /> همگام‌سازی لحظه‌ای ابری بین ربات و وب
                 </li>
               </ul>
             </div>
 
-            {/* ویترین بصری نشان درخشان جدید با هاله نور و برچسب‌های معلق */}
             <div className="lp-hero__showcase-col">
               <div className="lp-hero__showcase">
                 <div className="lp-hero__aura" aria-hidden="true" />
@@ -465,7 +585,6 @@ export default function Landing() {
                   />
                 </div>
 
-                {/* تگ‌های معلق نمایانگر قابلیت‌های چهارگانه */}
                 <div className="lp-hero__floating-tags" aria-hidden="true">
                   <div className="lp-float-badge lp-float-badge--1">
                     <Icon name="telegram" size={16} />
@@ -489,12 +608,12 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── ۲) نوارهای اعتماد و شاخص‌های کلیدی پلتفرم ── */}
-        <section className="lp-metrics-section" aria-label="شاخص‌های عملکردی پلتفرم">
+        {/* ── ۲) شاخص‌های اعتماد و کلیدی پلتفرم ── */}
+        <section className="lp-metrics-section lp-proof" aria-label="شاخص‌های عملکردی پلتفرم">
           <div className="lp-wrap">
             <div className="lp-metrics-grid">
               {STAT_METRICS.map((m) => (
-                <div className="lp-metric-card" key={m.label}>
+                <div className={`lp-metric-card lp-tone--${m.tone}`} key={m.label}>
                   <div className="lp-metric-icon">
                     <Icon name={m.icon} size={22} />
                   </div>
@@ -514,16 +633,18 @@ export default function Landing() {
             <header className="lp-section__head">
               <span className="lp-section-tag">معماری جامع زیست‌بوم</span>
               <h2 id="pillars-title">چهار ستون اختصاصی توانمندسازی دانشجو</h2>
-              <p>هامزیار فراتر از یک وب‌اپ ساده است؛ زیست‌بومی کامل برای تمام چرخه آموزشی از علوم پایه تا کشیک‌های بیمارستانی.</p>
+              <p>
+                هامزیار فراتر از یک وب‌اپ ساده است؛ زیست‌بومی کامل برای تمام دورهٔ آموزشی از علوم پایه تا کشیک‌های بیمارستانی.
+              </p>
             </header>
 
-            {/* کنترلرهای انتخاب ستون */}
             <div className="lp-pillar-tabs" role="tablist" aria-label="ستون‌های هامزیار">
               {PILLARS.map((pillar) => {
                 const isActive = pillar.id === activePillar;
                 return (
                   <button
                     key={pillar.id}
+                    type="button"
                     role="tab"
                     aria-selected={isActive}
                     aria-controls={`pillar-panel-${pillar.id}`}
@@ -538,9 +659,8 @@ export default function Landing() {
               })}
             </div>
 
-            {/* بدنه ستون فعال */}
             <div
-              className="lp-pillar-panel"
+              className={`lp-pillar-panel lp-tone--${activePillarData.tone}`}
               role="tabpanel"
               id={`pillar-panel-${activePillarData.id}`}
               aria-labelledby={`pillar-tab-${activePillarData.id}`}
@@ -564,37 +684,43 @@ export default function Landing() {
                 </ul>
 
                 <div className="lp-pillar-cta-row">
-                  <a className="lp-btn lp-btn--primary" href="/student/install">
-                    مشاهده در نسخه وب
+                  <a className="lp-btn lp-btn--secondary" href="/student/install">
+                    ورود به نسخهٔ وب
                     <Icon name="arrow" size={16} />
                   </a>
-                  <a
-                    className="lp-btn lp-btn--ghost"
-                    href={botUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Icon name="telegram" size={16} />
-                    بررسی در ربات تلگرام
-                  </a>
+                  {supportUrl ? (
+                    <a
+                      className="lp-btn lp-btn--ghost"
+                      href={supportUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Icon name="telegram" size={16} />
+                      بررسی در ربات تلگرام
+                    </a>
+                  ) : (
+                    <a className="lp-btn lp-btn--ghost" href="#platforms">
+                      <Icon name="download" size={16} />
+                      نصب روی دستگاه
+                    </a>
+                  )}
                 </div>
               </div>
 
-              {/* پیش‌نمایش گرافیکی ستون متناسب با سناریوی واقعی */}
               <div className="lp-pillar-panel__preview">
                 <div className="lp-preview-card">
                   <div className="lp-preview-card__header">
                     <div className="lp-preview-avatar">
                       <Icon name={activePillarData.icon} size={18} />
                     </div>
-                    <div>
+                    <div className="lp-preview-head-text">
                       <div className="lp-preview-name">{activePillarData.preview.title}</div>
                       <div className="lp-preview-sub">{activePillarData.preview.meta}</div>
                     </div>
                     <span className="lp-preview-badge">{activePillarData.preview.badge}</span>
                   </div>
 
-                  <div className="lp-preview-item lp-preview-item--cyan">
+                  <div className="lp-preview-item lp-preview-item--sky">
                     <div className="lp-preview-icon">
                       <Icon name="stethoscope" size={18} />
                     </div>
@@ -610,7 +736,9 @@ export default function Landing() {
                     </div>
                     <div className="lp-preview-details">
                       <div className="lp-preview-title">وضعیت تحلیل آموزشی</div>
-                      <div className="lp-preview-meta">تأییدیه استانداردهای آموزشی قطب‌های کشوری و کوریکولوم</div>
+                      <div className="lp-preview-meta">
+                        تأییدیه استانداردهای آموزشی قطب‌های کشوری و سرفصل مصوب
+                      </div>
                     </div>
                     <span className="lp-score-tag">فعال</span>
                   </div>
@@ -621,7 +749,7 @@ export default function Landing() {
                       <span>{activePillarData.preview.actionLabel}</span>
                     </div>
                     <p className="lp-preview-ai__text">
-                      مستندسازی فرآیند آموزش با ذخیره‌سازی ابری و تحلیل تسلط بر اساس شاخص‌های اعتبارسنجی شده پزشکی.
+                      مستندسازی فرآیند آموزش با ذخیره‌سازی ابری و تحلیل تسلط بر اساس شاخص‌های اعتبارسنجی‌شده پزشکی.
                     </p>
                   </div>
                 </div>
@@ -636,12 +764,14 @@ export default function Landing() {
             <header className="lp-section__head">
               <span className="lp-section-tag">امکانات پلتفرم بالینی</span>
               <h2 id="features-title">هر آنچه برای موفقیت در دوره پزشکی نیاز دارید</h2>
-              <p>طراحی متمرکز بر سبک زندگی فشرده دانشجویان پزشکی، دوره علوم پایه، دوره‌های بالینی، استاژری و انترنی.</p>
+              <p>
+                طراحی متمرکز بر برنامهٔ فشرده دانشجویان پزشکی از علوم پایه تا استاژری و انترنی.
+              </p>
             </header>
 
             <div className="lp-cards">
               {FEATURES.map((f) => (
-                <article className="lp-card" key={f.title}>
+                <article className={`lp-card lp-tone--${f.tone}`} key={f.title}>
                   <div className="lp-card__top">
                     <span className="lp-card__icon">
                       <Icon name={f.icon} size={22} />
@@ -662,7 +792,7 @@ export default function Landing() {
             <header className="lp-section__head">
               <span className="lp-section-tag">مسیر اتصال</span>
               <h2 id="how-title">شروع آسان در سه قدم</h2>
-              <p>بدون نیاز به ثبت‌نام‌های وقت‌گیر؛ ورود و همگام‌سازی در کمتر از ۶۰ ثانیه انجام می‌شود.</p>
+              <p>بدون نیاز به ثبت‌نام‌های وقت‌گیر؛ ورود و همگام‌سازی در کمتر از یک دقیقه انجام می‌شود.</p>
             </header>
 
             <ol className="lp-steps">
@@ -679,7 +809,67 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── ۶) پایش زنده سلامت زیرساخت و سرویس‌ها ── */}
+        {/* ── ۶) راهنمای تعاملی نصب روی دستگاه‌ها ── */}
+        <section className="lp-section lp-platforms-section" id="platforms" aria-labelledby="platforms-title">
+          <div className="lp-wrap">
+            <header className="lp-section__head">
+              <span className="lp-section-tag">اجرا روی همهٔ دستگاه‌ها</span>
+              <h2 id="platforms-title">نصب مستقیم بدون نیاز به اپ‌استور</h2>
+              <p>
+                دستگاه خود را انتخاب کنید تا مراحل سه‌گانه افزودن نسخهٔ وب را به‌سرعت ببینید.
+              </p>
+            </header>
+
+            <div className="lp-platforms-box">
+              <div className="lp-platform-tabs-wrap">
+                <div className="lp-platform-tabs" role="tablist" aria-label="انتخاب دستگاه">
+                  {PLATFORM_ORDER.map((key) => {
+                    const item = PLATFORM_GUIDES[key];
+                    const active = selectedPlatform === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        className={`lp-platform-tab ${active ? 'lp-platform-tab--active' : ''}`}
+                        onClick={() => setSelectedPlatform(key)}
+                      >
+                        <Icon name={item.icon} size={17} />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="lp-platforms-detected">
+                  دستگاه فعلی شما: <strong>{PLATFORM_GUIDES[detectedPlatform].label}</strong>
+                </p>
+              </div>
+
+              <div className="lp-platform-panel" role="tabpanel">
+                <p className="lp-platform-hint">{activeGuide.hint}</p>
+                <ol className="lp-platform-steps">
+                  {activeGuide.steps.map((text, idx) => (
+                    <li className="lp-platform-step" key={idx}>
+                      <span className="lp-platform-step__num" aria-hidden="true">
+                        {toFaDigits(idx + 1)}
+                      </span>
+                      <span>{text}</span>
+                    </li>
+                  ))}
+                </ol>
+                <div className="lp-platform-cta">
+                  <a className="lp-btn lp-btn--secondary" href="/student/install">
+                    مشاهدهٔ راهنمای کامل نصب و ورود
+                    <Icon name="arrow" size={16} />
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── ۷) پایش زنده سلامت زیرساخت و سرویس‌ها ── */}
         <section className="lp-section lp-status-section" id="status" aria-labelledby="status-title">
           <div className="lp-wrap">
             <div className="lp-status-box">
@@ -699,12 +889,12 @@ export default function Landing() {
                       {serviceStatus === 'healthy'
                         ? 'تمام سیستم‌ها فعال و پایدار هستند'
                         : serviceStatus === 'degraded'
-                        ? 'برخی از بخش‌ها در حال بهینه‌سازی زیرساخت هستند'
+                        ? 'برخی از بخش‌ها در حال به‌روزرسانی زیرساخت هستند'
                         : 'در حال سنجش پایداری سرور...'}
                     </h2>
                   </div>
                   <p className="lp-status-sub">
-                    پایش لحظه‌ای زیرساخت سرور و اتصالات شبکه‌ای · به‌روزرسانی خودکار هر ۶۰ ثانیه
+                    پایش لحظه‌ای وضعیت سرویس‌ها و اتصالات سرور · به‌روزرسانی خودکار هر ۶۰ ثانیه
                   </p>
                 </div>
 
@@ -712,10 +902,11 @@ export default function Landing() {
                   {pingMs !== null && (
                     <span className="lp-ping-badge">
                       <Icon name="pulse" size={14} />
-                      پینگ سرور: {pingMs}ms
+                      <span>پینگ سرور: {toFaDigits(pingMs)} میلی‌ثانیه</span>
                     </span>
                   )}
                   <button
+                    type="button"
                     className={`lp-refresh-btn ${isRefreshing ? 'lp-refresh-btn--spin' : ''}`}
                     onClick={checkHealth}
                     title="بررسی مجدد وضعیت"
@@ -727,18 +918,17 @@ export default function Landing() {
                 </div>
               </div>
 
-              {/* نوار پایداری ۳۰ روزه */}
               <div className="lp-uptime-tracker">
                 <div className="lp-uptime-tracker__head">
                   <span className="lp-uptime-label">پایداری ۳۰ روز گذشته</span>
-                  <span className="lp-uptime-pct">۹۹.۹۸٪ Uptime</span>
+                  <span className="lp-uptime-pct">۹۹.۹۸٪ دسترس‌پذیری</span>
                 </div>
                 <div className="lp-uptime-bars" aria-label="نمودار وضعیت پایداری روزانه">
                   {uptimeBars.map((b, idx) => (
                     <div
                       key={idx}
                       className={`lp-uptime-bar ${b.status === 'up' ? 'lp-uptime-bar--up' : 'lp-uptime-bar--down'}`}
-                      title={`روز ${b.day} قبل: وضعیت کاملاً پایدار`}
+                      title={`روز ${b.day} قبل: وضعیت پایدار`}
                     />
                   ))}
                 </div>
@@ -748,17 +938,16 @@ export default function Landing() {
                 </div>
               </div>
 
-              {/* کارت‌های سلامت چهارگانه */}
               <div className="lp-service-grid">
                 <div className="lp-service-card">
                   <div className="lp-service-card__icon">
                     <Icon name="server" size={18} />
                   </div>
                   <div className="lp-service-card__body">
-                    <span className="lp-service-name">هسته API و وب‌سرور</span>
-                    <span className="lp-service-status">عملیاتی (Operational)</span>
+                    <span className="lp-service-name">هستهٔ سامانه و وب‌سرور</span>
+                    <span className="lp-service-status">فعال و عملیاتی</span>
                   </div>
-                  <span className="lp-service-badge lp-service-badge--ok">۱۰۰٪ پایدار</span>
+                  <span className="lp-service-badge lp-service-badge--ok">پایدار</span>
                 </div>
 
                 <div className="lp-service-card">
@@ -766,8 +955,8 @@ export default function Landing() {
                     <Icon name="database" size={18} />
                   </div>
                   <div className="lp-service-card__body">
-                    <span className="lp-service-name">دیتابیس ابری (MongoDB)</span>
-                    <span className="lp-service-status">متصل و فعال</span>
+                    <span className="lp-service-name">پایگاه دادهٔ ابری</span>
+                    <span className="lp-service-status">متصل و همگام</span>
                   </div>
                   <span className="lp-service-badge lp-service-badge--ok">متصل</span>
                 </div>
@@ -778,7 +967,7 @@ export default function Landing() {
                   </div>
                   <div className="lp-service-card__body">
                     <span className="lp-service-name">ربات تلگرام و یادآوری‌ها</span>
-                    <span className="lp-service-status">در حال شنود (Polling)</span>
+                    <span className="lp-service-status">برخط و پاسخگو</span>
                   </div>
                   <span className="lp-service-badge lp-service-badge--ok">برخط</span>
                 </div>
@@ -788,7 +977,7 @@ export default function Landing() {
                     <Icon name="spark" size={18} />
                   </div>
                   <div className="lp-service-card__body">
-                    <span className="lp-service-name">موتور هوش مصنوعی و OCR</span>
+                    <span className="lp-service-name">موتور هوش مصنوعی و تحلیل متن</span>
                     <span className="lp-service-status">آماده به کار</span>
                   </div>
                   <span className="lp-service-badge lp-service-badge--ok">فعال</span>
@@ -798,13 +987,13 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── ۷) پرسش‌های متداول ── */}
+        {/* ── ۸) پرسش‌های متداول ── */}
         <section className="lp-section lp-section--alt" id="faq" aria-labelledby="faq-title">
           <div className="lp-wrap lp-faq">
             <header className="lp-section__head">
               <span className="lp-section-tag">پاسخ به ابهامات</span>
               <h2 id="faq-title">سؤال‌های متداول دانشجویان</h2>
-              <p>پاسخ به سوالات پرتکرار پیرامون شیوه کارکرد، امنیت و دسترسی بدون فیلترشکن به پلتفرم.</p>
+              <p>پاسخ به سؤال‌های پرتکرار دربارهٔ نحوهٔ ورود، امنیت حساب و کار با نسخهٔ وب.</p>
             </header>
 
             {FAQ.map((item, i) => (
@@ -816,33 +1005,40 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── ۸) بخش نهایی دعوت به عمل ── */}
+        {/* ── ۹) بخش نهایی دعوت به عمل ── */}
         <section className="lp-final" aria-labelledby="final-title">
           <div className="lp-wrap lp-final__inner">
             <h2 id="final-title">مطالعه هدفمند پزشکی را از همین لحظه آغاز کنید</h2>
             <p>
-              به جمع صدها دانشجوی پزشکی بپیوندید که برنامه‌ریزی، جزوات، تست‌زنی و روتیشن‌های خود را با هامزیار سازمان‌دهی می‌کنند.
+              برنامه‌ریزی، جزوه‌ها، تست‌زنی و روتیشن‌های خود را در یک محیط سریع و منظم با هامزیار سازمان‌دهی کنید.
             </p>
             <div className="lp-hero__actions lp-hero__actions--center">
               <a className="lp-btn lp-btn--primary lp-btn--lg" href="/student/install">
-                ورود به نسخهٔ وب (PWA)
+                ورود به نسخهٔ وب
                 <Icon name="arrow" size={18} />
               </a>
-              <a
-                className="lp-btn lp-btn--ghost lp-btn--lg"
-                href={botUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Icon name="telegram" size={18} />
-                باز کردن در تلگرام
-              </a>
+              {supportUrl ? (
+                <a
+                  className="lp-btn lp-btn--ghost lp-btn--lg"
+                  href={supportUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Icon name="telegram" size={18} />
+                  باز کردن در تلگرام
+                </a>
+              ) : (
+                <a className="lp-btn lp-btn--ghost lp-btn--lg" href="#platforms">
+                  <Icon name="download" size={18} />
+                  نصب روی گوشی و کامپیوتر
+                </a>
+              )}
             </div>
           </div>
         </section>
       </main>
 
-      {/* ── ۹) پانوشت کامل و واکنش‌گرا ── */}
+      {/* ── ۱۰) پانوشت ── */}
       <footer className="lp-footer">
         <div className="lp-wrap lp-footer__inner">
           <div className="lp-footer__brand">
@@ -852,17 +1048,20 @@ export default function Landing() {
 
           <nav className="lp-footer__links" aria-label="پیوندهای پانوشت">
             <a href="/student/install">ورود به نسخهٔ وب</a>
-            <a href={botUrl} target="_blank" rel="noreferrer">
-              ربات تلگرام
-            </a>
+            {supportUrl && (
+              <a href={supportUrl} target="_blank" rel="noreferrer">
+                ربات تلگرام
+              </a>
+            )}
             <a href="#pillars">چهار ستون</a>
             <a href="#features">قابلیت‌ها</a>
+            <a href="#platforms">نصب روی دستگاه</a>
             <a href="#status">وضعیت سرویس‌ها</a>
             <a href="#faq">پرسش‌های متداول</a>
           </nav>
 
           <p className="lp-footer__note">
-            نسخه اختصاصی وب (PWA) روی انواع سیستم‌عامل‌ها بدون نیاز به فیلترشکن قابل استفاده است · تمامی حقوق برای پلتفرم هامزیار محفوظ است.
+            نسخهٔ وب هامزیار روی گوشی و کامپیوتر بدون نیاز به فیلترشکن در دسترس است · تمامی حقوق برای پلتفرم هامزیار محفوظ است.
           </p>
         </div>
       </footer>

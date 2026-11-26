@@ -1,0 +1,802 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   DS v2 Pre-Auth Screens (LoginScreen, GateScreens, InstallGuideScreen)
+   Reads ONLY DS v2 semantic/role/accent tokens, logical properties,
+   and .ds-* base styles — zero hex, rgba, !important, or physical props.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.app-shell--bare:has(.auth-screen) {
+  background: var(--hym-surface-0);
+}
+
+.auth-screen {
+  position: relative;
+  flex: 1 0 auto;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-block: max(var(--hym-space-6), env(safe-area-inset-top, 0px)) max(var(--hym-space-6), env(safe-area-inset-bottom, 0px));
+  padding-inline: var(--hym-space-4);
+  background-color: var(--hym-surface-0);
+  background-image:
+    radial-gradient(640px 360px at 85% 0%, color-mix(in srgb, var(--hym-accent) 10%, transparent), transparent 70%),
+    radial-gradient(640px 360px at 15% 100%, color-mix(in srgb, var(--hym-role-ai-vivid) 8%, transparent), transparent 70%);
+  color: var(--hym-text-primary);
+  overflow-x: clip;
+}
+
+.auth-screen--modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--hym-z-modal);
+  overflow-y: auto;
+  justify-content: flex-start;
+}
+
+.session-relogin__panel .auth-screen {
+  min-height: 0;
+  padding: var(--hym-space-2);
+  background-color: transparent;
+  background-image: none;
+}
+
+.session-relogin__panel .auth-topbar {
+  display: none;
+}
+
+.session-relogin__panel .auth-card {
+  box-shadow: none;
+  border: 0;
+  border-block-start: 0;
+  padding: var(--hym-space-4);
+}
+
+/* ── نوار ابزار بالای کارت (بازگشت و تغییر تم) ── */
+.auth-topbar {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-2);
+  margin-block-end: var(--hym-space-3);
+}
+
+.auth-topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hym-space-2);
+  min-height: var(--hym-control-h-md);
+  min-width: var(--hym-control-h-md);
+  padding-inline: var(--hym-space-3);
+  border-radius: var(--hym-radius-control);
+  border: 1px solid var(--hym-hairline-strong);
+  background: var(--hym-surface-1);
+  color: var(--hym-text-secondary);
+  box-shadow: var(--hym-elev-1);
+  font: inherit;
+  font-size: var(--hym-fs-small);
+  font-weight: var(--hym-fw-bold);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color var(--hym-duration-fast) var(--hym-ease-default),
+              color var(--hym-duration-fast) var(--hym-ease-default);
+}
+
+.auth-topbar-btn:hover {
+  color: var(--hym-text-primary);
+  border-color: var(--hym-accent);
+}
+
+.auth-topbar-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--hym-focus-ring-v2);
+}
+
+.auth-theme-btn {
+  margin-inline-start: auto;
+}
+
+/* ── کارت اصلی پیش‌ورود ── */
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 500px;
+  background: var(--hym-surface-1);
+  color: var(--hym-text-primary);
+  border: 1px solid var(--hym-hairline);
+  border-block-start: 3px solid var(--hym-accent);
+  border-radius: var(--hym-radius-sheet);
+  box-shadow: var(--hym-elev-2);
+  padding: var(--hym-space-6) var(--hym-space-4);
+}
+
+@media (min-width: 480px) {
+  .auth-card {
+    padding: var(--hym-space-8) var(--hym-space-6);
+  }
+}
+
+.auth-card--compact {
+  max-width: 420px;
+  padding-block: var(--hym-space-10);
+  text-align: center;
+}
+
+/* ── سرصفحه برند و نشان ── */
+.auth-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--hym-space-2);
+}
+
+.auth-logo-frame {
+  display: inline-flex;
+  padding: var(--hym-space-2);
+  border-radius: var(--hym-radius-sheet);
+  background: var(--hym-surface-2);
+  border: 1px solid var(--hym-hairline);
+  box-shadow: var(--hym-elev-1);
+}
+
+.auth-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  margin-block-start: var(--hym-space-2);
+  font-size: var(--hym-fs-h1);
+  font-weight: var(--hym-fw-heavy);
+  line-height: var(--hym-lh-tight);
+}
+
+.auth-wordmark__hums {
+  color: var(--hym-text-primary);
+}
+
+.auth-wordmark__yar {
+  color: var(--hym-accent-text);
+}
+
+.auth-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hym-space-2);
+  padding-block: var(--hym-space-1);
+  padding-inline: var(--hym-space-3);
+  border-radius: var(--hym-radius-pill);
+  background: var(--hym-accent-subtle);
+  border: 1px solid var(--hym-accent-border);
+  color: var(--hym-accent-text);
+  font-size: var(--hym-fs-caption);
+  font-weight: var(--hym-fw-bold);
+  line-height: var(--hym-lh-ui);
+}
+
+.auth-pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hym-accent);
+}
+
+.auth-title {
+  margin: var(--hym-space-2) 0 0;
+  font-size: var(--hym-fs-h2);
+  font-weight: var(--hym-fw-heavy);
+  line-height: var(--hym-lh-tight);
+  color: var(--hym-text-primary);
+}
+
+.auth-subtitle {
+  margin: 0;
+  max-width: 38ch;
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-body);
+  color: var(--hym-text-secondary);
+}
+
+/* ── فرم و فیلد ۸ کاراکتری کد ورود ── */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-4);
+  margin-block-start: var(--hym-space-5);
+}
+
+.auth-code-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-2);
+}
+
+.auth-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--hym-space-2);
+}
+
+.auth-code-label {
+  font-size: var(--hym-fs-small);
+  font-weight: var(--hym-fw-bold);
+  color: var(--hym-text-primary);
+}
+
+.auth-prefix-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px var(--hym-space-2);
+  border-radius: var(--hym-radius-sm);
+  background: var(--hym-accent-subtle);
+  border: 1px solid var(--hym-accent-border);
+  color: var(--hym-accent-text);
+  font-size: var(--hym-fs-caption);
+  font-weight: var(--hym-fw-bold);
+  white-space: nowrap;
+}
+
+.auth-prefix-kbd {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: var(--hym-radius-sm);
+  background: var(--hym-surface-1);
+  border: 1px solid var(--hym-accent-border);
+  color: var(--hym-accent-text);
+  font-family: var(--hym-font-mono);
+  font-weight: var(--hym-fw-heavy);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.auth-slots-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.auth-slots-container {
+  display: flex;
+  direction: ltr;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  padding: var(--hym-space-2);
+  border-radius: var(--hym-radius-card);
+  background: var(--hym-surface-sunken);
+  border: 1px solid var(--hym-hairline-strong);
+  cursor: text;
+  transition: border-color var(--hym-duration-fast) var(--hym-ease-default),
+              box-shadow var(--hym-duration-fast) var(--hym-ease-default);
+}
+
+.auth-slots-container:hover,
+.auth-slots-wrap:focus-within .auth-slots-container {
+  border-color: var(--hym-accent);
+  box-shadow: 0 0 0 3px var(--hym-accent-subtle);
+}
+
+.auth-slot-box {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 40px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--hym-radius-md);
+  background: var(--hym-surface-1);
+  border: 1px solid var(--hym-hairline-strong);
+  color: var(--hym-text-primary);
+  font-family: var(--hym-font-mono);
+  font-size: var(--hym-fs-h3);
+  font-weight: var(--hym-fw-heavy);
+  user-select: none;
+  transition: border-color var(--hym-duration-fast) var(--hym-ease-default),
+              background-color var(--hym-duration-fast) var(--hym-ease-default),
+              box-shadow var(--hym-duration-fast) var(--hym-ease-default);
+}
+
+.auth-slot-box.is-filled {
+  background: var(--hym-accent-subtle);
+  border-color: var(--hym-accent-border);
+  color: var(--hym-accent-text);
+}
+
+.auth-slot-box.is-active {
+  border-color: var(--hym-accent);
+  box-shadow: 0 0 0 2px var(--hym-accent-subtle);
+}
+
+.auth-slot-cursor {
+  width: 2px;
+  height: 20px;
+  border-radius: 1px;
+  background: var(--hym-accent);
+  animation: auth-cursor-blink 1s infinite;
+}
+
+@keyframes auth-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.auth-slots-sep {
+  flex: 0 0 auto;
+  color: var(--hym-text-muted);
+  font-weight: var(--hym-fw-bold);
+  font-size: var(--hym-fs-body);
+}
+
+@media (max-width: 359px) {
+  .auth-slots-container {
+    gap: 4px;
+    padding-inline: var(--hym-space-1);
+  }
+}
+
+.auth-hidden-input {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  cursor: text;
+  font-size: var(--hym-fs-input);
+}
+
+.auth-code-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hym-space-2);
+  font-size: var(--hym-fs-caption);
+  line-height: var(--hym-lh-ui);
+  color: var(--hym-text-muted);
+}
+
+.auth-code-hint svg {
+  flex: 0 0 auto;
+  margin-block-start: 2px;
+  color: var(--hym-accent-text);
+}
+
+.auth-code-hint--ready {
+  color: var(--hym-role-grades-text);
+}
+
+.auth-code-hint--ready svg {
+  color: var(--hym-role-grades-text);
+}
+
+/* ── پیام‌های وضعیت ── */
+.auth-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hym-space-2);
+  margin: 0;
+  padding: var(--hym-space-3);
+  border-radius: var(--hym-radius-control);
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-ui);
+}
+
+.auth-alert svg {
+  flex: 0 0 auto;
+  margin-block-start: 2px;
+}
+
+.auth-alert--warn {
+  background: var(--hym-role-schedule-subtle);
+  border: 1px solid var(--hym-role-schedule-subtle-border);
+  color: var(--hym-role-schedule-text);
+}
+
+.auth-alert--danger {
+  background: var(--hym-role-danger-subtle);
+  border: 1px solid var(--hym-role-danger-subtle-border);
+  color: var(--hym-role-danger-text);
+}
+
+/* ── پانوشت کارت ورود ── */
+.auth-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--hym-space-3);
+  margin-block-start: var(--hym-space-5);
+  padding-block-start: var(--hym-space-4);
+  border-block-start: 1px solid var(--hym-hairline);
+}
+
+.auth-support-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hym-space-2);
+  min-height: var(--hym-control-h-md);
+  padding-inline: var(--hym-space-3);
+  border-radius: var(--hym-radius-control);
+  color: var(--hym-accent-text);
+  font-size: var(--hym-fs-small);
+  font-weight: var(--hym-fw-semibold);
+  text-decoration: none;
+  text-align: center;
+  transition: background-color var(--hym-duration-fast) var(--hym-ease-default);
+}
+
+.auth-support-link:hover {
+  background: var(--hym-accent-subtle);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.auth-support-note {
+  margin: 0;
+  font-size: var(--hym-fs-caption);
+  line-height: var(--hym-lh-body);
+  color: var(--hym-text-muted);
+  text-align: center;
+}
+
+.auth-install-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-3);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--hym-space-3) var(--hym-space-4);
+  border-radius: var(--hym-radius-card);
+  background: var(--hym-accent-subtle);
+  border: 1px dashed var(--hym-accent-border);
+  color: var(--hym-accent-text);
+  font: inherit;
+  font-size: var(--hym-fs-small);
+  font-weight: var(--hym-fw-bold);
+  cursor: pointer;
+  text-align: start;
+  text-decoration: none;
+  transition: border-color var(--hym-duration-fast) var(--hym-ease-default),
+              background-color var(--hym-duration-fast) var(--hym-ease-default);
+}
+
+.auth-install-cta:hover {
+  border-color: var(--hym-accent);
+}
+
+.auth-install-cta__text {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: start;
+}
+
+/* ── مرحلهٔ انتظار و کد تطبیق ── */
+.auth-challenge-card {
+  margin-block: var(--hym-space-5) var(--hym-space-4);
+  text-align: center;
+}
+
+.auth-challenge-label {
+  font-size: var(--hym-fs-caption);
+  font-weight: var(--hym-fw-bold);
+  color: var(--hym-text-muted);
+  margin-block-end: var(--hym-space-2);
+}
+
+.auth-challenge-code {
+  display: inline-block;
+  padding: var(--hym-space-2) var(--hym-space-6);
+  border-radius: var(--hym-radius-card);
+  background: var(--hym-surface-1);
+  border: 1px solid var(--hym-accent-border);
+  color: var(--hym-accent-text);
+  font-family: var(--hym-font-mono);
+  font-size: var(--hym-fs-display);
+  font-weight: var(--hym-fw-heavy);
+  letter-spacing: 0.22em;
+  direction: ltr;
+  font-variant-numeric: tabular-nums;
+}
+
+.auth-challenge-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hym-space-2);
+  margin-block-start: var(--hym-space-3);
+  font-size: var(--hym-fs-small);
+  color: var(--hym-text-secondary);
+}
+
+.auth-challenge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hym-accent);
+}
+
+.auth-challenge-dot--expired {
+  background: var(--hym-role-danger-solid);
+}
+
+.auth-challenge-expired {
+  color: var(--hym-role-danger-text);
+  font-weight: var(--hym-fw-bold);
+}
+
+.auth-waiting-hint {
+  text-align: center;
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-body);
+  color: var(--hym-text-secondary);
+}
+
+.auth-waiting-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-2);
+}
+
+.auth-sheet-body {
+  padding: var(--hym-space-2) var(--hym-space-4) var(--hym-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-4);
+}
+
+.auth-sheet-lead {
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-body);
+  color: var(--hym-text-secondary);
+}
+
+.auth-sheet-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-4);
+}
+
+/* ── صفحات گیت (Pending / Blocked / Splash) ── */
+.gate-badge-wrap {
+  margin-block-start: var(--hym-space-2);
+}
+
+.gate-steps-card {
+  margin-block-start: var(--hym-space-5);
+}
+
+.gate-steps {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-3);
+  list-style: none;
+}
+
+.gate-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hym-space-3);
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-body);
+  color: var(--hym-text-secondary);
+}
+
+.gate-step-num {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  margin-block-start: 1px;
+  border-radius: 50%;
+  background: var(--hym-accent-subtle);
+  border: 1px solid var(--hym-accent-border);
+  color: var(--hym-accent-text);
+  font-size: var(--hym-fs-caption);
+  font-weight: var(--hym-fw-heavy);
+  display: grid;
+  place-items: center;
+}
+
+.gate-step-text {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.gate-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-3);
+  margin-block-start: var(--hym-space-5);
+}
+
+/* ── اسپینر صفحه بارگذاری اولیه ── */
+.auth-spinner-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-block: var(--hym-space-6) var(--hym-space-4);
+}
+
+.auth-spinner {
+  animation: auth-spin 1.1s linear infinite;
+}
+
+.auth-spinner__track {
+  stroke: var(--hym-hairline-strong);
+}
+
+.auth-spinner__arc {
+  stroke: var(--hym-accent);
+  stroke-dasharray: 84, 150;
+  stroke-dashoffset: 0;
+  stroke-linecap: round;
+}
+
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}
+
+.auth-splash-status {
+  font-size: var(--hym-fs-body);
+  font-weight: var(--hym-fw-semibold);
+  color: var(--hym-text-secondary);
+}
+
+/* ── راهنمای نصب (InstallGuideScreen) ── */
+.pwa-seg {
+  margin-block-start: var(--hym-space-4);
+  width: 100%;
+}
+
+.pwa-seg .ds-seg__item {
+  min-height: var(--hym-control-h-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hym-space-1);
+}
+
+.pwa-detected-caption {
+  margin: var(--hym-space-2) 0 0;
+  font-size: var(--hym-fs-caption);
+  color: var(--hym-text-muted);
+  text-align: center;
+}
+
+.pwa-detected-caption strong {
+  color: var(--hym-text-primary);
+}
+
+.pwa-steps-content {
+  margin-block-start: var(--hym-space-5);
+}
+
+.pwa-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-3);
+}
+
+.pwa-direct-install-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-2);
+  margin-block-end: var(--hym-space-1);
+}
+
+.pwa-direct-hint {
+  text-align: center;
+  font-size: var(--hym-fs-caption);
+  color: var(--hym-text-muted);
+}
+
+.pwa-step-row {
+  display: flex;
+  align-items: center;
+  gap: var(--hym-space-3);
+  padding: var(--hym-space-3) var(--hym-space-4);
+  border-radius: var(--hym-radius-card);
+  background: var(--hym-surface-sunken);
+  border: 1px solid var(--hym-hairline);
+  text-align: start;
+}
+
+.pwa-step-num {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  background: var(--hym-accent);
+  color: var(--hym-accent-on);
+  font-size: var(--hym-fs-small);
+  font-weight: var(--hym-fw-heavy);
+  display: grid;
+  place-items: center;
+}
+
+.pwa-step-desc {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-body);
+  color: var(--hym-text-primary);
+}
+
+.pwa-step-desc strong {
+  color: var(--hym-accent-text);
+  font-weight: var(--hym-fw-bold);
+}
+
+.pwa-step-visual {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: var(--hym-radius-control);
+  background: var(--hym-surface-1);
+  border: 1px solid var(--hym-hairline-strong);
+  color: var(--hym-accent-text);
+  display: grid;
+  place-items: center;
+}
+
+.pwa-step-visual--badge {
+  width: auto;
+  min-width: 48px;
+  padding-inline: var(--hym-space-2);
+  background: var(--hym-accent-subtle);
+  border-color: var(--hym-accent-border);
+  color: var(--hym-accent-text);
+  font-size: var(--hym-fs-small);
+  font-weight: var(--hym-fw-heavy);
+}
+
+.pwa-tip-box {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hym-space-2);
+  padding: var(--hym-space-3) var(--hym-space-4);
+  border-radius: var(--hym-radius-card);
+  background: var(--hym-accent-subtle);
+  border: 1px solid var(--hym-accent-border);
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-body);
+  color: var(--hym-text-primary);
+}
+
+.pwa-tip-box svg {
+  flex: 0 0 auto;
+  margin-block-start: 3px;
+  color: var(--hym-accent-text);
+}
+
+.pwa-actions-footer {
+  margin-block-start: var(--hym-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-slot-cursor,
+  .auth-spinner {
+    animation: none;
+  }
+}
