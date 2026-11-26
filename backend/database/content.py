@@ -6,10 +6,14 @@
 """
 import os
 import re
+import ast
+import json
 import logging
 import asyncio
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from html import escape
+from typing import Any
 from urllib.parse import quote
 from bson import ObjectId
 from pymongo import ReturnDocument
@@ -23,9 +27,53 @@ from question_bank.contracts import (
 # نام logger عمداً «database» نگه داشته شد تا کانال لاگ تغییر نکند
 logger = logging.getLogger('database')
 
+_TERM_KEYS = ('term', 'name', 'label', 'title')
+
+
+def _normalize_term(val: Any, _depth: int = 0) -> str:
+    """استخراج ایمن نام/کد ترم از رشته، عدد، dict یا رشتهٔ شبه‌دیکشنری پایتون (Audit S5)."""
+    if _depth > 4 or val is None or isinstance(val, bool):
+        return ''
+    if isinstance(val, (int, float)):
+        return str(int(val)) if isinstance(val, int) or float(val).is_integer() else str(val)
+    if isinstance(val, Mapping):
+        for k in _TERM_KEYS:
+            if k in val:
+                inner = _normalize_term(val[k], _depth + 1)
+                if inner:
+                    return inner
+        return ''
+    if isinstance(val, (list, tuple)):
+        for item in val:
+            inner = _normalize_term(item, _depth + 1)
+            if inner:
+                return inner
+        return ''
+    s = str(val).strip()
+    if not s or s in ('None', 'null', 'undefined', '[object Object]'):
+        return ''
+    if s.startswith('{') and s.endswith('}'):
+        for parser in (json.loads, ast.literal_eval):
+            try:
+                parsed = parser(s)
+                if isinstance(parsed, Mapping):
+                    return _normalize_term(parsed, _depth + 1)
+            except Exception:
+                pass
+        for k in _TERM_KEYS:
+            m = re.search(rf"""['"]?{k}['"]?\s*:\s*(?:'([^']*)'|"([^"]*)"|(-?\d+(?:\.\d+)?))""", s)
+            if m:
+                extracted = (m.group(1) or m.group(2) or m.group(3) or '').strip()
+                if extracted and extracted not in ('None', 'null'):
+                    return extracted
+        return ''
+    if '[object Object]' in s:
+        return ''
+    return s
 
 
 class DBContent:
+    normalize_term = staticmethod(_normalize_term)
 
 
     async def bs_get_lessons(self, term: str, intake=None):
@@ -2233,7 +2281,7 @@ class DBContent:
     async def get_current_term_config(self) -> dict:
         """دریافت تنظیمات ترم جاری (نام ترم، تاریخ پایان امتحانات، وضعیت یادآوری انتخاب واحد)."""
         from time_utils import gregorian_to_jalali, today_tehran
-        saved_term = str(await self.get_setting('current_academic_term', '') or '').strip()
+        saved_term = _normalize_term(await self.get_setting('current_academic_term', ''))
         if not saved_term:
             try:
                 t_d = today_tehran()
@@ -2283,11 +2331,21 @@ class DBContent:
     ) -> dict:
         """ذخیره تنظیمات ترم جاری توسط ادمین + آرشیو خودکار انتخاب واحدهای ترم‌های قبل در صورت تغییر ترم."""
         from time_utils import parse_gregorian_date, parse_jalali_date, en_digits
+        if isinstance(term, Mapping):
+            if exams_end_date is None and 'exams_end_date' in term:
+                exams_end_date = term.get('exams_end_date')
+            if second_reminder_enabled is None and 'second_reminder_enabled' in term:
+                second_reminder_enabled = term.get('second_reminder_enabled')
+            if second_reminder_days is None and 'second_reminder_days' in term:
+                second_reminder_days = term.get('second_reminder_days')
+            if 'archive_previous' in term:
+                archive_previous = bool(term.get('archive_previous'))
         cur_cfg = await self.get_current_term_config()
         old_term = cur_cfg['term']
-        new_term = str(term).strip() if term is not None and str(term).strip() else old_term
+        cleaned_term = _normalize_term(term) if term is not None else ''
+        new_term = cleaned_term or old_term
 
-        if term is not None and str(term).strip():
+        if cleaned_term:
             await self.set_setting('current_academic_term', new_term)
 
         if exams_end_date is not None:
@@ -2770,7 +2828,7 @@ class DBContent:
         """دریافت انتخاب واحدهای فعلی دانشجو در ترم جاری + کاتالوگ درس‌ها (فیلترشده با گروه آموزشی دانشجو) + گروه اکثریت."""
         uid = int(uid)
         term_cfg = await self.get_current_term_config()
-        active_term = term or term_cfg['term']
+        active_term = _normalize_term(term) or term_cfg['term']
         user = await self.get_user(uid, use_cache=False) or {}
         edu_info = self.extract_user_educational_group_info(user)
         user_edu = edu_info['educational_group']  # 'male' | 'female' | 'unknown'
@@ -2847,7 +2905,7 @@ class DBContent:
         """ذخیره انتخاب واحد درس‌به‌درس دانشجو + اعمال فیلتر مرکزی گروه آموزشی + محاسبه خودکار گروه اکثریت."""
         uid = int(uid)
         term_cfg = await self.get_current_term_config()
-        active_term = term or term_cfg['term']
+        active_term = _normalize_term(term) or term_cfg['term']
         user = await self.get_user(uid, use_cache=False) or {}
         edu_info = self.extract_user_educational_group_info(user)
         user_edu = edu_info['educational_group']
@@ -3077,7 +3135,7 @@ class DBContent:
     async def get_course_selection_admin_stats(self, term: str = None) -> dict:
         """آمار مدیریتی انتخاب واحد برای پنل ادمین (تعداد تکمیل‌شدگان، تفکیک گروه اکثریت، گروه آموزشی و درس‌ها)."""
         term_cfg = await self.get_current_term_config()
-        active_term = term or term_cfg['term']
+        active_term = _normalize_term(term) or term_cfg['term']
         offerings = await self.get_term_course_offerings(active_term, include_all_educational_groups=True)
         total_reachable = await self.count_reachable_users()
 

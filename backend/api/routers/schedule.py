@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from api.auth import get_current_user, require_perm
+from backend.database.content import _normalize_term
 from database import db
 from time_utils import parse_gregorian_date, utc_now_iso
 from utils import now_tehran
@@ -93,7 +94,7 @@ def _format_schedule(
             item.get("course_code")
         ),
 
-        "term": _text(
+        "term": _normalize_term(
             item.get("term")
         ),
 
@@ -206,7 +207,7 @@ async def get_schedule(
         "unselected_lessons": personalized.get("unselected_lessons") or [],
         "majority": personalized.get("majority") or {},
         "conflicts": personalized.get("conflicts") or [],
-        "term": personalized.get("term") or "",
+        "term": _normalize_term(personalized.get("term")),
     }
 
 

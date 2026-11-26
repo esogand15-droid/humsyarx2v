@@ -1,0 +1,840 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   برنامهٔ هفتگی و تسک‌های مطالعه (Wave 3C · DS v2)
+   قوانین §4: بدون hex، بدون rgb/rgba، بدون !important، بدون ویژگی فیزیکی left/right.
+   ریشه data-section="schedule" → --hym-accent-* = نقش schedule (amber).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.sched-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-4);
+  padding-inline: 0;
+  padding-block: 0 var(--hym-space-4);
+  min-width: 0;
+}
+
+.sched-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-4);
+  min-width: 0;
+}
+
+/* ── تب‌سوئیچ بالا (S2) ──────────────────────────────────────────────── */
+.sched-tabs .ds-seg__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--hym-control-h-md);
+  padding-inline: var(--hym-space-2);
+  font-size: var(--hym-fs-small);
+}
+
+.sched-tab-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hym-space-2);
+  white-space: nowrap;
+}
+
+/* ── کارت گروه / وضعیت همگام‌سازی (S4 / S5) ─────────────────────────── */
+.sched-cohort {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-3);
+}
+
+.sched-cohort__lead {
+  display: flex;
+  align-items: center;
+  gap: var(--hym-space-3);
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.sched-cohort__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--hym-control-h-md);
+  height: var(--hym-control-h-md);
+  border-radius: var(--hym-radius-control);
+  background: var(--hym-accent-subtle);
+  border: 1px solid var(--hym-accent-border);
+  color: var(--hym-accent-text);
+}
+
+.sched-cohort__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sched-cohort__title {
+  margin: 0;
+  font-size: var(--hym-fs-body);
+  font-weight: var(--hym-fw-heavy);
+  line-height: var(--hym-lh-tight);
+  color: var(--hym-text-primary);
+}
+
+.sched-cohort__sub {
+  margin: 0;
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-ui);
+  color: var(--hym-text-muted);
+}
+
+/* ── بنر کلاس در حال برگزاری / کلاس بعدی ───────────────────────────── */
+.sched-live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-2) var(--hym-space-3);
+}
+
+.sched-live__lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hym-space-2);
+  min-width: 0;
+}
+
+.sched-live__title {
+  font-size: var(--hym-fs-body);
+  font-weight: var(--hym-fw-bold);
+  color: var(--hym-text-primary);
+}
+
+.sched-live__meta {
+  font-size: var(--hym-fs-small);
+  color: var(--hym-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── بنر هشدار خطا یا تداخل زمانی ───────────────────────────────────── */
+.sched-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hym-space-2);
+  color: var(--hym-role-danger-text);
+}
+
+.sched-alert__icon {
+  flex: 0 0 auto;
+  margin-block-start: 2px;
+}
+
+.sched-alert__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-1);
+  min-width: 0;
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-body);
+}
+
+.sched-alert__title {
+  font-weight: var(--hym-fw-bold);
+}
+
+.sched-conflict-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sched-empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--hym-space-2);
+}
+
+/* ── نوار جابه‌جایی هفته + شاخص‌های واحددار + فیلتر گروه (S3 / S4) ──── */
+.sched-week-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-3);
+}
+
+.sched-week-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-2);
+}
+
+.sched-week-nav {
+  flex: 0 0 auto;
+  min-width: var(--hym-control-h-md);
+  min-height: var(--hym-control-h-md);
+  padding-inline: var(--hym-space-3);
+}
+
+.sched-week-mid {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+
+.sched-week-label {
+  font-size: var(--hym-fs-body);
+  font-weight: var(--hym-fw-heavy);
+  line-height: var(--hym-lh-tight);
+  color: var(--hym-text-primary);
+}
+
+.sched-week-range {
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-ui);
+  color: var(--hym-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sched-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-2);
+  padding-block-start: var(--hym-space-3);
+  border-block-start: 1px solid var(--hym-hairline);
+}
+
+.sched-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hym-space-2);
+}
+
+.sched-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hym-space-2);
+}
+
+.sched-groups .ds-seg__item {
+  min-height: var(--hym-control-h-md);
+  min-width: var(--hym-control-h-md);
+  padding-inline: var(--hym-space-3);
+}
+
+.sched-jump-btn {
+  min-height: var(--hym-control-h-md);
+}
+
+@media (max-width: 420px) {
+  .sched-week-nav {
+    gap: var(--hym-space-1);
+    padding-inline: var(--hym-space-2);
+    font-size: var(--hym-fs-caption);
+  }
+
+  .sched-week-range {
+    font-size: var(--hym-fs-caption);
+    white-space: nowrap;
+  }
+
+  .sched-toolbar__actions,
+  .sched-groups,
+  .sched-groups .ds-seg {
+    width: 100%;
+  }
+}
+
+/* ── بدنهٔ برنامه: موبایل/تبلت (< 1024px) کارت‌های روزبه‌روز ──────────── */
+.sched-agenda {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--hym-space-3);
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sched-agenda {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+.sched-day-card {
+  overflow: hidden;
+  border: 1px solid var(--hym-hairline);
+}
+
+.sched-day-card.is-today {
+  border-color: var(--hym-accent-border);
+  box-shadow: var(--hym-elev-2);
+}
+
+.sched-day-card.is-past .sched-day-card__head {
+  opacity: 0.85;
+}
+
+.sched-day-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-2);
+  padding-block: var(--hym-space-3);
+  padding-inline: var(--hym-space-4);
+  background: var(--hym-surface-sunken);
+  border-block-end: 1px solid var(--hym-hairline);
+}
+
+.sched-day-card.is-today .sched-day-card__head {
+  background: var(--hym-accent-subtle);
+  border-block-end-color: var(--hym-accent-border);
+}
+
+.sched-day-card__title-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hym-space-2);
+  min-width: 0;
+}
+
+.sched-day-card__title {
+  margin: 0;
+  font-size: var(--hym-fs-body);
+  font-weight: var(--hym-fw-heavy);
+  line-height: var(--hym-lh-tight);
+  color: var(--hym-text-primary);
+}
+
+.sched-day-card.is-today .sched-day-card__title {
+  color: var(--hym-accent-text);
+}
+
+.sched-day-card__date {
+  font-size: var(--hym-fs-small);
+  color: var(--hym-text-muted);
+}
+
+/* ── ردیف جلسه در موبایل و تبلت ─────────────────────────────────────── */
+.sched-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hym-space-3);
+  padding-block: var(--hym-space-3);
+  padding-inline: var(--hym-space-4);
+  border-inline-start: 3px solid transparent;
+}
+
+.sched-row.is-exam {
+  background: var(--hym-role-danger-subtle);
+  border-inline-start-color: var(--hym-role-danger-solid);
+}
+
+.sched-row.is-makeup {
+  border-inline-start-color: var(--hym-accent);
+}
+
+.sched-row.is-now {
+  background: var(--hym-role-grades-subtle);
+  border-inline-start-color: var(--hym-role-grades-solid);
+}
+
+.sched-row.is-next {
+  background: var(--hym-accent-subtle);
+  border-inline-start-color: var(--hym-accent);
+}
+
+.sched-row.is-over {
+  opacity: 0.76;
+}
+
+.sched-row.is-exam .sched-row__sub,
+.sched-row.is-now .sched-row__sub,
+.sched-row.is-next .sched-row__sub {
+  color: var(--hym-text-secondary);
+}
+
+.sched-row__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--hym-control-h-md);
+  height: var(--hym-control-h-md);
+  border-radius: var(--hym-radius-control);
+  background: var(--hym-accent-subtle);
+  color: var(--hym-accent-text);
+}
+
+.sched-row.is-exam .sched-row__icon {
+  background: var(--hym-role-danger-solid);
+  color: var(--hym-role-danger-on-solid);
+}
+
+.sched-row__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-1);
+}
+
+.sched-row__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-1) var(--hym-space-2);
+}
+
+.sched-row__lesson {
+  font-size: var(--hym-fs-body);
+  font-weight: var(--hym-fw-heavy);
+  line-height: var(--hym-lh-tight);
+  color: var(--hym-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.sched-row__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hym-space-1);
+}
+
+.sched-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hym-space-1) var(--hym-space-2);
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-ui);
+  color: var(--hym-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sched-row__time {
+  font-weight: var(--hym-fw-bold);
+  color: var(--hym-text-primary);
+}
+
+.sched-row.is-exam .sched-row__time {
+  color: var(--hym-role-danger-text);
+}
+
+.sched-row__sub {
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-ui);
+  color: var(--hym-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.sched-row__note {
+  font-size: var(--hym-fs-caption);
+  line-height: var(--hym-lh-body);
+  color: var(--hym-text-secondary);
+  padding-block: var(--hym-space-1);
+  padding-inline: var(--hym-space-2);
+  border-radius: var(--hym-radius-sm);
+  background: var(--hym-surface-sunken);
+  overflow-wrap: anywhere;
+}
+
+/* ── جمع‌کنندهٔ روزهای خالی در موبایل و تبلت ──────────────────────────── */
+.sched-empty-days {
+  grid-column: 1 / -1;
+}
+
+.sched-empty-toggle {
+  justify-content: space-between;
+  min-height: var(--hym-control-h-md);
+}
+
+.sched-empty-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hym-space-2);
+  margin-block-start: var(--hym-space-3);
+  padding-block-start: var(--hym-space-3);
+  border-block-start: 1px solid var(--hym-hairline);
+}
+
+.sched-empty-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hym-space-1);
+  padding-block: var(--hym-space-1);
+  padding-inline: var(--hym-space-3);
+  border-radius: var(--hym-radius-pill);
+  background: var(--hym-surface-sunken);
+  color: var(--hym-text-muted);
+  font-size: var(--hym-fs-caption);
+  line-height: var(--hym-lh-ui);
+}
+
+/* ── جدول هفت‌ستونهٔ دسکتاپ (>= 1024px) (D1 / PD1) ──────────────────── */
+.sched-grid {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .sched-agenda {
+    display: none;
+  }
+
+  .sched-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--hym-space-2);
+    align-items: stretch;
+  }
+
+  .sched-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hym-space-2);
+    min-width: 0;
+    min-height: 220px;
+    padding: var(--hym-space-2);
+    border-radius: var(--hym-radius-card);
+    background: var(--hym-surface-1);
+    box-shadow: var(--hym-elev-1);
+    border: 1px solid var(--hym-hairline);
+  }
+
+  .sched-col.is-today {
+    border-color: var(--hym-accent);
+    background: var(--hym-surface-2);
+    box-shadow: var(--hym-elev-2);
+  }
+
+  .sched-col.is-past .sched-col__head {
+    opacity: 0.85;
+  }
+
+  .sched-col__head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+    padding-block: var(--hym-space-2);
+    padding-inline: var(--hym-space-1);
+    border-radius: var(--hym-radius-control);
+    background: var(--hym-surface-sunken);
+    border-block-end: 1px solid var(--hym-hairline);
+  }
+
+  .sched-col.is-today .sched-col__head {
+    background: var(--hym-accent-subtle);
+    border-block-end-color: var(--hym-accent-border);
+  }
+
+  .sched-col__day {
+    font-size: var(--hym-fs-small);
+    font-weight: var(--hym-fw-heavy);
+    line-height: var(--hym-lh-tight);
+    color: var(--hym-text-primary);
+  }
+
+  .sched-col.is-today .sched-col__day {
+    color: var(--hym-accent-text);
+  }
+
+  .sched-col__date {
+    font-size: var(--hym-fs-caption);
+    color: var(--hym-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sched-col__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hym-space-2);
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .sched-col__empty {
+    margin: auto;
+    padding-block: var(--hym-space-6);
+    text-align: center;
+    font-size: var(--hym-fs-caption);
+    color: var(--hym-text-muted);
+  }
+
+  .sched-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--hym-space-2);
+    border-radius: var(--hym-radius-control);
+    background: var(--hym-surface-sunken);
+    border: 1px solid var(--hym-hairline);
+    border-inline-start: 3px solid var(--hym-accent);
+    min-width: 0;
+  }
+
+  .sched-cell.is-exam {
+    background: var(--hym-role-danger-subtle);
+    border-color: var(--hym-role-danger-subtle-border);
+    border-inline-start: 3px solid var(--hym-role-danger-solid);
+  }
+
+  .sched-cell.is-now {
+    background: var(--hym-role-grades-subtle);
+    border-color: var(--hym-role-grades-subtle-border);
+    border-inline-start: 3px solid var(--hym-role-grades-solid);
+  }
+
+  .sched-cell.is-next {
+    background: var(--hym-accent-subtle);
+    border-color: var(--hym-accent-border);
+  }
+
+  .sched-cell.is-over {
+    opacity: 0.76;
+  }
+
+  .sched-cell.is-exam .sched-cell__meta,
+  .sched-cell.is-now .sched-cell__meta,
+  .sched-cell.is-next .sched-cell__meta {
+    color: var(--hym-text-secondary);
+  }
+
+  .sched-cell__time {
+    font-size: var(--hym-fs-caption);
+    font-weight: var(--hym-fw-bold);
+    line-height: var(--hym-lh-tight);
+    color: var(--hym-accent-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sched-cell.is-exam .sched-cell__time {
+    color: var(--hym-role-danger-text);
+  }
+
+  .sched-cell.is-now .sched-cell__time {
+    color: var(--hym-role-grades-text);
+  }
+
+  .sched-cell__lesson {
+    font-size: var(--hym-fs-small);
+    font-weight: var(--hym-fw-heavy);
+    line-height: var(--hym-lh-tight);
+    color: var(--hym-text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  .sched-cell__meta {
+    font-size: var(--hym-fs-caption);
+    line-height: var(--hym-lh-ui);
+    color: var(--hym-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .sched-cell__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-block-start: 2px;
+  }
+
+  .sched-cell__note {
+    font-size: var(--hym-fs-caption);
+    line-height: var(--hym-lh-ui);
+    color: var(--hym-text-secondary);
+    overflow-wrap: anywhere;
+  }
+}
+
+/* ── بخش تسک‌های مطالعه جلالی ────────────────────────────────────────── */
+.sched-tasks-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--hym-space-4);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .sched-tasks-layout {
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+  }
+
+  .sched-task-form-card {
+    position: sticky;
+    top: calc(var(--hym-header-h) + var(--hym-space-5));
+  }
+}
+
+.sched-task-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-3);
+  margin-block-start: var(--hym-space-3);
+}
+
+.sched-task-form__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--hym-space-3);
+}
+
+@media (min-width: 480px) {
+  .sched-task-form__row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.sched-task-form__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--hym-space-2);
+  padding-block-start: var(--hym-space-1);
+}
+
+.sched-input-ltr {
+  text-align: end;
+}
+
+.sched-tasks-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-3);
+  min-width: 0;
+}
+
+.sched-tasks-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-2);
+}
+
+.sched-tasks-head__title {
+  margin: 0;
+  font-size: var(--hym-fs-h3);
+  font-weight: var(--hym-fw-heavy);
+  line-height: var(--hym-lh-tight);
+  color: var(--hym-text-primary);
+}
+
+.sched-task {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hym-space-2);
+  padding-block: var(--hym-space-2);
+  padding-inline: var(--hym-space-2) var(--hym-space-4);
+  transition: opacity var(--hym-duration-fast) var(--hym-ease-default);
+}
+
+.sched-task.is-done {
+  opacity: 0.72;
+}
+
+/* ≥44×44px لمس‌هدف برای چک‌باکس، بدون تغییر ظاهر باکس ۲۲×۲۲ */
+.sched-task__check-btn {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--hym-control-h-md);
+  height: var(--hym-control-h-md);
+  padding: 0;
+  border: 0;
+  border-radius: var(--hym-radius-control);
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sched-task__check-btn:hover .sched-task__box {
+  border-color: var(--hym-accent);
+}
+
+.sched-task__check-btn:focus-visible {
+  outline: 2px solid var(--hym-accent);
+  outline-offset: 2px;
+}
+
+.sched-task__box {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--hym-radius-sm);
+  border: 2px solid var(--hym-hairline-strong);
+  background: var(--hym-surface-1);
+  color: transparent;
+  transition: background var(--hym-duration-fast) var(--hym-ease-default),
+              border-color var(--hym-duration-fast) var(--hym-ease-default),
+              color var(--hym-duration-fast) var(--hym-ease-default);
+}
+
+.sched-task.is-done .sched-task__box {
+  background: var(--hym-accent);
+  border-color: var(--hym-accent);
+  color: var(--hym-accent-on);
+}
+
+.sched-task__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-block: var(--hym-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-1);
+}
+
+.sched-task__title {
+  font-size: var(--hym-fs-body);
+  font-weight: var(--hym-fw-bold);
+  line-height: var(--hym-lh-ui);
+  color: var(--hym-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.sched-task.is-done .sched-task__title {
+  text-decoration: line-through;
+  color: var(--hym-text-muted);
+}
+
+.sched-task__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hym-space-2) var(--hym-space-3);
+  font-size: var(--hym-fs-small);
+  color: var(--hym-text-muted);
+}
+
+.sched-task__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hym-space-1);
+}
+
+/* ── اسکلت بارگذاری ───────────────────────────────────────────────────── */
+.sched-skel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sched-task,
+  .sched-task__box {
+    transition: none;
+  }
+}
