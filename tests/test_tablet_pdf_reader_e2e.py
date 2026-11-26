@@ -176,11 +176,14 @@ class Tier1Feature4GpuZoomTests(ReaderBaseTest):
         self.assertIn("baseWidth * zoom", self.reader_view_tsx)
 
     def test_tc_zoom_02_zoom_clamping_limits(self):
-        """TC-ZOOM-02: Verify zoom level is clamped to min 0.6 and max >= 2.0."""
-        self.assertIn("0.6", self.reader_view_tsx)
-        # Max zoom is 2.0 or 3.0
-        has_max_zoom = "2.0" in self.reader_view_tsx or "2" in self.reader_view_tsx or "3.0" in self.reader_view_tsx
-        self.assertTrue(has_max_zoom, "Max zoom boundary must be defined")
+        """TC-ZOOM-02: one shared clamp for wheel, pinch, keys: min 0.5, max 3 (2026-11-26).
+        Before, keys capped at 2.0 while wheel/pinch went to 2.5, so '+' could zoom out."""
+        self.assertIn("const ZOOM_MIN = 0.5", self.reader_view_tsx)
+        self.assertIn("const ZOOM_MAX = 3", self.reader_view_tsx)
+        # no call site may carry its own literal bounds again
+        self.assertNotIn("Math.max(0.6", self.reader_view_tsx)
+        self.assertNotIn("Math.min(2.0", self.reader_view_tsx)
+        self.assertNotIn("Math.min(2.5", self.reader_view_tsx)
 
     def test_tc_zoom_03_focal_point_math_accuracy(self):
         """TC-ZOOM-03: Mathematical verification that focal point zooming preserves cursor coordinate."""

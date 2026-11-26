@@ -333,14 +333,12 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
         # Background
         self.assertIn("rgba(15, 23, 42, 0.78)", block)
 
-        # Border
-        self.assertIn("1px solid rgba(56, 189, 248, 0.22)", block)
-
-        # 4 box-shadow layers
-        self.assertIn("0 8px 32px 0 rgba(0, 0, 0, 0.55)", block)
-        self.assertIn("0 0 20px -3px rgba(37, 99, 235, 0.35)", block)
-        self.assertIn("0 0 16px -2px rgba(0, 242, 254, 0.25)", block)
-        self.assertIn("0 0 0 1px rgba(56, 189, 248, 0.15)", block)
+        # Antislop pass (2026-11-26): header separates by tone + neutral hairline and one
+        # neutral elevation shadow. No colored glow: cyan is reserved for active/primary.
+        self.assertIn("1px solid rgba(148, 163, 184, 0.16)", block)
+        self.assertIn("0 8px 24px 0 rgba(0, 0, 0, 0.35)", block)
+        self.assertNotIn("rgba(0, 242, 254", block)
+        self.assertNotIn("rgba(37, 99, 235", block)
 
     def test_adv_theme_light_mode_medical_white_and_soft_aura_layers(self):
         """Stress Test Light Mode Styling:
@@ -369,11 +367,11 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
         # Border
         self.assertIn("1px solid rgba(226, 232, 240, 0.9)", block)
 
-        # 4 box-shadow layers
+        # Neutral elevation layers only; the blue/cyan aura was removed in the antislop pass
         self.assertIn("0 10px 25px -5px rgba(15, 23, 42, 0.08)", block)
         self.assertIn("0 4px 10px -2px rgba(15, 23, 42, 0.04)", block)
-        self.assertIn("0 0 16px -2px rgba(37, 99, 235, 0.12)", block)
-        self.assertIn("0 0 12px -2px rgba(0, 242, 254, 0.14)", block)
+        self.assertNotIn("rgba(0, 242, 254", block)
+        self.assertNotIn("rgba(37, 99, 235", block)
 
     def test_adv_frosted_glass_blur_token_validity(self):
         """Stress Test Frosted Glassmorphism:
