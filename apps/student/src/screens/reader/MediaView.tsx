@@ -8,6 +8,9 @@ import type {
 import '../../design/media.css';
 import { Icon } from '../../icons';
 import { fa, humanSize } from '../../lib/library';
+import { bgAudio } from '../../lib/bgAudio';
+import type { Scope } from '../../lib/ink';
+import { readerPath } from '../../lib/reader';
 
 interface Props {
   url: string;
@@ -21,6 +24,8 @@ interface Props {
   onExpired?: () => Promise<string | null>;
   /** زمان انقضای لینک فعلی (ms، ساعت همین مرورگر)؛ والد کمی قبل از آن لینک تازه میدهد */
   expiresAt?: number;
+  /** voice only: lets playback continue in the mini player after leaving this screen */
+  bg?: { scope: Scope; id: string };
 }
 
 type PlayerProps = Omit<Props, 'kind'>;
@@ -1156,8 +1161,38 @@ const WAVE = Array.from({ length: 36 }, (_, i) => 0.3 + 0.7 * Math.abs(Math.sin(
 const SLEEPS = [0, 15, 30, 60];
 
 function AudioPlayer(p: PlayerProps) {
-  const m = useMediaEngine({ ...p, kind: 'audio' });
+  // the same voice playing in the mini player continues here from its current second
+  const [taken] = useState(() => (p.bg ? bgAudio.takeOver(p.bg.scope, p.bg.id) : null));
+  const m = useMediaEngine({ ...p, startAt: taken ?? p.startAt, kind: 'audio' });
   const [sleep, setSleep] = useState(0);
+
+  const autoplayed = useRef(false);
+  useEffect(() => {
+    if (taken == null || autoplayed.current || !(m.dur > 0)) return;
+    autoplayed.current = true;
+    void m.ref.current?.play().catch(() => undefined);
+  }, [taken, m.dur, m.ref]);
+
+  // leaving the screen while playing: hand the voice to the mini player instead of stopping
+  const handoff = useRef({ playing: false, el: null as HTMLMediaElement | null, src: '', rate: 1, p });
+  handoff.current = { ...handoff.current, playing: m.playing, src: m.src, rate: m.rate, p };
+  useEffect(
+    () => () => {
+      const h = handoff.current;
+      const bg = h.p.bg;
+      if (!bg || !h.playing || !h.el || !h.src) return;
+      bgAudio.start({
+        scope: bg.scope,
+        id: bg.id,
+        name: h.p.name,
+        src: h.src,
+        at: h.el.currentTime,
+        rate: h.rate,
+        returnTo: readerPath(bg.scope, bg.id),
+      });
+    },
+    [],
+  );
 
   // تایمر خواب: بعد از چند دقیقه خودکار متوقف
   useEffect(() => {
@@ -1176,6 +1211,7 @@ function AudioPlayer(p: PlayerProps) {
       <audio
         ref={(el) => {
           m.ref.current = el;
+          if (el) handoff.current.el = el;
         }}
         src={m.src}
         preload="metadata"
