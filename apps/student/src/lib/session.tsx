@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { api, ApiError, onSessionExpired } from './api';
+import { clearCache } from './swr';
 import type { AccountState, AuthConfig, PublicUser } from './api-types';
 
 /** وضعیت نشست در کل اپ — تنها منبع حقیقت برای گارد مسیرها. */
@@ -78,6 +79,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } catch {
       // حتی اگر شبکه خطا داد، سمت کلاینت خارج میشویم؛ کوکی منقضی میماند
     }
+    clearCache(); // next account must never paint the previous one's data
     setExpired(false);
     setUser(null);
     setStatus('anonymous');

@@ -8,6 +8,7 @@ import { DsBadge, DsButton, DsCard, DsChip, DsEmpty } from '../../design/compone
 import { Icon } from '../../icons';
 import { accuracyTone, exam, type LessonItem, type StatsPayload, type TopicItem } from '../../lib/exam';
 import { faNum, faPercent, formatTerm } from '../../lib/fa';
+import { peek, put } from '../../lib/swr';
 
 /** تمرین — انتخاب درس و مبحث، سپس شروع تمرین یا آزمون زمان‌دار.
  *
@@ -15,9 +16,10 @@ import { faNum, faPercent, formatTerm } from '../../lib/fa';
  */
 export function ExamHome() {
   const navigate = useNavigate();
-  const [lessons, setLessons] = useState<LessonItem[]>([]);
-  const [stats, setStats] = useState<StatsPayload | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [cached] = useState(() => peek<{ lessons: LessonItem[]; stats: StatsPayload | null }>('exam-home'));
+  const [lessons, setLessons] = useState<LessonItem[]>(cached?.lessons ?? []);
+  const [stats, setStats] = useState<StatsPayload | null>(cached?.stats ?? null);
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>(cached ? 'ready' : 'loading');
   const [error, setError] = useState<unknown>(null);
 
   const [picked, setPicked] = useState<LessonItem | null>(null);
@@ -25,13 +27,14 @@ export function ExamHome() {
   const [topicsLoading, setTopicsLoading] = useState(false);
 
   const load = useCallback(async () => {
-    setState('loading');
+    if (!peek('exam-home')) setState('loading');
     setError(null);
     try {
       const [less, st] = await Promise.all([
         exam.lessons(),
         exam.stats().catch(() => null),
       ]);
+      put('exam-home', { lessons: less.lessons ?? [], stats: st });
       setLessons(less.lessons ?? []);
       setStats(st);
       setState('ready');

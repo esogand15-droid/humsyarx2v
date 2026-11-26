@@ -12,6 +12,7 @@ import { library } from '../../lib/library';
 import type { LibraryState, SubjectItem, TermItem } from '../../lib/library';
 import { reader, readerPath } from '../../lib/reader';
 import type { ContinueItem } from '../../lib/reader';
+import { peek, put } from '../../lib/swr';
 
 type Tab = 'lessons' | 'references';
 
@@ -25,40 +26,40 @@ function clockFa(sec: number): string {
 /** کتابخانه — ریشهٔ دو شاخه: «درس‌ها» (منابع علوم پایه) و «مرجع».
  *  رنگ بخش: Indigo (`resources`)، ورودی فرمت‌شده (`LB1`)، درصد فارسی (`H2`).
  */
+interface LibraryBundle {
+  state: LibraryState;
+  terms: TermItem[];
+  subjects: SubjectItem[];
+  recent: ContinueItem[];
+}
+
 export function LibraryScreen() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('lessons');
-  const [state, setState] = useState<LibraryState | null>(null);
-  const [terms, setTerms] = useState<TermItem[] | null>(null);
-  const [subjects, setSubjects] = useState<SubjectItem[] | null>(null);
+  const [cached] = useState(() => peek<LibraryBundle>('library'));
+  const [state, setState] = useState<LibraryState | null>(cached?.state ?? null);
+  const [terms, setTerms] = useState<TermItem[] | null>(cached?.terms ?? null);
+  const [subjects, setSubjects] = useState<SubjectItem[] | null>(cached?.subjects ?? null);
   const [error, setError] = useState<unknown>(null);
-  const [loading, setLoading] = useState(true);
-  const [recent, setRecent] = useState<ContinueItem[]>([]);
+  const [loading, setLoading] = useState(!cached);
+  const [recent, setRecent] = useState<ContinueItem[]>(cached?.recent ?? []);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!peek('library')) setLoading(true);
     setError(null);
     try {
       const st = await library.state();
+      // terms, subjects and recent are independent: fetch together, not one after another
+      const [t, s, r] = await Promise.all([
+        st.resources.allowed ? library.terms().then((x) => x.terms) : Promise.resolve([] as TermItem[]),
+        st.references.allowed ? library.subjects().then((x) => x.subjects) : Promise.resolve([] as SubjectItem[]),
+        reader.recent().then((x) => x.items).catch(() => [] as ContinueItem[]),
+      ]);
+      put<LibraryBundle>('library', { state: st, terms: t, subjects: s, recent: r });
       setState(st);
-
-      if (st.resources.allowed) {
-        const t = await library.terms();
-        setTerms(t.terms);
-      } else {
-        setTerms([]);
-      }
-      reader
-        .recent()
-        .then((r) => setRecent(r.items))
-        .catch(() => setRecent([]));
-
-      if (st.references.allowed) {
-        const s = await library.subjects();
-        setSubjects(s.subjects);
-      } else {
-        setSubjects([]);
-      }
+      setTerms(t);
+      setSubjects(s);
+      setRecent(r);
     } catch (err) {
       setError(err);
     } finally {

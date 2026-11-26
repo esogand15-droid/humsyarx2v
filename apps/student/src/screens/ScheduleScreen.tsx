@@ -22,6 +22,16 @@ import {
 } from '../lib/fa';
 import { schedule, studyTasks } from '../lib/schedule';
 import type { ScheduleConflict, ScheduleItem, StudyTask } from '../lib/schedule';
+import { peek, put } from '../lib/swr';
+
+interface ScheduleMeta {
+  cohortTitle: string;
+  selected_count: number;
+  total_offered_count: number;
+  has_custom_selection: boolean;
+  term: string;
+  conflicts: ScheduleConflict[];
+}
 import {
   addDays,
   buildWeekPlan,
@@ -292,24 +302,20 @@ export function ScheduleScreen() {
       : 'timetable';
 
   const [activeTab, setActiveTab] = useState<'timetable' | 'tasks'>(initialTab);
-  const [items, setItems] = useState<ScheduleItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [cachedTt] = useState(() => peek<{ items: ScheduleItem[]; meta: ScheduleMeta }>('schedule'));
+  const [items, setItems] = useState<ScheduleItem[]>(cachedTt?.items ?? []);
+  const [loading, setLoading] = useState(!cachedTt);
   const [error, setError] = useState('');
-  const [meta, setMeta] = useState<{
-    cohortTitle: string;
-    selected_count: number;
-    total_offered_count: number;
-    has_custom_selection: boolean;
-    term: string;
-    conflicts: ScheduleConflict[];
-  }>({
-    cohortTitle: '',
-    selected_count: 0,
-    total_offered_count: 0,
-    has_custom_selection: false,
-    term: '',
-    conflicts: [],
-  });
+  const [meta, setMeta] = useState<ScheduleMeta>(
+    cachedTt?.meta ?? {
+      cohortTitle: '',
+      selected_count: 0,
+      total_offered_count: 0,
+      has_custom_selection: false,
+      term: '',
+      conflicts: [],
+    },
+  );
 
   const now = useMemo(() => tehranNow(), []);
   const thisWeek = useMemo(() => weekStart(now.iso), [now.iso]);
@@ -318,8 +324,8 @@ export function ScheduleScreen() {
   const [showEmptyDays, setShowEmptyDays] = useState(false);
 
   // تسک‌های مطالعه جلالی
-  const [tasks, setTasks] = useState<StudyTask[]>([]);
-  const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasks, setTasks] = useState<StudyTask[]>(() => peek<StudyTask[]>('schedule-tasks') ?? []);
+  const [tasksLoading, setTasksLoading] = useState(() => !peek('schedule-tasks'));
   const [tasksError, setTasksError] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDate, setTaskDate] = useState(getTodayJalali);
@@ -333,20 +339,22 @@ export function ScheduleScreen() {
   };
 
   const loadTimetable = useCallback(async () => {
-    setLoading(true);
+    if (!peek('schedule')) setLoading(true);
     setError('');
     try {
       const res = await schedule.list({ since: thisWeek });
       const rawList = res.items || res.schedule || [];
-      setItems(rawList);
-      setMeta({
+      const nextMeta: ScheduleMeta = {
         cohortTitle: formatCohortTitle(res.group || res.computed_group, res.educational_group),
         selected_count: res.selected_count ?? 0,
         total_offered_count: res.total_offered_count ?? 0,
         has_custom_selection: Boolean(res.has_custom_selection),
         term: formatTerm(res.term),
         conflicts: res.conflicts || [],
-      });
+      };
+      put('schedule', { items: rawList, meta: nextMeta });
+      setItems(rawList);
+      setMeta(nextMeta);
     } catch (err) {
       setError(errorText(err, 'دریافت برنامه هفتگی با خطا مواجه شد'));
     } finally {
@@ -355,11 +363,11 @@ export function ScheduleScreen() {
   }, [thisWeek]);
 
   const loadTasks = useCallback(async () => {
-    setTasksLoading(true);
+    if (!peek('schedule-tasks')) setTasksLoading(true);
     setTasksError('');
     try {
       const res = await studyTasks.list();
-      setTasks(res.tasks || []);
+      setTasks(put('schedule-tasks', res.tasks || []));
     } catch (err) {
       setTasksError(errorText(err, 'دریافت تسک‌های مطالعه با خطا مواجه شد'));
     } finally {

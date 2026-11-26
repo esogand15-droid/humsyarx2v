@@ -113,6 +113,27 @@ function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export function App() {
+  // Warm the main screen chunks once idle: tab switches then never wait on a download,
+  // so RouteFallback shows only on a cold first paint. Same specifiers = same chunks as lazy().
+  useEffect(() => {
+    const warm = () => {
+      void import('./screens/HomeScreen');
+      void import('./screens/library/LibraryScreen');
+      void import('./screens/exam/ExamHome');
+      void import('./screens/ai/AiChatScreen');
+      void import('./screens/GradesScreen');
+      void import('./screens/ScheduleScreen');
+      void import('./screens/notes/NotesScreen');
+      void import('./screens/MeScreen');
+      void import('./screens/reader/ReaderScreen');
+    };
+    const ric = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
+    const id = ric ? ric(warm) : window.setTimeout(warm, 1500);
+    return () => {
+      if (!ric) window.clearTimeout(id);
+    };
+  }, []);
+
   return (
     <Layout>
       <ScrollToTop />

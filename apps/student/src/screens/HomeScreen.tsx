@@ -23,6 +23,7 @@ import type { ContinueItem } from '../lib/reader';
 import { studyTasks } from '../lib/schedule';
 import type { StudyTask } from '../lib/schedule';
 import { useSession } from '../lib/session';
+import { peek, put } from '../lib/swr';
 
 const PERSIAN_WEEK_DAYS = [
   { key: 'sat', fa: 'ش', full: 'شنبه' },
@@ -613,19 +614,29 @@ function QuickAccessCommandGrid() {
   );
 }
 
+interface HomeBundle {
+  data: DashboardPayload | null;
+  recent: ContinueItem[];
+  subStatus: SubscriptionStatus | null;
+  tasks: StudyTask[];
+  weekly: WeeklyActivityItem[];
+}
+
 /* ── صفحهٔ اصلی خانه ──────────────────────────────────────────────────── */
 export function HomeScreen() {
   const { user } = useSession();
-  const [data, setData] = useState<DashboardPayload | null>(null);
-  const [recent, setRecent] = useState<ContinueItem[]>([]);
-  const [subStatus, setSubStatus] = useState<SubscriptionStatus | null>(null);
-  const [tasks, setTasks] = useState<StudyTask[]>([]);
-  const [weekly, setWeekly] = useState<WeeklyActivityItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [cached] = useState(() => peek<HomeBundle>('home'));
+  const [data, setData] = useState<DashboardPayload | null>(cached?.data ?? null);
+  const [recent, setRecent] = useState<ContinueItem[]>(cached?.recent ?? []);
+  const [subStatus, setSubStatus] = useState<SubscriptionStatus | null>(cached?.subStatus ?? null);
+  const [tasks, setTasks] = useState<StudyTask[]>(cached?.tasks ?? []);
+  const [weekly, setWeekly] = useState<WeeklyActivityItem[]>(cached?.weekly ?? []);
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState('');
 
   const loadData = useCallback(async () => {
-    setLoading(true);
+    // cached data stays on screen while it refreshes; skeleton only on a cold cache
+    if (!peek('home')) setLoading(true);
     setError('');
     try {
       const [dashRes, recentRes, subRes, tasksRes, weeklyRes] = await Promise.all([
@@ -636,11 +647,18 @@ export function HomeScreen() {
         dashboard.weekly().catch(() => ({ weekly: [] })),
       ]);
 
-      setData(dashRes);
-      setRecent(recentRes?.items || []);
-      setSubStatus(subRes);
-      setTasks(tasksRes?.tasks || []);
-      setWeekly(weeklyRes?.weekly || []);
+      const next = put<HomeBundle>('home', {
+        data: dashRes,
+        recent: recentRes?.items || [],
+        subStatus: subRes,
+        tasks: tasksRes?.tasks || [],
+        weekly: weeklyRes?.weekly || [],
+      });
+      setData(next.data);
+      setRecent(next.recent);
+      setSubStatus(next.subStatus);
+      setTasks(next.tasks);
+      setWeekly(next.weekly);
     } catch (err) {
       setError(errorText(err, 'بارگذاری داشبورد انجام نشد.'));
     } finally {

@@ -8,6 +8,7 @@ import { Icon } from '../icons';
 import { errorText } from '../lib/api';
 import { faDigits, faNum } from '../lib/fa';
 import { grades, type GradesSummaryPayload } from '../lib/grades';
+import { peek, put } from '../lib/swr';
 
 function gpaTone(gpa: number | null): 'excellent' | 'normal' | 'warn' | 'danger' {
   if (gpa === null) return 'normal';
@@ -45,16 +46,16 @@ function formatCourseScore(raw: string | number | null | undefined): string {
 
 /** کارنامه و معدل کل — ممیز فارسی (٫)، نمودار روند معدل بین ترم‌ها و چیدمان دوستونی. */
 export function GradesScreen() {
-  const [data, setData] = useState<GradesSummaryPayload | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<GradesSummaryPayload | null>(() => peek<GradesSummaryPayload>('grades') ?? null);
+  const [loading, setLoading] = useState(() => !peek('grades'));
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!peek('grades')) setLoading(true);
     setError('');
     try {
       const res = await grades.summary();
-      setData(res);
+      setData(put('grades', res));
     } catch (err) {
       setError(errorText(err, 'دریافت کارنامه تحصیلی با خطا مواجه شد.'));
     } finally {

@@ -10,6 +10,7 @@ import type { IconName } from '../../icons';
 import { faNum } from '../../lib/fa';
 import { ink, type NoteItem } from '../../lib/ink';
 import { readerPath } from '../../lib/reader';
+import { peek, put } from '../../lib/swr';
 
 const ICON: Record<string, IconName> = {
   pdf: 'i-doc',
@@ -26,15 +27,15 @@ const PAGE_SIZE = 10;
  */
 export function NotesScreen() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<NoteItem[]>([]);
-  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [items, setItems] = useState<NoteItem[]>(() => peek<NoteItem[]>('notes') ?? []);
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>(() => (peek('notes') ? 'ready' : 'loading'));
   const [currentPage, setCurrentPage] = useState(1);
 
   const load = useCallback(async () => {
-    setState('loading');
+    if (!peek('notes')) setState('loading');
     try {
       const res = await ink.notes();
-      setItems(res.items ?? []);
+      setItems(put('notes', res.items ?? []));
       setState('ready');
     } catch {
       setState('error');
