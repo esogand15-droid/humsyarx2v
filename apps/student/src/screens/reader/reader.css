@@ -578,6 +578,17 @@ html.dark .reader-workspace {
   color: var(--hym-text-primary);
 }
 
+/* The dock root also carries the legacy `.ink-bar` class (ui.css), which painted a second glass
+   panel with a drop shadow behind the capsule. The capsule is the only surface. */
+.ink-bar.ink-dock {
+  padding: 0;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
 .ink-dock.dock-bottom {
   inset-block-end: max(14px, env(safe-area-inset-bottom, 0px));
   inset-block-start: auto;
