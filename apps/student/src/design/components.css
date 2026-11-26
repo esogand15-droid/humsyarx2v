@@ -249,7 +249,8 @@ textarea.ds-input { padding-block: var(--hym-space-3); resize: vertical; }
 .ds-input--ltr { direction: ltr; text-align: start; font-variant-numeric: tabular-nums; }
 
 .ds-search { position: relative; display: flex; align-items: center; }
-.ds-search .ds-input { padding-inline-start: 44px; border-radius: var(--hym-radius-pill); background: var(--hym-surface-sunken); border-color: transparent; }
+/* both sides: input dir="auto" can resolve LTR while the icon follows the page RTL */
+.ds-search .ds-input { padding-inline: 44px; border-radius: var(--hym-radius-pill); background: var(--hym-surface-sunken); border-color: transparent; }
 .ds-search .ds-input:focus { background: var(--hym-surface-1); }
 .ds-search__icon {
   position: absolute; inset-inline-start: var(--hym-space-4);

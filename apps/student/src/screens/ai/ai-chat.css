@@ -375,3 +375,98 @@ ol.md__list[dir="rtl"] { list-style-type: persian; }
 .md__a-center { text-align: center; }
 .md__a-end { text-align: end; }
 .md__clip { position: fixed; inset-block-start: 0; inset-inline-start: 0; opacity: 0; pointer-events: none; }
+
+/* ═══ ChatGPT-style layer (2026-11-27) ═══════════════════════════════
+   Same layout grammar as ChatGPT on every device: flat canvas, quiet sidebar,
+   neutral user bubble, assistant as plain text, pill composer, centered greeting.
+   Brand accent stays only on focus rings and links; no glow, no card frame. */
+@media (min-width: 768px) {
+  .aic { padding: 0; }
+  .aic-layout { border-radius: 0; background: var(--hym-bg-page); box-shadow: none; }
+  .aic-side { background: var(--hym-surface-sunken); border-inline-end: 0; }
+}
+.aic-hist__new {
+  justify-content: flex-start; gap: var(--hym-space-2);
+  min-height: 40px; border: 0; border-radius: var(--hym-radius-control);
+  background: transparent; color: var(--hym-text-primary); box-shadow: none;
+  font-weight: var(--hym-fw-semibold);
+}
+.aic-hist__new:hover { background: var(--hym-bg-hover); }
+.aic-conv.is-active { background: var(--hym-bg-hover); box-shadow: none; }
+.aic-conv.is-active .aic-conv__title { color: var(--hym-text-primary); }
+.aic-conv__meta { display: none; }
+.aic-conv__main { min-height: 40px; }
+
+.aic-thread { gap: var(--hym-space-6); padding-block: var(--hym-space-6) var(--hym-space-8); }
+
+/* user: neutral rounded bubble, no accent ring */
+.aic-bubble {
+  max-width: min(70%, 520px);
+  padding: 10px var(--hym-space-4);
+  border-radius: 22px;
+  background: var(--hym-surface-2);
+  box-shadow: none;
+}
+.aic-msg--user .aic-msg__time { opacity: 0; transition: opacity var(--hym-duration-fast) var(--hym-ease-default); }
+.aic-msg--user:hover .aic-msg__time, .aic-msg--user:focus-within .aic-msg__time { opacity: 1; }
+
+/* assistant: plain text column, small mark, no name/time line */
+.aic-msg--ai { align-items: flex-end; } /* user asked: هوشیار on the LEFT in RTL */
+.aic-msg--ai .aic-msg__head { gap: 0; }
+.aic-msg--ai .aic-msg__name, .aic-msg--ai .aic-msg__head .aic-msg__time { display: none; }
+.aic-avatar { width: 26px; height: 26px; background: none; color: var(--hym-text-primary); box-shadow: inset 0 0 0 1px var(--hym-hairline-strong); }
+@media (min-width: 768px) {
+  /* row-reverse in RTL: avatar at the left edge, reply grows rightward up to full width */
+  .aic-msg--ai { flex-direction: row-reverse; align-items: flex-start; gap: var(--hym-space-3); }
+  .aic-msg--ai .aic-msg__head { flex: 0 0 auto; }
+  .aic-msg--ai .aic-msg__body, .aic-msg--ai .aic-actions { padding-inline: 0; }
+  .aic-msg--ai > .aic-msg__body { flex: 0 1 auto; min-width: 0; }
+  .aic-msg--ai { flex-wrap: wrap; }
+  .aic-msg--ai > .aic-actions { flex-basis: 100%; justify-content: flex-end; padding-left: 38px; }
+}
+.aic-actions { opacity: .7; }
+.aic-msg--ai:hover .aic-actions, .aic-actions:focus-within { opacity: 1; }
+
+/* message enter: short rise, then nothing moves */
+@keyframes aic-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.aic-msg { animation: aic-in 180ms var(--hym-ease-default) both; }
+
+/* typing: one breathing dot, like ChatGPT's thinking indicator */
+.aic-typing span { display: none; }
+.aic-typing span:first-child {
+  display: block; width: 12px; height: 12px; background: var(--hym-text-primary);
+  animation: aic-breathe 1.1s var(--hym-ease-default) infinite;
+}
+@keyframes aic-breathe { 0%, 100% { transform: scale(.7); opacity: .5; } 50% { transform: scale(1); opacity: 1; } }
+
+/* greeting: centered question, starters as quiet pills */
+.aic-hero__mark { display: none; }
+.aic-hero__title { font-size: var(--hym-fs-h2); font-weight: var(--hym-fw-semibold); margin-block-end: var(--hym-space-4); }
+.aic-hero__sub { display: none; }
+.aic-starters { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--hym-space-2); max-width: 640px; margin-inline: auto; }
+.aic-starter {
+  flex-direction: row; align-items: center; gap: var(--hym-space-2); min-height: 40px; max-width: 100%;
+  padding: var(--hym-space-2) var(--hym-space-4);
+  border-radius: var(--hym-radius-pill); background: transparent;
+}
+.aic-starter:hover { background: var(--hym-bg-hover); border-color: var(--hym-hairline-strong); }
+.aic-starter__tag { gap: 0; color: var(--hym-text-muted); font-size: 0; }
+.aic-starter__tag svg { color: var(--hym-text-muted); }
+/* the full prompt is the label: a pill must say what it will send */
+.aic-starter__text { font-size: var(--hym-fs-small); color: var(--hym-text-primary); text-align: start; }
+
+/* composer: one pill, solid round send button, no glow on focus */
+.aic-composer__box {
+  padding: 6px 6px 6px 8px;
+  border-radius: 28px;
+  background: var(--hym-surface-2);
+  box-shadow: inset 0 0 0 1px var(--hym-hairline);
+}
+.aic-composer__box:focus-within { box-shadow: inset 0 0 0 1px var(--hym-hairline-strong); }
+.aic-composer__send { background: var(--hym-text-primary); color: var(--hym-surface-1); }
+.aic-composer__send:hover:not(:disabled) { background: var(--hym-text-primary); opacity: .85; }
+.aic-composer__send:disabled { background: var(--hym-hairline-strong); color: var(--hym-surface-1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .aic-msg, .aic-typing span:first-child { animation: none; }
+}

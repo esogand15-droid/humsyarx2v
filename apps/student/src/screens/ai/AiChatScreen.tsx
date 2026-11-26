@@ -358,7 +358,7 @@ export function AiChatScreen() {
                   <span className="aic-hero__mark" aria-hidden="true">
                     <Icon name="logo-mark" size={30} />
                   </span>
-                  <h2 className="aic-hero__title">سلام، من هوش‌یارم</h2>
+                  <h2 className="aic-hero__title">امروز چی بخونیم؟</h2>
                   <p className="aic-hero__sub">
                     {`دستیار آموزشی تو برای علوم پایه و بالینی، فارماکولوژی، تفسیر آزمایش${ZW}ها و مرور پیش از امتحان.`}
                   </p>
