@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Icon } from '../../icons';
 import type { StickyNote } from '../../lib/ink';
 
 interface StickyNoteOverlayProps {
@@ -9,11 +10,11 @@ interface StickyNoteOverlayProps {
   onUpdateNotes: (notes: StickyNote[]) => void;
 }
 
-export const STICKY_NOTE_COLORS: Array<{ id: 'yellow' | 'cyan' | 'green' | 'coral'; label: string; hex: string }> = [
-  { id: 'yellow', label: 'زرد', hex: '#FEF08A' },
-  { id: 'cyan', label: 'آبی', hex: '#A5F3FC' },
-  { id: 'green', label: 'سبز', hex: '#BBF7D0' },
-  { id: 'coral', label: 'مرجانی', hex: '#FECDD3' },
+export const STICKY_NOTE_COLORS: Array<{ id: 'yellow' | 'cyan' | 'green' | 'coral'; label: string }> = [
+  { id: 'yellow', label: 'زرد' },
+  { id: 'cyan', label: 'آبی' },
+  { id: 'green', label: 'سبز' },
+  { id: 'coral', label: 'مرجانی' },
 ];
 
 export function StickyNoteOverlay({
@@ -139,8 +140,11 @@ export function StickyNoteOverlay({
             <button
               key={note.note_id}
               type="button"
+              ref={(el) => {
+                el?.style.setProperty('--note-x', `${posX}px`);
+                el?.style.setProperty('--note-y', `${posY}px`);
+              }}
               className={`sticky-note ${colorClass} sticky-note--collapsed`}
-              style={{ left: `${posX}px`, top: `${posY}px` }}
               onClick={() => toggleCollapse(note.note_id)}
               onPointerDown={(e) => handlePointerDown(e, note)}
               onPointerMove={handlePointerMove}
@@ -148,7 +152,7 @@ export function StickyNoteOverlay({
               title={`یادداشت حاشیه (صفحه ${note.page}) — برای باز کردن کلیک کنید`}
               aria-label="باز کردن یادداشت چسبان"
             >
-              📌
+              <Icon name="i-pin" size={16} />
             </button>
           );
         }
@@ -156,8 +160,11 @@ export function StickyNoteOverlay({
         return (
           <div
             key={note.note_id}
+            ref={(el) => {
+              el?.style.setProperty('--note-x', `${posX}px`);
+              el?.style.setProperty('--note-y', `${posY}px`);
+            }}
             className={`sticky-note ${colorClass}`}
-            style={{ left: `${posX}px`, top: `${posY}px` }}
           >
             <div
               className="sticky-note__header"
@@ -175,7 +182,7 @@ export function StickyNoteOverlay({
                   title="تغییر رنگ"
                   aria-label="تغییر رنگ یادداشت"
                 >
-                  🎨
+                  <Icon name="i-palette" size={14} />
                 </button>
                 <button
                   type="button"
@@ -184,7 +191,7 @@ export function StickyNoteOverlay({
                   title="سنجاق کردن / جمع‌کردن"
                   aria-label="سنجاق کردن یادداشت"
                 >
-                  📌
+                  <Icon name="i-pin" size={14} />
                 </button>
                 <button
                   type="button"
@@ -193,7 +200,7 @@ export function StickyNoteOverlay({
                   title="حذف یادداشت"
                   aria-label="حذف یادداشت"
                 >
-                  ✕
+                  <Icon name="i-x" size={14} />
                 </button>
               </div>
             </div>

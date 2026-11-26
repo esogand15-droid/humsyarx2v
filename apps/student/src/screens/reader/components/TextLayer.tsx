@@ -56,7 +56,7 @@ const TextLayer = forwardRef<TextLayerRef, TextLayerProps>(({
   className = '',
   renderScale = 1,
 }, ref) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const spansRef = useRef<Map<number, HTMLSpanElement>>(new Map());
   const textContentRef = useRef<any>(null);
   const [textContentLoaded, setTextContentLoaded] = useState(false);
@@ -274,17 +274,14 @@ const TextLayer = forwardRef<TextLayerRef, TextLayerProps>(({
 
   return (
     <div
-      ref={containerRef}
-      className={`text-layer ${className}`}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: `${viewport?.width ?? 0}px`,
-        height: `${viewport?.height ?? 0}px`,
-        pointerEvents: enableSelection ? 'auto' : 'none',
-        zIndex: 10,
+      ref={(el) => {
+        containerRef.current = el;
+        if (el) {
+          el.style.setProperty('--tl-w', `${viewport?.width ?? 0}px`);
+          el.style.setProperty('--tl-h', `${viewport?.height ?? 0}px`);
+        }
       }}
+      className={`text-layer ${!enableSelection ? 'is-disabled' : ''} ${className}`}
       aria-hidden={!enableSelection}
     />
   );

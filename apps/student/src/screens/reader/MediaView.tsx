@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
-  CSSProperties,
   KeyboardEvent as RKeyboardEvent,
   PointerEvent as RPointerEvent,
   SyntheticEvent,
@@ -50,10 +49,10 @@ const FAIL: Record<Fail, { title: string; text: string }> = {
   },
   auth: {
     title: 'به این فایل دسترسی نداری',
-    text: 'اشتراک یا دسترسی این درس فعال نیست. اگر تازه تمدید کردهای، یک بار از حساب خارج و دوباره وارد شو.',
+    text: 'اشتراک یا دسترسی این درس فعال نیست. اگر تازه تمدید کرده‌ای، یک بار از حساب خارج و دوباره وارد شو.',
   },
   rate: {
-    title: 'درخواستها زیاد شد',
+    title: 'درخواست‌ها زیاد شد',
     text: 'چند لحظه صبر کن و دوباره امتحان کن.',
   },
   upstream: {
@@ -61,12 +60,12 @@ const FAIL: Record<Fail, { title: string; text: string }> = {
     text: 'ارتباط سرور هامزیار با محل نگهداری فایل موقتاً برقرار نشد. چند ثانیه بعد دوباره امتحان کن.',
   },
   format: {
-    title: 'مرورگر این فرمت را پخش نمیکند',
-    text: 'این فایل با مرورگر فعلی سازگار نیست؛ Chrome یا Safari بهروز را امتحان کن یا فایل را از ربات دریافت کن.',
+    title: 'مرورگر این فرمت را پخش نمی‌کند',
+    text: 'این فایل با مرورگر فعلی سازگار نیست؛ Chrome یا Safari به‌روز را امتحان کن یا فایل را از ربات دریافت کن.',
   },
   network: {
     title: 'اینترنت قطع است',
-    text: 'اتصال اینترنت را بررسی کن؛ وقتی وصل شدی پخش از همانجا ادامه پیدا میکند.',
+    text: 'اتصال اینترنت را بررسی کن؛ وقتی وصل شدی پخش از همانجا ادامه پیدا می‌کند.',
   },
 };
 
@@ -219,7 +218,7 @@ function Hints({ video }: { video: boolean }) {
     <p className="mhint">
       <kbd>Space</kbd> پخش/توقف · <kbd>←</kbd>
       <kbd>→</kbd> ۵ ثانیه · <kbd>J</kbd>
-      <kbd>L</kbd> ۱۰ ثانیه · <kbd>M</kbd> بیصدا{video ? <> · <kbd>F</kbd> تمامصفحه</> : null} ·{' '}
+      <kbd>L</kbd> ۱۰ ثانیه · <kbd>M</kbd> بی‌صدا{video ? <> · <kbd>F</kbd> تمام‌صفحه</> : null} ·{' '}
       <kbd>&lt;</kbd>
       <kbd>&gt;</kbd> سرعت
     </p>
@@ -307,13 +306,26 @@ function Timeline({
       onPointerLeave={() => setHover(null)}
       onKeyDown={onKey}
     >
-      <div className="mtl__track">
-        <div className="mtl__buf" style={{ width: `${bpct}%` }} />
-        <div className="mtl__played" style={{ width: `${pct}%` }} />
-        <div className="mtl__thumb" style={{ insetInlineStart: `${pct}%` }} />
+      <div
+        className="mtl__track"
+        ref={(el) => {
+          if (el) {
+            el.style.setProperty('--mtl-buf', `${bpct}%`);
+            el.style.setProperty('--mtl-pct', `${pct}%`);
+          }
+        }}
+      >
+        <div className="mtl__buf" />
+        <div className="mtl__played" />
+        <div className="mtl__thumb" />
       </div>
       {tip !== null && dur > 0 && (
-        <span className="mtl__tip num" style={{ insetInlineStart: `${(tip / dur) * 100}%` }}>
+        <span
+          className="mtl__tip num"
+          ref={(el) => {
+            el?.style.setProperty('--mtl-tip', `${(tip / dur) * 100}%`);
+          }}
+        >
           {clock(tip)}
         </span>
       )}
@@ -881,7 +893,7 @@ function VideoPlayer(p: PlayerProps) {
   const stage = useRef<HTMLDivElement>(null);
   const [fs, setFs] = useState(false);
   const [idle, setIdle] = useState(false);
-  const [flash, setFlash] = useState<{ left: boolean; back: boolean; key: number } | null>(null);
+  const [flash, setFlash] = useState<{ startEdge: boolean; back: boolean; key: number } | null>(null);
   const idleTimer = useRef<number | null>(null);
   const tapTimer = useRef<number | null>(null);
   const lastTap = useRef(0);
@@ -985,13 +997,13 @@ function VideoPlayer(p: PlayerProps) {
       }
       const third = rect.width / 3;
       if (x < third || x > 2 * third) {
-        const left = x < third;
+        const tappedLeft = x < third;
         const rtl = getComputedStyle(e.currentTarget).direction === 'rtl';
         // در RTL ابتدای زمان سمت راست است
-        const back = rtl ? !left : left;
+        const back = rtl ? !tappedLeft : tappedLeft;
         m.skip(back ? -10 : 10);
         const key = now;
-        setFlash({ left, back, key });
+        setFlash({ startEdge: tappedLeft, back, key });
         window.setTimeout(() => setFlash((f) => (f && f.key === key ? null : f)), 650);
       } else {
         m.toggle();
@@ -1028,7 +1040,7 @@ function VideoPlayer(p: PlayerProps) {
           disablePictureInPicture={!pipOk}
           {...m.handlers}
         >
-          مرورگر تو پخش ویدیو را پشتیبانی نمیکند.
+          مرورگر تو پخش ویدیو را پشتیبانی نمی‌کند.
         </video>
 
         <div className="vstage__shade" aria-hidden="true" />
@@ -1050,16 +1062,18 @@ function VideoPlayer(p: PlayerProps) {
         {fs && <p className="vstage__title">{p.name}</p>}
 
         {flash && (
-          <div key={flash.key} className={`vflash ${flash.left ? 'vflash--left' : 'vflash--right'}`} aria-hidden="true">
-            <MI d={flash.back ? ICON.back : ICON.fwd} stroke size={26} className="mbtn__arc" />
-            <span className="num">{flash.back ? '−' : '+'}۱۰</span>
+          <div className="vstage__flashes" dir="ltr" aria-hidden="true">
+            <div key={flash.key} className={`vflash ${flash.startEdge ? 'vflash--start' : 'vflash--end'}`}>
+              <MI d={flash.back ? ICON.back : ICON.fwd} stroke size={26} className="mbtn__arc" />
+              <span className="num">{flash.back ? '−' : '+'}۱۰</span>
+            </div>
           </div>
         )}
 
         {m.waiting && !m.fail && (
           <div className="vspin" aria-live="polite">
             <span className="mspinner" aria-hidden="true" />
-            <span className="vspin__t">{m.slow ? 'اولین پخش این فایل کمی طول میکشد…' : 'در حال بارگذاری…'}</span>
+            <span className="vspin__t">{m.slow ? 'اولین پخش این فایل کمی طول می‌کشد…' : 'در حال بارگذاری…'}</span>
           </div>
         )}
 
@@ -1101,7 +1115,7 @@ function VideoPlayer(p: PlayerProps) {
               type="button"
               className="mbtn vctl__opt"
               onClick={m.toggleMute}
-              aria-label={m.muted ? 'روشن کردن صدا' : 'بیصدا'}
+              aria-label={m.muted ? 'روشن کردن صدا' : 'بی‌صدا'}
             >
               <MI d={m.muted ? ICON.mute : ICON.vol} stroke />
             </button>
@@ -1110,7 +1124,7 @@ function VideoPlayer(p: PlayerProps) {
                 <MI d={ICON.pip} stroke />
               </button>
             )}
-            <button type="button" className="mbtn" onClick={toggleFs} aria-label={fs ? 'خروج از تمامصفحه' : 'تمامصفحه'}>
+            <button type="button" className="mbtn" onClick={toggleFs} aria-label={fs ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'}>
               <MI d={fs ? ICON.min : ICON.max} stroke />
             </button>
           </div>
@@ -1167,7 +1181,7 @@ function AudioPlayer(p: PlayerProps) {
         preload="metadata"
         {...m.handlers}
       >
-        مرورگر تو پخش صدا را پشتیبانی نمیکند.
+        مرورگر تو پخش صدا را پشتیبانی نمی‌کند.
       </audio>
 
       <div className={`aplayer${m.playing ? ' is-playing' : ''}`}>
@@ -1179,7 +1193,15 @@ function AudioPlayer(p: PlayerProps) {
 
         <div className="aplayer__wave" aria-hidden="true">
           {WAVE.map((h, i) => (
-            <i key={i} style={{ '--h': h.toFixed(2), '--d': `${((i * 7) % 11) * 0.09}s` } as CSSProperties} />
+            <i
+              key={i}
+              ref={(el) => {
+                if (el) {
+                  el.style.setProperty('--h', h.toFixed(2));
+                  el.style.setProperty('--d', `${((i * 7) % 11) * 0.09}s`);
+                }
+              }}
+            />
           ))}
         </div>
 
@@ -1232,7 +1254,7 @@ function AudioPlayer(p: PlayerProps) {
 
         {m.fail && <FailBox fail={m.fail} onRetry={() => void m.reload(false)} />}
         {m.slow && m.waiting && !m.fail && (
-          <p className="aplayer__note">اولین پخش این فایل کمی طول میکشد؛ دفعههای بعد فوری است.</p>
+          <p className="aplayer__note">اولین پخش این فایل کمی طول می‌کشد؛ دفعه‌های بعد فوری است.</p>
         )}
         <ResumeChip m={m} />
       </div>

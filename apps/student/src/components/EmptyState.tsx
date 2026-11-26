@@ -9,14 +9,16 @@ export interface EmptyStateProps {
   action?: ReactNode;
 }
 
-/** حالت خالی — یک جملهٔ راهنما و حداکثر یک کنش. */
+/** حالت خالی DS v2 — یک جملهٔ راهنما و حداکثر یک کنش. */
 export function EmptyState({ icon = 'i-arch', title, text, action }: EmptyStateProps) {
   return (
-    <div className="empty">
-      <Icon name={icon} size={44} />
-      <div className="h3" style={{ color: 'var(--ink-2)' }}>{title}</div>
-      {text && <p className="small" style={{ marginTop: 6, maxWidth: 340, marginInline: 'auto' }}>{text}</p>}
-      {action && <div style={{ marginTop: 14 }}>{action}</div>}
+    <div className="ds-empty">
+      <span className="ds-empty__icon" aria-hidden="true">
+        <Icon name={icon} size={28} />
+      </span>
+      <div className="ds-empty__title">{title}</div>
+      {text && <p className="ds-empty__body">{text}</p>}
+      {action && <div className="ds-empty__action">{action}</div>}
     </div>
   );
 }

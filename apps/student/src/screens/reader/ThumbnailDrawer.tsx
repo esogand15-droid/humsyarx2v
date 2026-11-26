@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DsEmpty } from '../../design/components';
 import { Icon } from '../../icons';
 import { fa } from '../../lib/library';
 import { ink, type InkSummaryPage, type Scope } from '../../lib/ink';
@@ -75,7 +76,7 @@ export function ThumbnailDrawer({
             aria-label="بستن کشو"
             title="بستن"
           >
-            ✕
+            <Icon name="i-x" size={16} />
           </button>
         </div>
 
@@ -130,8 +131,12 @@ export function ThumbnailDrawer({
                   />
                   <div className="thumb-card__footer">
                     <span className="thumb-card__num num">صفحه {fa(dim.page)}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {hasInk && <span title="دارای حاشیه‌نویسی">🖋️</span>}
+                    <div className="thumb-card__actions">
+                      {hasInk && (
+                        <span className="thumb-card__ink-badge" title="دارای حاشیه‌نویسی">
+                          <Icon name="i-pen" size={14} />
+                        </span>
+                      )}
                       <button
                         type="button"
                         className={`thumb-card__bm-btn ${isBm ? 'is-active' : ''}`}
@@ -142,7 +147,7 @@ export function ThumbnailDrawer({
                         title={isBm ? 'حذف از نشان‌شده‌ها' : 'نشان کردن'}
                         aria-label={`نشان کردن صفحه ${dim.page}`}
                       >
-                        {isBm ? '★' : '☆'}
+                        <Icon name={isBm ? 'i-star-filled' : 'i-star'} size={15} />
                       </button>
                     </div>
                   </div>
@@ -155,10 +160,12 @@ export function ThumbnailDrawer({
         {activeTab === 'bookmarks' && (
           <div className="thumb-drawer__grid">
             {bookmarkedPages.length === 0 ? (
-              <div style={{ gridColumn: '1 / -1', padding: '32px 16px', textAlign: 'center', color: 'var(--ink-3)' }}>
-                <Icon name="i-bookmark" size={32} />
-                <p className="small mt-8">هنوز صفحه‌ای را نشان نکرده‌ای.</p>
-                <p className="tiny mt-4">روی ستارهٔ هر صفحه بزن تا در این فهرست ذخیره شود.</p>
+              <div className="thumb-drawer__empty">
+                <DsEmpty
+                  icon={<Icon name="i-bookmark" size={28} />}
+                  title="هنوز صفحه‌ای را نشان نکرده‌ای"
+                  body="روی ستارهٔ هر صفحه بزن تا در این فهرست ذخیره شود."
+                />
               </div>
             ) : (
               pageDimensions
@@ -192,8 +199,9 @@ export function ThumbnailDrawer({
                             onToggleBookmark(dim.page);
                           }}
                           title="حذف از نشان‌شده‌ها"
+                          aria-label={`حذف نشان صفحه ${dim.page}`}
                         >
-                          ★
+                          <Icon name="i-star-filled" size={15} />
                         </button>
                       </div>
                     </div>
@@ -204,41 +212,30 @@ export function ThumbnailDrawer({
         )}
 
         {activeTab === 'notes' && (
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+          <div className="thumb-drawer__notes-body">
             {annotatedPages.length === 0 ? (
-              <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--ink-3)' }}>
-                <Icon name="i-pen" size={32} />
-                <p className="small mt-8">هنوز روی این جزوه چیزی ننوشته‌ای.</p>
-                <p className="tiny mt-4">با قلم یا هایلایتر خط بکش؛ یادداشت‌هایت خودکار ذخیره می‌شوند.</p>
-              </div>
+              <DsEmpty
+                icon={<Icon name="i-pen" size={28} />}
+                title="هنوز روی این جزوه چیزی ننوشته‌ای"
+                body="با قلم یا هایلایتر خط بکش؛ یادداشت‌هایت خودکار ذخیره می‌شوند."
+              />
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <p className="tiny" style={{ color: 'var(--ink-3)' }}>
+              <div className="thumb-drawer__list">
+                <p className="tiny thumb-drawer__meta">
                   {fa(annotatedPages.length)} صفحه دارای حاشیه‌نویسی · مجموع {fa(totalInk)} خط
                 </p>
                 {annotatedPages.map((item) => (
                   <button
                     key={item.page}
                     type="button"
-                    className="notebook__item"
+                    className="thumb-drawer__note-btn"
                     onClick={() => {
                       onJump(item.page);
                       onClose();
                     }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      width: '100%',
-                      padding: '10px 14px',
-                      borderRadius: 10,
-                      border: '1px solid var(--line)',
-                      background: 'var(--paper)',
-                      cursor: 'pointer',
-                    }}
                   >
-                    <span className="num" style={{ fontWeight: 700 }}>صفحهٔ {fa(item.page)}</span>
-                    <span className="tiny" style={{ color: 'var(--ink-3)' }}>{fa(item.count)} خط دیجیتال</span>
+                    <span className="num thumb-drawer__page-num">صفحهٔ {fa(item.page)}</span>
+                    <span className="tiny thumb-drawer__meta">{fa(item.count)} خط دیجیتال</span>
                   </button>
                 ))}
               </div>

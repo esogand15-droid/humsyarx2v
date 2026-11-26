@@ -12,14 +12,12 @@ export interface ListRowProps {
   trailing?: ReactNode;
   chevron?: boolean;
   danger?: boolean;
-  /** مسیر مقصد. اگر داده شود، ردیف خودش یک لینک است — نه دکمه‌ای
-      داخل لینک. (نesting دو عنصر تعاملی، کلیک را می‌بلعد و
-      مرورگر هم آن را نامعتبر می‌داند.) */
+  /** مسیر مقصد. اگر داده شود، ردیف خودش یک لینک است. */
   to?: string;
   onClick?: () => void;
 }
 
-/** ردیف لیست — یک کنش در هر ردیف؛ آخرین ردیف بدون خط پایین. */
+/** ردیف لیست DS v2 — یک کنش در هر ردیف با ایزولاسیون BiDi. */
 export function ListRow({
   title,
   sub,
@@ -33,24 +31,28 @@ export function ListRow({
 }: ListRowProps) {
   const inner = (
     <>
-      {icon && <Icon name={icon} size={20} className="lead" />}
-      <span className="grow">
-        <span className="h3" style={{ display: 'block' }}>
-          {title}
+      {icon && (
+        <span className="ds-row__icon" aria-hidden="true">
+          <Icon name={icon} size={20} />
+        </span>
+      )}
+      <span className="ds-row__body">
+        <span className="ds-row__title">
+          <bdi dir="auto">{title}</bdi>
         </span>
         {sub && (
-          <span className="small" style={{ display: 'block' }}>
-            {sub}
+          <span className="ds-row__sub">
+            <bdi dir="auto">{sub}</bdi>
           </span>
         )}
-        {meta && <span className="list__meta num">{meta}</span>}
       </span>
+      {meta && <span className="ds-row__meta num">{meta}</span>}
       {trailing}
-      {chevron && <Icon name="i-chevron" size={16} />}
+      {chevron && <Icon name="i-chevron-r" size={18} className="ds-row__chev" />}
     </>
   );
 
-  const cls = `list__item ${danger ? 'list__item--danger' : ''}`.trim();
+  const cls = `ds-row${danger ? ' acct-row-danger' : ''}`;
 
   if (to) {
     return (

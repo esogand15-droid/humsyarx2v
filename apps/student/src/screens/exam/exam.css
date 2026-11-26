@@ -87,10 +87,12 @@
   display: block;
   width: 100%;
   height: 100%;
+  stroke: none;
 }
 
 .exam-progress__fill {
   fill: var(--hym-accent);
+  stroke: none;
   transition: width var(--hym-duration-normal) var(--hym-ease-default),
               x var(--hym-duration-normal) var(--hym-ease-default);
 }

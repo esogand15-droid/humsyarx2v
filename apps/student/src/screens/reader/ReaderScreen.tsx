@@ -4,11 +4,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AppBar, Button, EmptyState } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
 import { Icon } from '../../icons';
+import { faNum } from '../../lib/fa';
 import { ink } from '../../lib/ink';
 import { reader } from '../../lib/reader';
 import type { Kind, Scope, ViewInfo } from '../../lib/reader';
 import { EmbeddedAiStudyPanel } from './EmbeddedAiStudyPanel';
 import { NotebookPanel } from './NotebookPanel';
+import './reader.css';
 
 // pdf.js حجم دارد؛ فقط وقتی وارد ریدر PDF می‌شویم بارگذاری می‌شود
 const PdfView = lazy(() => import('./PdfView').then((m) => ({ default: m.PdfView })));
@@ -211,18 +213,26 @@ export function ReaderScreen() {
     <>
       <AppBar
         title={info?.name ?? 'در حال باز کردن…'}
-        sub={saved ? 'پیشرفت ذخیره شد' : 'خواندن داخل هامزیار'}
+        sub={
+          saved
+            ? 'پیشرفت ذخیره شد'
+            : kind === 'video' || kind === 'audio'
+              ? 'پخش داخل هامزیار'
+              : kind === 'image'
+                ? 'مشاهده داخل هامزیار'
+                : 'خواندن داخل هامزیار'
+        }
         back
         onBack={() => navigate(-1)}
         actions={
           kind === 'pdf' ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="reader-shell__actions">
               <button
                 type="button"
                 className={`iconbtn ${sidePanel === 'ai_chat' ? 'is-active' : ''}`}
                 onClick={() => setSidePanel((p) => (p === 'ai_chat' ? 'none' : 'ai_chat'))}
-                title="دستیار هوش‌یار همزمان (\)"
-                aria-label="دستیار هوش‌یار"
+                title="دستیار هوشیار همزمان (\)"
+                aria-label="دستیار هوشیار"
               >
                 <Icon name="i-chat" size={18} />
               </button>
@@ -272,7 +282,7 @@ export function ReaderScreen() {
       )}
 
       {!loading && !error && info && info.available && (url || kind === 'pdf') && (
-        <div className={`study-workspace ${sidePanel === 'notes' ? 'is-split' : ''}`}>
+        <div className={`study-workspace reader-workspace ${sidePanel === 'notes' ? 'is-split' : ''}`}>
           <div className="study-workspace__primary">
             <div className="reader-shell">
               <Suspense
@@ -337,7 +347,9 @@ export function ReaderScreen() {
 
               <aside
                 className="study-workspace__secondary"
-                style={{ width: `${sideWidth}px`, flex: `0 0 ${sideWidth}px` }}
+                ref={(el) => {
+                  el?.style.setProperty('--side-w', `${sideWidth}px`);
+                }}
               >
                 <div className="study-workspace__secondary-header">
                   <span className="h3">دفترچه یادداشت</span>
@@ -348,7 +360,7 @@ export function ReaderScreen() {
                     aria-label="بستن پنل"
                     title="بستن"
                   >
-                    ✕
+                    <Icon name="i-x" size={16} />
                   </button>
                 </div>
                 <div className="study-workspace__secondary-body">
@@ -368,60 +380,63 @@ export function ReaderScreen() {
             </>
           )}
 
-          {/* جریان شناور بالا به پایین هوش‌یار بالینی (Top-Flow AI Assistant Island) */}
-          <div
-            className={`ai-top-flow-backdrop ${sidePanel === 'ai_chat' ? 'is-open' : ''}`}
-            onClick={() => setSidePanel('none')}
-            aria-hidden={sidePanel !== 'ai_chat'}
-          >
+          {/* جریان شناور بالا به پایین هوشیار بالینی (فقط در ریدر PDF) */}
+          {kind === 'pdf' && (
             <div
-              className={`ai-top-flow-card ${sidePanel === 'ai_chat' ? 'is-open' : ''}`}
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-label="دستیار هوش‌یار بالینی"
+              className={`ai-top-flow-backdrop ${sidePanel === 'ai_chat' ? 'is-open' : ''}`}
+              onClick={() => setSidePanel('none')}
+              aria-hidden={sidePanel !== 'ai_chat'}
             >
-              <div className="ai-top-flow-handle-bar">
-                <div className="ai-top-flow-handle" />
-              </div>
-              <div className="ai-top-flow-header">
-                <div className="ai-top-flow-title-wrap">
-                  <div className="ai-top-flow-avatar">
-                    <span className="ai-top-flow-avatar-glow" />
-                    <Icon name="i-chat" size={18} />
+              <div
+                className={`ai-top-flow-card ${sidePanel === 'ai_chat' ? 'is-open' : ''}`}
+                data-section="ai"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-label="دستیار هوشیار بالینی"
+              >
+                <div className="ai-top-flow-handle-bar">
+                  <div className="ai-top-flow-handle" />
+                </div>
+                <div className="ai-top-flow-header">
+                  <div className="ai-top-flow-title-wrap">
+                    <div className="ai-top-flow-avatar">
+                      <span className="ai-top-flow-avatar-glow" />
+                      <Icon name="i-chat" size={18} />
+                    </div>
+                    <div className="ai-top-flow-titles">
+                      <div className="ai-top-flow-main-title">
+                        <span>هوشیار بالینی</span>
+                        <span className="ai-top-flow-badge">دستیار هوشمند مطالعه</span>
+                      </div>
+                      <div className="ai-top-flow-subtitle">
+                        {info?.name ? `جزوهٔ «${info.name}»` : 'مطالعهٔ جزوه'} · صفحهٔ {faNum(latest.current.page || 1)}
+                      </div>
+                    </div>
                   </div>
-                  <div className="ai-top-flow-titles">
-                    <div className="ai-top-flow-main-title">
-                      <span>هوش‌یار بالینی</span>
-                      <span className="ai-top-flow-badge">دستیار هوشمند مطالعه</span>
-                    </div>
-                    <div className="ai-top-flow-subtitle">
-                      {info?.name ? `جزوهٔ «${info.name}»` : 'مطالعهٔ جزوه'} · صفحهٔ {latest.current.page || 1}
-                    </div>
+                  <div className="ai-top-flow-actions">
+                    <button
+                      type="button"
+                      className="ai-top-flow-close-btn"
+                      onClick={() => setSidePanel('none')}
+                      aria-label="بستن دستیار هوشمند"
+                      title="بستن (Esc یا \)"
+                    >
+                      <Icon name="i-x" size={16} />
+                    </button>
                   </div>
                 </div>
-                <div className="ai-top-flow-actions">
-                  <button
-                    type="button"
-                    className="ai-top-flow-close-btn"
-                    onClick={() => setSidePanel('none')}
-                    aria-label="بستن دستیار هوشمند"
-                    title="بستن (Esc یا \)"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
 
-              <div className="ai-top-flow-body">
-                <EmbeddedAiStudyPanel
-                  fileId={id}
-                  bookletName={info?.name}
-                  page={latest.current.page}
-                  onClose={() => setSidePanel('none')}
-                />
+                <div className="ai-top-flow-body">
+                  <EmbeddedAiStudyPanel
+                    fileId={id}
+                    bookletName={info?.name}
+                    page={latest.current.page}
+                    onClose={() => setSidePanel('none')}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </>

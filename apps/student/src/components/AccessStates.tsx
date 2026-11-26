@@ -1,16 +1,16 @@
 import type { ReactNode } from 'react';
 
-import { Button, Card, EmptyState, SkeletonStack } from '../components';
+import { SkeletonStack } from './Skeleton';
+import { DsButton, DsCard, DsEmpty } from '../design/components';
 import { Icon } from '../icons';
 import type { IconName } from '../icons/sprite';
 import { ApiError, errorText } from '../lib/api';
 
-/* حالت‌های مشترک کتابخانه — یک نگاشت، نه پیام‌های پراکنده در هر صفحه.
-   همان جدول design/16: هر کد خطای واقعی یک وضعیت مشخص دارد. */
+/* حالت‌های مشترک DS v2 — یک نگاشت، بدون inline style. */
 
 export function LoadingBlock({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="mt-16">
+    <div className="access-loading">
       <SkeletonStack rows={rows} />
     </div>
   );
@@ -27,23 +27,24 @@ export function ErrorBlock({ error, onRetry }: ErrorBlockProps) {
   const icon: IconName = offline ? 'i-arch' : 'i-clock';
 
   return (
-    <EmptyState
-      icon={icon}
-      title={offline ? 'اتصال به سرور برقرار نشد' : 'بارگذاری ممکن نشد'}
-      text={errorText(error, 'مشکلی پیش آمد. دوباره تلاش کن.')}
-      action={
-        onRetry ? (
-          <Button variant="ghost" size="sm" onClick={onRetry}>
-            تلاش دوباره
-          </Button>
-        ) : undefined
-      }
-    />
+    <DsCard>
+      <DsEmpty
+        icon={<Icon name={icon} size={28} />}
+        title={offline ? 'اتصال به سرور برقرار نشد' : 'بارگذاری ممکن نشد'}
+        body={errorText(error, 'مشکلی پیش آمد. دوباره تلاش کنید.')}
+        action={
+          onRetry ? (
+            <DsButton variant="secondary" size="md" onClick={onRetry}>
+              تلاش دوباره
+            </DsButton>
+          ) : undefined
+        }
+      />
+    </DsCard>
   );
 }
 
-/** بن‌بست دسترسی: وقتی گیت اشتراک/دامنه جلوی بخش را گرفته است.
-    بن‌بست نیست — یک اقدام واقعی دارد (بازگشت یا راهنمای فعال‌سازی). */
+/** بن‌بست دسترسی: وقتی گیت اشتراک/دامنه جلوی بخش را گرفته است. */
 export function LockedBlock({
   title,
   text,
@@ -56,20 +57,18 @@ export function LockedBlock({
   code?: string;
 }) {
   return (
-    <Card variant="quiet" className="mt-16" style={{ textAlign: 'center', padding: '26px 18px' }}>
-      <div className="row" style={{ justifyContent: 'center' }}>
-        <Icon name="i-lock" size={30} />
-      </div>
-      <div className="h3 mt-12">{title}</div>
-      <p className="small mt-8" style={{ maxWidth: 340, marginInline: 'auto' }}>
-        {text}
-      </p>
+    <DsCard level="sunken" className="access-locked">
+      <span className="access-locked__icon" aria-hidden="true">
+        <Icon name="i-lock" size={24} />
+      </span>
+      <h2 className="access-locked__title">{title}</h2>
+      <p className="access-locked__text">{text}</p>
       {code && (
-        <p className="tiny mt-8" dir="ltr" style={{ opacity: 0.7 }}>
+        <p className="access-locked__code" dir="ltr">
           {code}
         </p>
       )}
-      {action && <div className="mt-16">{action}</div>}
-    </Card>
+      {action && <div className="access-locked__action">{action}</div>}
+    </DsCard>
   );
 }

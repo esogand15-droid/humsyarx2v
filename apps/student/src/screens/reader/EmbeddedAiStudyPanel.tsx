@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../../icons';
+import type { IconName } from '../../icons/sprite';
 import { streamAiChat, type AiMessage } from '../../lib/ai';
+import { faNum } from '../../lib/fa';
 
 interface Props {
   fileId: string;
@@ -9,16 +11,16 @@ interface Props {
   onClose?: () => void;
 }
 
-const PRESET_PROMPTS = [
-  { icon: '🩺', text: 'نکات بالینی و تشخیصی کلیدی این جزوه چیست؟' },
-  { icon: '⚡', text: 'این مبحث را در چند نکته طلایی برای آزمون خلاصه کن.' },
-  { icon: '📝', text: '۳ تست تالیفی استاندارد با پاسخ تشریحی از این بخش طراحی کن.' },
-  { icon: '💊', text: 'نکات فارماکولوژی، دوزاژ و تشخیص‌های افتراقی این مبحث چیست؟' },
+const PRESET_PROMPTS: ReadonlyArray<{ icon: IconName; text: string }> = [
+  { icon: 'i-stethoscope', text: 'نکات بالینی و تشخیصی کلیدی این جزوه چیست؟' },
+  { icon: 'i-zap', text: 'این مبحث را در چند نکته طلایی برای آزمون خلاصه کن.' },
+  { icon: 'i-file-text', text: '۳ تست تالیفی استاندارد با پاسخ تشریحی از این بخش طراحی کن.' },
+  { icon: 'i-pill', text: 'نکات فارماکولوژی، دوزاژ و تشخیص‌های افتراقی این مبحث چیست؟' },
 ];
 
 export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
   void onClose;
-  const defaultWelcomeText = `سلام! من هوش‌یار هستم؛ همکار هوشمند مطالعهٔ شما در پلتفرم هامزیار.\nدر حال حاضر جزوهٔ «${bookletName || 'این بخش'}»${page ? ` (صفحهٔ ${page})` : ''} را مرور می‌کنید. هر سؤالی پیرامون فارماکولوژی، پاتوفیزیولوژی، تشخیص‌های افتراقی، یا تفسیر ECG دارید بپرسید تا با شواهد علمی پاسخ دهم.`;
+  const defaultWelcomeText = `سلام! من هوشیار هستم؛ همکار هوشمند مطالعهٔ شما در پلتفرم هامزیار.\nدر حال حاضر جزوهٔ «${bookletName || 'این بخش'}»${page ? ` (صفحهٔ ${faNum(page)})` : ''} را مرور می‌کنید. هر سؤالی پیرامون فارماکولوژی، پاتوفیزیولوژی، تشخیص‌های افتراقی، یا تفسیر ECG دارید بپرسید تا با شواهد علمی پاسخ دهم.`;
 
   const [messages, setMessages] = useState<AiMessage[]>([
     {
@@ -127,7 +129,7 @@ export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
               {m.role === 'assistant' ? (
                 <div className="embedded-ai-sender-tag">
                   <span className="embedded-ai-pulse-dot" />
-                  <span className="embedded-ai-sender-name">هوش‌یار</span>
+                  <span className="embedded-ai-sender-name">هوشیار</span>
                 </div>
               ) : (
                 <span className="embedded-ai-user-tag">پرسش شما</span>
@@ -139,7 +141,8 @@ export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
                   onClick={() => handleCopy(m.id, m.text)}
                   title="کپی پاسخ"
                 >
-                  {copiedId === m.id ? '✓ کپی شد' : 'کپی'}
+                  <Icon name={copiedId === m.id ? 'i-check' : 'i-copy'} size={12} />
+                  <span>{copiedId === m.id ? 'کپی شد' : 'کپی'}</span>
                 </button>
               )}
             </div>
@@ -165,11 +168,11 @@ export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
       <div className="embedded-ai-chips">
         <button
           type="button"
-          className="embedded-ai-chip embedded-ai-chip--reset"
+          className="embedded-ai-chip embedded-ai-reset"
           onClick={handleReset}
           title="شروع گفتگوی تازه"
         >
-          <span className="embedded-ai-chip-icon">🔄</span>
+          <Icon name="i-refresh" size={14} />
           <span>گفتگوی تازه</span>
         </button>
         {PRESET_PROMPTS.map((prompt) => (
@@ -179,7 +182,7 @@ export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
             className="embedded-ai-chip"
             onClick={() => void handleSend(prompt.text)}
           >
-            <span className="embedded-ai-chip-icon">{prompt.icon}</span>
+            <Icon name={prompt.icon} size={14} />
             <span>{prompt.text}</span>
           </button>
         ))}
@@ -209,7 +212,7 @@ export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
           aria-label="ارسال سؤال"
           title="ارسال سؤال (Enter)"
         >
-          <Icon name="i-chat" size={17} />
+          <Icon name="i-send" size={17} />
         </button>
       </div>
     </div>

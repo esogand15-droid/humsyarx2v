@@ -1,12 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 
-import { AppBar, Card, EmptyState, SkeletonStack } from '../components';
+import './core.css';
+import { AppBar, SkeletonStack } from '../components';
+import { DsBadge, DsButton, DsCard, DsChip, DsEmpty } from '../design/components';
+import type { DsSection } from '../design/components';
 import { Icon } from '../icons';
+import type { IconName } from '../icons/sprite';
+import { errorText } from '../lib/api';
+import { faNum } from '../lib/fa';
 import { searchApi } from '../lib/search';
 import type { SearchResultItem } from '../lib/search';
-import { errorText } from '../lib/api';
 
-const TYPE_ICONS: Record<string, string> = {
+const TYPE_ICONS: Record<SearchResultItem['type'], IconName> = {
   resource: 'i-file-text',
   question: 'i-help-circle',
   faq: 'i-message-circle',
@@ -15,7 +21,7 @@ const TYPE_ICONS: Record<string, string> = {
   book: 'i-book-open',
 };
 
-const TYPE_LABELS: Record<string, string> = {
+const TYPE_LABELS: Record<SearchResultItem['type'], string> = {
   resource: 'منبع',
   question: 'سؤال',
   faq: 'پرسش',
@@ -24,26 +30,46 @@ const TYPE_LABELS: Record<string, string> = {
   book: 'کتاب',
 };
 
-function ResultRow({ item }: { item: SearchResultItem }) {
-  return (
-    <div className="list__item" style={{ padding: '14px 16px' }}>
-      <Icon name={TYPE_ICONS[item.type] as any || 'i-file-text'} size={20} className="lead" />
-      <span className="grow">
-        <span className="h3" style={{ display: 'block' }}>{item.title}</span>
-        {item.subtitle && (
-          <span className="small" style={{ display: 'block' }}>{item.subtitle}</span>
-        )}
-      </span>
-      <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 999, background: 'var(--paper-3)', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
-        {TYPE_LABELS[item.type] || item.type}
-      </span>
-    </div>
-  );
+const TYPE_SECTIONS: Record<SearchResultItem['type'], DsSection> = {
+  resource: 'resources',
+  subject: 'resources',
+  book: 'resources',
+  question: 'qbank',
+  schedule: 'schedule',
+  faq: 'brand',
+};
+
+function routeForResult(item: SearchResultItem): string {
+  switch (item.type) {
+    case 'resource':
+      return `/read/res/${encodeURIComponent(item.id)}`;
+    case 'subject':
+      return `/library/subject/${encodeURIComponent(item.id)}`;
+    case 'book':
+      return `/library/book/${encodeURIComponent(item.id)}`;
+    case 'schedule':
+      return '/schedule';
+    case 'question':
+      return '/exam';
+    case 'faq':
+      return '/me';
+    default:
+      return '/library';
+  }
 }
 
-/** جستجوی سراسری — در منابع، سؤالات، برنامه و مرجع */
+const FILTERS: Array<{ key: 'all' | SearchResultItem['type']; label: string }> = [
+  { key: 'all', label: 'همه' },
+  { key: 'resource', label: 'منابع' },
+  { key: 'question', label: 'سؤالات' },
+  { key: 'book', label: 'کتاب‌ها' },
+  { key: 'schedule', label: 'برنامه' },
+];
+
+/** جستجوی سراسری — DS v2، فیلتر دسته‌بندی، لینک مستقیم و فونت ورودی ≥ ۱۶px. */
 export function SearchScreen() {
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | SearchResultItem['type']>('all');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -69,15 +95,19 @@ export function SearchScreen() {
             all.push({
               id: it.id || it._id || String(Math.random()),
               title: it.title || it.name || it.question || it.lesson || '—',
-              type: type.replace(/s$/, '') as any,
-              subtitle: it.subtitle || it.topic || it.teacher || (it.answer ? it.answer.slice(0, 60) : undefined),
+              type: type.replace(/s$/, '') as SearchResultItem['type'],
+              subtitle:
+                it.subtitle ||
+                it.topic ||
+                it.teacher ||
+                (it.answer ? String(it.answer).slice(0, 80) : undefined),
             });
           });
         }
       });
       setResults(all);
     } catch (err) {
-      setError(errorText(err));
+      setError(errorText(err, 'جستجو با خطا مواجه شد.'));
     } finally {
       setLoading(false);
     }
@@ -88,7 +118,7 @@ export function SearchScreen() {
       if (query.trim().length >= 2) {
         void search(query);
       }
-    }, 400);
+    }, 350);
     return () => clearTimeout(id);
   }, [query, search]);
 
@@ -96,82 +126,140 @@ export function SearchScreen() {
     inputRef.current?.focus();
   }, []);
 
+  const filtered = useMemo(
+    () => (filter === 'all' ? results : results.filter((r) => r.type === filter)),
+    [results, filter],
+  );
+
   return (
     <>
-      <AppBar title="جستجو" sub="جستجوی سراسری در محتوا" />
-      <div className="page">
-        <div className="row gap-8" style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--paper)', padding: '8px 0' }}>
-          <div className="grow" style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-3)', pointerEvents: 'none' }}>
-              <Icon name="i-search" size={18} />
-            </span>
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="جستجو در منابع، سؤالات، برنامه…"
-              style={{
-                width: '100%',
-                height: 46,
-                padding: '0 42px 0 14px',
-                borderRadius: 13,
-                border: '1px solid var(--line)',
-                background: 'var(--paper-2)',
-                fontSize: 'var(--hym-fs-input)',
-                fontFamily: 'inherit',
-                outline: 'none',
-              }}
-            />
-            {query && (
-              <button
-                onClick={() => { setQuery(''); setResults([]); setSearched(false); inputRef.current?.focus(); }}
-                style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 0, cursor: 'pointer', color: 'var(--ink-3)' }}
-              >
-                <Icon name="i-x" size={18} />
-              </button>
+      <AppBar title="جستجو" sub="جستجوی سراسری در منابع، سؤالات و برنامه" back />
+
+      <div className="page page-enter core-page">
+        <div className="search-stage">
+          <div className="search-sticky">
+            <div className="ds-search">
+              <Icon name="i-search" size={18} className="ds-search__icon" />
+              <input
+                ref={inputRef}
+                type="search"
+                className="ds-input"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="جستجو در منابع، سؤالات، برنامه…"
+                aria-label="عبارت جستجو"
+              />
+              {query && (
+                <button
+                  type="button"
+                  className="ds-search__clear search-clear-btn"
+                  aria-label="پاک کردن جستجو"
+                  onClick={() => {
+                    setQuery('');
+                    setResults([]);
+                    setSearched(false);
+                    inputRef.current?.focus();
+                  }}
+                >
+                  <Icon name="i-x" size={18} />
+                </button>
+              )}
+            </div>
+
+            {results.length > 0 && (
+              <div className="search-filters" role="group" aria-label="فیلتر نوع نتیجه">
+                {FILTERS.map((f) => (
+                  <DsChip
+                    key={f.key}
+                    selected={filter === f.key}
+                    className="search-filter-chip"
+                    onClick={() => setFilter(f.key)}
+                  >
+                    {f.label}
+                  </DsChip>
+                ))}
+              </div>
             )}
           </div>
-        </div>
 
-        {loading && <div className="mt-8"><SkeletonStack rows={4} /></div>}
+          {loading && <SkeletonStack rows={4} />}
 
-        {error && !loading && (
-          <div className="mt-16" style={{ textAlign: 'center' }}>
-            <p className="body">{error}</p>
-            <button className="btn mt-8" onClick={() => search(query)}>تلاش دوباره</button>
-          </div>
-        )}
+          {error && !loading && (
+            <DsCard>
+              <DsEmpty
+                icon={<Icon name="i-alert-circle" size={28} />}
+                title="خطا در جستجو"
+                body={error}
+                action={
+                  <DsButton variant="secondary" onClick={() => void search(query)}>
+                    تلاش دوباره
+                  </DsButton>
+                }
+              />
+            </DsCard>
+          )}
 
-        {!loading && !error && searched && results.length === 0 && (
-          <div className="mt-16">
-            <EmptyState
-              icon="i-search"
-              title="نتیجه‌ای پیدا نشد"
-              text={`برای «${query}» چیزی نداریم. کلمهٔ دیگری امتحان کن.`}
-            />
-          </div>
-        )}
+          {!loading && !error && searched && filtered.length === 0 && (
+            <DsCard>
+              <DsEmpty
+                icon={<Icon name="i-search" size={28} />}
+                title="نتیجه‌ای پیدا نشد"
+                body={`برای «${query}» موردی ثبت نشده است؛ واژهٔ دیگری امتحان کنید.`}
+              />
+            </DsCard>
+          )}
 
-        {!loading && !error && results.length > 0 && (
-          <>
-            <div className="row row--between mt-8">
-              <div className="small">{results.length} نتیجه</div>
+          {!loading && !error && filtered.length > 0 && (
+            <div className="core-stack">
+              <div className="core-sec-head">
+                <h2 className="core-sec-head__title">نتایج جستجو</h2>
+                <span className="core-sec-head__sub">{faNum(filtered.length)} نتیجه</span>
+              </div>
+
+              <DsCard flush>
+                <div className="ds-list">
+                  {filtered.map((item) => {
+                    const sec = TYPE_SECTIONS[item.type] || 'brand';
+                    return (
+                      <Link
+                        key={`${item.type}-${item.id}`}
+                        to={routeForResult(item)}
+                        className="ds-row"
+                        data-section={sec}
+                      >
+                        <span className="ds-row__icon" aria-hidden="true">
+                          <Icon name={TYPE_ICONS[item.type] || 'i-file-text'} size={20} />
+                        </span>
+                        <span className="ds-row__body">
+                          <span className="ds-row__title">
+                            <bdi dir="auto">{item.title}</bdi>
+                          </span>
+                          {item.subtitle && (
+                            <span className="ds-row__sub">
+                              <bdi dir="auto">{item.subtitle}</bdi>
+                            </span>
+                          )}
+                        </span>
+                        <DsBadge tone="accent">{TYPE_LABELS[item.type] || item.type}</DsBadge>
+                        <Icon name="i-chevron-r" size={18} className="ds-row__chev" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              </DsCard>
             </div>
-            <Card variant="flush" className="mt-8">
-              {results.map((item) => (
-                <ResultRow key={`${item.type}-${item.id}`} item={item} />
-              ))}
-            </Card>
-          </>
-        )}
+          )}
 
-        {!searched && !loading && (
-          <div className="mt-24" style={{ textAlign: 'center', opacity: 0.5 }}>
-            <Icon name="i-search" size={48} />
-            <p className="body mt-12">برای جستجو چیزی بنویس</p>
-          </div>
-        )}
+          {!searched && !loading && (
+            <DsCard level="sunken">
+              <DsEmpty
+                icon={<Icon name="i-search" size={28} />}
+                title="جستجو در کل هامزیار"
+                body="نام درس، جزوه، کتاب مرجع یا واژهٔ کلیدی سؤال را تایپ کنید (حداقل ۲ حرف)."
+              />
+            </DsCard>
+          )}
+        </div>
       </div>
     </>
   );
