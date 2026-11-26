@@ -261,10 +261,10 @@ class Tier1Feature6StickyNoteTests(ReaderBaseTest):
         self.assertIn("'coral'", self.sticky_note_tsx)
 
     def test_tc_note_04_compact_pin_collapse_state(self):
-        """TC-NOTE-04: Verify collapsing sticky notes into compact button pins (📌)."""
+        """TC-NOTE-04: Verify collapsing sticky notes into compact button pins (i-pin icon)."""
         self.assertIn("collapsed", self.sticky_note_tsx)
         self.assertIn("sticky-note--collapsed", self.sticky_note_tsx)
-        self.assertIn("📌", self.sticky_note_tsx)
+        self.assertIn('name="i-pin"', self.sticky_note_tsx)
 
     def test_tc_note_05_backend_mutation_upsert_and_delete(self):
         """TC-NOTE-05: Verify backend StickyNoteModel validation on max page, text length, and non-finite floats."""
@@ -750,7 +750,7 @@ class Tier4RealWorldScenarioTests(ReaderBaseTest):
             color="yellow"
         )
         self.assertEqual(0.82, note.x)
-        self.assertIn("📌", self.sticky_note_tsx)
+        self.assertIn('name="i-pin"', self.sticky_note_tsx)
 
     def test_scenario_05_histopathology_zoom_and_focus_mode(self):
         """SCENARIO-05: Student zooms into 40x myocardial histology diagram and toggles focus mode."""

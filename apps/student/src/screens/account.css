@@ -749,6 +749,11 @@
   gap: var(--hym-space-2);
 }
 
+.acct-discount-row .acct-btn-tall {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .acct-discount-row__field {
   flex: 1 1 auto;
   min-width: 0;

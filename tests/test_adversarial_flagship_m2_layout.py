@@ -56,6 +56,8 @@ class MobileBreakpointInvariantsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.ui_css = (DESIGN_DIR / "ui.css").read_text(encoding="utf-8")
+        cls.components_css = (DESIGN_DIR / "components.css").read_text(encoding="utf-8")
+        cls.shell_css = (DESIGN_DIR / "shell.css").read_text(encoding="utf-8")
         cls.tokens_css = (DESIGN_DIR / "tokens.css").read_text(encoding="utf-8")
         cls.tabbar_tsx = (LAYOUT_DIR / "TabBar.tsx").read_text(encoding="utf-8")
         cls.sheet_tsx = (COMPONENTS_DIR / "Sheet.tsx").read_text(encoding="utf-8")
@@ -81,26 +83,31 @@ class MobileBreakpointInvariantsTests(unittest.TestCase):
         self.assertIn("display: none !important", header_match.group(1))
 
     def test_tabbar_fixed_positioning_and_safe_area_insets(self):
-        """Verify .tabbar uses fixed positioning and respects safe-area-inset-bottom."""
-        # Find .tabbar CSS block
-        match = re.search(r"\.tabbar\s*\{([^}]+)\}", self.ui_css)
-        self.assertIsNotNone(match, ".tabbar definition not found in ui.css")
+        """Verify .ds-tabbar uses fixed positioning and respects safe-area-inset-bottom."""
+        # TabBar mounts .ds-tabbar and .app-tabbar
+        self.assertIn("ds-tabbar", self.tabbar_tsx)
+        self.assertIn("app-tabbar", self.tabbar_tsx)
+
+        # Find .ds-tabbar CSS block in components.css
+        match = re.search(r"\.ds-tabbar\s*\{([^}]+)\}", self.components_css)
+        self.assertIsNotNone(match, ".ds-tabbar definition not found in components.css")
         rules = match.group(1)
 
-        self.assertIn("position:fixed", rules.replace(" ", ""))
-        self.assertIn("bottom:0", rules.replace(" ", ""))
-        self.assertIn("left:0", rules.replace(" ", ""))
-        self.assertIn("right:0", rules.replace(" ", ""))
-        self.assertIn("z-index:50", rules.replace(" ", ""))
+        compact = rules.replace(" ", "")
+        self.assertIn("position:fixed", compact)
+        self.assertIn("bottom:0", compact)
+        self.assertIn("inset-inline:0", compact)
+        self.assertIn("z-index:var(--hym-z-nav)", compact)
         self.assertIn("env(safe-area-inset-bottom", rules)
 
-        # TabBar must be explicitly hidden on >= 768px
+        # TabBar must be explicitly hidden on >= 768px via .app-tabbar in shell.css
         hide_match = re.search(
-            r"@media\s*\(\s*min-width:\s*768px\s*\)\s*\{([^}]+)\.tabbar\s*\{([^}]+)\}",
-            self.ui_css,
+            r"@media\s*\(\s*min-width:\s*768px\s*\)\s*\{([^}]*)\.app-tabbar\s*\{([^}]+)\}",
+            self.shell_css,
+            re.DOTALL,
         )
-        self.assertIsNotNone(hide_match, "TabBar hiding query on min-width 768px not found")
-        self.assertIn("display: none !important", hide_match.group(2))
+        self.assertIsNotNone(hide_match, "TabBar hiding query on min-width 768px not found in shell.css")
+        self.assertIn("display: none", hide_match.group(2))
 
     def test_tabbar_five_primary_destinations_structure(self):
         """Verify TabBar.tsx mounts exactly 5 primary navigation destinations with icons."""

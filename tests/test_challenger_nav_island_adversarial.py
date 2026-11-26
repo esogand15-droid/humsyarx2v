@@ -425,7 +425,7 @@ class TestNavIslandCSSAndDesignInvariants(ChallengerNavIslandBase):
         reader_branch = self.shell_tsx[self.shell_tsx.find("variant === 'reader'"):self.shell_tsx.find("variant === 'bare'")]
         self.assertNotIn("<DesktopHeader", reader_branch)
         # 2. Reader uses app-shell--reader rather than stage-content
-        self.assertIn('<div className="app-shell app-shell--reader">{children}</div>', reader_branch)
+        self.assertIn('<div className="app-shell app-shell--reader" data-section={section}>', reader_branch)
 
 
 # =============================================================================

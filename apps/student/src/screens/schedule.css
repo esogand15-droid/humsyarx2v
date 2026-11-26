@@ -558,6 +558,10 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .sched-col.is-today .sched-col__date {
+    color: var(--hym-text-secondary);
+  }
+
   .sched-col__body {
     display: flex;
     flex-direction: column;

@@ -745,19 +745,19 @@ class Tier1Feature12DatabaseDecouplingOutboxTests(Tier1BaseTest):
 class Tier1Feature13RouteBaselineSyncTests(Tier1BaseTest):
     """T1-13: Route Baseline Synchronization verification."""
 
-    def test_01_openapi_operations_matches_759(self):
-        """Verify openapi_operations count matches 759."""
+    def test_01_openapi_operations_matches_762(self):
+        """Verify openapi_operations count matches 762."""
         counts = _count_api_operations()
-        self.assertEqual(counts["openapi_operations"], 759)
+        self.assertEqual(counts["openapi_operations"], 762)
 
-    def test_02_route_objects_matches_766(self):
-        """Verify route_objects count under /api matches 766."""
+    def test_02_route_objects_matches_769(self):
+        """Verify route_objects count under /api matches 769."""
         counts = _count_api_operations()
-        self.assertEqual(counts["api_route_objects"], 766)
+        self.assertEqual(counts["api_route_objects"], 769)
 
-    def test_03_route_baseline_constant_is_759(self):
-        """Verify _ROUTE_BASELINE in main.py is 759."""
-        self.assertEqual(_ROUTE_BASELINE, 759)
+    def test_03_route_baseline_constant_is_762(self):
+        """Verify _ROUTE_BASELINE in main.py is 762."""
+        self.assertEqual(_ROUTE_BASELINE, 762)
 
     def test_04_every_route_has_valid_method(self):
         """Verify all mounted routes define valid HTTP methods."""

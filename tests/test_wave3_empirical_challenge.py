@@ -37,6 +37,7 @@ class TestWave3FrontendEmpiricalChallenge(unittest.TestCase):
         cls.button_path = cls.student_dir / "src" / "components" / "Button.tsx"
         cls.tokens_css_path = cls.student_dir / "src" / "design" / "tokens.css"
         cls.ui_css_path = cls.student_dir / "src" / "design" / "ui.css"
+        cls.shell_css_path = cls.student_dir / "src" / "design" / "shell.css"
 
         # Verify all target files exist
         for p in [
@@ -47,6 +48,7 @@ class TestWave3FrontendEmpiricalChallenge(unittest.TestCase):
             cls.button_path,
             cls.tokens_css_path,
             cls.ui_css_path,
+            cls.shell_css_path,
         ]:
             if not p.is_file():
                 raise FileNotFoundError(f"Target file not found: {p}")
@@ -152,6 +154,7 @@ class TestWave3FrontendEmpiricalChallenge(unittest.TestCase):
         """Verify 4-tier responsive breakpoint definitions in tokens.css and ui.css."""
         tokens = self.tokens_css_path.read_text(encoding="utf-8")
         ui = self.ui_css_path.read_text(encoding="utf-8")
+        shell = self.shell_css_path.read_text(encoding="utf-8")
 
         # Tier tokens in tokens.css
         self.assertIn("--hym-sidebar-w:        256px;", tokens)
@@ -176,10 +179,10 @@ class TestWave3FrontendEmpiricalChallenge(unittest.TestCase):
         self.assertIsNotNone(tablet_match, "Tablet rail media query not found in ui.css")
         self.assertIn("var(--hym-rail-w)", tablet_match.group(2))
 
-        # Breakpoint 3 & 4: TabBar hidden on >= 768px
-        tabbar_hide = re.search(r"@media\s*\(\s*min-width:\s*768px\s*\)\s*\{([^}]+)\.tabbar\s*\{([^}]+)\}", ui)
-        self.assertIsNotNone(tabbar_hide, "TabBar hiding on >= 768px not found in ui.css")
-        self.assertIn("display: none !important", tabbar_hide.group(2))
+        # Breakpoint 3 & 4: TabBar hidden on >= 768px via .app-tabbar in shell.css
+        tabbar_hide = re.search(r"@media\s*\(\s*min-width:\s*768px\s*\)\s*\{([^}]*)\.app-tabbar\s*\{([^}]+)\}", shell, re.DOTALL)
+        self.assertIsNotNone(tabbar_hide, "TabBar hiding on >= 768px not found in shell.css")
+        self.assertIn("display: none", tabbar_hide.group(2))
 
     def test_tablet_rail_footer_flex_overflow_risk(self):
         """Verify tablet rail footer specifies flex-direction: column to prevent overflow."""

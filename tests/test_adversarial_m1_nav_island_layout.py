@@ -124,13 +124,15 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.ui_css = (DESIGN_DIR / "ui.css").read_text(encoding="utf-8")
+        cls.components_css = (DESIGN_DIR / "components.css").read_text(encoding="utf-8")
+        cls.shell_css = (DESIGN_DIR / "shell.css").read_text(encoding="utf-8")
         cls.tokens_css = (DESIGN_DIR / "tokens.css").read_text(encoding="utf-8")
         cls.desktop_header_tsx = (LAYOUT_DIR / "DesktopHeader.tsx").read_text(encoding="utf-8")
         cls.header_context_tsx = (LAYOUT_DIR / "HeaderContext.tsx").read_text(encoding="utf-8")
         cls.appbar_tsx = (COMPONENTS_DIR / "AppBar.tsx").read_text(encoding="utf-8")
         cls.shell_tsx = (LAYOUT_DIR / "Shell.tsx").read_text(encoding="utf-8")
         cls.reader_screen_tsx = (SCREENS_DIR / "reader" / "ReaderScreen.tsx").read_text(encoding="utf-8")
-        cls.oracle = EmpiricalCSSLayoutOracle(cls.ui_css)
+        cls.oracle = EmpiricalCSSLayoutOracle(cls.ui_css + "\n" + cls.components_css + "\n" + cls.shell_css)
 
     # =========================================================================
     # CHALLENGE AREA 1: VIEWPORT BOUNDARY TRANSITIONS (320px..3840px)
@@ -152,11 +154,13 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
         sidebar_props = self.oracle.resolve(".sidebar", w)
         self.assertEqual("none !important", sidebar_props.get("display"))
 
-        # Tabbar
-        tabbar_props = self.oracle.resolve(".tabbar", w)
+        # Tabbar (.ds-tabbar + .app-tabbar)
+        tabbar_props = self.oracle.resolve(".ds-tabbar", w)
+        app_tabbar_props = self.oracle.resolve(".app-tabbar", w)
         self.assertIn("fixed", tabbar_props.get("position", ""))
-        self.assertEqual("50", tabbar_props.get("z-index"))
-        self.assertNotEqual("none !important", tabbar_props.get("display"))
+        self.assertEqual("var(--hym-z-nav)", tabbar_props.get("z-index"))
+        self.assertNotEqual("none", app_tabbar_props.get("display"))
+        self.assertNotEqual("none !important", app_tabbar_props.get("display"))
 
         # AppBar safe-area top inset active on mobile
         appbar_props = self.oracle.resolve(".appbar", w)
@@ -176,8 +180,9 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
         sidebar_props = self.oracle.resolve(".sidebar", w)
         self.assertEqual("none !important", sidebar_props.get("display"))
 
-        tabbar_props = self.oracle.resolve(".tabbar", w)
-        self.assertNotEqual("none !important", tabbar_props.get("display"))
+        app_tabbar_props = self.oracle.resolve(".app-tabbar", w)
+        self.assertNotEqual("none", app_tabbar_props.get("display"))
+        self.assertNotEqual("none !important", app_tabbar_props.get("display"))
 
         # De-duplication rule does NOT trigger at 767px
         dedup_props = self.oracle.resolve(".stage-content .appbar", w)
@@ -185,15 +190,15 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
 
     def test_adv_viewport_768px_tablet_transition_threshold(self):
         """Stress Test 768px: Lower edge of tablet breakpoint.
-        - Switch from mobile to tablet: Tabbar becomes display: none !important
+        - Switch from mobile to tablet: Tabbar becomes display: none
         - Desktop header becomes visible and active with compact tablet margins
         - Sidebar becomes compact vertical rail (72px)
         - De-duplication strictly suppresses .stage-content .appbar
         """
         w = 768.0
         # Tabbar is hidden
-        tabbar_props = self.oracle.resolve(".tabbar", w)
-        self.assertEqual("none !important", tabbar_props.get("display"))
+        app_tabbar_props = self.oracle.resolve(".app-tabbar", w)
+        self.assertEqual("none", app_tabbar_props.get("display"))
 
         # Desktop header is visible with tablet margins: 12px 14px 0 14px
         header_props = self.oracle.resolve(".desktop-header", w)
@@ -203,9 +208,10 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
         self.assertEqual("12px 14px 0 14px", header_props.get("margin"))
         self.assertEqual("0 16px", header_props.get("padding"))
 
-        # Search box compacted on tablet
+        # Search box adapted on tablet (flex auto with min-width: 150px)
         search_props = self.oracle.resolve(".desktop-header__search", w)
-        self.assertEqual("170px", search_props.get("width"))
+        self.assertEqual("auto", search_props.get("width"))
+        self.assertEqual("150px", search_props.get("min-width"))
 
         # De-duplication strictly active
         dedup_props = self.oracle.resolve(".stage-content .appbar", w)
@@ -214,7 +220,7 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
     def test_adv_viewport_1023px_tablet_boundary_limit(self):
         """Stress Test 1023px: Upper edge of tablet breakpoint.
         - Tablet compaction persists
-        - Search width remains 170px
+        - Search adapts to tablet width (auto / min-width 150px)
         - Margin remains 12px 14px 0 14px
         - De-duplication strictly suppresses .stage-content .appbar
         """
@@ -224,7 +230,8 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
         self.assertEqual("0 16px", header_props.get("padding"))
 
         search_props = self.oracle.resolve(".desktop-header__search", w)
-        self.assertEqual("170px", search_props.get("width"))
+        self.assertEqual("auto", search_props.get("width"))
+        self.assertEqual("150px", search_props.get("min-width"))
 
         dedup_props = self.oracle.resolve(".stage-content .appbar", w)
         self.assertEqual("none !important", dedup_props.get("display"))
@@ -440,7 +447,7 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
             "ScheduleScreen.tsx", "NotesScreen.tsx", "MeScreen.tsx",
             "SearchScreen.tsx", "AiChatScreen.tsx", "GradesScreen.tsx",
             "SubscriptionScreen.tsx", "NotificationsScreen.tsx", "TicketsScreen.tsx",
-            "ReaderScreen.tsx", "SystemScreen.tsx", "StatesScreen.tsx", "Placeholder.tsx"
+            "ReaderScreen.tsx", "SystemScreen.tsx", "StatesScreen.tsx", "NotFoundScreen.tsx"
         ]
         found = 0
         for name in screens:
@@ -555,7 +562,7 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
         self.assertIn('<Brand size="sm" />', self.desktop_header_tsx)
         self.assertIn('className="desktop-header__search"', self.desktop_header_tsx)
         self.assertIn('aria-label="جستجو در محتوا و منابع"', self.desktop_header_tsx)
-        self.assertIn('⌘K', self.desktop_header_tsx)
+        self.assertIn('className="desktop-header__search-label"', self.desktop_header_tsx)
         self.assertIn('badge-dot badge-dot--cyan', self.desktop_header_tsx)
 
 

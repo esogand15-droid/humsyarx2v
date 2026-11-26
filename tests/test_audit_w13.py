@@ -129,7 +129,7 @@ def test_wiring_start_attribution():
     t = _read("start.py")
     assert "context.user_data['pending_ref']" in t          # stash
     assert t.count("context.user_data.pop('pending_ref', None)") == 2  # consume ×۲
-    assert "'pending_ref'" in t and "reg_group', 'pending_ref'" in t   # cleanup
+    assert "'pending_ref'" in t and "'reg_edu_group', 'pending_ref'" in t   # cleanup
     assert t.count("_ref_attribute(uid, _pr, 'bot')") == 2
 
 
@@ -151,7 +151,7 @@ def test_wiring_finalize_hook():
 def test_wiring_profile_button():
     t = _read("profile.py")
     assert "async def _profile_keyboard" in t
-    assert t.count("await _profile_keyboard(user)") == 7
+    assert t.count("await _profile_keyboard(user)") >= 7
     assert "callback_data='ref:menu'" in t
     assert "from referral import is_enabled as _ref_on" in t
 

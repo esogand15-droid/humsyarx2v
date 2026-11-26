@@ -214,7 +214,7 @@
   --hym-text-primary:      #0F172A;
   --hym-text-secondary:    #334155;
   --hym-text-muted:        #56657A; /* v2: 5.7:1 on page, 5.4:1 on inset (was #64748B 4.3:1 on inset) */
-  --hym-text-disabled:     #94A3B8;
+  --hym-text-disabled:     #5E6C80; /* v2: 4.87:1 on sunken, 5.34:1 on raised; stays muted via dashed/sunken cue */
   --hym-text-inverse:      #F8FAFC;
   --hym-text-link:         #2563EB;
   --hym-text-on-brand:     #FFFFFF;
@@ -320,7 +320,7 @@ html.dark {
   --hym-text-primary:      #F8FAFC; /* Pure Ice White */
   --hym-text-secondary:    #CBD5E1; /* v2: Slate 300, 12:1 — keeps secondary above muted */
   --hym-text-muted:        #94A3B8; /* v2: Slate 400, 7.5:1 on page, 5.7:1 on raised (was 3.75:1) */
-  --hym-text-disabled:     #475569; /* Cool Slate 600 */
+  --hym-text-disabled:     #8091A7; /* v2: 6.1:1 on sunken, 5.55:1 on surface, 4.55:1 on raised */
   --hym-text-inverse:      #0F172A;
   --hym-text-link:         #38BDF8;
   --hym-text-on-brand:     #FFFFFF;

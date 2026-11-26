@@ -371,169 +371,175 @@ html.dark .reader-workspace {
 }
 
 /* ── AI Top-Flow Drawer & Embedded AI Panel (light & dark DS v2) ── */
-.reader-shell .ai-top-flow-backdrop {
+.reader-workspace .ai-top-flow-backdrop {
   background: var(--hym-bg-scrim);
   visibility: hidden;
 }
 
-.reader-shell .ai-top-flow-backdrop.is-open {
+.reader-workspace .ai-top-flow-backdrop.is-open {
   visibility: visible;
 }
 
-.reader-shell .ai-top-flow-card {
+.reader-workspace .ai-top-flow-card {
   background: var(--hym-surface-1);
   border: 1px solid var(--hym-hairline-strong);
   box-shadow: var(--hym-elev-3);
   color: var(--hym-text-primary);
 }
 
-.reader-shell .ai-top-flow-handle {
+.reader-workspace .ai-top-flow-handle {
   background: var(--hym-hairline-strong);
 }
 
-.reader-shell .ai-top-flow-header {
+.reader-workspace .ai-top-flow-header {
   border-block-end: 1px solid var(--hym-hairline);
 }
 
-.reader-shell .ai-top-flow-avatar {
+.reader-workspace .ai-top-flow-avatar {
   background: var(--hym-accent);
   color: var(--hym-accent-on);
   box-shadow: none;
 }
 
-.reader-shell .ai-top-flow-avatar-glow {
+.reader-workspace .ai-top-flow-avatar-glow {
   display: none;
 }
 
-.reader-shell .ai-top-flow-main-title {
+.reader-workspace .ai-top-flow-main-title {
   color: var(--hym-text-primary);
 }
 
-.reader-shell .ai-top-flow-badge {
+.reader-workspace .ai-top-flow-badge {
   background: var(--hym-accent-subtle);
   border: 1px solid var(--hym-accent-border);
   color: var(--hym-accent-text);
 }
 
-.reader-shell .ai-top-flow-subtitle {
+.reader-workspace .ai-top-flow-subtitle {
   color: var(--hym-text-muted);
 }
 
-.reader-shell .ai-top-flow-close-btn {
-  min-width: 44px;
-  min-height: 44px;
+.reader-workspace .ai-top-flow-close-btn {
+  width: var(--hym-control-h-md);
+  height: var(--hym-control-h-md);
+  min-width: var(--hym-control-h-md);
+  min-height: var(--hym-control-h-md);
   border-radius: var(--hym-radius-control);
   background: var(--hym-surface-sunken);
   border: 1px solid var(--hym-hairline);
   color: var(--hym-text-secondary);
 }
 
-.reader-shell .ai-top-flow-close-btn:hover {
+.reader-workspace .ai-top-flow-close-btn:hover {
   background: var(--hym-role-danger-subtle);
   border-color: var(--hym-role-danger-subtle-border);
   color: var(--hym-role-danger-text);
 }
 
-.reader-shell .embedded-ai-messages {
+.reader-workspace .embedded-ai-messages {
   padding-inline-end: var(--hym-space-1);
 }
 
-.reader-shell .embedded-ai-bubble {
+.reader-workspace .embedded-ai-bubble {
   box-shadow: var(--hym-elev-1);
   font-size: var(--hym-fs-small);
 }
 
-.reader-shell .embedded-ai-bubble--assistant {
+.reader-workspace .embedded-ai-bubble--assistant {
   background: var(--hym-surface-2);
   border: 1px solid var(--hym-hairline);
   color: var(--hym-text-primary);
 }
 
-.reader-shell .embedded-ai-bubble--user {
+.reader-workspace .embedded-ai-bubble--user {
   background: var(--hym-accent);
   border: 1px solid transparent;
   color: var(--hym-accent-on);
 }
 
-.reader-shell .embedded-ai-sender-name {
+.reader-workspace .embedded-ai-sender-name {
   color: var(--hym-accent-text);
 }
 
-.reader-shell .embedded-ai-pulse-dot,
-.reader-shell .ai-typing-dot {
+.reader-workspace .embedded-ai-pulse-dot,
+.reader-workspace .ai-typing-dot {
   background: var(--hym-accent);
   box-shadow: none;
 }
 
-.reader-shell .embedded-ai-user-tag {
+.reader-workspace .embedded-ai-user-tag {
   color: var(--hym-accent-on);
   opacity: 0.85;
 }
 
-.reader-shell .embedded-ai-copy-btn {
+.reader-workspace .embedded-ai-copy-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--hym-space-1);
   border: 1px solid var(--hym-hairline);
   color: var(--hym-text-secondary);
   background: var(--hym-surface-1);
-  min-height: 28px;
-  padding: 2px 8px;
+  min-width: var(--hym-control-h-md);
+  min-height: var(--hym-control-h-md);
+  padding-block: 4px;
+  padding-inline: var(--hym-space-3);
 }
 
-.reader-shell .embedded-ai-copy-btn:hover {
+.reader-workspace .embedded-ai-copy-btn:hover {
   color: var(--hym-accent-text);
   border-color: var(--hym-accent-border);
   background: var(--hym-accent-subtle);
 }
 
-.reader-shell .embedded-ai-typing-label {
+.reader-workspace .embedded-ai-typing-label {
   color: var(--hym-accent-text);
   margin-inline-start: var(--hym-space-2);
 }
 
-.reader-shell .embedded-ai-chip {
-  min-height: 36px;
+.reader-workspace .embedded-ai-chip {
+  min-height: var(--hym-control-h-md);
   background: var(--hym-surface-sunken);
   border: 1px solid var(--hym-hairline);
   color: var(--hym-text-secondary);
 }
 
-.reader-shell .embedded-ai-chip:hover {
+.reader-workspace .embedded-ai-chip:hover {
   background: var(--hym-accent-subtle);
   border-color: var(--hym-accent-border);
   color: var(--hym-accent-text);
 }
 
-.reader-shell .embedded-ai-reset {
+.reader-workspace .embedded-ai-reset {
   background: var(--hym-accent-subtle);
   border-color: var(--hym-accent-border);
   color: var(--hym-accent-text);
 }
 
-.reader-shell .embedded-ai-input-wrap {
+.reader-workspace .embedded-ai-input-wrap {
   background: var(--hym-surface-sunken);
   border: 1px solid var(--hym-hairline-strong);
   box-shadow: none;
 }
 
-.reader-shell .embedded-ai-input-wrap:focus-within {
+.reader-workspace .embedded-ai-input-wrap:focus-within {
   border-color: var(--hym-accent);
   box-shadow: var(--hym-focus-ring-v2);
 }
 
-.reader-shell .embedded-ai-input {
+.reader-workspace .embedded-ai-input {
   color: var(--hym-text-primary);
   font-size: var(--hym-fs-input);
 }
 
-.reader-shell .embedded-ai-input::placeholder {
+.reader-workspace .embedded-ai-input::placeholder {
   color: var(--hym-text-muted);
 }
 
-.reader-shell .embedded-ai-send-btn {
-  width: 40px;
-  height: 40px;
+.reader-workspace .embedded-ai-send-btn {
+  width: var(--hym-control-h-md);
+  height: var(--hym-control-h-md);
+  flex: 0 0 var(--hym-control-h-md);
   border-radius: var(--hym-radius-control);
   border: 0;
   background: var(--hym-accent);
@@ -543,17 +549,17 @@ html.dark .reader-workspace {
   cursor: pointer;
 }
 
-.reader-shell .embedded-ai-send-btn:disabled {
+.reader-workspace .embedded-ai-send-btn:disabled {
   opacity: 0.45;
   cursor: default;
 }
 
 @media (max-width: 767px) {
-  .reader-shell .ai-top-flow-backdrop {
+  .reader-workspace .ai-top-flow-backdrop {
     padding: var(--hym-space-2);
   }
 
-  .reader-shell .ai-top-flow-card {
+  .reader-workspace .ai-top-flow-card {
     width: calc(100vw - 16px);
     height: min(76dvh, 620px);
     max-height: calc(100dvh - 24px);
@@ -783,8 +789,22 @@ html.dark .reader-workspace {
   flex-direction: column;
 }
 
-.ink-dock__swatch,
+.ink-dock__swatch {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.ink-dock__swatch-dot,
 .ink-dock .ink-dot {
+  display: block;
   width: 24px;
   height: 24px;
   min-width: 24px;
@@ -792,12 +812,10 @@ html.dark .reader-workspace {
   border: 2px solid var(--hym-surface-1);
   box-shadow: 0 0 0 1px var(--hym-hairline-strong);
   background: var(--swatch, var(--hym-accent));
-  cursor: pointer;
-  padding: 0;
   transition: transform var(--hym-duration-fast) ease, box-shadow var(--hym-duration-fast) ease;
 }
 
-.ink-dock__swatch.is-active,
+.ink-dock__swatch.is-active .ink-dock__swatch-dot,
 .ink-dock .ink-dot.is-on {
   transform: scale(1.16);
   box-shadow: 0 0 0 2px var(--hym-surface-1), 0 0 0 4px var(--hym-accent);
@@ -844,6 +862,30 @@ html.dark .reader-workspace {
   color: var(--hym-accent-on);
   box-shadow: none;
   transform: none;
+}
+
+@media (max-width: 1023px), (pointer: coarse) {
+  .ink-dock__btn,
+  .ink-dock__mini,
+  .ink-dock__color-btn {
+    min-width: var(--hym-control-h-md);
+    height: var(--hym-control-h-md);
+  }
+  .ink-dock__mini,
+  .ink-dock__color-btn {
+    width: var(--hym-control-h-md);
+  }
+  .ink-dock__swatches {
+    gap: 0;
+  }
+  .ink-dock__swatch {
+    width: var(--hym-control-h-md);
+    height: var(--hym-control-h-md);
+    min-width: var(--hym-control-h-md);
+  }
+  .ink-dock .ink-stepper-btn {
+    min-height: var(--hym-control-h-md);
+  }
 }
 
 .ink-dock .ink-sync-circle {

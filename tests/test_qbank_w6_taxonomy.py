@@ -1,6 +1,8 @@
 """🌊 QBANK-W6 — lesson-level taxonomy independent of content-admin sessions."""
 from __future__ import annotations
 
+import unittest
+
 import pytest
 
 from question_bank.contracts import (
@@ -34,10 +36,9 @@ class TestLessonCatalog:
         ) == "آناتومی سر و گردن"
 
 
-class TestEnsureTaxonomyUnit:
+class TestEnsureTaxonomyUnit(unittest.IsolatedAsyncioTestCase):
     """In-memory fake DB exercising ensure_taxonomy_for_import without Mongo."""
 
-    @pytest.mark.asyncio
     async def test_auto_creates_lesson_and_bucket(self):
         bson = pytest.importorskip("bson")
         ObjectId = bson.ObjectId

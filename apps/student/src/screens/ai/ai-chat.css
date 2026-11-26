@@ -113,7 +113,7 @@
 .aic-conv.is-active .aic-conv__title { color: var(--hym-accent-text); }
 .aic-conv__meta { display: flex; align-items: center; gap: var(--hym-space-2); font-size: var(--hym-fs-caption); color: var(--hym-text-muted); line-height: var(--hym-lh-ui); }
 .aic-conv__more {
-  flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; margin-inline-end: 2px;
+  flex: 0 0 auto; display: grid; place-items: center; width: var(--hym-control-h-md); height: var(--hym-control-h-md); margin-inline-end: 2px;
   border: 0; border-radius: var(--hym-radius-md); background: none; color: var(--hym-text-muted); cursor: pointer;
 }
 .aic-conv__more:hover { background: var(--hym-bg-hover); color: var(--hym-text-primary); }
@@ -284,8 +284,8 @@
 .aic-composer__box:focus-within { box-shadow: inset 0 0 0 1px var(--hym-accent), 0 0 0 3px var(--hym-accent-subtle); }
 .aic-composer.is-over .aic-composer__box { box-shadow: inset 0 0 0 1px var(--hym-role-danger-solid); }
 .aic-composer__input {
-  flex: 1; min-width: 0; min-height: 42px; max-height: 200px;
-  padding: 9px var(--hym-space-2);
+  flex: 1; min-width: 0; min-height: var(--hym-control-h-md); max-height: 200px;
+  padding: 10px var(--hym-space-2);
   border: 0; outline: none; background: transparent; resize: none; overflow-y: hidden;
   color: var(--hym-text-primary); font: inherit;
   font-size: max(var(--hym-fs-input), var(--hym-fs-lead)); /* ≥16px همهجا (G7) */
@@ -294,7 +294,7 @@
 .aic-composer__input.is-scroll { overflow-y: auto; }
 .aic-composer__input::placeholder { color: var(--hym-text-muted); opacity: 1; }
 .aic-composer__icon, .aic-composer__send {
-  flex: 0 0 auto; display: grid; place-items: center; width: 42px; height: 42px;
+  flex: 0 0 auto; display: grid; place-items: center; width: var(--hym-control-h-md); height: var(--hym-control-h-md);
   border: 0; border-radius: 50%; cursor: pointer; touch-action: manipulation;
 }
 .aic-composer__icon { background: none; color: var(--hym-text-secondary); }

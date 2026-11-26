@@ -975,7 +975,9 @@ export function InkToolbar({
                   className={`ink-dock__swatch${color === c ? ' is-active' : ''}`}
                   aria-label={`انتخاب رنگ ${c}`}
                   onClick={() => setColor(c)}
-                />
+                >
+                  <span className="ink-dock__swatch-dot" aria-hidden="true" />
+                </button>
               ))}
               <button
                 type="button"

@@ -71,7 +71,8 @@ class TestBotFilterWiring:
     """Static: فیلتر §۵.۴ در ربات سیم‌کشی شده است."""
 
     def _bot(self):
-        return (ROOT / "questions.py").read_text(encoding="utf-8")
+        from tests._source_reader import read_source
+        return read_source("questions.py")
 
     def test_filter_callbacks_exist(self):
         bot = self._bot()

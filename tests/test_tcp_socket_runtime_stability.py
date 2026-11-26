@@ -22,6 +22,8 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, List, Tuple
 
+__test__ = False  # Standalone empirical CLI harness (run via __main__, not pytest collection)
+
 
 VITE_HOST = "127.0.0.1"
 VITE_PORT = 5173

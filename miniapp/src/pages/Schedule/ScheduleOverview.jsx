@@ -16,7 +16,7 @@ import { useMemo, useState } from 'react';
 
 import WeeklyTimetable from './WeeklyTimetable';
 
-import { faNum } from '../../lib/format';
+import { faDate, faNum } from '../../lib/format';
 import { haptic } from '../../lib/telegram';
 import {
   WEEK,

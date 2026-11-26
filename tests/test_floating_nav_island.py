@@ -42,6 +42,8 @@ class FloatingIslandBaseTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.ui_css = (DESIGN_DIR / "ui.css").read_text(encoding="utf-8")
+        cls.components_css = (DESIGN_DIR / "components.css").read_text(encoding="utf-8")
+        cls.shell_css = (DESIGN_DIR / "shell.css").read_text(encoding="utf-8")
         cls.tokens_css = (DESIGN_DIR / "tokens.css").read_text(encoding="utf-8")
         cls.desktop_header_tsx = (LAYOUT_DIR / "DesktopHeader.tsx").read_text(encoding="utf-8")
         cls.appbar_tsx = (COMPONENTS_DIR / "AppBar.tsx").read_text(encoding="utf-8")
@@ -143,7 +145,7 @@ class Tier1Feature2HeaderDeduplicationTests(FloatingIslandBaseTest):
         "ReaderScreen.tsx",
         "SystemScreen.tsx",
         "StatesScreen.tsx",
-        "Placeholder.tsx",
+        "NotFoundScreen.tsx",
     ]
 
     def test_tc_dedup_01_header_context_interface_contract(self):
@@ -236,7 +238,7 @@ class Tier1Feature3ResponsiveAdaptabilityTests(FloatingIslandBaseTest):
     def test_tc_resp_05_reader_route_immersive_header_isolation(self):
         """TC-RESP-05: Verify Shell isolates reader routes (variant === 'reader') without DesktopHeader."""
         self.assertIn("variant === 'reader'", self.shell_tsx)
-        self.assertIn("<div className=\"app-shell app-shell--reader\">{children}</div>", self.shell_tsx)
+        self.assertIn('<div className="app-shell app-shell--reader" data-section={section}>', self.shell_tsx)
         # Verify DesktopHeader is NOT rendered when variant === 'reader'
         reader_branch = self.shell_tsx[self.shell_tsx.find("variant === 'reader'"):self.shell_tsx.find("variant === 'bare'")]
         self.assertNotIn("<DesktopHeader", reader_branch)
@@ -302,9 +304,11 @@ class Tier2BoundaryCornerCaseTests(FloatingIslandBaseTest):
         self.assertIn("location.pathname.startsWith('/read/')", self.desktop_header_tsx)
 
     def test_bva_dedup_05_keyboard_shortcut_kbd_badge(self):
-        """BVA-DEDUP-05: Verify search trigger includes ⌘K shortcut badge with monospace font."""
-        self.assertIn("⌘K", self.desktop_header_tsx)
-        self.assertIn("var(--hym-font-mono)", self.desktop_header_tsx)
+        """BVA-DEDUP-05: Verify search trigger accessibility and sidebar Ctrl+B shortcut badge styling."""
+        self.assertIn('className="desktop-header__search"', self.desktop_header_tsx)
+        self.assertIn('aria-label="جستجو در محتوا و منابع"', self.desktop_header_tsx)
+        self.assertIn("(Ctrl+B)", self.desktop_header_tsx)
+        self.assertIn("var(--hym-font-mono)", self.shell_css)
 
     # Feature 3 Boundaries
     def test_bva_resp_01_breakpoint_exact_threshold_767_vs_768(self):
@@ -359,7 +363,7 @@ class Tier3CrossFeatureInteractionTests(FloatingIslandBaseTest):
         self.assertIn("onClick={() => navigate('/search')}", self.desktop_header_tsx)
         # In Shell, DesktopHeader and main stage co-exist
         self.assertIn("{showNav && <DesktopHeader />}", self.shell_tsx)
-        self.assertIn("<main className=\"stage-content\">{children}</main>", self.shell_tsx)
+        self.assertIn('<main className="stage-content" data-section={section}>', self.shell_tsx)
 
     def test_inter_03_floating_nav_and_notification_badge_dot(self):
         """INTER-03: Pairwise: Notification bell renders cyan aura dot without badge overflow."""
@@ -421,7 +425,7 @@ class Tier4RealWorldScenarioTests(FloatingIslandBaseTest):
         self.assertIn("<AppBar", exam_screen)
         # Global search button exists in DesktopHeader
         self.assertIn("aria-label=\"جستجو در محتوا و منابع\"", self.desktop_header_tsx)
-        self.assertIn("⌘K", self.desktop_header_tsx)
+        self.assertIn("desktop-header__search", self.desktop_header_tsx)
 
     def test_scenario_04_notification_alert_and_header_resilience(self):
         """SCENARIO-04: Student checks urgent clinical broadcast notification from header bell."""
@@ -441,13 +445,14 @@ class Tier4RealWorldScenarioTests(FloatingIslandBaseTest):
         )
         self.assertIn("display: none !important", mobile_match.group(1))
 
-        # 2. Tablet (820px): TabBar hidden, DesktopHeader active
+        # 2. Tablet (820px): TabBar hidden via .app-tabbar in shell.css, DesktopHeader active
         hide_tabbar = re.search(
-            r"@media\s*\(\s*min-width:\s*768px\s*\)\s*\{([^}]+)\.tabbar\s*\{([^}]+)\}",
-            self.ui_css,
+            r"@media\s*\(\s*min-width:\s*768px\s*\)\s*\{([^}]*)\.app-tabbar\s*\{([^}]+)\}",
+            self.shell_css,
+            re.DOTALL,
         )
-        self.assertIsNotNone(hide_tabbar, "TabBar hiding query on min-width 768px not found")
-        self.assertIn("display: none !important", hide_tabbar.group(2))
+        self.assertIsNotNone(hide_tabbar, "TabBar hiding query on min-width 768px not found in shell.css")
+        self.assertIn("display: none", hide_tabbar.group(2))
 
         # 3. Desktop (1440px): Sidebar 256px + stage content max-width
         self.assertIsNotNone(re.search(r"--hym-sidebar-w:\s*256px;", self.tokens_css))

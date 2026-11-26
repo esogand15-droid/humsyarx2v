@@ -816,13 +816,13 @@ html[data-theme="light"] .lp-hero__aura {
   animation: lp-float 4.8s infinite ease-in-out;
 }
 
-@media (max-width: 639px) {
+@media (max-width: 1023px) {
   .lp-hero__showcase {
     min-height: auto;
   }
   .lp-hero__emblem-frame {
-    width: min(248px, 64vw);
-    height: min(248px, 64vw);
+    width: min(256px, 34vw);
+    height: min(256px, 34vw);
   }
   .lp-hero__floating-tags {
     position: static;
@@ -842,6 +842,13 @@ html[data-theme="light"] .lp-hero__aura {
     padding: 8px 10px;
     border-radius: 14px;
     white-space: normal;
+  }
+}
+
+@media (max-width: 639px) {
+  .lp-hero__emblem-frame {
+    width: min(248px, 64vw);
+    height: min(248px, 64vw);
   }
 }
 

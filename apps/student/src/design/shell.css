@@ -96,6 +96,19 @@
 /* No horizontal overflow at 360–430 (iOS rubber-band sideways scroll). */
 .main-stage { min-width: 0; overflow-x: clip; }
 
+/* ── Desktop / tablet header (PD1) ──────────────────────────────────── */
+:root .desktop-header,
+html[data-theme="light"] .desktop-header {
+  background: var(--hym-bar-bg);
+  border-color: var(--hym-hairline);
+  box-shadow: var(--hym-elev-2);
+}
+
+.desktop-header { padding-block-start: env(safe-area-inset-top, 0px); }
+.desktop-header__search {
+  min-height: var(--hym-control-h-sm);
+}
+
 /* ── Touch targets across chrome (>=44px on mobile/tablet touch) ─────── */
 @media (max-width: 1023px), (pointer: coarse) {
   .iconbtn,
@@ -135,18 +148,6 @@
   filter: none;
 }
 
-/* ── Desktop / tablet header (PD1) ──────────────────────────────────── */
-:root .desktop-header,
-html[data-theme="light"] .desktop-header {
-  background: var(--hym-bar-bg);
-  border-color: var(--hym-hairline);
-  box-shadow: var(--hym-elev-2);
-}
-
-.desktop-header { padding-block-start: env(safe-area-inset-top, 0px); }
-.desktop-header__search {
-  min-height: var(--hym-control-h-sm);
-}
 .desktop-header__search-label {
   min-width: 0;
   white-space: nowrap;
