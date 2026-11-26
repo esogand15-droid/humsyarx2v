@@ -1,47 +1,60 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AppBar } from '../components/AppBar';
-import { Card } from '../components/Card';
-import { Chip } from '../components/Chip';
-import { EmptyState } from '../components/EmptyState';
+
+import './account.css';
 import { SkeletonStack } from '../components';
+import { AppBar } from '../components/AppBar';
+import { DsButton, DsCard, DsEmpty, DsSegmented } from '../design/components';
 import { Icon } from '../icons';
 import { apiCall, errorText } from '../lib/api';
+import { faDate, faNum } from '../lib/fa';
 
-/* صندوق اعلان واقعی — همان /api/notifications/inbox که مینی‌اپ و ربات
-   می‌نویسند (کوکی نشست وب را هم می‌پذیرد). قبلاً سه اعلان ساختگی با
-   تاریخ امتحان جعلی به همهٔ دانشجوها نشان داده می‌شد. */
-interface InboxItem {
+interface NotificationItem {
   id: string;
-  type: string;
   title: string;
   body: string;
-  link?: string | null;
-  read: boolean;
-  created_at: string;
   category?: string;
-  tone?: string;
-  pinned?: boolean;
+  read: boolean;
+  created_at?: string;
 }
 
 interface InboxPayload {
-  items: InboxItem[];
-  unread: number;
+  items: NotificationItem[];
 }
 
-function when(iso: string): string {
-  const d = new Date(iso);
-  if (!iso || Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString('fa-IR', {
-    timeZone: 'Asia/Tehran', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
+const DATE_TIME_FA = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  timeZone: 'Asia/Tehran',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+function formatNotifTime(iso?: string): string {
+  if (!iso) return '';
+  const dt = new Date(iso);
+  if (!Number.isFinite(dt.getTime())) return faDate(iso);
+  try {
+    return DATE_TIME_FA.format(dt);
+  } catch {
+    return faDate(iso);
+  }
 }
 
-const isExam = (i: InboxItem) => i.category === 'exam' || i.type.includes('exam');
+function notifKind(item: NotificationItem): 'exam' | 'content' | 'general' {
+  const cat = (item.category || '').toLowerCase();
+  if (cat.includes('exam') || item.title.includes('آزمون')) return 'exam';
+  if (cat.includes('content') || cat.includes('library') || item.title.includes('جزوه')) {
+    return 'content';
+  }
+  return 'general';
+}
 
+/** مرکز اعلان‌ها — سطح خنثی یکسان برای خوانده و خوانده‌نشده + نقطهٔ خوانده‌نشده و عنوان پررنگ (NT1). */
 export function NotificationsScreen() {
-  const [items, setItems] = useState<InboxItem[] | null>(null);
-  const [error, setError] = useState('');
+  const [items, setItems] = useState<NotificationItem[] | null>(null);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -59,9 +72,14 @@ export function NotificationsScreen() {
   }, [load]);
 
   const markRead = async (ids: string[] | null) => {
-    setItems((prev) => (prev ?? []).map((i) => (ids === null || ids.includes(i.id) ? { ...i, read: true } : i)));
+    setItems((prev) =>
+      (prev ?? []).map((i) => (ids === null || ids.includes(i.id) ? { ...i, read: true } : i)),
+    );
     try {
-      await apiCall('/api/notifications/inbox/read', { method: 'POST', body: JSON.stringify({ ids }) });
+      await apiCall('/api/notifications/inbox/read', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      });
     } catch {
       void load();
     }
@@ -78,102 +96,119 @@ export function NotificationsScreen() {
         sub="پیام‌ها و اطلاعیه‌های سامانه"
         actions={
           unreadCount > 0 ? (
-            <button
-              type="button"
-              className="btn btn--sm btn--ghost"
+            <DsButton
+              variant="ghost"
+              size="sm"
+              className="acct-btn-tall"
               onClick={() => void markRead(null)}
-              style={{ fontSize: 12 }}
             >
               خواندن همه
-            </button>
+            </DsButton>
           ) : undefined
         }
       />
 
-      <div className="page">
-        <div className="seg mt-8" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={filter === 'all'}
-            className={`seg__btn ${filter === 'all' ? 'is-on' : ''}`.trim()}
-            onClick={() => setFilter('all')}
-          >
-            همه پیام‌ها ({list.length.toLocaleString('fa-IR')})
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={filter === 'unread'}
-            className={`seg__btn ${filter === 'unread' ? 'is-on' : ''}`.trim()}
-            onClick={() => setFilter('unread')}
-          >
-            خوانده‌نشده ({unreadCount.toLocaleString('fa-IR')})
-          </button>
-        </div>
+      <div className="page page-enter acct-page">
+        <DsSegmented
+          block
+          label="فیلتر اعلان‌ها"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: `همه پیام‌ها (${faNum(list.length)})` },
+            { value: 'unread', label: `خوانده‌نشده (${faNum(unreadCount)})` },
+          ]}
+        />
 
         {error && (
-          <p className="notice notice--warn mt-12" role="alert">
-            {error}{' '}
-            <button type="button" className="btn btn--sm btn--ghost" onClick={() => void load()}>
-              تلاش دوباره
-            </button>
-          </p>
+          <DsCard>
+            <div className="acct-notice acct-notice--danger" role="alert">
+              <div className="acct-notice__lead">
+                <Icon name="i-alert-circle" size={18} />
+                <span>{error}</span>
+              </div>
+              <DsButton variant="secondary" size="md" onClick={() => void load()}>
+                تلاش دوباره
+              </DsButton>
+            </div>
+          </DsCard>
         )}
 
         {items === null ? (
-          <div className="mt-16">
-            <SkeletonStack />
-          </div>
+          <SkeletonStack rows={4} />
         ) : filtered.length === 0 ? (
-          <div className="mt-20">
-            <EmptyState
-              icon="i-bell"
+          <DsCard>
+            <DsEmpty
+              icon={<Icon name="i-bell" size={28} />}
               title="اعلانی وجود ندارد"
-              text={filter === 'unread' ? 'همهٔ اعلان‌ها را خوانده‌اید.' : 'هنوز اعلانی برای شما ثبت نشده است.'}
+              body={
+                filter === 'unread'
+                  ? 'همهٔ اعلان‌ها را خوانده‌اید.'
+                  : 'هنوز اعلانی برای شما ثبت نشده است.'
+              }
+              action={
+                filter === 'unread' && list.length > 0 ? (
+                  <DsButton variant="secondary" onClick={() => setFilter('all')}>
+                    نمایش همهٔ پیام‌ها
+                  </DsButton>
+                ) : undefined
+              }
             />
-          </div>
+          </DsCard>
         ) : (
-          <div className="mt-16" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {filtered.map((item) => (
-              <Card
-                key={item.id}
-                onClick={() => (item.read ? undefined : void markRead([item.id]))}
-                className="card--glass"
-                style={{
-                  cursor: item.read ? 'default' : 'pointer',
-                  padding: '14px 16px',
-                  borderInlineStart: item.read ? undefined : '3px solid var(--hym-neon-cyan)',
-                  background: item.read ? 'var(--paper-3)' : 'var(--paper-2)',
-                }}
-              >
-                <div className="row row--between" style={{ alignItems: 'center' }}>
-                  <div className="row gap-8" style={{ alignItems: 'center' }}>
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        background: isExam(item) ? 'var(--danger-soft)' : 'var(--cyan-soft)',
-                        color: isExam(item) ? 'var(--danger)' : 'var(--cyan)',
-                        display: 'grid',
-                        placeItems: 'center',
-                      }}
-                    >
-                      <Icon name={isExam(item) ? 'i-award' : 'i-bell'} size={18} />
+          <div className="acct-notif-list">
+            {filtered.map((item) => {
+              const kind = notifKind(item);
+              const iconName =
+                kind === 'exam' ? 'i-award' : kind === 'content' ? 'i-book' : 'i-bell';
+              const iconCls =
+                kind === 'exam'
+                  ? 'acct-notif-icon acct-notif-icon--exam'
+                  : kind === 'content'
+                    ? 'acct-notif-icon acct-notif-icon--content'
+                    : 'acct-notif-icon';
+
+              const cardInner = (
+                <>
+                  <div className="acct-notif-head">
+                    <span className={iconCls} aria-hidden="true">
+                      <Icon name={iconName} size={18} />
+                    </span>
+                    <div className="acct-notif-title-wrap">
+                      {!item.read && (
+                        <span className="acct-unread-dot" aria-label="خوانده‌نشده" />
+                      )}
+                      <h2 className="acct-notif-title">{item.title}</h2>
                     </div>
-                    <span className="h3" style={{ fontSize: 14.5 }}>{item.title}</span>
                   </div>
-                  {!item.read && <Chip variant="cyan">جدید</Chip>}
-                </div>
-                {item.body && (
-                  <p className="body small mt-8" style={{ color: 'var(--ink)', whiteSpace: 'pre-line' }}>
-                    {item.body}
-                  </p>
-                )}
-                <div className="tiny color-muted mt-8">{when(item.created_at)}</div>
-              </Card>
-            ))}
+
+                  {item.body && <p className="acct-notif-body">{item.body}</p>}
+
+                  {item.created_at && (
+                    <span className="acct-notif-time">{formatNotifTime(item.created_at)}</span>
+                  )}
+                </>
+              );
+
+              if (!item.read) {
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="ds-card acct-notif-card is-unread"
+                    onClick={() => void markRead([item.id])}
+                  >
+                    {cardInner}
+                  </button>
+                );
+              }
+
+              return (
+                <DsCard key={item.id} className="acct-notif-card">
+                  {cardInner}
+                </DsCard>
+              );
+            })}
           </div>
         )}
       </div>

@@ -1,38 +1,64 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { AppBar, Button, Card, Chip, EmptyState } from '../../components';
+import './exam.css';
+import { AppBar } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
-import { DsButton } from '../../design/components';
+import { DsBadge, DsButton, DsCard, DsChip, DsEmpty } from '../../design/components';
+import { Icon } from '../../icons';
 import { ApiError } from '../../lib/api';
-import { fa } from '../../lib/library';
-import { exam, mockExam, type LessonItem, type MockPreview, type MockSummary, type TopicItem } from '../../lib/exam';
+import {
+  exam,
+  mockExam,
+  type LessonItem,
+  type MockPreview,
+  type MockSummary,
+  type TopicItem,
+} from '../../lib/exam';
+import { faDate, faNum, faPercent } from '../../lib/fa';
 
 const COUNTS = [10, 20, 30, 50];
-const MINUTES = [0, 10, 15, 20, 30, 45, 60];
+const MINUTES = [10, 20, 30, 45, 0];
 
-/** ساخت آزمون — درس، مبحث، تعداد، زمان.
+const STATUS_LABEL: Record<string, string> = {
+  active: 'در جریان',
+  finished: 'تمام‌شده',
+  expired: 'زمان تمام',
+  abandoned: 'رها‌شده',
+};
+
+function statusBadgeTone(status: string): 'accent' | 'success' | 'warning' | 'danger' {
+  if (status === 'finished') return 'success';
+  if (status === 'expired') return 'warning';
+  if (status === 'abandoned') return 'danger';
+  return 'accent';
+}
+
+/** ساخت آزمون زمان‌دار.
  *
- *  تعداد پیش از شروع با سرور چک می‌شود (`/exam/mock/preview`) تا کاربر
- *  آزمون ۲۰ سؤالی نخواهد وقتی بانک ۷ سؤال دارد. عدد «موجود» از سرور است،
- *  نه حدس کلاینت.
+ *  Audit ES1: شماره‌گذاری مراحل پویا است (وقتی مبحثی نیست ۱، ۲، ۳؛ وقتی هست ۱، ۲، ۳، ۴).
+ *  Audit ES2: دکمهٔ شروع وقتی درس انتخاب نشده غیرفعال با ظاهر sunken dashed + راهنمای واضح است.
+ *  Audit ES3: چیدمان دوستونی در تبلت و دسکتاپ با پنل پیش‌نمایش و چیپ‌های ۴۴px.
  */
 export function ExamSetup() {
   const navigate = useNavigate();
+
   const [lessons, setLessons] = useState<LessonItem[]>([]);
-  const [pickedLesson, setPickedLesson] = useState<LessonItem | null>(null);
   const [topics, setTopics] = useState<TopicItem[]>([]);
-  const [pickedTopic, setPickedTopic] = useState<TopicItem | null>(null);
-  const [count, setCount] = useState(20);
-  const [minutes, setMinutes] = useState(20);
-  const [preview, setPreview] = useState<MockPreview | null>(null);
-  const [busy, setBusy] = useState(false);
   const [active, setActive] = useState<MockSummary | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<unknown>(null);
 
+  const [pickedLesson, setPickedLesson] = useState<LessonItem | null>(null);
+  const [pickedTopic, setPickedTopic] = useState<TopicItem | null>(null);
+  const [count, setCount] = useState<number>(20);
+  const [minutes, setMinutes] = useState<number>(20);
+  const [preview, setPreview] = useState<MockPreview | null>(null);
+  const [busy, setBusy] = useState(false);
+
   const load = useCallback(async () => {
     setState('loading');
+    setError(null);
     try {
       const [less, act] = await Promise.all([
         exam.lessons(),
@@ -51,24 +77,24 @@ export function ExamSetup() {
     void load();
   }, [load]);
 
-  // پیش‌نمایش ظرفیت — با هر تغییر انتخاب، از سرور
   useEffect(() => {
-    let cancelled = false;
     if (!pickedLesson) {
       setPreview(null);
       return;
     }
+    let cancelled = false;
     (async () => {
       try {
-        const p = await mockExam.preview({
+        const res = await mockExam.preview({
           lesson: pickedLesson.name,
           topic: pickedTopic?.name ?? null,
           lesson_id: pickedLesson.id,
           topic_id: pickedTopic?.id ?? null,
           count,
           minutes,
+          allow_smaller: true,
         });
-        if (!cancelled) setPreview(p);
+        if (!cancelled) setPreview(res);
       } catch {
         if (!cancelled) setPreview(null);
       }
@@ -101,12 +127,10 @@ export function ExamSetup() {
         topic_id: pickedTopic?.id ?? null,
         count,
         minutes,
-        allow_smaller: true, // تعداد واقعی را سرور تعیین می‌کند و در پیش‌نمایش گفته
+        allow_smaller: true,
       });
       navigate(`/exam/run/${s.session_id}`, { replace: true });
     } catch (err) {
-      // سرور گفت «آزمون فعال داری» (۴۰۹ + خودِ آزمون در detail.exam):
-      // به‌جای خطای مبهم، همان کارت «ادامه / رها کردن» را نشان می‌دهیم.
       if (err instanceof ApiError && err.code === 'active_exam_exists') {
         const existing = (err.detail?.exam ?? null) as MockSummary | null;
         if (existing) {
@@ -122,171 +146,258 @@ export function ExamSetup() {
     }
   };
 
+  // شمارهٔ مراحل بدون پرش بین ۱ و ۳ (ES1)
+  let stepCursor = 1;
+  const stepLesson = stepCursor++;
+  const stepTopic = topics.length > 0 ? stepCursor++ : null;
+  const stepCount = stepCursor++;
+  const stepMinutes = stepCursor++;
+
+  const canStart = Boolean(pickedLesson && (preview?.available_count ?? 0) > 0);
+  const actualCount = preview ? Math.min(count, preview.available_count) : count;
+
   return (
     <>
       <AppBar title="آزمون" sub="زمان‌دار، بدون پاسخ در میانه" back onBack={() => navigate(-1)} />
-      <div className="page">
-        {state === 'loading' && <LoadingBlock rows={3} />}
+      <div className="page page-enter exam-page">
+        {state === 'loading' && <LoadingBlock rows={4} />}
         {state === 'error' && <ErrorBlock error={error} onRetry={() => void load()} />}
 
         {state === 'ready' && (
           <>
             {active && (
-              <Card className="mt-16">
-                <p className="h3">یک آزمون نیمه‌کاره داری</p>
-                <p className="small mt-8">
+              <DsCard className="exam-banner-card">
+                <div className="exam-sec-head">
+                  <h2 className="exam-sec-head__title">یک آزمون نیمه‌کاره دارید</h2>
+                  <DsBadge tone="warning">در جریان</DsBadge>
+                </div>
+                <p className="exam-hint-text">
                   {active.lesson}
-                  {active.topic ? ` · ${active.topic}` : ''} — {fa(active.answered)} از {fa(active.total)} پاسخ
+                  {active.topic ? ` · ${active.topic}` : ''} — {faNum(active.answered)} از{' '}
+                  {faNum(active.total)} پاسخ
                 </p>
-                <div className="row gap-8 mt-12">
-                  <Button variant="primary" size="sm" onClick={() => navigate(`/exam/run/${active.session_id}`)}>
+                <div className="exam-banner-actions">
+                  <DsButton
+                    variant="primary"
+                    size="md"
+                    onClick={() => navigate(`/exam/run/${active.session_id}`)}
+                  >
                     ادامهٔ آزمون
-                  </Button>
-                  <Button
+                  </DsButton>
+                  <DsButton
                     variant="ghost"
-                    size="sm"
+                    size="md"
                     onClick={async () => {
                       await mockExam.abandon(active.session_id).catch(() => undefined);
                       setActive(null);
                     }}
                   >
                     رها کردن
-                  </Button>
+                  </DsButton>
                 </div>
-              </Card>
+              </DsCard>
             )}
 
             {lessons.length === 0 ? (
-              <EmptyState
-                icon="i-doc"
-                title="سؤالی برای ورودی تو ثبت نشده"
-                text="آزمون از همان بانک سؤال تمرین ساخته می‌شود؛ وقتی سؤالی برای ورودی تو ثبت شود، همین‌جا می‌شود آزمون ساخت."
-              />
+              <DsCard>
+                <DsEmpty
+                  icon={<Icon name="i-file-text" size={28} />}
+                  title="سؤالی برای ورودی شما ثبت نشده"
+                  body="آزمون از همان بانک سؤال تمرین ساخته می‌شود؛ پس از ثبت سؤالات برای ورودی شما، اینجا فعال می‌شود."
+                  action={
+                    <DsButton variant="secondary" onClick={() => navigate('/exam')}>
+                      بازگشت به تمرین
+                    </DsButton>
+                  }
+                />
+              </DsCard>
             ) : (
-              <>
-                <div className="section__head mt-16">
-                  <span className="h3">۱. درس</span>
-                </div>
-                <div className="row gap-8 mt-8" style={{ flexWrap: 'wrap' }}>
-                  {lessons.map((l) => (
-                    <button
-                      key={l.id}
-                      type="button"
-                      className={`chip-btn${pickedLesson?.id === l.id ? ' is-on' : ''}`}
-                      aria-pressed={pickedLesson?.id === l.id}
-                      onClick={() => void pick(l)}
-                    >
-                      {l.name} <span className="tiny num">· {fa(l.count)}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {topics.length > 0 && (
-                  <>
-                    <div className="section__head mt-16">
-                      <span className="h3">۲. مبحث</span>
-                      <span className="tiny">اختیاری</span>
+              <div className="exam-setup-grid">
+                <div className="exam-setup-main">
+                  <DsCard className="exam-step-card">
+                    <div className="exam-step-head">
+                      <span className="exam-step-num">{faNum(stepLesson)}</span>
+                      <h2 className="exam-sec-head__title">انتخاب درس</h2>
                     </div>
-                    <div className="row gap-8 mt-8" style={{ flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        className={`chip-btn${!pickedTopic ? ' is-on' : ''}`}
-                        aria-pressed={!pickedTopic}
-                        onClick={() => setPickedTopic(null)}
-                      >
-                        همهٔ درس
-                      </button>
-                      {topics.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          className={`chip-btn${pickedTopic?.id === t.id ? ' is-on' : ''}`}
-                          aria-pressed={pickedTopic?.id === t.id}
-                          onClick={() => setPickedTopic(t)}
+                    <div className="exam-topics-wrap">
+                      {lessons.map((l) => (
+                        <DsChip
+                          key={l.id}
+                          selected={pickedLesson?.id === l.id}
+                          className="exam-choice-chip"
+                          onClick={() => void pick(l)}
                         >
-                          {t.name} <span className="tiny num">· {fa(t.count)}</span>
-                        </button>
+                          <span>{l.name}</span>
+                          <span className="exam-choice-chip__count">· {faNum(l.count)}</span>
+                        </DsChip>
                       ))}
                     </div>
-                  </>
-                )}
+                  </DsCard>
 
-                <div className="section__head mt-16">
-                  <span className="h3">۳. تعداد سؤال</span>
-                </div>
-                <div className="row gap-8 mt-8" style={{ flexWrap: 'wrap' }}>
-                  {COUNTS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={`chip-btn${count === c ? ' is-on' : ''}`}
-                      aria-pressed={count === c}
-                      onClick={() => setCount(c)}
-                    >
-                      <span className="num">{fa(c)}</span>
-                    </button>
-                  ))}
+                  {stepTopic !== null && (
+                    <DsCard className="exam-step-card">
+                      <div className="exam-sec-head">
+                        <div className="exam-step-head">
+                          <span className="exam-step-num">{faNum(stepTopic)}</span>
+                          <h2 className="exam-sec-head__title">مبحث</h2>
+                        </div>
+                        <span className="exam-sec-head__sub">اختیاری</span>
+                      </div>
+                      <div className="exam-topics-wrap">
+                        <DsChip
+                          selected={!pickedTopic}
+                          className="exam-choice-chip"
+                          onClick={() => setPickedTopic(null)}
+                        >
+                          همهٔ درس
+                        </DsChip>
+                        {topics.map((t) => (
+                          <DsChip
+                            key={t.id}
+                            selected={pickedTopic?.id === t.id}
+                            className="exam-choice-chip"
+                            onClick={() => setPickedTopic(t)}
+                          >
+                            <span>{t.name}</span>
+                            <span className="exam-choice-chip__count">· {faNum(t.count)}</span>
+                          </DsChip>
+                        ))}
+                      </div>
+                    </DsCard>
+                  )}
+
+                  <DsCard className="exam-step-card">
+                    <div className="exam-step-head">
+                      <span className="exam-step-num">{faNum(stepCount)}</span>
+                      <h2 className="exam-sec-head__title">تعداد سؤال</h2>
+                    </div>
+                    <div className="exam-topics-wrap">
+                      {COUNTS.map((c) => (
+                        <DsChip
+                          key={c}
+                          selected={count === c}
+                          className="exam-choice-chip"
+                          onClick={() => setCount(c)}
+                        >
+                          {faNum(c)} سؤال
+                        </DsChip>
+                      ))}
+                    </div>
+                  </DsCard>
+
+                  <DsCard className="exam-step-card">
+                    <div className="exam-step-head">
+                      <span className="exam-step-num">{faNum(stepMinutes)}</span>
+                      <h2 className="exam-sec-head__title">مدت زمان</h2>
+                    </div>
+                    <div className="exam-topics-wrap">
+                      {MINUTES.map((m) => (
+                        <DsChip
+                          key={m}
+                          selected={minutes === m}
+                          className="exam-choice-chip"
+                          onClick={() => setMinutes(m)}
+                        >
+                          {m === 0 ? 'بدون زمان' : `${faNum(m)} دقیقه`}
+                        </DsChip>
+                      ))}
+                    </div>
+                  </DsCard>
                 </div>
 
-                <div className="section__head mt-16">
-                  <span className="h3">۴. زمان</span>
-                </div>
-                <div className="row gap-8 mt-8" style={{ flexWrap: 'wrap' }}>
-                  {MINUTES.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      className={`chip-btn${minutes === m ? ' is-on' : ''}`}
-                      aria-pressed={minutes === m}
-                      onClick={() => setMinutes(m)}
-                    >
-                      {m === 0 ? 'بدون زمان' : `${fa(m)} دقیقه`}
-                    </button>
-                  ))}
-                </div>
+                <aside className="exam-setup-side">
+                  <DsCard level="raised" className="exam-stack">
+                    <div className="exam-sec-head">
+                      <h2 className="exam-sec-head__title">خلاصهٔ آزمون</h2>
+                      {pickedLesson && preview && (
+                        <DsBadge
+                          tone={
+                            preview.available_count === 0
+                              ? 'danger'
+                              : preview.can_start
+                                ? 'success'
+                                : 'warning'
+                          }
+                        >
+                          {faNum(preview.available_count)} سؤال موجود
+                        </DsBadge>
+                      )}
+                    </div>
 
-                {pickedLesson && (
-                  <Card variant="quiet" className="mt-16">
-                    {preview ? (
-                      <>
-                        <p className="small">
-                          در این محدوده <b className="num">{fa(preview.available_count)}</b> سؤال موجود است.
-                          {preview.can_start
-                            ? ` آزمون با ${fa(Math.min(count, preview.available_count))} سؤال ساخته می‌شود.`
-                            : ` کمتر از ${fa(count)} انتخاب‌شده؛ آزمون با ${fa(preview.available_count)} سؤال ساخته می‌شود.`}
-                        </p>
-                        {preview.available_count === 0 && (
-                          <p className="tiny mt-8">برای این مبحث هنوز سؤالی ثبت نشده؛ مبحث دیگری را امتحان کن.</p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="small">در حال بررسی ظرفیت…</p>
+                    <ul className="exam-summary-list">
+                      <li className="exam-summary-row">
+                        <span className="exam-summary-row__k">درس</span>
+                        <span className="exam-summary-row__v">
+                          {pickedLesson ? pickedLesson.name : 'انتخاب نشده'}
+                        </span>
+                      </li>
+                      {topics.length > 0 && (
+                        <li className="exam-summary-row">
+                          <span className="exam-summary-row__k">مبحث</span>
+                          <span className="exam-summary-row__v">
+                            {pickedTopic ? pickedTopic.name : 'همهٔ مباحث درس'}
+                          </span>
+                        </li>
+                      )}
+                      <li className="exam-summary-row">
+                        <span className="exam-summary-row__k">تعداد سؤال</span>
+                        <span className="exam-summary-row__v">{faNum(actualCount)} سؤال</span>
+                      </li>
+                      <li className="exam-summary-row">
+                        <span className="exam-summary-row__k">زمان</span>
+                        <span className="exam-summary-row__v">
+                          {minutes === 0 ? 'بدون محدودیت' : `${faNum(minutes)} دقیقه`}
+                        </span>
+                      </li>
+                    </ul>
+
+                    {pickedLesson && (
+                      <p className="exam-hint-text">
+                        {preview
+                          ? preview.available_count === 0
+                            ? 'برای این مبحث هنوز سؤالی ثبت نشده است؛ مبحث یا درس دیگری را انتخاب کنید.'
+                            : preview.can_start
+                              ? `آزمون با ${faNum(actualCount)} سؤال از ${faNum(preview.available_count)} سؤال موجود ساخته می‌شود.`
+                              : `ظرفیت کمتر از ${faNum(count)} است؛ آزمون با ${faNum(preview.available_count)} سؤال ساخته می‌شود.`
+                          : 'در حال بررسی ظرفیت بانک سؤال…'}
+                      </p>
                     )}
-                  </Card>
-                )}
 
-                <div className="exam-actions">
+                    <div className="exam-actions">
+                      <DsButton
+                        size="lg"
+                        block
+                        onClick={() => void start()}
+                        disabled={!canStart}
+                        loading={busy}
+                      >
+                        {busy ? 'در حال ساخت آزمون…' : 'شروع آزمون'}
+                      </DsButton>
+                      {!pickedLesson && (
+                        <span className="exam-actions__hint">
+                          ابتدا یک درس انتخاب کنید تا شروع آزمون فعال شود
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="ds-card__sub">
+                      در جریان آزمون پاسخ صحیح نمایش داده نمی‌شود؛ کارنامه و بازبینی پس از پایان در دسترس است.
+                    </p>
+                  </DsCard>
+
                   <DsButton
-                    size="lg"
-                    onClick={() => void start()}
-                    disabled={!pickedLesson || (preview?.available_count ?? 0) === 0}
-                    loading={busy}
+                    variant="ghost"
+                    size="md"
+                    block
+                    className="exam-btn-tall"
+                    onClick={() => navigate('/exam/mock/history')}
                   >
-                    {busy ? 'در حال ساخت آزمون…' : 'شروع آزمون'}
+                    <Icon name="i-clock" size={16} />
+                    <span>مشاهدهٔ آزمون‌های قبلی</span>
                   </DsButton>
-                  {!pickedLesson && <span className="exam-actions__hint">برای شروع، یک درس انتخاب کن</span>}
-                </div>
-                <p className="tiny mt-8">
-                  در جریان آزمون پاسخ صحیح نمایش داده نمی‌شود؛ کارنامه و بازبینی بعد از پایان می‌آید.
-                </p>
-              </>
+                </aside>
+              </div>
             )}
-
-            <div className="row gap-8 mt-16">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/exam/mock/history')}>
-                آزمون‌های قبلی
-              </Button>
-            </div>
           </>
         )}
       </div>
@@ -294,7 +405,7 @@ export function ExamSetup() {
   );
 }
 
-/** فهرست آزمون‌های قبلی — از همان `history` دامنه، با همان گیت. */
+/** فهرست آزمون‌های قبلی — خلاصهٔ آماری و برچسب‌های وضعیت معنایی (Audit E4). */
 export function MockExamHistory() {
   const navigate = useNavigate();
   const [items, setItems] = useState<MockSummary[]>([]);
@@ -312,47 +423,91 @@ export function MockExamHistory() {
     })();
   }, []);
 
-  const label: Record<string, string> = {
-    active: 'در جریان',
-    finished: 'تمام‌شده',
-    expired: 'زمان تمام',
-    abandoned: 'رها‌شده',
-  };
+  const completed = items.filter((e) => e.status === 'finished' || e.status === 'expired');
+  const finishedCount = items.filter((e) => e.status === 'finished').length;
+  const avgPct =
+    completed.length > 0
+      ? Math.round(completed.reduce((acc, e) => acc + (e.percentage || 0), 0) / completed.length)
+      : null;
 
   return (
     <>
       <AppBar title="آزمون‌های قبلی" sub="کارنامه و بازبینی" back onBack={() => navigate(-1)} />
-      <div className="page">
+      <div className="page page-enter exam-page">
         {state === 'loading' && <LoadingBlock rows={3} />}
         {state === 'error' && <ErrorBlock error={null} onRetry={() => navigate(0)} />}
         {state === 'ready' && items.length === 0 && (
-          <EmptyState icon="i-clock" title="هنوز آزمونی نداده‌ای" text="اولین آزمون را از صفحهٔ «آزمون» بساز." />
+          <DsCard>
+            <DsEmpty
+              icon={<Icon name="i-clock" size={28} />}
+              title="هنوز آزمونی نداده‌اید"
+              body="اولین آزمون زمان‌دار خود را بسازید تا کارنامه و روند پیشرفتتان اینجا ثبت شود."
+              action={
+                <DsButton variant="primary" onClick={() => navigate('/exam/setup')}>
+                  ساخت آزمون تازه
+                </DsButton>
+              }
+            />
+          </DsCard>
         )}
         {state === 'ready' && items.length > 0 && (
-          <Card variant="flush" className="mt-16">
-            {items.map((e) => (
-              <button
-                key={e.session_id}
-                type="button"
-                className="mock-row"
-                onClick={() =>
-                  navigate(e.status === 'active' ? `/exam/run/${e.session_id}` : `/exam/result/${e.session_id}`)
-                }
-              >
-                <span className="grow" style={{ textAlign: 'start' }}>
-                  <span className="h3" style={{ display: 'block' }}>
-                    {e.lesson}
-                    {e.topic ? ` · ${e.topic}` : ''}
-                  </span>
-                  <span className="tiny">
-                    {fa(e.answered)} از {fa(e.total)} پاسخ
-                    {e.status !== 'active' ? ` · ${fa(Math.round(e.percentage))}٪ درست` : ''}
-                  </span>
+          <div className="exam-stack">
+            <div className="exam-kpi-strip" aria-label="خلاصهٔ آزمون‌ها">
+              <div className="exam-kpi-tile">
+                <span className="exam-kpi-tile__val">{faNum(items.length)}</span>
+                <span className="exam-kpi-tile__lbl">کل آزمون‌ها</span>
+              </div>
+              <div className="exam-kpi-tile">
+                <span className="exam-kpi-tile__val exam-kpi-tile__val--good">
+                  {faNum(finishedCount)}
                 </span>
-                <Chip variant={e.status === 'active' ? 'cyan' : 'quiet'}>{label[e.status] ?? e.status}</Chip>
-              </button>
-            ))}
-          </Card>
+                <span className="exam-kpi-tile__lbl">تمام‌شده</span>
+              </div>
+              <div className="exam-kpi-tile">
+                <span className="exam-kpi-tile__val exam-kpi-tile__val--accent">
+                  {avgPct !== null ? faPercent(avgPct) : '—'}
+                </span>
+                <span className="exam-kpi-tile__lbl">میانگین نمره</span>
+              </div>
+            </div>
+
+            <DsCard flush>
+              <div className="ds-list">
+                {items.map((e) => {
+                  const dateLabel = faDate(e.finished_at || e.started_at);
+                  return (
+                    <button
+                      key={e.session_id}
+                      type="button"
+                      className="exam-mock-row"
+                      onClick={() =>
+                        navigate(
+                          e.status === 'active'
+                            ? `/exam/run/${e.session_id}`
+                            : `/exam/result/${e.session_id}`,
+                        )
+                      }
+                    >
+                      <span className="exam-mock-row__body">
+                        <span className="exam-mock-row__title">
+                          {e.lesson}
+                          {e.topic ? ` · ${e.topic}` : ''}
+                        </span>
+                        <span className="exam-mock-row__meta">
+                          {faNum(e.answered)} از {faNum(e.total)} پاسخ
+                          {e.status !== 'active' ? ` · ${faPercent(Math.round(e.percentage))}` : ''}
+                          {dateLabel ? ` · ${dateLabel}` : ''}
+                        </span>
+                      </span>
+                      <DsBadge tone={statusBadgeTone(e.status)}>
+                        {STATUS_LABEL[e.status] ?? e.status}
+                      </DsBadge>
+                    </button>
+                  );
+                })}
+              </div>
+            </DsCard>
+          </div>
         )}
       </div>
     </>

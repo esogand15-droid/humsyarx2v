@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { AppBar, Button, Chip } from '../../components';
+import './exam.css';
+import { AppBar } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
-import { DsButton } from '../../design/components';
+import { DsBadge, DsButton } from '../../design/components';
 import { Icon } from '../../icons';
 import { ApiError } from '../../lib/api';
-import { fa } from '../../lib/library';
 import {
   OPTION_LETTERS,
   clockFa,
@@ -15,15 +15,12 @@ import {
   type MockNext,
   type MockSummary,
 } from '../../lib/exam';
+import { faNum } from '../../lib/fa';
 
 /** اجرای آزمون زمان‌دار.
  *
- *  سه قاعده که عمداً این‌جاست:
- *  ۱) مهلت **از سرور** می‌آید (`seconds_left`)؛ شمارش محلی فقط نمایشی است.
- *     وقتی به صفر رسید، از سرور وضعیت تازه پرسیده می‌شود، نه اینکه
- *     کلاینت خودش آزمون را ببندد.
- *  ۲) در میانهٔ آزمون پاسخ صحیح نمایش داده نمی‌شود؛ دکمهٔ «ثبت و بعدی»
- *     فقط می‌فرستد و جلو می‌رود.
+ *  ۱) مهلت از سرور می‌آید (`seconds_left`)؛ شمارش محلی فقط نمایشی است.
+ *  ۲) در میانهٔ آزمون پاسخ صحیح نمایش داده نمی‌شود.
  *  ۳) رفرش صفحه آزمون را از بین نمی‌برد؛ وضعیت از `/mock/{id}` می‌آید.
  */
 export function MockRun() {
@@ -44,10 +41,22 @@ export function MockRun() {
   const sending = useRef(false);
 
   useEffect(() => {
-    void exam.flagged().then((res) => {
-      if (Array.isArray(res.flagged_ids)) setFlaggedIds(new Set(res.flagged_ids));
-    }).catch(() => {});
+    void exam
+      .flagged()
+      .then((res) => {
+        if (Array.isArray(res.flagged_ids)) setFlaggedIds(new Set(res.flagged_ids));
+      })
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!confirmLeave) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setConfirmLeave(false);
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [confirmLeave]);
 
   const toggleFlag = async () => {
     const qid = current?.question?.id;
@@ -56,10 +65,10 @@ export function MockRun() {
     try {
       const res = await exam.flag(qid);
       setFlaggedIds((prev) => {
-        const next = new Set(prev);
-        if (res.flagged) next.add(qid);
-        else next.delete(qid);
-        return next;
+        const nextSet = new Set(prev);
+        if (res.flagged) nextSet.add(qid);
+        else nextSet.delete(qid);
+        return nextSet;
       });
     } catch {
       // ignore
@@ -68,7 +77,10 @@ export function MockRun() {
     }
   };
 
-  const goResult = useCallback(() => navigate(`/exam/result/${sid}`, { replace: true }), [navigate, sid]);
+  const goResult = useCallback(
+    () => navigate(`/exam/result/${sid}`, { replace: true }),
+    [navigate, sid],
+  );
 
   const boot = useCallback(async () => {
     setState('loading');
@@ -92,11 +104,9 @@ export function MockRun() {
     void boot();
   }, [boot]);
 
-  // شمارش معکوس نمایشی؛ هر ثانیه یک درجه. منبع حقیقت سرور است.
   useEffect(() => {
     if (left === null) return;
     if (left <= 0) {
-      // مهلت تمام شد: وضعیت واقعی را از سرور بگیر
       void (async () => {
         try {
           const n = await mockExam.next(sid);
@@ -135,8 +145,10 @@ export function MockRun() {
       setCurrent(n);
       setLeft(typeof n.seconds_left === 'number' ? n.seconds_left : null);
     } catch (err) {
-      // مهلت وسط ثبت پاسخ تمام شد → کارنامه، نه صفحهٔ خطا.
-      if (err instanceof ApiError && (err.code === 'exam_not_active' || err.code === 'exam_still_active')) {
+      if (
+        err instanceof ApiError &&
+        (err.code === 'exam_not_active' || err.code === 'exam_still_active')
+      ) {
         goResult();
         return;
       }
@@ -148,10 +160,9 @@ export function MockRun() {
     }
   };
 
-  // کیبورد: ۱..۴ انتخاب، Enter ثبت
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (busy || !current?.question) return;
+      if (busy || confirmLeave || !current?.question) return;
       const n = ['1', '2', '3', '4'].indexOf(e.key);
       if (n >= 0) {
         e.preventDefault();
@@ -170,119 +181,168 @@ export function MockRun() {
   const progress = current?.progress ?? 0;
   const total = current?.total ?? summary?.total ?? 0;
   const urgent = left !== null && left <= 60;
+  const isFlagged = q ? flaggedIds.has(q.id) : false;
+  const metaParts = q
+    ? [q.difficulty_label || 'متوسط', q.topic || q.lesson, q.exam_session_label].filter(Boolean)
+    : [];
 
   return (
     <>
       <AppBar
-        title={summary ? `${summary.lesson}${summary.topic ? ` · ${summary.topic}` : ''}` : 'آزمون'}
-        sub={summary?.exam_code ? `کد ${summary.exam_code}` : 'در حال آماده‌سازی'}
+        title={summary?.lesson || 'آزمون'}
+        sub={summary?.topic || 'آزمون زمان‌دار'}
         back
         onBack={() => setConfirmLeave(true)}
         actions={
           left !== null ? (
-            <span className={`timer${urgent ? ' is-urgent' : ''}`} aria-live="off" dir="ltr">
-              {clockFa(left)}
+            <span className={`exam-timer${urgent ? ' is-urgent' : ''}`} aria-live="off">
+              <Icon name="i-clock" size={16} />
+              <bdi dir="ltr">{clockFa(left)}</bdi>
             </span>
           ) : undefined
         }
       />
 
-      <div className="page">
+      <div className="page page-enter exam-page">
         {state === 'loading' && <LoadingBlock rows={3} />}
         {state === 'error' && <ErrorBlock error={error} onRetry={() => void boot()} />}
 
         {state === 'ready' && q && (
-          <>
-            <div className="row gap-8 mt-12" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-              <Chip variant="quiet">
-                سؤال {fa(progress)} از {fa(total)}
-              </Chip>
+          <div className="exam-focus">
+            <div className="exam-run-meta">
+              <DsBadge tone="accent">
+                سؤال {faNum(progress)} از {faNum(total)}
+              </DsBadge>
+              {summary?.exam_code && (
+                <span className="exam-code-pill">
+                  <span>کد آزمون:</span>
+                  <bdi dir="ltr">{summary.exam_code}</bdi>
+                </span>
+              )}
+              <span className="exam-run-meta__spacer" />
               <button
                 type="button"
                 onClick={() => void toggleFlag()}
                 disabled={flagging}
-                className={`btn btn--sm ${flaggedIds.has(q.id) ? 'btn--ink' : 'btn--ghost'}`}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: flaggedIds.has(q.id) ? 'var(--hym-neon-cyan)' : undefined,
-                  borderColor: flaggedIds.has(q.id) ? 'var(--hym-neon-cyan)' : undefined,
-                  padding: '3px 10px',
-                  borderRadius: '8px',
-                }}
-                title={flaggedIds.has(q.id) ? 'حذف از نشان‌شده‌ها' : 'نشان‌کردن سوال'}
-                aria-label={flaggedIds.has(q.id) ? 'حذف از نشان‌شده‌ها' : 'نشان‌کردن سوال'}
+                className={`exam-flag-btn${isFlagged ? ' is-flagged' : ''}`}
+                title={isFlagged ? 'حذف از نشان‌شده‌ها' : 'نشان‌کردن سؤال'}
+                aria-label={isFlagged ? 'حذف از نشان‌شده‌ها' : 'نشان‌کردن سؤال'}
+                aria-pressed={isFlagged}
               >
                 <Icon name="i-bookmark" size={16} />
-                <span style={{ fontSize: 12 }}>{flaggedIds.has(q.id) ? 'نشان‌شده' : 'نشان‌کردن سوال'}</span>
+                <span>{isFlagged ? 'نشان‌شده' : 'نشان‌کردن'}</span>
               </button>
-              <span className="grow" />
-              <span className="tiny">پاسخ درستی نمایش داده نمی‌شود تا پایان آزمون</span>
             </div>
 
-            <div
-              className="mt-8"
-              role="progressbar"
-              aria-valuenow={progress}
-              aria-valuemin={0}
-              aria-valuemax={total}
-              aria-label="پیشرفت آزمون"
-            >
-              <div className="bar">
-                <i style={{ width: `${total ? Math.round((100 * (progress - 1)) / total) : 0}%` }} />
+            {(() => {
+              const denom = Math.max(1, total);
+              const val = Math.max(0, progress - 1);
+              const pct = Math.min(100, Math.max(0, Math.round((val / denom) * 100)));
+              return (
+                <div
+                  className="exam-progress"
+                  role="progressbar"
+                  aria-valuenow={val}
+                  aria-valuemin={0}
+                  aria-valuemax={denom}
+                  aria-label="پیشرفت آزمون"
+                >
+                  <svg className="exam-progress__svg" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+                    <rect className="exam-progress__fill" x={100 - pct} y={0} width={pct} height={8} rx={4} />
+                  </svg>
+                </div>
+              );
+            })()}
+
+            <article className="exam-q-card">
+              <div className="exam-q-header">
+                <span className="exam-q-meta">
+                  {metaParts.length > 0
+                    ? metaParts.join(' · ')
+                    : 'پاسخ صحیح پس از پایان آزمون نمایش داده می‌شود'}
+                </span>
               </div>
-            </div>
 
-            <article className="q-card mt-16">
               {q.image_url && (
-                <img className="q-img" src={q.image_url} alt={q.image.alt_text || 'تصویر سؤال'} loading="lazy" />
+                <img
+                  className="exam-q-img"
+                  src={q.image_url}
+                  alt={q.image.alt_text || 'تصویر سؤال'}
+                  loading="lazy"
+                />
               )}
-              <p className="q-stem mt-12">{q.question}</p>
-              <ul className="q-options" role="radiogroup" aria-label="گزینه‌ها">
+
+              <p className="exam-q-stem">{q.question}</p>
+
+              <ul className="exam-options" role="radiogroup" aria-label="گزینه‌ها">
                 {q.options.map((opt, i) => (
                   <li key={i}>
                     <button
                       type="button"
                       role="radio"
                       aria-checked={selected === i}
-                      className={`q-opt${selected === i ? ' is-picked' : ''}`}
+                      className={`exam-opt${selected === i ? ' is-picked' : ''}`}
                       onClick={() => pick(i)}
                     >
-                      <span className="q-opt__l" aria-hidden="true">
-                        {OPTION_LETTERS[i] ?? i + 1}
+                      <span className="exam-opt__letter" aria-hidden="true">
+                        {OPTION_LETTERS[i] ?? faNum(i + 1)}
                       </span>
-                      <span className="q-opt__t">{opt}</span>
+                      <span className="exam-opt__text">{opt}</span>
                     </button>
                   </li>
                 ))}
               </ul>
+
               <div className="exam-actions">
-                <DsButton size="lg" onClick={() => void submit()} disabled={selected === null} loading={busy}>
-                  {busy ? 'در حال ثبت…' : progress >= total ? 'ثبت و پایان آزمون' : 'ثبت و سؤال بعدی'}
+                <DsButton
+                  size="lg"
+                  onClick={() => void submit()}
+                  disabled={selected === null}
+                  loading={busy}
+                >
+                  {busy
+                    ? 'در حال ثبت…'
+                    : progress >= total
+                      ? 'ثبت و پایان آزمون'
+                      : 'ثبت و سؤال بعدی'}
                 </DsButton>
-                {selected === null && !busy && <span className="exam-actions__hint">یک گزینه را انتخاب کن</span>}
-                <span className="exam-actions__hint kbd-hint">۱ تا ۴ انتخاب، Enter ثبت</span>
+                {selected === null && !busy && (
+                  <span className="exam-actions__hint">یک گزینه را انتخاب کنید</span>
+                )}
+                <span className="exam-actions__hint kbd-hint">
+                  با کلیدهای ۱ تا ۴ انتخاب، Enter ثبت
+                </span>
               </div>
             </article>
-          </>
+          </div>
         )}
       </div>
 
       {confirmLeave && (
-        <div className="sheet-scrim" role="dialog" aria-modal="true" aria-label="خروج از آزمون">
-          <div className="sheet">
-            <p className="h3">از آزمون بیرون بروی؟</p>
-            <p className="small mt-8">
-              آزمون ذخیره می‌شود و از «آزمون» می‌توانی ادامه بدهی. زمان، همچنان در حال گذشتن است.
+        <div
+          className="exam-dialog-scrim"
+          role="dialog"
+          aria-modal="true"
+          aria-label="خروج از آزمون"
+          onClick={() => setConfirmLeave(false)}
+        >
+          <div className="exam-dialog" onClick={(e) => e.stopPropagation()}>
+            <h2 className="exam-dialog__title">از آزمون بیرون می‌روید؟</h2>
+            <p className="exam-dialog__body">
+              پاسخ‌های ثبت‌شدهٔ شما ذخیره شده‌اند و از بخش «آزمون» می‌توانید ادامه دهید؛ زمان آزمون
+              همچنان در حال گذشتن است.
             </p>
-            <div className="row gap-8 mt-16">
-              <Button variant="primary" size="sm" onClick={() => setConfirmLeave(false)}>
+            <div className="exam-dialog__actions">
+              <DsButton variant="primary" size="md" onClick={() => setConfirmLeave(false)}>
                 ادامهٔ آزمون
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/exam', { replace: true })}>
-                خروج
-              </Button>
+              </DsButton>
+              <DsButton
+                variant="ghost"
+                size="md"
+                onClick={() => navigate('/exam', { replace: true })}
+              >
+                خروج موقت
+              </DsButton>
             </div>
           </div>
         </div>

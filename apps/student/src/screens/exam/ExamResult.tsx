@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { AppBar, Button, Card, Chip } from '../../components';
+import './exam.css';
+import { AppBar } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
+import { DsBadge, DsButton, DsCard } from '../../design/components';
 import { Icon } from '../../icons';
-import { fa } from '../../lib/library';
 import { OPTION_LETTERS, accuracyTone, mockExam, type MockReview } from '../../lib/exam';
+import { faNum, faPercent } from '../../lib/fa';
 
-/** کارنامه + بازبینی.
+function verdictLabel(tone: 'good' | 'mid' | 'low'): string {
+  if (tone === 'good') return 'عملکرد عالی';
+  if (tone === 'mid') return 'عملکرد قابل قبول';
+  return 'نیاز به مرور بیشتر';
+}
+
+/** کارنامه و بازبینی آزمون زمان‌دار.
  *
- *  اعداد از خودِ سند آزمون می‌آیند (`answered`, `correct`, `percentage`).
- *  بازبینی فقط برای آزمون تمام‌شده در دسترس است؛ سرور برای آزمون فعال
- *  ۴۰۹ می‌دهد، پس این صفحه هرگز پاسخ‌های صحیح آزمون جاری را لو نمی‌دهد.
+ *  Audit ER1: یک CTA اصلی واضح (`دریافت دفترچه PDF`) + دکمه‌های ثانویهٔ متوازن + حلقهٔ نمره با برچسب معنایی.
+ *  Audit ER2: تراز صحیح آیکون و عنوان «بازبینی» + متادیتای خوانا (>= ۱۳px) با تفکیک رنگی درست/غلط.
  */
 export function ExamResult() {
   const { sid = '' } = useParams();
@@ -29,7 +36,6 @@ export function ExamResult() {
       setState('ready');
     } catch (err) {
       const code = (err as { code?: string })?.code ?? '';
-      // آزمون هنوز تمام نشده → برگرد به اجرای آزمون
       if (code === 'exam_still_active') setState('active');
       else setState('error');
     }
@@ -42,7 +48,7 @@ export function ExamResult() {
     try {
       await mockExam.downloadPdf(sid, mode, `daftarche-azmoon-${data?.exam_code || sid}.pdf`);
     } catch {
-      setPdfError('دانلود دفترچه آزمون با خطا مواجه شد. لطفاً دوباره تلاش کنید.');
+      setPdfError('دانلود دفترچهٔ آزمون با خطا مواجه شد. لطفاً دوباره تلاش کنید.');
     } finally {
       setDownloading(false);
     }
@@ -61,88 +67,137 @@ export function ExamResult() {
 
   return (
     <>
-      <AppBar title="کارنامه" sub={data?.exam_code ? `کد ${data.exam_code}` : 'نتیجهٔ آزمون'} back onBack={() => navigate('/exam')} />
-      <div className="page">
+      <AppBar
+        title="کارنامه"
+        sub={data ? `${data.lesson}${data.topic ? ` · ${data.topic}` : ''}` : 'نتیجهٔ آزمون'}
+        back
+        onBack={() => navigate('/exam')}
+      />
+      <div className="page page-enter exam-page">
         {state === 'loading' && <LoadingBlock rows={3} />}
         {state === 'error' && <ErrorBlock error={null} onRetry={() => void load()} />}
 
         {state === 'ready' && data && (
-          <>
-            <Card className="mt-16" style={{ textAlign: 'center' }}>
-              <div className={`score score--${tone}`}>
-                <span className="score__n num">{fa(pct)}</span>
-                <span className="score__u">٪</span>
+          <div className="exam-stack">
+            <DsCard className="exam-result-hero">
+              <div className={`exam-score-ring exam-score-ring--${tone}`}>
+                <span className="exam-score-ring__val">{faPercent(pct)}</span>
               </div>
-              <p className="small mt-8">
-                {fa(data.correct)} پاسخ درست از {fa(data.answered)} پاسخ
-                {data.total > data.answered ? ` · ${fa(data.total - data.answered)} سؤال بی‌پاسخ` : ''}
-              </p>
-              <div className="row gap-8 mt-12" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
-                <Chip variant="quiet">{data.lesson}{data.topic ? ` · ${data.topic}` : ''}</Chip>
-                <Chip variant="quiet">{fa(data.total)} سؤال</Chip>
-                {data.minutes > 0 && <Chip variant="quiet">{fa(data.minutes)} دقیقه</Chip>}
-              </div>
-            </Card>
 
-            <div className="row gap-8 mt-16" style={{ flexWrap: 'wrap' }}>
-              <Button
+              <DsBadge tone={tone === 'good' ? 'success' : tone === 'mid' ? 'warning' : 'danger'}>
+                {verdictLabel(tone)}
+              </DsBadge>
+
+              <p className="exam-hint-text">
+                {faNum(data.correct)} پاسخ درست از {faNum(data.answered)} پاسخ
+                {data.total > data.answered
+                  ? ` · ${faNum(data.total - data.answered)} سؤال بی‌پاسخ`
+                  : ''}
+              </p>
+
+              <div className="exam-result-badges">
+                <DsBadge tone="accent">
+                  {data.lesson}
+                  {data.topic ? ` · ${data.topic}` : ''}
+                </DsBadge>
+                <DsBadge tone="neutral">{faNum(data.total)} سؤال</DsBadge>
+                {data.minutes > 0 && <DsBadge tone="neutral">{faNum(data.minutes)} دقیقه</DsBadge>}
+                {data.exam_code && (
+                  <DsBadge tone="neutral">
+                    کد <bdi dir="ltr">{data.exam_code}</bdi>
+                  </DsBadge>
+                )}
+              </div>
+            </DsCard>
+
+            <div className="exam-result-ctas">
+              <DsButton
                 variant="primary"
-                size="sm"
-                icon="i-download"
+                size="lg"
                 loading={downloading}
                 onClick={() => void handleDownloadPdf('exam')}
               >
-                دریافت دفترچه PDF
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/exam/setup', { replace: true })}>
-                آزمون تازه
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/exam/mock/history')}>
-                آزمون‌های قبلی
-              </Button>
+                <Icon name="i-download" size={18} />
+                <span>دریافت دفترچه PDF</span>
+              </DsButton>
+              <div className="exam-result-secondary-ctas">
+                <DsButton
+                  variant="secondary"
+                  size="md"
+                  className="exam-btn-tall"
+                  onClick={() => navigate('/exam/setup', { replace: true })}
+                >
+                  آزمون تازه
+                </DsButton>
+                <DsButton
+                  variant="ghost"
+                  size="md"
+                  className="exam-btn-tall"
+                  onClick={() => navigate('/exam/mock/history')}
+                >
+                  آزمون‌های قبلی
+                </DsButton>
+              </div>
             </div>
+
             {pdfError && (
-              <p className="tiny mt-8" style={{ color: 'var(--danger)' }} role="alert">
+              <p className="exam-error-note" role="alert">
                 {pdfError}
               </p>
             )}
 
-            <div className="section__head mt-16">
-              <Icon name="i-check" size={16} />
-              <span className="h3">بازبینی</span>
+            <div className="exam-review-head">
+              <Icon name="i-file-text" size={18} className="exam-review-head__icon" />
+              <h2 className="exam-sec-head__title">بازبینی پاسخ‌ها</h2>
             </div>
 
             {data.review.length === 0 ? (
-              <p className="small mt-8">پاسخی برای بازبینی ثبت نشده است.</p>
+              <DsCard level="sunken">
+                <p className="exam-hint-text">پاسخی برای بازبینی ثبت نشده است.</p>
+              </DsCard>
             ) : (
-              <div className="mt-8" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="exam-review-grid">
                 {data.review.map((r, idx) => (
-                  <article key={`${r.question_id}-${idx}`} className="q-card q-card--review">
-                    <div className="row gap-8" style={{ alignItems: 'center' }}>
-                      <span className="tiny num">سؤال {fa(idx + 1)}</span>
-                      <span className="grow" />
-                      <Chip variant={r.is_correct ? 'cyan' : 'quiet'} icon={r.is_correct ? 'i-check' : undefined}>
+                  <DsCard key={`${r.question_id}-${idx}`} className="exam-review-card">
+                    <div className="exam-review-card__top">
+                      <span className="exam-sec-head__sub">سؤال {faNum(idx + 1)}</span>
+                      <DsBadge tone={r.is_correct ? 'success' : 'danger'}>
                         {r.is_correct ? 'درست' : 'غلط'}
-                      </Chip>
+                      </DsBadge>
                     </div>
+
                     {r.image_url && (
-                      <img className="q-img mt-8" src={r.image_url} alt="تصویر سؤال" loading="lazy" />
+                      <img
+                        className="exam-q-img"
+                        src={r.image_url}
+                        alt="تصویر سؤال"
+                        loading="lazy"
+                      />
                     )}
-                    <p className="q-stem mt-8" style={{ fontSize: 14.5 }}>
+
+                    <p className="exam-review-card__stem">
                       {r.question ?? 'متن سؤال در دسترس نیست.'}
                     </p>
-                    <p className="tiny mt-8">
-                      پاسخ تو: <b>{OPTION_LETTERS[r.selected] ?? r.selected}</b>
-                      {r.options?.[r.selected] ? ` — ${r.options[r.selected]}` : ''} · پاسخ درست:{' '}
-                      <b>{OPTION_LETTERS[r.correct_answer] ?? r.correct_answer}</b>
-                      {r.options?.[r.correct_answer] ? ` — ${r.options[r.correct_answer]}` : ''}
-                    </p>
-                    {r.explanation && <p className="tiny mt-8">{r.explanation}</p>}
-                  </article>
+
+                    <div className="exam-review-answers">
+                      <span className={r.is_correct ? 'exam-review-ans--ok' : 'exam-review-ans--no'}>
+                        پاسخ شما: {OPTION_LETTERS[r.selected] ?? faNum(r.selected)}
+                        {r.options?.[r.selected] ? ` — ${r.options[r.selected]}` : ''}
+                      </span>
+                      {!r.is_correct && (
+                        <span className="exam-review-ans--ok">
+                          پاسخ درست: {OPTION_LETTERS[r.correct_answer] ?? faNum(r.correct_answer)}
+                          {r.options?.[r.correct_answer] ? ` — ${r.options[r.correct_answer]}` : ''}
+                        </span>
+                      )}
+                    </div>
+
+                    {r.explanation && <p className="exam-review-expl">{r.explanation}</p>}
+                  </DsCard>
                 ))}
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </>

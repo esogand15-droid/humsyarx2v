@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppBar } from '../components/AppBar';
-import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { Chip } from '../components/Chip';
-import { Input } from '../components/Input';
+
+import './account.css';
 import { SkeletonStack } from '../components';
+import { AppBar } from '../components/AppBar';
+import { DsBadge, DsButton, DsCard } from '../design/components';
 import { Icon } from '../icons';
 import { apiCall, errorText } from '../lib/api';
-import { fa } from '../lib/library';
-
-/* اشتراک — تماماً از سرور: پلن‌ها، وضعیت، کد تخفیف و درگاه زرین‌پال.
-   قبلاً پلن‌ها و قیمت‌ها در کد ثابت بودند و دکمهٔ پرداخت فقط یک alert
-   نشان می‌داد؛ دانشجو قیمتی می‌دید که واقعی نبود و پرداختی انجام نمی‌شد. */
+import { faDate, faDigits, faNum } from '../lib/fa';
 
 interface Plan {
   id: string;
@@ -47,9 +42,9 @@ interface DiscountResult {
 
 const FEATURES = [
   'دسترسی کامل به جزوه‌ها و منابع محافظت‌شده در کتابخوان',
-  'بانک سؤال و آزمون‌های زمان‌دار',
-  'دستیار هوشیار برای پرسش و تحلیل تصویر',
-  'یادداشت‌برداری با قلم دیجیتال روی جزوه‌ها',
+  'بانک سؤال و آزمون‌های زمان‌دار با کارنامهٔ تحلیلی',
+  'دستیار هوشیار برای پرسش و تحلیل تصویر بالینی',
+  'یادداشت‌برداری با قلم دیجیتال و همگام‌سازی روی همهٔ دستگاه‌ها',
 ];
 
 function newIdem(): string {
@@ -60,6 +55,7 @@ function newIdem(): string {
   }
 }
 
+/** اشتراک و تمدید — چیدمان دوتایی دسکتاپ، نوار پرداخت چسبان بالای تب‌بار موبایل، و جداکنندهٔ فارسی `٬`. */
 export function SubscriptionScreen() {
   const [status, setStatus] = useState<StatusPayload | null>(null);
   const [gateway, setGateway] = useState<GatewayStatus | null>(null);
@@ -71,7 +67,6 @@ export function SubscriptionScreen() {
   const [checkingCode, setCheckingCode] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
-  // یک کلید ثابت برای هر تلاش پرداخت تا دوبار زدن دکمه دو تراکنش نسازد
   const [idem, setIdem] = useState(newIdem);
 
   const load = useCallback(async () => {
@@ -83,8 +78,8 @@ export function SubscriptionScreen() {
       ]);
       setStatus(s);
       setGateway(g);
-      const plans = Array.isArray(s?.plans) ? s.plans : [];
-      setSelectedPlan((cur) => cur || plans[0]?.id || '');
+      const list = Array.isArray(s?.plans) ? s.plans : [];
+      setSelectedPlan((cur) => cur || list[0]?.id || '');
     } catch (err) {
       setLoadError(errorText(err, 'دریافت وضعیت اشتراک ممکن نشد.'));
     }
@@ -96,9 +91,18 @@ export function SubscriptionScreen() {
 
   const plans = useMemo(() => (Array.isArray(status?.plans) ? status!.plans : []), [status]);
   const plan = plans.find((p) => p.id === selectedPlan) || null;
-  const finalPrice = discount && plan && discount.price === plan.price ? discount.final_price : plan?.price ?? 0;
+  const finalPrice =
+    discount && plan && discount.price === plan.price ? discount.final_price : (plan?.price ?? 0);
   const onlinePay = Boolean(gateway?.online_pay_enabled);
   const botLink = `https://t.me/${gateway?.bot_username || 'HumsYarBot'}`;
+
+  // نرخ پایهٔ روزانه از کوتاه‌ترین پلن پولی برای محاسبهٔ درصد صرفه‌جویی پلن‌های بلندمدت
+  const baseDailyRate = useMemo(() => {
+    const paid = plans.filter((p) => p.days > 0 && p.price > 0);
+    if (paid.length === 0) return 0;
+    const shortest = paid.reduce((a, b) => (a.days <= b.days ? a : b));
+    return shortest.price / shortest.days;
+  }, [plans]);
 
   const choosePlan = (id: string) => {
     setSelectedPlan(id);
@@ -150,195 +154,254 @@ export function SubscriptionScreen() {
     }
   };
 
+  const expiresLabel = status?.expires_fa
+    ? faDigits(status.expires_fa)
+    : status?.expires
+      ? faDate(status.expires)
+      : '';
+
   return (
     <>
-      <AppBar title="اشتراک" sub="وضعیت و تمدید اشتراک" />
+      <AppBar title="طرح‌های اشتراک" sub="دسترسی جامع به منابع و هوش پزشکی" />
 
-      <div className="page">
+      <div className="page page-enter acct-page acct-sub-page">
         {loadError && (
-          <p className="notice notice--warn mt-8" role="alert">
-            {loadError}{' '}
-            <button type="button" className="btn btn--sm btn--ghost" onClick={() => void load()}>
-              تلاش دوباره
-            </button>
-          </p>
+          <DsCard>
+            <div className="acct-notice acct-notice--danger" role="alert">
+              <div className="acct-notice__lead">
+                <Icon name="i-alert-circle" size={18} />
+                <span>{loadError}</span>
+              </div>
+              <DsButton variant="secondary" size="md" onClick={() => void load()}>
+                تلاش دوباره
+              </DsButton>
+            </div>
+          </DsCard>
         )}
 
         {!status && !loadError ? (
-          <div className="mt-12">
-            <SkeletonStack rows={4} />
-          </div>
+          <SkeletonStack rows={4} />
         ) : status ? (
-          <>
-            {/* وضعیت فعلی — از سرور */}
-            <Card
-              className="mt-8 card--glass"
-              style={{
-                borderInlineStart: `4px solid ${status.active ? 'var(--hym-neon-cyan)' : 'var(--line-2)'}`,
-                padding: '16px 20px',
-              }}
-            >
-              <div className="row row--between" style={{ alignItems: 'center', gap: 12 }}>
-                <div>
-                  <div className="h3">
-                    {status.active
-                      ? status.stacked || !status.plan_name
-                        ? 'اشتراک فعال'
-                        : status.plan_name
-                      : 'اشتراک فعالی ندارید'}
+          <div className="acct-two-col">
+            <div className="acct-col-main">
+              <DsCard
+                className={`acct-card-stack acct-sub-status${status.active ? ' is-active' : ''}`}
+              >
+                <div className="acct-sec-head">
+                  <div>
+                    <h2 className="ds-card__title">
+                      {status.active
+                        ? status.stacked || !status.plan_name
+                          ? 'اشتراک فعال'
+                          : status.plan_name
+                        : 'اشتراک فعالی ندارید'}
+                    </h2>
+                    {status.active && (
+                      <p className="ds-card__sub">
+                        {faNum(status.days_left)} روز باقی‌مانده
+                        {expiresLabel ? ` · تا ${expiresLabel}` : ''}
+                      </p>
+                    )}
                   </div>
-                  {status.active && (
-                    <p className="tiny color-muted mt-4">
-                      {fa(status.days_left)} روز باقی‌مانده
-                      {status.expires_fa ? ` · تا ${status.expires_fa}` : ''}
-                    </p>
-                  )}
+                  <DsBadge tone={status.active ? 'success' : 'neutral'}>
+                    {status.active && <Icon name="i-check" size={12} />}
+                    <span>{status.active ? 'فعال' : 'غیرفعال'}</span>
+                  </DsBadge>
                 </div>
-                <Chip variant={status.active ? 'cyan' : 'quiet'} icon={status.active ? 'i-check' : undefined}>
-                  {status.active ? 'فعال' : 'غیرفعال'}
-                </Chip>
-              </div>
-              {status.has_pending_payment && (
-                <p className="notice notice--warn mt-12">
-                  یک رسید پرداخت شما در انتظار بررسی است؛ پس از تأیید، روزها به اشتراک اضافه می‌شود.
-                </p>
-              )}
-            </Card>
 
-            {plans.length === 0 ? (
-              <Card className="mt-16 card--glass">
-                <p className="small">در حال حاضر پلن فعالی برای خرید تعریف نشده است.</p>
-              </Card>
-            ) : (
-              <>
-                <div className="h3 mt-20 mb-12">{status.active ? 'تمدید اشتراک' : 'انتخاب پلن'}</div>
-                <div role="radiogroup" aria-label="پلن‌های اشتراک" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {plans.map((p) => {
-                    const isSelected = selectedPlan === p.id;
-                    return (
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={isSelected}
-                        key={p.id}
-                        onClick={() => choosePlan(p.id)}
-                        className="card card--glass"
-                        style={{
-                          cursor: 'pointer',
-                          padding: '16px 20px',
-                          textAlign: 'start',
-                          font: 'inherit',
-                          color: 'inherit',
-                          width: '100%',
-                          border: isSelected ? '2px solid var(--hym-neon-cyan)' : '1px solid var(--line)',
-                          boxShadow: isSelected ? '0 0 20px -4px rgba(0, 242, 254, 0.25)' : undefined,
-                          transition: 'border-color var(--t-fast) ease, box-shadow var(--t-fast) ease',
-                        }}
-                      >
-                        <div className="row row--between" style={{ alignItems: 'center', gap: 12 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <span
-                              aria-hidden="true"
-                              style={{
-                                width: 22,
-                                height: 22,
-                                flex: '0 0 22px',
-                                borderRadius: '50%',
-                                border: `2px solid ${isSelected ? 'var(--hym-neon-cyan)' : 'var(--line-2)'}`,
-                                display: 'grid',
-                                placeItems: 'center',
-                              }}
-                            >
-                              {isSelected && (
-                                <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--hym-neon-cyan)' }} />
-                              )}
+                {status.has_pending_payment && (
+                  <div className="acct-notice acct-notice--warn" role="status">
+                    <span>
+                      یک رسید پرداخت شما در انتظار بررسی است؛ پس از تأیید، روزها به اشتراک اضافه
+                      می‌شود.
+                    </span>
+                  </div>
+                )}
+              </DsCard>
+
+              {plans.length === 0 ? (
+                <DsCard>
+                  <p className="ds-card__sub">در حال حاضر پلن فعالی برای خرید تعریف نشده است.</p>
+                </DsCard>
+              ) : (
+                <>
+                  <div className="acct-sec-head">
+                    <h2 className="acct-sec-head__title">
+                      {status.active ? 'تمدید اشتراک' : 'انتخاب پلن'}
+                    </h2>
+                    <span className="acct-sec-head__sub">{faNum(plans.length)} طرح</span>
+                  </div>
+
+                  <div className="acct-plans-grid" role="radiogroup" aria-label="پلن‌های اشتراک">
+                    {plans.map((p) => {
+                      const isSelected = selectedPlan === p.id;
+                      const monthlyEq =
+                        p.days > 31 && p.price > 0 ? Math.round((p.price / p.days) * 30) : null;
+                      const savingsPct =
+                        p.days > 31 && p.price > 0 && baseDailyRate > 0
+                          ? Math.round((1 - p.price / p.days / baseDailyRate) * 100)
+                          : 0;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          onClick={() => choosePlan(p.id)}
+                          className={`acct-plan-card${isSelected ? ' is-selected' : ''}`}
+                        >
+                          <div className="acct-plan-card__top">
+                            <span className="acct-plan-card__lead">
+                              <span className="acct-plan-radio" aria-hidden="true">
+                                {isSelected && <span className="acct-plan-radio__dot" />}
+                              </span>
+                              <span>
+                                <span className="acct-plan-card__title">{p.name}</span>
+                                {p.days > 0 && (
+                                  <span className="acct-plan-card__days">
+                                    {faNum(p.days)} روز دسترسی
+                                  </span>
+                                )}
+                              </span>
                             </span>
-                            <span>
-                              <span className="h3" style={{ fontSize: 15, display: 'block' }}>{p.name}</span>
-                              {p.days > 0 && <span className="tiny color-muted mt-2" style={{ display: 'block' }}>{fa(p.days)} روز دسترسی</span>}
+
+                            <span className="acct-plan-card__price">
+                              <span>{p.price > 0 ? faNum(p.price) : 'رایگان'}</span>
+                              {p.price > 0 && <span className="acct-plan-card__unit">تومان</span>}
                             </span>
                           </div>
-                          <span className="h2 num" style={{ fontSize: 18, color: 'var(--brand)', whiteSpace: 'nowrap' }}>
-                            {p.price > 0 ? fa(p.price) : 'رایگان'}
-                            {p.price > 0 && <span style={{ fontSize: 11, fontWeight: 500, marginInlineStart: 4 }}>تومان</span>}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
 
-                {/* کد تخفیف — اعتبارسنجی واقعی روی سرور */}
-                <Card className="mt-16 card--glass">
-                  <div className="row gap-8" style={{ alignItems: 'flex-end' }}>
-                    <div className="grow">
-                      <Input
-                        label="کد تخفیف"
-                        placeholder="کد را اینجا وارد کنید"
-                        value={discountCode}
-                        onChange={(e) => {
-                          setDiscountCode(e.target.value);
-                          setDiscount(null);
-                          setDiscountError('');
-                        }}
-                        code
-                      />
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={() => void applyDiscount()} disabled={!discountCode.trim() || !plan || checkingCode}>
-                      {checkingCode ? 'در حال بررسی…' : 'اعمال کد'}
-                    </Button>
+                          {(monthlyEq !== null || savingsPct >= 5) && (
+                            <div className="acct-plan-card__foot">
+                              {monthlyEq !== null && (
+                                <span className="acct-sec-head__sub">
+                                  معادل ماهانه {faNum(monthlyEq)} تومان
+                                </span>
+                              )}
+                              {savingsPct >= 5 && (
+                                <DsBadge tone="success">{faNum(savingsPct)}٪ صرفه‌جویی</DsBadge>
+                              )}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
+                </>
+              )}
+
+              <DsCard className="acct-card-stack">
+                <h2 className="ds-card__title">امکانات اشتراک کامل</h2>
+                <ul className="acct-feature-list">
+                  {FEATURES.map((feat) => (
+                    <li key={feat} className="acct-feature-item">
+                      <Icon name="i-check" size={16} className="acct-feature-item__icon" />
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              </DsCard>
+            </div>
+
+            {plans.length > 0 && (
+              <aside className="acct-col-side">
+                <DsCard className="acct-card-stack">
+                  <div className="ds-field">
+                    <label className="ds-field__label" htmlFor="sub-discount-code">
+                      کد تخفیف
+                    </label>
+                    <div className="acct-discount-row">
+                      <div className="acct-discount-row__field">
+                        <input
+                          id="sub-discount-code"
+                          type="text"
+                          className={`ds-input acct-code-input${
+                            discountCode.trim() ? ' acct-code-input--filled' : ''
+                          }`}
+                          placeholder="کد را اینجا وارد کنید"
+                          value={discountCode}
+                          onChange={(e) => {
+                            setDiscountCode(e.target.value);
+                            setDiscount(null);
+                            setDiscountError('');
+                          }}
+                          autoCapitalize="characters"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <DsButton
+                        variant="secondary"
+                        size="md"
+                        className="acct-btn-tall"
+                        onClick={() => void applyDiscount()}
+                        disabled={!discountCode.trim() || !plan || checkingCode}
+                        loading={checkingCode}
+                      >
+                        {checkingCode ? 'بررسی…' : 'اعمال کد'}
+                      </DsButton>
+                    </div>
+                  </div>
+
                   {discount && (
-                    <p className="tiny mt-6" style={{ color: 'var(--ok, #10B981)' }}>
-                      {fa(discount.percent)}٪ تخفیف اعمال شد — مبلغ نهایی {fa(discount.final_price)} تومان
+                    <p className="acct-discount-ok" role="status">
+                      {faNum(discount.percent)}٪ تخفیف اعمال شد — مبلغ نهایی{' '}
+                      {faNum(discount.final_price)} تومان
                     </p>
                   )}
                   {discountError && (
-                    <p className="tiny mt-6 color-danger" role="alert">{discountError}</p>
+                    <p className="acct-discount-err" role="alert">
+                      {discountError}
+                    </p>
                   )}
-                </Card>
 
-                <Card className="mt-16 card--glass">
-                  <div className="h3 mb-12">با اشتراک به این امکانات دسترسی دارید</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {FEATURES.map((feat) => (
-                      <div key={feat} className="row gap-8" style={{ alignItems: 'flex-start' }}>
-                        <div style={{ color: 'var(--hym-neon-cyan)', marginTop: 2 }}>
-                          <Icon name="i-check" size={16} />
-                        </div>
-                        <span className="small">{feat}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
+                  <p className="acct-pay-hint">
+                    {onlinePay
+                      ? 'انتقال به درگاه امن زرین‌پال · فعال‌سازی خودکار بلافاصله پس از پرداخت'
+                      : 'پرداخت آنلاین فعلاً غیرفعال است؛ خرید از طریق ربات تلگرام انجام می‌شود.'}
+                  </p>
+                </DsCard>
 
-                <div className="mt-20 mb-24">
+                <div className="acct-pay-bar">
                   {payError && (
-                    <p className="notice notice--warn mb-12" role="alert">{payError}</p>
+                    <div className="acct-notice acct-notice--danger" role="alert">
+                      <span>{payError}</span>
+                    </div>
                   )}
+
+                  {plan && (
+                    <div className="acct-pay-summary">
+                      <span>{plan.name}</span>
+                      <span className="acct-pay-summary__price">
+                        {finalPrice > 0 ? `${faNum(finalPrice)} تومان` : 'رایگان'}
+                      </span>
+                    </div>
+                  )}
+
                   {onlinePay ? (
-                    <>
-                      <Button variant="primary" block loading={paying} disabled={!plan || status.has_pending_payment} onClick={() => void pay()}>
-                        {plan ? `پرداخت ${fa(finalPrice)} تومان` : 'یک پلن انتخاب کنید'}
-                      </Button>
-                      <p className="tiny color-muted mt-8 text-center">
-                        به درگاه امن زرین‌پال منتقل می‌شوید و پس از پرداخت، اشتراک خودکار فعال می‌شود.
-                      </p>
-                    </>
+                    <DsButton
+                      variant="primary"
+                      size="lg"
+                      block
+                      loading={paying}
+                      disabled={!plan || status.has_pending_payment}
+                      onClick={() => void pay()}
+                    >
+                      {plan ? `پرداخت ${faNum(finalPrice)} تومان` : 'یک پلن انتخاب کنید'}
+                    </DsButton>
                   ) : (
-                    <>
-                      <a className="btn btn--primary btn--block" href={botLink} target="_blank" rel="noopener noreferrer">
-                        خرید اشتراک در ربات تلگرام
-                      </a>
-                      <p className="tiny color-muted mt-8 text-center">
-                        پرداخت آنلاین فعلاً فعال نیست؛ خرید با کارت‌به‌کارت از طریق ربات انجام می‌شود.
-                      </p>
-                    </>
+                    <a
+                      className="ds-btn ds-btn--lg ds-btn--block"
+                      href={botLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      خرید اشتراک در ربات تلگرام
+                    </a>
                   )}
                 </div>
-              </>
+              </aside>
             )}
-          </>
+          </div>
         ) : null}
       </div>
     </>
