@@ -63,6 +63,23 @@ export const ICON_NAMES = [
   'i-pin',
   'i-menu',
   'i-arrow-down',
+  // DS v2 icons (replaces emoji chrome)
+  'i-flame',
+  'i-pencil',
+  'i-fountain',
+  'i-lasso',
+  'i-shapes',
+  'i-expand',
+  'i-arrow-up',
+  'i-arrow-left',
+  'i-arrow-right',
+  'i-palette',
+  'i-scissors',
+  'i-star',
+  'i-star-filled',
+  'i-stethoscope',
+  'i-zap',
+  'i-pill',
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -70,7 +87,7 @@ export type IconName = (typeof ICON_NAMES)[number];
 /** یک‌بار در ریشهٔ اپ رندر می‌شود؛ همهٔ آیکون‌ها با <use href="#id"> از آن می‌آیند. */
 export function IconSprite() {
   return (
-    <svg width="0" height="0" aria-hidden="true" focusable="false" style={{ position: 'absolute' }}>
+    <svg width="0" height="0" aria-hidden="true" focusable="false" className="svg-sprite-defs">
       <symbol id="logo-mark" viewBox="0 0 24 24">
       <path d="M12 12.4c-2.3-1.3-5-1.6-7.7-.8v7.1c2.7-.8 5.4-.5 7.7.8 2.3-1.3 5-1.6 7.7-.8V11.6c-2.7-.8-5.4-.5-7.7.8z"
       fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round"/>
@@ -134,6 +151,22 @@ export function IconSprite() {
       <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 3.5h6l-1 6 3.5 3.5h-11L10 9.5z"/><path d="M12 13v7.5"/></symbol>
       <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h10"/></symbol>
       <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m5.5 12.5 6.5 6.5 6.5-6.5"/></symbol>
+      <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 2.8c.4 3.4-2.2 5.2-2.2 8.2a3.2 3.2 0 0 0 3.2 3.2 3.2 3.2 0 0 0 3-4.3c2.1 1.6 3.2 4 3.2 6.3a7.2 7.2 0 1 1-14.4 0c0-4 2.7-7.7 7.2-13.4z"/></symbol>
+      <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/><path d="m14 6 4 4"/></symbol>
+      <symbol id="i-fountain" viewBox="0 0 24 24"><path d="M12 3 8.2 10.5a4 4 0 0 0 .8 4.4L12 18l3-3.1a4 4 0 0 0 .8-4.4z"/><path d="M12 3v7"/><circle cx="12" cy="11.2" r="1"/><path d="M8.5 19.5h7"/></symbol>
+      <symbol id="i-lasso" viewBox="0 0 24 24"><path d="M11 4.5c4.7 0 8.5 2.7 8.5 6s-3.8 6-8.5 6-8.5-2.7-8.5-6 3.8-6 8.5-6z" strokeDasharray="3 2.5"/><path d="M8.5 16.2c-.8 1.3-.8 2.8.3 3.8 1.2 1 3 .6 3.5-.8.4-1.2-.3-2.5-1.6-2.8"/></symbol>
+      <symbol id="i-shapes" viewBox="0 0 24 24"><circle cx="8" cy="15.5" r="4.2"/><rect x="13" y="11.5" width="7.2" height="7.2" rx="1.4"/><path d="m12 3.5 4.2 6.8H7.8z"/></symbol>
+      <symbol id="i-expand" viewBox="0 0 24 24"><path d="M8.5 3.5H4.5a1 1 0 0 0-1 1v4"/><path d="M15.5 3.5h4a1 1 0 0 1 1 1v4"/><path d="M8.5 20.5H4.5a1 1 0 0 1-1-1v-4"/><path d="M15.5 20.5h4a1 1 0 0 0 1-1v-4"/></symbol>
+      <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5.5 11.5 6.5-6.5 6.5 6.5"/></symbol>
+      <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m11.5 5.5-6.5 6.5 6.5 6.5"/></symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12.5 5.5 6.5 6.5-6.5 6.5"/></symbol>
+      <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18 1.6 1.6 0 0 0 1.6-1.6c0-.4-.2-.8-.4-1.1a1.5 1.5 0 0 1 1.2-2.4H16a5 5 0 0 0 5-5c0-4.4-4-8.9-9-8.9z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15.5" cy="8.5" r="1"/></symbol>
+      <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6.5" cy="7" r="2.6"/><circle cx="6.5" cy="17" r="2.6"/><path d="M8.8 8.6 19.5 16"/><path d="M8.8 15.4 19.5 8"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.2 2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.6l6-.9z"/></symbol>
+      <symbol id="i-star-filled" viewBox="0 0 24 24"><path d="m12 3.2 2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.6l6-.9z" fill="currentColor"/></symbol>
+      <symbol id="i-stethoscope" viewBox="0 0 24 24"><path d="M6 3.5v4.5a4 4 0 0 0 8 0V3.5"/><path d="M10 12v3a5 5 0 0 0 10 0v-2.5"/><circle cx="20" cy="10.5" r="2"/><path d="M5 3.5h2M13 3.5h2"/></symbol>
+      <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2.8 4.8 13.4H12L11 21.2l8.2-10.6H12z"/></symbol>
+      <symbol id="i-pill" viewBox="0 0 24 24"><path d="m10.5 20.5 10-10a4.95 4.95 0 0 0-7-7l-10 10a4.95 4.95 0 0 0 7 7Z"/><path d="m8.5 8.5 7 7"/></symbol>
     </svg>
   );
 }

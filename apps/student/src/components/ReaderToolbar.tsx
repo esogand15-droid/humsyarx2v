@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { IconButton } from './IconButton';
 import type { IconName } from '../icons/sprite';
 
@@ -23,7 +24,7 @@ export function ReaderToolbar({
   return (
     <div className="rtool" role="toolbar" aria-label="ابزارهای مطالعه">
       {TOOLS.map((t, i) => (
-        <span key={t.id} style={{ display: 'contents' }}>
+        <Fragment key={t.id}>
           {i === 4 && <span className="sep" aria-hidden="true" />}
           <IconButton
             icon={t.icon}
@@ -31,7 +32,7 @@ export function ReaderToolbar({
             active={active === t.id}
             onClick={() => onSelect(t.id)}
           />
-        </span>
+        </Fragment>
       ))}
     </div>
   );

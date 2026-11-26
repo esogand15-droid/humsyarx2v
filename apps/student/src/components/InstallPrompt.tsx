@@ -111,43 +111,38 @@ export function InstallCard() {
 
   return (
     <section className="ds-card install-card" aria-labelledby="install-card-title">
-      <div className="install-card__head">
-        <span className="install-card__icon" aria-hidden="true">
-          <Icon name="i-smartphone" size={22} />
-        </span>
-        <div className="install-card__titles">
-          <h2 id="install-card-title" className="install-card__title">
-            هامزیار را روی صفحهٔ اصلی نصب کن
-          </h2>
-          <p className="install-card__sub">تمام‌صفحه و سریع‌تر باز می‌شود، مثل یک برنامهٔ واقعی.</p>
+      <div className="install-card__row">
+        <div className="install-card__head">
+          <span className="install-card__icon" aria-hidden="true">
+            <Icon name="i-smartphone" size={20} />
+          </span>
+          <div className="install-card__titles">
+            <h2 id="install-card-title" className="install-card__title">
+              نصب سریع روی صفحهٔ اصلی
+            </h2>
+            <p className="install-card__sub">
+              {ios && !canPrompt
+                ? 'در Safari دکمهٔ Share و سپس Add to Home Screen را انتخاب کنید.'
+                : 'تمام‌صفحه و سریع‌تر باز می‌شود، مثل یک برنامهٔ مستقل.'}
+            </p>
+          </div>
         </div>
-      </div>
 
-      {ios && !canPrompt && (
-        <ol className="install-card__steps">
-          <li>
-            در <bdi dir="ltr">Safari</bdi> دکمهٔ <b>اشتراک‌گذاری</b> را بزن (مربع با فلش رو به بالا).
-          </li>
-          <li>
-            گزینهٔ <b>افزودن به صفحهٔ اصلی</b> (<bdi dir="ltr">Add to Home Screen</bdi>) را انتخاب کن.
-          </li>
-        </ol>
-      )}
-
-      <div className="install-card__actions">
-        {canPrompt ? (
-          <DsButton onClick={() => void install()}>
-            <Icon name="i-download" size={18} />
-            نصب برنامه
+        <div className="install-card__actions">
+          {canPrompt ? (
+            <DsButton size="sm" onClick={() => void install()}>
+              <Icon name="i-download" size={16} />
+              <span>نصب برنامه</span>
+            </DsButton>
+          ) : (
+            <Link to="/install" className="ds-btn ds-btn--secondary ds-btn--sm">
+              راهنمای نصب
+            </Link>
+          )}
+          <DsButton variant="ghost" size="sm" onClick={dismiss}>
+            بعداً
           </DsButton>
-        ) : (
-          <Link to="/install" className="ds-btn ds-btn--secondary">
-            راهنمای تصویری
-          </Link>
-        )}
-        <DsButton variant="ghost" onClick={dismiss}>
-          فهمیدم، نشان نده
-        </DsButton>
+        </div>
       </div>
     </section>
   );

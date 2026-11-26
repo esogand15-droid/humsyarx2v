@@ -68,8 +68,14 @@ export function DesktopHeader() {
         )}
         <Brand size="sm" />
         <div className="desktop-header__titles">
-          <div className="desktop-header__title">{title}</div>
-          {sub && <div className="desktop-header__sub">{sub}</div>}
+          <div className="desktop-header__title">
+            <bdi dir="auto">{title}</bdi>
+          </div>
+          {sub && (
+            <div className="desktop-header__sub">
+              <bdi dir="auto">{sub}</bdi>
+            </div>
+          )}
         </div>
       </div>
 
@@ -90,7 +96,7 @@ export function DesktopHeader() {
           aria-label="جستجو در محتوا و منابع"
         >
           <Icon name="i-search" size={16} />
-          <span>جستجوی منابع، آزمون...</span>
+          <span className="desktop-header__search-label">جستجوی منابع و آزمون…</span>
         </button>
 
         <button

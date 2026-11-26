@@ -316,7 +316,6 @@ html[data-theme="dark"] .rtool button[aria-pressed="true"]{color:var(--on-brand-
 @container app-frame (min-width:760px){
   .content{padding:22px 26px 110px}
   .dash-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start}
-  .lib-grid{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start}
   .lib-side{position:sticky;top:0}
   .card{padding:18px}
   .h1{font-size:30px}
@@ -324,7 +323,7 @@ html[data-theme="dark"] .rtool button[aria-pressed="true"]{color:var(--on-brand-
   .paper{max-width:640px;padding:34px 32px}
 }
 @container app-frame (min-width:1000px){
-  .lib-grid{grid-template-columns:280px 1fr}
+  .lib-side{top:12px}
 }
 
 /* در گوشی: فیلتر ترم به نوار افقی تبدیل می‌شود */
@@ -1381,12 +1380,6 @@ html[data-theme="light"] .desktop-header {
     display: flex;
     flex-direction: column;
     gap: 16px;
-  }
-  .lib-grid {
-    display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
-    gap: 24px;
-    align-items: start;
   }
 }
 

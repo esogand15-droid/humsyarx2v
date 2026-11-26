@@ -46,13 +46,13 @@ export function DeviceListModal({ open, onClose }: { open: boolean; onClose: () 
 
   return (
     <Sheet open={open} onClose={onClose} title="دستگاه‌های متصل">
-      <div style={{ padding: '8px 16px 24px' }}>
-        <p className="small color-muted mb-16">
+      <div className="device-modal">
+        <p className="device-modal__intro">
           فهرست تمام دستگاه‌هایی که با این حساب کاربری وارد شده‌اند. می‌توانی دسترسی دستگاه‌های ناشناس را لغو کنی.
         </p>
 
         {error && (
-          <p className="notice notice--warn mb-12" role="alert">
+          <p className="notice notice--warn device-modal__error" role="alert">
             {error}
           </p>
         )}
@@ -60,47 +60,30 @@ export function DeviceListModal({ open, onClose }: { open: boolean; onClose: () 
         {loading ? (
           <SkeletonStack rows={3} />
         ) : sessions.length === 0 ? (
-          <div className="text-center py-20 small color-muted">هیچ نشست فعالی یافت نشد.</div>
+          <div className="device-modal__empty">هیچ نشست فعالی یافت نشد.</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div className="device-modal__list">
             {sessions.map((sess) => (
               <div
                 key={sess.session_id}
-                className="card card--glass"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '12px',
-                  padding: '12px 14px',
-                  border: sess.is_current ? '1px solid rgba(0, 242, 254, 0.4)' : undefined,
-                  boxShadow: sess.is_current ? '0 0 16px -4px rgba(0, 242, 254, 0.25)' : undefined,
-                }}
+                className={`card device-modal__row ${sess.is_current ? 'is-current' : ''}`}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 12,
-                      background: sess.is_current ? 'var(--brand-soft)' : 'var(--paper-3)',
-                      color: sess.is_current ? 'var(--brand)' : 'var(--ink-2)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
+                <div className="device-modal__lead">
+                  <div className="device-modal__icon" aria-hidden="true">
                     <Icon name="i-smartphone" size={20} />
                   </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="h3" style={{ fontSize: '14px' }}>
-                        {sess.device_name || 'مرورگر وب'}
+                  <div className="device-modal__meta">
+                    <div className="device-modal__title-row">
+                      <span className="device-modal__name">
+                        <bdi dir="auto">{sess.device_name || 'مرورگر وب'}</bdi>
                       </span>
                       {sess.is_current && <Chip variant="cyan">این دستگاه</Chip>}
                     </div>
-                    <div className="tiny color-muted mt-4" style={{ direction: 'ltr', textAlign: 'right' }}>
-                      IP: {sess.ip_address || '—'}
+                    <div className="device-modal__ip">
+                      <span>نشانی IP: </span>
+                      <bdi dir="ltr" className="num">
+                        {sess.ip_address || '—'}
+                      </bdi>
                     </div>
                   </div>
                 </div>

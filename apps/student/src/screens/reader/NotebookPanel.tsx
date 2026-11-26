@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { Icon } from '../../icons';
 import { fa } from '../../lib/library';
 import { ink, type InkSummaryPage, type Scope } from '../../lib/ink';
 
@@ -51,7 +52,7 @@ export function NotebookPanel({ scope, id, page, open, onClose, onJump, refreshK
       <div className="notebook__head">
         <span className="h3">دفتر</span>
         <button type="button" className="iconbtn" onClick={onClose} aria-label="بستن دفتر">
-          <span aria-hidden="true" className="zoom-glyph">×</span>
+          <Icon name="i-x" size={16} />
         </button>
       </div>
 

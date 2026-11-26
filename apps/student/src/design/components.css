@@ -136,7 +136,7 @@
 }
 .ds-seg--block { display: grid; width: 100%; }
 .ds-seg__item {
-  min-height: calc(var(--hym-control-h-sm) - 4px);
+  min-height: 40px;
   padding-inline: var(--hym-space-3);
   border: 0;
   border-radius: calc(var(--hym-radius-control) - 3px);
@@ -148,6 +148,9 @@
   white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+@media (pointer: coarse) {
+  .ds-seg__item { min-height: var(--hym-control-h-md); }
 }
 .ds-seg__item:hover { color: var(--hym-text-primary); }
 .ds-seg__item[aria-selected="true"],
@@ -420,3 +423,24 @@ textarea.ds-input { padding-block: var(--hym-space-3); resize: vertical; }
   gap: var(--hym-space-2);
   flex-shrink: 0;
 }
+
+/* ── Progress bar (zero-inline SVG, RTL right-anchored) ───────────────── */
+.ds-progress {
+  width: 100%;
+  height: 8px;
+  border-radius: var(--hym-radius-pill);
+  background: var(--hym-surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--hym-hairline);
+  overflow: hidden;
+}
+.ds-progress--thin { height: 5px; }
+.ds-progress__svg { display: block; width: 100%; height: 100%; stroke: none; }
+.ds-progress__fill {
+  fill: var(--hym-accent);
+  stroke: none;
+  transition: width var(--hym-duration-normal) var(--hym-ease-default),
+              x var(--hym-duration-normal) var(--hym-ease-default);
+}
+.ds-progress__fill--good { fill: var(--hym-role-grades-solid); }
+.ds-progress__fill--warn { fill: var(--hym-role-schedule-solid); }
+.ds-progress__fill--danger { fill: var(--hym-role-danger-solid); }

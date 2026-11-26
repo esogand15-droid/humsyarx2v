@@ -1,20 +1,45 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   App shell (Wave 3, w3-shell). Reads tokens and .ds-* only (docs/design/DS_V2.md §4):
+   App shell & shared DS v2 layout (Wave 3/4).
+   Reads tokens and .ds-* only (docs/design/DS_V2.md §4):
    no hex, no rgba, no physical left/right, no !important.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── Install card: inline on home only, opaque, one-time (audit G1) ───── */
+/* ── Fix .page-enter so position:fixed inside pages is never trapped ─── */
+.page-enter {
+  will-change: auto;
+  animation: dsPageEnter 180ms var(--hym-ease-out);
+}
+@keyframes dsPageEnter {
+  from { opacity: 0.9; transform: translate3d(0, 6px, 0); }
+  to   { opacity: 1;   transform: none; }
+}
+
+/* ── Install card: compact, inline on home only, opaque, one-time (G1) ─ */
 .install-card {
   display: grid;
   gap: var(--hym-space-3);
-  margin-block: var(--hym-space-4);
   background: var(--hym-surface-1);
 }
-.install-card__head { display: flex; align-items: flex-start; gap: var(--hym-space-3); }
+.install-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-3);
+  flex-wrap: wrap;
+}
+.install-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--hym-space-3);
+  min-width: 0;
+  flex: 1 1 220px;
+}
 .install-card__icon {
   flex: 0 0 auto;
-  display: grid; place-items: center;
-  width: 40px; height: 40px;
+  display: grid;
+  place-items: center;
+  width: var(--hym-control-h-md);
+  height: var(--hym-control-h-md);
   border-radius: var(--hym-radius-control);
   border: 1px solid var(--hym-accent-border);
   background: var(--hym-accent-subtle);
@@ -23,41 +48,44 @@
 .install-card__titles { min-width: 0; }
 .install-card__title {
   margin: 0;
-  font-size: var(--hym-fs-h3);
-  font-weight: var(--hym-fw-bold);
-  line-height: var(--hym-lh-ui);
+  font-size: var(--hym-fs-body);
+  font-weight: var(--hym-fw-heavy);
+  line-height: var(--hym-lh-tight);
   color: var(--hym-text-primary);
 }
 .install-card__sub {
-  margin: var(--hym-space-1) 0 0;
+  margin: 2px 0 0;
   font-size: var(--hym-fs-small);
   line-height: var(--hym-lh-ui);
   color: var(--hym-text-secondary);
 }
-.install-card__steps {
-  margin: 0;
-  padding-inline-start: var(--hym-space-5);
-  display: grid; gap: var(--hym-space-1);
-  font-size: var(--hym-fs-small);
-  line-height: var(--hym-lh-body);
-  color: var(--hym-text-secondary);
+.install-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hym-space-2);
 }
-.install-card__actions { display: flex; flex-wrap: wrap; gap: var(--hym-space-2); }
 
-/* ── Bottom tab bar (audit G3) ──────────────────────────────────────────
-   Markup: <nav class="ds-tabbar ds-tabbar--blur app-tabbar">. Each item has its own
-   data-section, so the active pill/label take that section's accent. Mobile only:
-   from 768px the sidebar rail + desktop header take over (PD1). */
+/* ── Bottom tab bar (audit G3) ────────────────────────────────────────── */
 .app-tabbar .ds-tabbar__item { font-size: var(--hym-fs-caption); }
 .app-tabbar .ds-tabbar__label { white-space: nowrap; }
 @media (min-width: 768px) {
   .app-tabbar { display: none; }
 }
 
-/* Content never hides behind the bar: one clearance, owned by the shell. */
+/* Content never hides behind the bar; mobile appbar sits edge-to-edge */
 @media (max-width: 767px) {
   .app-shell--nav .stage-content {
     padding-block-end: calc(var(--hym-app-tab-bar-height) + env(safe-area-inset-bottom, 0px) + var(--hym-space-4));
+  }
+  .stage-content:not(:has(.aic)) .appbar {
+    margin-block-start: calc(var(--hym-space-4) * -1);
+    margin-block-end: 0;
+    margin-inline: calc(var(--hym-space-4) * -1);
+  }
+  .stage-content:not(:has(.aic)) .page {
+    padding-inline: 0;
+    padding-block-start: var(--hym-space-4);
   }
   .app-shell--nav .page { padding-block-end: var(--hym-space-4); }
 }
@@ -68,13 +96,67 @@
 /* No horizontal overflow at 360–430 (iOS rubber-band sideways scroll). */
 .main-stage { min-width: 0; overflow-x: clip; }
 
+/* ── Touch targets across chrome (>=44px on mobile/tablet touch) ─────── */
+@media (max-width: 1023px), (pointer: coarse) {
+  .iconbtn,
+  .appbar .iconbtn,
+  .sidebar__theme-btn,
+  .sidebar__collapse-toggle,
+  .sidebar__user {
+    min-width: var(--hym-control-h-md);
+    min-height: var(--hym-control-h-md);
+  }
+  .iconbtn,
+  .appbar .iconbtn,
+  .sidebar__theme-btn {
+    width: var(--hym-control-h-md);
+    height: var(--hym-control-h-md);
+  }
+  .desktop-header__search,
+  .install-card .ds-btn--sm {
+    min-height: var(--hym-control-h-md);
+  }
+}
+
+.sidebar__link {
+  min-height: var(--hym-control-h-md);
+}
+
+/* Active sidebar item uses its own route's DS v2 section accent */
+.sidebar__link.active {
+  background: var(--hym-accent-subtle);
+  color: var(--hym-accent-text);
+  font-weight: var(--hym-fw-bold);
+  border-inline-end: 3px solid var(--hym-accent);
+  box-shadow: inset 0 0 0 1px var(--hym-accent-border);
+}
+.sidebar__link.active svg {
+  stroke: var(--hym-accent-text);
+  filter: none;
+}
+
 /* ── Desktop / tablet header (PD1) ──────────────────────────────────── */
+:root .desktop-header,
+html[data-theme="light"] .desktop-header {
+  background: var(--hym-bar-bg);
+  border-color: var(--hym-hairline);
+  box-shadow: var(--hym-elev-2);
+}
+
 .desktop-header { padding-block-start: env(safe-area-inset-top, 0px); }
-.desktop-header__search span {
+.desktop-header__search {
+  min-height: var(--hym-control-h-sm);
+}
+.desktop-header__search-label {
   min-width: 0;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .desktop-header__search {
+    width: auto;
+    min-width: 150px;
+    padding-inline: var(--hym-space-3);
+  }
 }
 .desktop-header__kbd {
   margin-inline-start: auto;
@@ -91,9 +173,136 @@
   .desktop-header__kbd { display: none; }
 }
 
-/* ── Exam answer bar (audit E1) ─────────────────────────────────────────
-   Sticky above the tab bar and the home indicator, so "ثبت پاسخ" is always reachable;
-   the button itself is a .ds-btn (qbank accent when enabled, sunken well when not). */
+/* ── ListRow & AccessStates DS v2 helpers ────────────────────────────── */
+.ds-row__title-block { display: block; }
+.ds-row__sub-block { display: block; }
+.access-loading { margin-block-start: var(--hym-space-4); }
+.access-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--hym-space-2);
+  margin-block-start: var(--hym-space-4);
+  padding: var(--hym-space-8) var(--hym-space-5);
+  text-align: center;
+}
+.access-locked__icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--hym-radius-card);
+  background: var(--hym-accent-subtle);
+  color: var(--hym-accent-text);
+  border: 1px solid var(--hym-accent-border);
+}
+.access-locked__title {
+  margin: var(--hym-space-2) 0 0;
+  font-size: var(--hym-fs-h3);
+  font-weight: var(--hym-fw-heavy);
+  color: var(--hym-text-primary);
+}
+.access-locked__text {
+  margin: 0;
+  max-width: 340px;
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-body);
+  color: var(--hym-text-secondary);
+}
+.access-locked__code {
+  margin: 0;
+  font-size: var(--hym-fs-caption);
+  color: var(--hym-text-muted);
+}
+.access-locked__action {
+  margin-block-start: var(--hym-space-3);
+}
+
+/* ── DeviceListModal ─────────────────────────────────────────────────── */
+.device-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-3);
+  padding: var(--hym-space-2) var(--hym-space-4) var(--hym-space-6);
+}
+.device-modal__intro {
+  margin: 0;
+  font-size: var(--hym-fs-small);
+  line-height: var(--hym-lh-body);
+  color: var(--hym-text-muted);
+}
+.device-modal__error { margin: 0; }
+.device-modal__empty {
+  padding: var(--hym-space-5) 0;
+  text-align: center;
+  font-size: var(--hym-fs-small);
+  color: var(--hym-text-muted);
+}
+.device-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hym-space-2);
+}
+.device-modal__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-3);
+  padding: var(--hym-space-3) var(--hym-space-4);
+  background: var(--hym-surface-1);
+  border: 1px solid var(--hym-hairline);
+  border-radius: var(--hym-radius-card);
+  box-shadow: var(--hym-elev-1);
+}
+.device-modal__row.is-current {
+  border-color: var(--hym-accent-border);
+  background: var(--hym-accent-subtle);
+}
+.device-modal__lead {
+  display: flex;
+  align-items: center;
+  gap: var(--hym-space-3);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.device-modal__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--hym-radius-control);
+  background: var(--hym-surface-sunken);
+  color: var(--hym-text-secondary);
+}
+.device-modal__row.is-current .device-modal__icon {
+  background: var(--hym-accent-subtle);
+  color: var(--hym-accent-text);
+  border: 1px solid var(--hym-accent-border);
+}
+.device-modal__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.device-modal__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--hym-space-2);
+  flex-wrap: wrap;
+}
+.device-modal__name {
+  font-size: var(--hym-fs-body);
+  font-weight: var(--hym-fw-bold);
+  color: var(--hym-text-primary);
+}
+.device-modal__ip {
+  font-size: var(--hym-fs-caption);
+  color: var(--hym-text-muted);
+}
+
+/* ── Exam answer bar (audit E1) ───────────────────────────────────────── */
 .exam-actions {
   display: flex;
   align-items: center;
@@ -120,7 +329,6 @@
   }
   .exam-actions .ds-btn { flex: 1 1 auto; }
 }
-/* Keyboard shortcuts mean nothing on a touch screen. */
 @media (hover: none) {
   .kbd-hint { display: none; }
 }

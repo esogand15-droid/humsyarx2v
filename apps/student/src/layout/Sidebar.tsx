@@ -2,8 +2,10 @@ import { NavLink } from 'react-router-dom';
 import { Icon } from '../icons/Icon';
 import type { IconName } from '../icons/sprite';
 import { Brand } from '../components/Brand';
+import { faDigits } from '../lib/fa';
 import { useSession } from '../lib/session';
 import { useTheme } from '../lib/theme';
+import { sectionFor } from './section';
 import { useSidebar } from './SidebarContext';
 
 interface NavItem {
@@ -85,6 +87,7 @@ export function Sidebar() {
             key={item.to}
             to={item.to}
             end={item.to === '/'}
+            data-section={sectionFor(item.to)}
             className={({ isActive }) => `sidebar__link ${isActive ? 'active' : ''}`}
             title={item.label}
             aria-label={item.label}
@@ -103,8 +106,12 @@ export function Sidebar() {
         >
           <div className="sidebar__avatar">{initial}</div>
           <div className="sidebar__user-details">
-            <span className="sidebar__user-name">{user?.name || 'دانشجو'}</span>
-            <span className="sidebar__user-role">{user?.student_id || 'حساب کاربری'}</span>
+            <span className="sidebar__user-name">
+              <bdi dir="auto">{user?.name || 'دانشجو'}</bdi>
+            </span>
+            <span className="sidebar__user-role num">
+              {user?.student_id ? faDigits(user.student_id) : 'حساب کاربری'}
+            </span>
           </div>
         </NavLink>
 

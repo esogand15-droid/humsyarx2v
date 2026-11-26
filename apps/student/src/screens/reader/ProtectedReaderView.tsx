@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
+import { DsButton, DsEmpty, DsSkeleton } from '../../design/components';
 import { Icon } from '../../icons';
 import { apiCall } from '../../lib/api';
 import { fa } from '../../lib/library';
@@ -12,6 +13,7 @@ import { ThumbnailDrawer } from './ThumbnailDrawer';
 import { TextLayer } from './components/TextLayer';
 
 import './components/TextLayer.css';
+import './reader.css';
 
 export interface PageDimension {
   page: number;
@@ -523,23 +525,26 @@ export function ProtectedReaderView({
       className={`reader reader--ink ${focusMode ? 'reader-focus-mode' : ''}`}
       ref={containerRef}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
     >
       {loading && (
         <div className="reader__center" aria-busy="true">
+          <DsSkeleton shape="title" />
           <span className="small">در حال آماده‌سازی سند امن…</span>
         </div>
       )}
 
       {error && !loading && (
         <div className="reader__center">
-          <Icon name="i-arch" size={30} />
-          <p className="small mt-8" style={{ maxWidth: 320 }}>
-            {error}
-          </p>
-          <button type="button" className="btn btn--quiet mt-12" onClick={() => void loadManifest()}>
-            تلاش مجدد
-          </button>
+          <DsEmpty
+            icon={<Icon name="i-arch" size={30} />}
+            title="بارگذاری سند انجام نشد"
+            body={<span className="reader__error-msg">{error}</span>}
+            action={
+              <DsButton variant="secondary" size="sm" onClick={() => void loadManifest()}>
+                تلاش مجدد
+              </DsButton>
+            }
+          />
         </div>
       )}
 
@@ -555,12 +560,8 @@ export function ProtectedReaderView({
           >
             <div
               className="reader__scroll-track"
-              style={{
-                width: `${Math.floor(baseWidth * zoom)}px`,
-                margin: '0 auto',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
+              ref={(el) => {
+                el?.style.setProperty('--zoom-w', `${Math.floor(baseWidth * zoom)}px`);
               }}
             >
               {manifest.page_dimensions.map((dim) => {
@@ -688,7 +689,7 @@ export function ProtectedReaderView({
             aria-label="خروج از حالت تمرکز"
             title="خروج از حالت تمرکز (Esc)"
           >
-            ✕
+            <Icon name="i-x" size={16} />
           </button>
         </>
       )}
@@ -893,76 +894,47 @@ function VirtualPageContainer({
 
   return (
     <div
-      ref={ref}
-      className={`pdf-page${isCurrent ? ' is-active' : ''}`}
-      style={{
-        width: `${width}px`,
-        height: `${height}px`,
-        position: 'relative',
-        margin: '0 auto 16px',
-        backgroundColor: invertContrast ? '#121620' : '#ffffff',
-        borderRadius: '6px',
-        boxShadow: 'var(--sh-1, 0 1px 3px rgba(0,0,0,0.12))',
-        border: '1px solid var(--line, #e2e8f0)',
-        overflow: 'hidden',
+      ref={(el) => {
+        ref.current = el;
+        if (el) {
+          el.style.setProperty('--page-w', `${width}px`);
+          el.style.setProperty('--page-h', `${height}px`);
+        }
       }}
+      className={`pdf-page${isCurrent ? ' is-active' : ''}${invertContrast ? ' is-inverted' : ''}`}
     >
       {isNearViewport ? (
         <>
           {failed ? (
-            <div
-              className="page-placeholder"
-              style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                color: 'var(--ink-3, #94a3b8)',
-                fontSize: '12px',
-                backgroundColor: 'var(--paper-2, #f8fafc)',
-              }}
-            >
+            <div className="page-placeholder">
               <span>صفحهٔ {fa(page)} بارگذاری نشد</span>
-              <button
-                type="button"
-                className="btn btn--quiet"
+              <DsButton
+                variant="secondary"
+                size="sm"
                 onClick={() => {
                   retriedRef.current = false;
                   void recover();
                 }}
               >
                 تلاش دوباره
-              </button>
+              </DsButton>
             </div>
           ) : (
-          <img
-            src={src}
-            alt={`صفحهٔ ${fa(page)}`}
-            className={`reader__page ${invertContrast ? 'reader__page--inverted' : ''}`}
-            style={{
-              width: `${width}px`,
-              height: `${height}px`,
-              display: 'block',
-              objectFit: 'contain',
-              userSelect: 'none',
-              pointerEvents: 'none',
-              opacity: imgLoaded ? 1 : 0.85,
-              transition: 'opacity 0.15s ease-in',
-            }}
-            loading="lazy"
-            decoding="async"
-            draggable={false}
-            onLoad={() => {
-              loadedRef.current = true;
-              retriedRef.current = false;
-              setImgLoaded(true);
-              onPageLoaded?.();
-            }}
-            onError={handleImgError}
-          />
+            <img
+              src={src}
+              alt={`صفحهٔ ${fa(page)}`}
+              className={`pdf-page__img reader__page${imgLoaded ? ' is-loaded' : ''}${invertContrast ? ' reader__page--inverted' : ''}`}
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              onLoad={() => {
+                loadedRef.current = true;
+                retriedRef.current = false;
+                setImgLoaded(true);
+                onPageLoaded?.();
+              }}
+              onError={handleImgError}
+            />
           )}
 
           {/* Text Layer - Semantic text overlay for selection, search, copy */}
@@ -1014,20 +986,9 @@ function VirtualPageContainer({
           />
         </>
       ) : (
-        <div
-          className="page-placeholder"
-          style={{
-            width: '100%',
-            height: '100%',
-            backgroundColor: 'var(--paper-2, #f8fafc)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--ink-3, #94a3b8)',
-            fontSize: '12px',
-          }}
-        >
-          صفحهٔ {fa(page)}
+        <div className="page-placeholder" aria-busy="true">
+          <DsSkeleton className="page-placeholder__skel" />
+          <span className="num">صفحهٔ {fa(page)}</span>
         </div>
       )}
     </div>

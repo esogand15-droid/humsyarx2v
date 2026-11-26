@@ -1,9 +1,26 @@
-/** نوار پیشرفت — بدون پرش؛ درصد با tabular-nums بیرون از آن نمایش داده می‌شود. */
-export function ProgressBar({ value, thin = false }: { value: number; thin?: boolean }) {
+/** نوار پیشرفت DS v2 — SVG راست‌چین بدون inline style. */
+export function ProgressBar({
+  value,
+  thin = false,
+  tone = 'accent',
+}: {
+  value: number;
+  thin?: boolean;
+  tone?: 'accent' | 'good' | 'warn' | 'danger';
+}) {
   const v = Math.max(0, Math.min(100, Math.round(value)));
+  const fillTone = tone === 'accent' ? '' : ` ds-progress__fill--${tone}`;
   return (
-    <div className="bar" style={thin ? { height: 4 } : undefined} role="progressbar" aria-valuenow={v} aria-valuemin={0} aria-valuemax={100}>
-      <i style={{ width: `${v}%` }} />
+    <div
+      className={`ds-progress${thin ? ' ds-progress--thin' : ''}`}
+      role="progressbar"
+      aria-valuenow={v}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <svg className="ds-progress__svg" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+        <rect className={`ds-progress__fill${fillTone}`} x={100 - v} y={0} width={v} height={8} rx={4} />
+      </svg>
     </div>
   );
 }
