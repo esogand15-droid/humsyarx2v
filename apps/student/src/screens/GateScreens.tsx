@@ -1,7 +1,10 @@
-import { Brand, Button, Card, Chip } from '../components';
+import './auth.css';
+import { Brand } from '../components';
+import { DsBadge, DsButton, DsCard } from '../design/components';
 import { Icon } from '../icons';
 import type { IconName } from '../icons/sprite';
 import { useSession } from '../lib/session';
+import { useTheme } from '../lib/theme';
 
 /* سه صفحهٔ «قبل از اپ» — منطبق با واژگان وضعیت در design/16:
    loading / pending_approval / suspended.
@@ -23,48 +26,83 @@ function StopPage({
   tone: 'warn' | 'danger';
 }) {
   const { refresh, signOut, config } = useSession();
-  const support = config?.support_url;
+  const { resolved, setMode } = useTheme();
+  const support = config?.support_url?.trim() || '';
 
   return (
-    <div className="auth">
-      <div className="auth__head">
-        <Brand size="lg" />
-        <div className="mt-16">
-          <Chip variant={tone === 'danger' ? 'danger' : 'amber'} icon={icon}>
-            {eyebrow}
-          </Chip>
-        </div>
-        <h1 className="h1 mt-12">{title}</h1>
-        <p className="body mt-8">{body}</p>
+    <div className="auth-screen">
+      <div className="auth-topbar">
+        <a href="/" className="auth-topbar-btn">
+          <Icon name="i-chevron-r" size={16} />
+          <span>صفحهٔ اصلی</span>
+        </a>
+        <button
+          type="button"
+          className="auth-topbar-btn auth-theme-btn"
+          onClick={() => setMode(resolved === 'dark' ? 'light' : 'dark')}
+          aria-label={resolved === 'dark' ? 'تغییر به حالت روشن' : 'تغییر به حالت تیره'}
+        >
+          <Icon name={resolved === 'dark' ? 'i-sun' : 'i-moon'} size={16} />
+          <span>{resolved === 'dark' ? 'حالت روشن' : 'حالت تیره'}</span>
+        </button>
       </div>
 
-      {steps && steps.length > 0 && (
-        <Card variant="quiet" className="mt-16">
-          <ol className="steps">
-            {steps.map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ol>
-        </Card>
-      )}
+      <div className="auth-card">
+        <div className="auth-hero">
+          <div className="auth-logo-frame">
+            <Brand size="lg" />
+          </div>
+          <div className="auth-wordmark">
+            <span className="auth-wordmark__hums">هامز</span>
+            <span className="auth-wordmark__yar">یار</span>
+          </div>
+          <div className="gate-badge-wrap">
+            <DsBadge tone={tone === 'danger' ? 'danger' : 'warning'}>
+              <Icon name={icon} size={14} />
+              <span>{eyebrow}</span>
+            </DsBadge>
+          </div>
+          <h1 className="auth-title">{title}</h1>
+          <p className="auth-subtitle">{body}</p>
+        </div>
 
-      <div className="auth__form">
-        <Button block onClick={() => void refresh()}>
-          بررسی دوبارهٔ وضعیت
-        </Button>
-        {support ? (
-          <a className="btn btn--ghost btn--block" href={support} target="_blank" rel="noreferrer">
-            <Icon name="i-chat" size={18} />
-            گفتگو با پشتیبانی در تلگرام
-          </a>
-        ) : (
-          <p className="tiny" style={{ textAlign: 'center' }}>
-            برای پیگیری، از همان ربات هامزیار در تلگرام پیام بده.
-          </p>
+        {steps && steps.length > 0 && (
+          <DsCard level="sunken" className="gate-steps-card">
+            <ol className="gate-steps">
+              {steps.map((s, idx) => (
+                <li key={s}>
+                  <span className="gate-step-num" aria-hidden="true">
+                    {['۱', '۲', '۳', '۴'][idx] || idx + 1}
+                  </span>
+                  <span className="gate-step-text">{s}</span>
+                </li>
+              ))}
+            </ol>
+          </DsCard>
         )}
-        <button type="button" className="linkbtn" onClick={() => void signOut()}>
-          خروج از حساب
-        </button>
+
+        <div className="gate-actions">
+          <DsButton block size="lg" onClick={() => void refresh()}>
+            <Icon name="i-refresh" size={18} />
+            <span>بررسی دوبارهٔ وضعیت</span>
+          </DsButton>
+
+          {support ? (
+            <a className="ds-btn ds-btn--ghost ds-btn--block" href={support} target="_blank" rel="noreferrer">
+              <Icon name="i-chat" size={18} />
+              <span>گفتگو با پشتیبانی در تلگرام</span>
+            </a>
+          ) : (
+            <p className="auth-support-note">
+              برای پیگیری، از همان ربات هامزیار در تلگرام پیام دهید.
+            </p>
+          )}
+
+          <DsButton variant="ghost" block onClick={() => void signOut()}>
+            <Icon name="i-logout" size={18} />
+            <span>خروج از حساب</span>
+          </DsButton>
+        </div>
       </div>
     </div>
   );
@@ -75,12 +113,12 @@ export function PendingScreen() {
     <StopPage
       icon="i-clock"
       eyebrow="در انتظار تأیید"
-      title="حسابت هنوز تأیید نشده"
-      body="ثبت‌نام تو انجام شده، ولی دسترسی به محتوا بعد از تأیید باز می‌شود. این کار از ربات هامزیار انجام می‌شود و معمولاً چند ساعت طول می‌کشد."
+      title="حساب شما هنوز تأیید نشده است"
+      body="ثبت‌نام انجام شده، ولی دسترسی به محتوا پس از تأیید باز می‌شود. این کار در ربات هامزیار انجام می‌شود و معمولا چند ساعت طول می‌کشد."
       steps={[
-        'در ربات هامزیار، مشخصات خودت را کامل کن.',
-        'اگر شمارهٔ دانشجویی خواسته شده، واردش کن.',
-        'بعد از تأیید، همین صفحه را دوباره بررسی کن.',
+        'در ربات هامزیار، مشخصات خود را کامل کنید.',
+        'اگر شمارهٔ دانشجویی خواسته شده، آن را وارد کنید.',
+        'پس از تأیید، همین صفحه را دوباره بررسی کنید.',
       ]}
       tone="warn"
     />
@@ -91,12 +129,12 @@ export function BlockedScreen() {
   return (
     <StopPage
       icon="i-lock"
-      eyebrow="دسترسی بسته"
-      title="دسترسی این حساب موقتاً متوقف شده"
-      body="ورود تو درست بود، اما دسترسی به محتوا برای این حساب بسته است. اگر فکر می‌کنی اشتباهی رخ داده، از مسیر پشتیبانی پیگیری کن."
+      eyebrow="دسترسی محدود"
+      title="دسترسی این حساب به طور موقت متوقف شده است"
+      body="ورود شما معتبر بود، اما دسترسی به محتوا برای این حساب بسته است. در صورت نیاز می‌توانید از مسیر پشتیبانی پیگیری کنید."
       steps={[
-        'اگر اشتراکت تازه تمام شده، بعد از تمدید دسترسی خودکار برمی‌گردد.',
-        'برای بررسی، کد حساب خودت را به پشتیبانی بده.',
+        'اگر اشتراک شما تازه به پایان رسیده، پس از تمدید دسترسی خودکار بازمی‌گردد.',
+        'برای بررسی وضعیت حساب، کد کاربری خود را به پشتیبانی اعلام کنید.',
       ]}
       tone="danger"
     />
@@ -105,14 +143,15 @@ export function BlockedScreen() {
 
 export function CircularSpinner({ size = 48 }: { size?: number }) {
   return (
-    <div className="hym-circular-spinner-wrap" aria-hidden="true">
+    <div className="auth-spinner-wrap" aria-hidden="true">
       <svg
-        className="hym-circular-spinner"
+        className="auth-spinner"
+        width={size}
+        height={size}
         viewBox="0 0 50 50"
-        style={{ width: size, height: size }}
       >
         <circle
-          className="hym-circular-track"
+          className="auth-spinner__track"
           cx="25"
           cy="25"
           r="20"
@@ -120,7 +159,7 @@ export function CircularSpinner({ size = 48 }: { size?: number }) {
           strokeWidth="3.5"
         />
         <circle
-          className="hym-circular-arc"
+          className="auth-spinner__arc"
           cx="25"
           cy="25"
           r="20"
@@ -129,40 +168,33 @@ export function CircularSpinner({ size = 48 }: { size?: number }) {
           strokeLinecap="round"
         />
       </svg>
-      <div className="hym-circular-core-glow" />
     </div>
   );
 }
 
 export function SplashScreen() {
   return (
-    <div className="login-universe-wrap" aria-busy="true">
-      <div className="login-ambient-glow login-ambient-glow--cyan" aria-hidden="true" />
-      <div className="login-ambient-glow login-ambient-glow--blue" aria-hidden="true" />
-      <div className="login-grid-overlay" aria-hidden="true" />
-
-      <div className="login-stellar-card text-center" style={{ maxWidth: 420, padding: '44px 28px' }}>
-        <div className="login-brand-hero text-center">
-          <div className="login-logo-glow-halo">
-            <Brand size="xl" />
+    <div className="auth-screen" aria-busy="true">
+      <div className="auth-card auth-card--compact">
+        <div className="auth-hero">
+          <div className="auth-logo-frame">
+            <Brand size="lg" />
           </div>
-          <div className="brand-wordmark mt-12">
-            <span className="hums">هامز</span>
-            <span className="yar">یار</span>
+          <div className="auth-wordmark">
+            <span className="auth-wordmark__hums">هامز</span>
+            <span className="auth-wordmark__yar">یار</span>
           </div>
-          <div className="login-medical-badge mt-8">
-            <span className="login-badge-dot" />
-            <span>سامانهٔ یکپارچه آموزش بالینی و یادگیری پزشکی</span>
+          <div className="auth-pill">
+            <span className="auth-pill__dot" aria-hidden="true" />
+            <span>دستیار هوشمند دانشجوی پزشکی</span>
           </div>
         </div>
 
-        <div className="mt-28 mb-16" style={{ display: 'flex', justifyContent: 'center' }}>
+        <div className="auth-spinner-wrap">
           <CircularSpinner size={52} />
         </div>
 
-        <p className="body mt-12" style={{ color: 'var(--ink-2, #94a3b8)', fontSize: '14px', fontWeight: 600 }}>
-          در حال بررسی و اتصال به سامانه…
-        </p>
+        <p className="auth-splash-status">در حال بررسی و اتصال به سامانه…</p>
       </div>
     </div>
   );

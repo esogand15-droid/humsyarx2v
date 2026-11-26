@@ -1,16 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import './auth.css';
 import { Brand } from '../components/Brand';
+import { DsButton, DsSegmented } from '../design/components';
+import { Icon } from '../icons';
+import { useTheme } from '../lib/theme';
 
 export type PlatformType = 'ios' | 'android' | 'desktop';
 
+const PLATFORM_LABELS: Record<PlatformType, string> = {
+  ios: 'آیفون',
+  android: 'اندروید',
+  desktop: 'کامپیوتر',
+};
+
+const PLATFORM_OPTIONS: ReadonlyArray<{ value: PlatformType; label: string }> = [
+  { value: 'ios', label: 'آیفون' },
+  { value: 'android', label: 'اندروید' },
+  { value: 'desktop', label: 'کامپیوتر' },
+];
+
 /**
- * تشخیص خودکار سیستم‌عامل کاربر (iOS, Android, Desktop)
+ * تشخیص خودکار سیستم‌عامل کاربر (آیفون، اندروید، کامپیوتر)
  */
 export function detectPlatform(): PlatformType {
   if (typeof window === 'undefined') return 'desktop';
   const ua = navigator.userAgent || '';
-  const platform = (navigator as unknown as { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || '';
+  const platform =
+    (navigator as unknown as { userAgentData?: { platform?: string } }).userAgentData?.platform ||
+    navigator.platform ||
+    '';
 
   if (/iPad|iPhone|iPod/.test(ua) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
     return 'ios';
@@ -22,13 +42,18 @@ export function detectPlatform(): PlatformType {
 }
 
 /**
- * بررسی اینکه آیا کاربر در حالت Standalone (نصب‌شده) است یا خیر
+ * بررسی اینکه آیا کاربر در حالت نصب‌شده (Standalone) است یا خیر
  */
 export function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;
   const mm = window.matchMedia('(display-mode: standalone)').matches;
   const standalone = (window.navigator as unknown as { standalone?: boolean }).standalone;
   return mm || standalone === true;
+}
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
 interface InstallGuideScreenProps {
@@ -38,16 +63,17 @@ interface InstallGuideScreenProps {
 
 export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScreenProps) {
   const navigate = useNavigate();
+  const { resolved, setMode } = useTheme();
   const [detected] = useState<PlatformType>(() => detectPlatform());
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>(detected);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState<boolean>(() => isStandalone());
   const [copied, setCopied] = useState<boolean>(false);
 
   useEffect(() => {
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
     const handleInstalled = () => {
       setInstalled(true);
@@ -72,7 +98,7 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
         setInstalled(true);
       }
     } catch {
-      // Ignored
+      // نادیده گرفته می‌شود
     } finally {
       setDeferredPrompt(null);
     }
@@ -81,11 +107,13 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
   const handleShareLink = () => {
     const url = window.location.origin + '/student/';
     if (navigator.share) {
-      navigator.share({
-        title: 'هامزیار — دستیار دانشجوی پزشکی',
-        text: 'وب‌اپلیکیشن تخصصی آموزش و یادگیری پزشکی هامزیار',
-        url,
-      }).catch(() => {});
+      navigator
+        .share({
+          title: 'هامزیار — دستیار دانشجوی پزشکی',
+          text: 'نسخهٔ وب تخصصی آموزش و یادگیری پزشکی هامزیار',
+          url,
+        })
+        .catch(() => {});
     } else if (navigator.clipboard) {
       navigator.clipboard.writeText(url);
       setCopied(true);
@@ -102,77 +130,66 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
   };
 
   return (
-    <div className={`pwa-guide-container ${isModal ? 'pwa-guide-container--modal' : ''}`}>
-      {/* هاله‌های نوری شناور تم تیره‌بالینی */}
-      <div className="login-ambient-glow login-ambient-glow--cyan" aria-hidden="true" />
-      <div className="login-ambient-glow login-ambient-glow--blue" aria-hidden="true" />
-      <div className="login-grid-overlay" aria-hidden="true" />
+    <div className={`auth-screen ${isModal ? 'auth-screen--modal' : ''}`}>
+      <div className="auth-topbar">
+        <button
+          type="button"
+          className="auth-topbar-btn"
+          onClick={handleCloseOrContinue}
+        >
+          <Icon name="i-chevron-r" size={16} />
+          <span>{onClose ? 'بستن' : 'ورود به حساب'}</span>
+        </button>
 
-      <div className="pwa-guide-card">
-        {/* هدر مشابه روبیکا با نماد اختصاصی هامزیار */}
-        <div className="pwa-guide-hero">
-          <div className="pwa-brand-wrapper">
-            <Brand size="xl" />
+        <button
+          type="button"
+          className="auth-topbar-btn auth-theme-btn"
+          onClick={() => setMode(resolved === 'dark' ? 'light' : 'dark')}
+          aria-label={resolved === 'dark' ? 'تغییر به حالت روشن' : 'تغییر به حالت تیره'}
+        >
+          <Icon name={resolved === 'dark' ? 'i-sun' : 'i-moon'} size={16} />
+          <span>{resolved === 'dark' ? 'حالت روشن' : 'حالت تیره'}</span>
+        </button>
+      </div>
+
+      <div className="auth-card">
+        <div className="auth-hero">
+          <div className="auth-logo-frame">
+            <Brand size="lg" />
           </div>
-
-          <h1 className="pwa-guide-title">
-            جهت نصب وب‌اپلیکیشن هامزیار مراحل زیر را انجام دهید
-          </h1>
-          <p className="pwa-guide-subtitle">
-            نسخهٔ وب پیش‌رونده (PWA) بدون نیاز به استور، با سرعت بالا و دسترسی به تمام امکانات روی گوشی و کامپیوتر شما نصب می‌شود.
+          <div className="auth-wordmark">
+            <span className="auth-wordmark__hums">هامز</span>
+            <span className="auth-wordmark__yar">یار</span>
+          </div>
+          <h1 className="auth-title">نصب نسخهٔ وب هامزیار روی دستگاه</h1>
+          <p className="auth-subtitle">
+            بدون نیاز به اپ‌استور یا فروشگاه برنامه، هامزیار را با سرعت بالا و آیکون مستقل روی گوشی یا کامپیوتر خود نصب کنید.
           </p>
-
-          {/* تب‌های انتخاب پلتفرم با نشان‌گر سیستم کاربر */}
-          <div className="pwa-tabs-wrapper" role="tablist" aria-label="انتخاب سیستم‌عامل">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selectedPlatform === 'ios'}
-              className={`pwa-tab-item ${selectedPlatform === 'ios' ? 'pwa-tab-item--active' : ''}`}
-              onClick={() => setSelectedPlatform('ios')}
-            >
-              <span className="pwa-tab-icon">🍏</span>
-              <span>آیفون (iOS)</span>
-              {detected === 'ios' && <span className="pwa-detected-badge">دستگاه شما</span>}
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selectedPlatform === 'android'}
-              className={`pwa-tab-item ${selectedPlatform === 'android' ? 'pwa-tab-item--active' : ''}`}
-              onClick={() => setSelectedPlatform('android')}
-            >
-              <span className="pwa-tab-icon">🤖</span>
-              <span>اندروید</span>
-              {detected === 'android' && <span className="pwa-detected-badge">دستگاه شما</span>}
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selectedPlatform === 'desktop'}
-              className={`pwa-tab-item ${selectedPlatform === 'desktop' ? 'pwa-tab-item--active' : ''}`}
-              onClick={() => setSelectedPlatform('desktop')}
-            >
-              <span className="pwa-tab-icon">💻</span>
-              <span>ویندوز و مک</span>
-              {detected === 'desktop' && <span className="pwa-detected-badge">دستگاه شما</span>}
-            </button>
-          </div>
         </div>
 
-        {/* مراحل گام‌به‌گام بر اساس پلتفرم انتخاب شده */}
+        <div className="pwa-seg">
+          <DsSegmented
+            value={selectedPlatform}
+            options={PLATFORM_OPTIONS}
+            onChange={setSelectedPlatform}
+            block
+            label="انتخاب دستگاه"
+          />
+          <p className="pwa-detected-caption">
+            دستگاه فعلی شما: <strong>{PLATFORM_LABELS[detected]}</strong>
+          </p>
+        </div>
+
         <div className="pwa-steps-content">
           {selectedPlatform === 'ios' && (
-            <div className="pwa-steps-list">
+            <div className="pwa-steps-list" role="tabpanel">
               <div className="pwa-step-row">
                 <div className="pwa-step-num">۱</div>
                 <div className="pwa-step-desc">
-                  در نوار پایین مرورگر Safari روی دکمه <strong>Share</strong> (اشتراک‌گذاری) بزنید
+                  در نوار پایین مرورگر Safari روی دکمهٔ <strong>Share</strong> (اشتراک‌گذاری) بزنید
                 </div>
-                <div className="pwa-step-visual pwa-step-visual--ios-share" title="دکمه Share">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#007AFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <div className="pwa-step-visual" title="دکمه Share">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
                     <polyline points="16 6 12 2 8 6" />
                     <line x1="12" y1="2" x2="12" y2="15" />
@@ -183,10 +200,10 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
               <div className="pwa-step-row">
                 <div className="pwa-step-num">۲</div>
                 <div className="pwa-step-desc">
-                  در منوی بازشده، به سمت پایین بیایید و گزینهٔ <strong>Add to Home Screen</strong> را انتخاب کنید
+                  در منوی بازشده به پایین بروید و گزینهٔ <strong>Add to Home Screen</strong> را انتخاب کنید
                 </div>
-                <div className="pwa-step-visual pwa-step-visual--ios-add" title="Add to Home Screen">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.2">
+                <div className="pwa-step-visual" title="Add to Home Screen">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <rect x="3" y="3" width="18" height="18" rx="4" />
                     <line x1="12" y1="8" x2="12" y2="16" />
                     <line x1="8" y1="12" x2="16" y2="12" />
@@ -197,43 +214,41 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
               <div className="pwa-step-row">
                 <div className="pwa-step-num">۳</div>
                 <div className="pwa-step-desc">
-                  در مرحله بعد در بالای صفحه سمت راست، روی <strong>Add</strong> بزنید
+                  در بالای صفحه روی دکمهٔ <strong>Add</strong> بزنید تا آیکون هامزیار روی صفحهٔ اصلی قرار گیرد
                 </div>
-                <div className="pwa-step-visual pwa-step-visual--text-badge">
+                <div className="pwa-step-visual pwa-step-visual--badge">
                   <span>Add</span>
                 </div>
               </div>
 
               <div className="pwa-tip-box">
-                <span className="pwa-tip-icon">ℹ️</span>
-                <span><strong>توجه مهم:</strong> برای نصب روی آیفون، حتماً صفحه را در مرورگر اصلی <strong>Safari</strong> باز کرده باشید.</span>
+                <Icon name="i-info" size={18} />
+                <span>
+                  این صفحه را حتما با مرورگر Safari باز کنید تا گزینهٔ افزودن به صفحهٔ اصلی نمایش داده شود.
+                </span>
               </div>
             </div>
           )}
 
           {selectedPlatform === 'android' && (
-            <div className="pwa-steps-list">
+            <div className="pwa-steps-list" role="tabpanel">
               {deferredPrompt && (
                 <div className="pwa-direct-install-box">
-                  <button
-                    type="button"
-                    className="pwa-direct-btn"
-                    onClick={handleDirectInstall}
-                  >
-                    <span className="pwa-direct-btn__icon">📲</span>
+                  <DsButton block size="lg" onClick={handleDirectInstall}>
+                    <Icon name="i-download" size={18} />
                     <span>نصب فوری اپلیکیشن با یک کلیک</span>
-                  </button>
-                  <span className="pwa-direct-hint">یا از مراحل سه‌گانه زیر استفاده نمایید:</span>
+                  </DsButton>
+                  <span className="pwa-direct-hint">یا از مراحل سه‌گانهٔ زیر استفاده کنید:</span>
                 </div>
               )}
 
               <div className="pwa-step-row">
                 <div className="pwa-step-num">۱</div>
                 <div className="pwa-step-desc">
-                  در بالای مرورگر کروم، روی دکمه منوی <strong>سه‌نقطه (⋮)</strong> بزنید
+                  در بالای مرورگر کروم، روی دکمهٔ منوی <strong>سه‌نقطه (⋮)</strong> بزنید
                 </div>
                 <div className="pwa-step-visual" title="منوی مرورگر">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="#38BDF8">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
                     <circle cx="12" cy="5" r="2.2" />
                     <circle cx="12" cy="12" r="2.2" />
                     <circle cx="12" cy="19" r="2.2" />
@@ -244,115 +259,104 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
               <div className="pwa-step-row">
                 <div className="pwa-step-num">۲</div>
                 <div className="pwa-step-desc">
-                  در منوی بازشده گزینه <strong>«نصب برنامه» (Install app)</strong> یا <strong>«افزودن به صفحه اصلی»</strong> را انتخاب کنید
+                  گزینهٔ <strong>«نصب برنامه» (Install app)</strong> یا <strong>«افزودن به صفحهٔ اصلی»</strong> را انتخاب کنید
                 </div>
-                <div className="pwa-step-visual" title="نصب یا افزودن">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
+                <div className="pwa-step-visual" title="نصب برنامه">
+                  <Icon name="i-download" size={22} />
                 </div>
               </div>
 
               <div className="pwa-step-row">
                 <div className="pwa-step-num">۳</div>
                 <div className="pwa-step-desc">
-                  در پنجره کوچک بازشده روی دکمه <strong>«نصب» (Install)</strong> بزنید تا آیکون هامزیار به برنامه‌های گوشی اضافه شود
+                  در پنجرهٔ تایید روی <strong>«نصب» (Install)</strong> بزنید تا آیکون هامزیار به گوشی اضافه شود
                 </div>
-                <div className="pwa-step-visual pwa-step-visual--text-badge pwa-step-visual--cyan">
+                <div className="pwa-step-visual pwa-step-visual--badge">
                   <span>نصب</span>
                 </div>
               </div>
 
               <div className="pwa-tip-box">
-                <span className="pwa-tip-icon">💡</span>
-                <span>پس از نصب، هامزیار بدون باز کردن مرورگر و با آیکون اختصاصی مستقل مثل یک برنامه اندرویدی باز می‌شود.</span>
+                <Icon name="i-info" size={18} />
+                <span>
+                  پس از نصب، هامزیار با آیکون مستقل و بدون نوارهای مرورگر مثل یک برنامهٔ بومی اجرا می‌شود.
+                </span>
               </div>
             </div>
           )}
 
           {selectedPlatform === 'desktop' && (
-            <div className="pwa-steps-list">
+            <div className="pwa-steps-list" role="tabpanel">
               {deferredPrompt && (
                 <div className="pwa-direct-install-box">
-                  <button
-                    type="button"
-                    className="pwa-direct-btn"
-                    onClick={handleDirectInstall}
-                  >
-                    <span className="pwa-direct-btn__icon">💻</span>
-                    <span>نصب فوری روی ویندوز / مک با ۱ کلیک</span>
-                  </button>
-                  <span className="pwa-direct-hint">یا از روش نوار آدرس مرورگر اقدام کنید:</span>
+                  <DsButton block size="lg" onClick={handleDirectInstall}>
+                    <Icon name="i-download" size={18} />
+                    <span>نصب فوری روی ویندوز و مک با یک کلیک</span>
+                  </DsButton>
+                  <span className="pwa-direct-hint">یا از نوار آدرس مرورگر اقدام کنید:</span>
                 </div>
               )}
 
               <div className="pwa-step-row">
                 <div className="pwa-step-num">۱</div>
                 <div className="pwa-step-desc">
-                  در انتهای سمت راست نوار آدرس مرورگر (کنار ستاره بوک‌مارک)، روی <strong>آیکون نصب (کامپیوتر کوچک با علامت دانلود)</strong> کلیک کنید
+                  در انتهای نوار آدرس مرورگر، روی <strong>آیکون نصب</strong> (نمایشگر همراه با فلش دانلود) کلیک کنید
                 </div>
                 <div className="pwa-step-visual" title="آیکون نصب دسکتاپ">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="3" width="20" height="14" rx="2" />
-                    <line x1="8" y1="21" x2="16" y2="21" />
-                    <line x1="12" y1="17" x2="12" y2="21" />
-                    <polyline points="9 10 12 13 15 10" />
-                    <line x1="12" y1="6" x2="12" y2="13" />
-                  </svg>
+                  <Icon name="i-download" size={22} />
                 </div>
               </div>
 
               <div className="pwa-step-row">
                 <div className="pwa-step-num">۲</div>
                 <div className="pwa-step-desc">
-                  یا از منوی سه‌نقطه (⋮) مرورگر، گزینه <strong>«Install Humsyar»</strong> یا <strong>«نصب هامزیار»</strong> را انتخاب کنید
+                  یا از منوی سه‌نقطهٔ مرورگر، گزینهٔ <strong>«Install Humsyar»</strong> یا <strong>«نصب هامزیار»</strong> را برگزینید
                 </div>
-                <div className="pwa-step-visual" title="گزینه نصب">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
+                <div className="pwa-step-visual" title="منوی نصب">
+                  <Icon name="i-plus" size={22} />
                 </div>
               </div>
 
               <div className="pwa-step-row">
                 <div className="pwa-step-num">۳</div>
                 <div className="pwa-step-desc">
-                  در پنجره تایید، دکمه <strong>Install</strong> را بزنید تا برنامه با پنجره اختصاصی و آیکون روی دسکتاپ نصب شود
+                  در پنجرهٔ تایید روی <strong>Install</strong> بزنید تا برنامه با پنجرهٔ اختصاصی روی دسکتاپ نصب شود
                 </div>
-                <div className="pwa-step-visual pwa-step-visual--text-badge pwa-step-visual--cyan">
+                <div className="pwa-step-visual pwa-step-visual--badge">
                   <span>Install</span>
                 </div>
               </div>
 
               <div className="pwa-tip-box">
-                <span className="pwa-tip-icon">✨</span>
-                <span>در ویندوز، نسخه وب با کلید میانبر و بدون منوهای اضافه مرورگر، فوق‌العاده سبک و پرسرعت اجرا می‌شود.</span>
+                <Icon name="i-info" size={18} />
+                <span>
+                  در ویندوز و مک، نسخهٔ وب با پنجرهٔ مجزا و بدون شلوغی تب‌های مرورگر، سبک و سریع اجرا می‌شود.
+                </span>
               </div>
             </div>
           )}
         </div>
 
-        {/* دکمه‌های اقدام و بستن/ورود */}
         <div className="pwa-actions-footer">
-          <button
+          <DsButton
             type="button"
-            className="pwa-footer-btn pwa-footer-btn--primary"
+            block
+            size="lg"
             onClick={handleCloseOrContinue}
           >
-            {installed ? 'باز کردن وب‌اپلیکیشن' : 'متوجه شدم / ورود به وب‌اپ'}
-          </button>
+            <span>{installed ? 'باز کردن وب‌اپلیکیشن' : 'متوجه شدم / ورود به وب‌اپ'}</span>
+            <Icon name="i-chevron" size={18} />
+          </DsButton>
 
-          <button
+          <DsButton
             type="button"
-            className="pwa-footer-btn pwa-footer-btn--ghost"
+            variant="ghost"
+            block
             onClick={handleShareLink}
           >
-            {copied ? '✅ لینک کپی شد' : '🔗 اشتراک‌گذاری آدرس با دوستان'}
-          </button>
+            <Icon name={copied ? 'i-check' : 'i-copy'} size={18} />
+            <span>{copied ? 'نشانی کپی شد' : 'اشتراک‌گذاری نشانی با دوستان'}</span>
+          </DsButton>
         </div>
       </div>
     </div>

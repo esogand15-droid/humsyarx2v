@@ -1,16 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   🏠 لندینگ هامزیار — استایلِ مخصوص صفحهٔ ریشه (/)
-   منبع تصمیم‌ها: Skill «UI/UX Pro Max» & «frontend-design»
-   • سبک : Modern Clinical Deep Navy + Radiant Blue/Cyan Glow
-   • الگو : Trust & Authority + Conversion + Medical Focus
-   • انیمیشن‌ها: شناوری آرام، پالس هاله درخشان، درخشش کارت‌ها هنگام هاور
-   • دسترس‌پذیری: WCAG 2.1 AA، پشتیبانی کامل از prefers-reduced-motion
-   • واکنش‌گرایی: سازگاری ۱۰۰٪ با موبایل (<640px)، تبلت، و دسکتاپ (بدون اسکرول افقی)
+   لندینگ هامزیار — استایل صفحهٔ ریشه (/)
+   • پشتیبانی کامل از تم تاریک (Obsidian #090D16) و تم روشن (Slate #F8FAFC)
+   • چیدمان بدون اسکرول افقی در موبایل (۳۶۰–۴۳۰px)، تبلت و دسکتاپ
+   • دسترسی‌پذیری WCAG AA و احترام به prefers-reduced-motion
    ═══════════════════════════════════════════════════════════════════════ */
 
 @import '../styles/tokens.css';
 
-/* ── فونت خودمیزبان (فایل‌های محلی وب‌سرور؛ عدم وابستگی به اینترنت بین‌الملل) ── */
+/* ── فونت خودمیزبان ── */
 @font-face {
   font-family: 'Vazirmatn';
   src: url('/fonts/vazirmatn-arabic.woff2') format('woff2');
@@ -26,18 +23,271 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2074, U+20AC, U+2122;
 }
 
+/* ── متغیرهای پیش‌فرض: تم تاریک (Obsidian) ── */
 :root {
   --lp-wrap: 1140px;
-  --lp-gutter: 20px;
+  --lp-gutter: 16px;
   --lp-radius: 18px;
   --lp-ease: cubic-bezier(.22, .61, .36, 1);
-  --lp-ink: var(--hym-text-primary);
-  --lp-ink-2: var(--hym-text-secondary);
-  --lp-line: var(--hym-border-default);
-  --lp-surface: var(--hym-bg-surface);
-  --lp-surface-2: var(--hym-bg-surface-raised);
-  --lp-brand: var(--hym-brand-default);
-  --lp-accent: var(--hym-accent-default);
+
+  --lp-bg: #090D16;
+  --lp-bg-alt: #0D1322;
+  --lp-surface: #0F172A;
+  --lp-surface-2: #162036;
+  --lp-surface-sunken: #070B13;
+
+  --lp-ink: #F8FAFC;
+  --lp-ink-2: #CBD5E1;
+  --lp-ink-muted: #94A3B8;
+
+  --lp-line: rgba(148, 163, 184, 0.16);
+  --lp-line-strong: rgba(148, 163, 184, 0.30);
+
+  --lp-header-bg: rgba(9, 13, 22, 0.88);
+  --lp-footer-bg: #060911;
+
+  --lp-brand: #2563EB;
+  --lp-brand-hover: #3B82F6;
+  --lp-brand-active: #1D4ED8;
+  --lp-on-brand: #FFFFFF;
+  --lp-hero-accent: #38BDF8;
+
+  --lp-header-cta-bg: rgba(37, 99, 235, 0.14);
+  --lp-header-cta-border: rgba(96, 165, 250, 0.35);
+  --lp-header-cta-fg: #93C5FD;
+
+  --lp-ghost-bg: rgba(255, 255, 255, 0.05);
+  --lp-ghost-hover-bg: rgba(56, 189, 248, 0.12);
+  --lp-ghost-hover-border: rgba(56, 189, 248, 0.45);
+
+  --lp-card-shadow: 0 4px 18px rgba(0, 0, 0, 0.32);
+  --lp-panel-shadow: 0 20px 56px rgba(0, 0, 0, 0.48);
+
+  --lp-grid-line: rgba(255, 255, 255, 0.03);
+  --lp-glow-a: rgba(14, 165, 233, 0.16);
+  --lp-glow-b: rgba(37, 99, 235, 0.18);
+
+  --lp-pill-glow-bg: rgba(14, 165, 233, 0.14);
+  --lp-pill-glow-border: rgba(56, 189, 248, 0.35);
+  --lp-pill-glow-fg: #7DD3FC;
+
+  --lp-badge-bg: rgba(15, 23, 42, 0.92);
+  --lp-badge-border: rgba(56, 189, 248, 0.35);
+  --lp-badge-fg: #F1F5F9;
+
+  --lp-emblem-bg: linear-gradient(135deg, rgba(56, 189, 248, 0.32), rgba(37, 99, 235, 0.22), rgba(15, 23, 42, 0.96));
+  --lp-emblem-border: rgba(56, 189, 248, 0.28);
+  --lp-emblem-shadow: 0 22px 52px rgba(0, 0, 0, 0.65), 0 0 36px rgba(14, 165, 233, 0.22);
+
+  --lp-ok-fg: #34D399;
+  --lp-ok-bg: rgba(16, 185, 129, 0.16);
+  --lp-ok-border: rgba(16, 185, 129, 0.32);
+
+  --lp-warn-fg: #FBBF24;
+  --lp-danger-fg: #F87171;
+
+  --lp-tone-fg: #7DD3FC;
+  --lp-tone-bg: rgba(14, 165, 233, 0.15);
+  --lp-tone-border: rgba(56, 189, 248, 0.32);
+
+  --lp-final-bg: radial-gradient(600px 240px at 50% 0%, rgba(37, 99, 235, 0.22), transparent 70%), var(--lp-surface);
+}
+
+/* ── تم روشن (Slate + Multi-accent Medical Depth) ── */
+html[data-theme="light"] {
+  --lp-bg: #F8FAFC;
+  --lp-bg-alt: #F1F5F9;
+  --lp-surface: #FFFFFF;
+  --lp-surface-2: #FFFFFF;
+  --lp-surface-sunken: #F1F5F9;
+
+  --lp-ink: #0F172A;
+  --lp-ink-2: #334155;
+  --lp-ink-muted: #526075;
+
+  --lp-line: rgba(15, 23, 42, 0.09);
+  --lp-line-strong: rgba(15, 23, 42, 0.18);
+
+  --lp-header-bg: rgba(255, 255, 255, 0.90);
+  --lp-footer-bg: #F1F5F9;
+
+  --lp-brand: #2563EB;
+  --lp-brand-hover: #1D4ED8;
+  --lp-brand-active: #1E40AF;
+  --lp-on-brand: #FFFFFF;
+  --lp-hero-accent: #1D4ED8;
+
+  --lp-header-cta-bg: #EFF6FF;
+  --lp-header-cta-border: #BFDBFE;
+  --lp-header-cta-fg: #1D4ED8;
+
+  --lp-ghost-bg: #FFFFFF;
+  --lp-ghost-hover-bg: #EFF6FF;
+  --lp-ghost-hover-border: #93C5FD;
+
+  --lp-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 6px 18px -4px rgba(15, 23, 42, 0.08);
+  --lp-panel-shadow: 0 4px 12px rgba(15, 23, 42, 0.05), 0 18px 40px -12px rgba(15, 23, 42, 0.10);
+
+  --lp-grid-line: rgba(15, 23, 42, 0.035);
+  --lp-glow-a: rgba(37, 99, 235, 0.08);
+  --lp-glow-b: rgba(14, 165, 233, 0.08);
+
+  --lp-pill-glow-bg: #EFF6FF;
+  --lp-pill-glow-border: #BFDBFE;
+  --lp-pill-glow-fg: #1D4ED8;
+
+  --lp-badge-bg: rgba(255, 255, 255, 0.96);
+  --lp-badge-border: rgba(15, 23, 42, 0.12);
+  --lp-badge-fg: #0F172A;
+
+  --lp-emblem-bg: linear-gradient(145deg, #EFF6FF, #FFFFFF);
+  --lp-emblem-border: rgba(37, 99, 235, 0.22);
+  --lp-emblem-shadow: 0 14px 36px -8px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(37, 99, 235, 0.10);
+
+  --lp-ok-fg: #047857;
+  --lp-ok-bg: #ECFDF5;
+  --lp-ok-border: #A7F3D0;
+
+  --lp-warn-fg: #B45309;
+  --lp-danger-fg: #BE123C;
+
+  --lp-tone-fg: #0369A1;
+  --lp-tone-bg: #E0F2FE;
+  --lp-tone-border: #BAE6FD;
+
+  --lp-final-bg: radial-gradient(600px 240px at 50% 0%, rgba(37, 99, 235, 0.09), transparent 70%), #FFFFFF;
+}
+
+@media (prefers-color-scheme: light) {
+  html:not([data-theme="dark"]) {
+    --lp-bg: #F8FAFC;
+    --lp-bg-alt: #F1F5F9;
+    --lp-surface: #FFFFFF;
+    --lp-surface-2: #FFFFFF;
+    --lp-surface-sunken: #F1F5F9;
+    --lp-ink: #0F172A;
+    --lp-ink-2: #334155;
+    --lp-ink-muted: #526075;
+    --lp-line: rgba(15, 23, 42, 0.09);
+    --lp-line-strong: rgba(15, 23, 42, 0.18);
+    --lp-header-bg: rgba(255, 255, 255, 0.90);
+    --lp-footer-bg: #F1F5F9;
+    --lp-brand: #2563EB;
+    --lp-brand-hover: #1D4ED8;
+    --lp-brand-active: #1E40AF;
+    --lp-on-brand: #FFFFFF;
+    --lp-hero-accent: #1D4ED8;
+    --lp-header-cta-bg: #EFF6FF;
+    --lp-header-cta-border: #BFDBFE;
+    --lp-header-cta-fg: #1D4ED8;
+    --lp-ghost-bg: #FFFFFF;
+    --lp-ghost-hover-bg: #EFF6FF;
+    --lp-ghost-hover-border: #93C5FD;
+    --lp-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 6px 18px -4px rgba(15, 23, 42, 0.08);
+    --lp-panel-shadow: 0 4px 12px rgba(15, 23, 42, 0.05), 0 18px 40px -12px rgba(15, 23, 42, 0.10);
+    --lp-grid-line: rgba(15, 23, 42, 0.035);
+    --lp-glow-a: rgba(37, 99, 235, 0.08);
+    --lp-glow-b: rgba(14, 165, 233, 0.08);
+    --lp-pill-glow-bg: #EFF6FF;
+    --lp-pill-glow-border: #BFDBFE;
+    --lp-pill-glow-fg: #1D4ED8;
+    --lp-badge-bg: rgba(255, 255, 255, 0.96);
+    --lp-badge-border: rgba(15, 23, 42, 0.12);
+    --lp-badge-fg: #0F172A;
+    --lp-emblem-bg: linear-gradient(145deg, #EFF6FF, #FFFFFF);
+    --lp-emblem-border: rgba(37, 99, 235, 0.22);
+    --lp-emblem-shadow: 0 14px 36px -8px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(37, 99, 235, 0.10);
+    --lp-ok-fg: #047857;
+    --lp-ok-bg: #ECFDF5;
+    --lp-ok-border: #A7F3D0;
+    --lp-warn-fg: #B45309;
+    --lp-danger-fg: #BE123C;
+    --lp-tone-fg: #0369A1;
+    --lp-tone-bg: #E0F2FE;
+    --lp-tone-border: #BAE6FD;
+    --lp-final-bg: radial-gradient(600px 240px at 50% 0%, rgba(37, 99, 235, 0.09), transparent 70%), #FFFFFF;
+  }
+}
+
+/* ── نقش‌های رنگی چندلایه پزشکی ── */
+.lp-tone--sky {
+  --lp-tone-fg: #7DD3FC;
+  --lp-tone-bg: rgba(14, 165, 233, 0.15);
+  --lp-tone-border: rgba(56, 189, 248, 0.32);
+}
+.lp-tone--violet {
+  --lp-tone-fg: #C4B5FD;
+  --lp-tone-bg: rgba(139, 92, 246, 0.16);
+  --lp-tone-border: rgba(167, 139, 250, 0.34);
+}
+.lp-tone--indigo {
+  --lp-tone-fg: #A5B4FC;
+  --lp-tone-bg: rgba(99, 102, 241, 0.16);
+  --lp-tone-border: rgba(129, 140, 248, 0.34);
+}
+.lp-tone--emerald {
+  --lp-tone-fg: #6EE7B7;
+  --lp-tone-bg: rgba(16, 185, 129, 0.16);
+  --lp-tone-border: rgba(52, 211, 153, 0.32);
+}
+.lp-tone--amber {
+  --lp-tone-fg: #FCD34D;
+  --lp-tone-bg: rgba(245, 158, 11, 0.16);
+  --lp-tone-border: rgba(251, 191, 36, 0.32);
+}
+
+html[data-theme="light"] .lp-tone--sky {
+  --lp-tone-fg: #0369A1;
+  --lp-tone-bg: #E0F2FE;
+  --lp-tone-border: #BAE6FD;
+}
+html[data-theme="light"] .lp-tone--violet {
+  --lp-tone-fg: #6D28D9;
+  --lp-tone-bg: #F5F3FF;
+  --lp-tone-border: #DDD6FE;
+}
+html[data-theme="light"] .lp-tone--indigo {
+  --lp-tone-fg: #4338CA;
+  --lp-tone-bg: #EEF2FF;
+  --lp-tone-border: #C7D2FE;
+}
+html[data-theme="light"] .lp-tone--emerald {
+  --lp-tone-fg: #047857;
+  --lp-tone-bg: #ECFDF5;
+  --lp-tone-border: #A7F3D0;
+}
+html[data-theme="light"] .lp-tone--amber {
+  --lp-tone-fg: #B45309;
+  --lp-tone-bg: #FFFBEB;
+  --lp-tone-border: #FDE68A;
+}
+
+@media (prefers-color-scheme: light) {
+  html:not([data-theme="dark"]) .lp-tone--sky {
+    --lp-tone-fg: #0369A1;
+    --lp-tone-bg: #E0F2FE;
+    --lp-tone-border: #BAE6FD;
+  }
+  html:not([data-theme="dark"]) .lp-tone--violet {
+    --lp-tone-fg: #6D28D9;
+    --lp-tone-bg: #F5F3FF;
+    --lp-tone-border: #DDD6FE;
+  }
+  html:not([data-theme="dark"]) .lp-tone--indigo {
+    --lp-tone-fg: #4338CA;
+    --lp-tone-bg: #EEF2FF;
+    --lp-tone-border: #C7D2FE;
+  }
+  html:not([data-theme="dark"]) .lp-tone--emerald {
+    --lp-tone-fg: #047857;
+    --lp-tone-bg: #ECFDF5;
+    --lp-tone-border: #A7F3D0;
+  }
+  html:not([data-theme="dark"]) .lp-tone--amber {
+    --lp-tone-fg: #B45309;
+    --lp-tone-bg: #FFFBEB;
+    --lp-tone-border: #FDE68A;
+  }
 }
 
 *,
@@ -56,20 +306,13 @@ body {
   margin: 0;
   min-height: 100dvh;
   overflow-x: hidden;
-  background-color: var(--hym-surface-canvas, #060B16);
+  background-color: var(--lp-bg);
   background-image:
-    radial-gradient(ellipse 900px 500px at 85% -10%, rgba(0, 242, 254, 0.16) 0%, transparent 65%),
-    radial-gradient(ellipse 900px 550px at 15% 15%, rgba(37, 99, 235, 0.18) 0%, transparent 65%),
-    radial-gradient(ellipse 1100px 650px at 50% 50%, rgba(14, 165, 233, 0.08) 0%, transparent 70%),
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size:
-    auto,
-    auto,
-    auto,
-    44px 44px,
-    44px 44px;
-  background-attachment: fixed;
+    radial-gradient(ellipse 900px 500px at 85% -10%, var(--lp-glow-a) 0%, transparent 65%),
+    radial-gradient(ellipse 900px 550px at 15% 15%, var(--lp-glow-b) 0%, transparent 65%),
+    linear-gradient(var(--lp-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--lp-grid-line) 1px, transparent 1px);
+  background-size: auto, auto, 44px 44px, 44px 44px;
   color: var(--lp-ink);
   font-family: 'Vazirmatn', system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 16px;
@@ -77,7 +320,10 @@ body {
   letter-spacing: 0;
 }
 
-/* ── دسترس‌پذیری کاهش حرکت ── */
+main {
+  overflow-x: clip;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -103,14 +349,12 @@ img {
   height: auto;
 }
 
-/* ── تمرکز صفحه‌کلید (WCAG 2.4.7) ── */
 :focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--lp-brand) 70%, #ffffff);
-  outline-offset: 3px;
-  border-radius: 6px;
+  outline: 3px solid var(--lp-brand);
+  outline-offset: 2px;
+  border-radius: 8px;
 }
 
-/* ── پرش به محتوای اصلی ── */
 .lp-skip {
   position: absolute;
   inset-inline-start: 12px;
@@ -119,7 +363,7 @@ img {
   padding: 10px 16px;
   border-radius: 10px;
   background: var(--lp-brand);
-  color: #04101F;
+  color: var(--lp-on-brand);
   font-weight: 700;
   text-decoration: none;
 }
@@ -127,12 +371,12 @@ img {
   top: 8px;
 }
 
-/* ── شبکهٔ پایه ── */
 .lp-wrap {
   width: 100%;
   max-width: var(--lp-wrap);
   margin-inline: auto;
   padding-inline: var(--lp-gutter);
+  min-width: 0;
 }
 
 /* ── دکمه‌ها ── */
@@ -143,10 +387,12 @@ img {
   justify-content: center;
   gap: 8px;
   min-height: 44px;
+  min-width: 44px;
   padding: 10px 18px;
   border-radius: 12px;
   border: 1px solid transparent;
   font: inherit;
+  font-size: 15px;
   font-weight: 700;
   text-decoration: none;
   cursor: pointer;
@@ -155,31 +401,62 @@ img {
 }
 .lp-btn--lg {
   min-height: 52px;
-  padding: 14px 24px;
-  font-size: 16.5px;
+  padding: 13px 24px;
+  font-size: 16px;
 }
 .lp-btn--primary {
   background: var(--lp-brand);
-  color: #04101F;
-  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.25);
+  color: var(--lp-on-brand);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.28);
 }
 .lp-btn--primary:hover {
-  background: var(--hym-brand-hover);
-  box-shadow: 0 6px 22px rgba(14, 165, 233, 0.38);
+  background: var(--lp-brand-hover);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.36);
 }
 .lp-btn--primary:active {
-  background: var(--hym-brand-active);
+  background: var(--lp-brand-active);
   transform: translateY(1px);
 }
+.lp-btn--secondary {
+  background: var(--lp-header-cta-bg);
+  border-color: var(--lp-header-cta-border);
+  color: var(--lp-header-cta-fg);
+}
+.lp-btn--secondary:hover {
+  background: var(--lp-brand);
+  border-color: var(--lp-brand);
+  color: var(--lp-on-brand);
+}
 .lp-btn--ghost {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--hym-border-strong);
+  background: var(--lp-ghost-bg);
+  border-color: var(--lp-line-strong);
   color: var(--lp-ink);
 }
 .lp-btn--ghost:hover {
+  border-color: var(--lp-ghost-hover-border);
+  background: var(--lp-ghost-hover-bg);
+  color: var(--lp-ink);
+}
+.lp-btn--header {
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 13.5px;
+  background: transparent;
+  border-color: var(--lp-line-strong);
+  color: var(--lp-ink);
+}
+.lp-btn--header:hover {
+  background: var(--lp-header-cta-bg);
   border-color: var(--lp-brand);
-  background: var(--hym-brand-subtle);
-  color: #fff;
+  color: var(--lp-header-cta-fg);
+}
+.lp-header-cta-full {
+  display: none;
+}
+@media (min-width: 480px) {
+  .lp-header-cta-full {
+    display: inline;
+  }
 }
 .lp-btn svg {
   flex: none;
@@ -190,91 +467,142 @@ img {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(6, 11, 22, .85);
+  background: var(--lp-header-bg);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-block-end: 1px solid var(--lp-line);
 }
 .lp-header__inner {
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-height: 68px;
+  gap: 10px;
+  min-height: 64px;
 }
 .lp-brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-height: 44px;
+  min-width: 0;
   text-decoration: none;
   color: inherit;
+  flex-shrink: 0;
 }
 .lp-brand__mark {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  background: rgba(37, 99, 235, 0.15);
-  border: 1px solid rgba(37, 99, 235, 0.35);
-  box-shadow: 0 0 15px rgba(37, 99, 235, 0.2);
+  border-radius: 10px;
+  background: var(--lp-surface-2);
+  border: 1px solid var(--lp-line);
+  padding: 2px;
+  flex-shrink: 0;
 }
 .lp-brand__logo {
-  border-radius: 10px;
-  flex: none;
+  border-radius: 8px;
+  display: block;
 }
 .lp-brand__text {
   display: grid;
-  line-height: 1.35;
+  line-height: 1.3;
+  min-width: 0;
 }
 .lp-brand__title {
   font-weight: 800;
-  font-size: 18px;
-  color: #fff;
-  letter-spacing: -0.01em;
+  font-size: 17px;
+  color: var(--lp-ink);
 }
 .lp-brand__subtitle {
+  display: none;
   font-size: 11.5px;
-  color: var(--lp-ink-2);
+  color: var(--lp-ink-muted);
 }
+
 .lp-nav {
   display: none;
   margin-inline-start: auto;
-  gap: 4px;
+  gap: 2px;
 }
 .lp-nav a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  padding-inline: 12px;
+  padding-inline: 10px;
   border-radius: 10px;
   color: var(--lp-ink-2);
   text-decoration: none;
-  font-size: 14.5px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
   transition: color .2s var(--lp-ease), background-color .2s var(--lp-ease);
 }
 .lp-nav a:hover {
   color: var(--lp-ink);
-  background: var(--hym-bg-hover);
+  background: var(--lp-surface-sunken);
 }
-.lp-header__cta {
+
+.lp-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-inline-start: auto;
+  flex-shrink: 0;
 }
-.lp-nav + .lp-header__cta {
+.lp-nav + .lp-header__actions {
   margin-inline-start: 0;
+}
+
+.lp-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 11px;
+  border-radius: 12px;
+  border: 1px solid var(--lp-line-strong);
+  background: var(--lp-surface-2);
+  color: var(--lp-ink-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color .2s var(--lp-ease), border-color .2s var(--lp-ease), color .2s var(--lp-ease);
+}
+.lp-theme-toggle:hover {
+  color: var(--lp-ink);
+  border-color: var(--lp-brand);
+}
+.lp-theme-toggle__label {
+  display: none;
+}
+@media (min-width: 480px) {
+  .lp-theme-toggle__label {
+    display: inline;
+  }
 }
 
 /* ── Hero Section ── */
 .lp-hero {
-  padding-block: clamp(40px, 7vw, 88px) clamp(28px, 5vw, 56px);
+  padding-block: clamp(32px, 6vw, 80px) clamp(28px, 5vw, 56px);
   overflow-x: clip;
 }
 .lp-hero__grid {
   display: grid;
-  gap: 40px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 36px;
   align-items: center;
+}
+.lp-hero__copy,
+.lp-hero__showcase-col {
+  min-width: 0;
 }
 .lp-badge-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 .lp-pill {
@@ -283,60 +611,54 @@ img {
   gap: 8px;
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--hym-border-strong);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 700;
 }
 .lp-pill--glow {
-  background: rgba(14, 165, 233, 0.12);
-  border: 1px solid rgba(14, 165, 233, 0.35);
-  color: #38bdf8;
-  box-shadow: 0 0 16px rgba(14, 165, 233, 0.15);
+  background: var(--lp-pill-glow-bg);
+  border: 1px solid var(--lp-pill-glow-border);
+  color: var(--lp-pill-glow-fg);
 }
 .lp-pill--ghost {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--hym-border-default);
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-line);
   color: var(--lp-ink-2);
 }
 .lp-pill__dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  background: var(--lp-ok-fg);
+  box-shadow: 0 0 8px var(--lp-ok-fg);
   animation: lp-pulse-anim 2s infinite ease-in-out;
 }
-
 @keyframes lp-pulse-anim {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+  50% { opacity: 0.45; transform: scale(0.85); }
 }
 
 .lp-hero h1 {
   margin: 18px 0 0;
-  font-size: clamp(26px, 4.8vw, 48px);
-  line-height: 1.32;
+  font-size: clamp(25px, 4.5vw, 46px);
+  line-height: 1.35;
   font-weight: 800;
-  letter-spacing: -.01em;
+  color: var(--lp-ink);
 }
 .lp-hero__accent {
-  color: transparent;
-  background: linear-gradient(96deg, #38bdf8, #10b981);
-  -webkit-background-clip: text;
-  background-clip: text;
+  color: var(--lp-hero-accent);
 }
 .lp-hero__lead {
   margin: 16px 0 0;
   max-width: 58ch;
   color: var(--lp-ink-2);
   font-size: clamp(15px, 1.5vw, 17px);
-  line-height: 1.95;
+  line-height: 1.9;
 }
 .lp-hero__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
-  margin-block-start: 26px;
+  gap: 12px;
+  margin-block-start: 24px;
 }
 .lp-hero__actions--center {
   justify-content: center;
@@ -347,15 +669,15 @@ img {
   gap: 6px;
 }
 .lp-cta-hint {
-  font-size: 11.5px;
-  color: var(--hym-text-muted);
+  font-size: 12px;
+  color: var(--lp-ink-muted);
   padding-inline-start: 4px;
 }
 .lp-hero__facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 20px;
-  margin: 24px 0 0;
+  gap: 8px 18px;
+  margin: 22px 0 0;
   padding: 0;
   list-style: none;
   color: var(--lp-ink-2);
@@ -367,175 +689,190 @@ img {
   gap: 6px;
 }
 .lp-hero__facts svg {
-  color: var(--hym-success-default);
+  color: var(--lp-ok-fg);
+  flex-shrink: 0;
 }
 
-/* ══════════════ ویترین Hero و نشان درخشان سه‌بعدی ══════════════ */
+/* ── ویترین Hero و نشان سه‌بعدی ── */
 .lp-hero__showcase-col {
   display: flex;
   justify-content: center;
   align-items: center;
 }
-
 .lp-hero__showcase {
   position: relative;
   width: 100%;
   max-width: 440px;
-  min-height: 380px;
+  min-height: 390px;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  gap: 16px;
+  min-width: 0;
 }
-
-/* هاله نور پس‌زمینه */
 .lp-hero__aura {
   position: absolute;
-  width: min(380px, 85vw);
-  height: min(380px, 85vw);
+  width: min(340px, 76vw);
+  height: min(340px, 76vw);
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.45) 0%, rgba(37, 99, 235, 0.22) 48%, transparent 72%);
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.36) 0%, rgba(37, 99, 235, 0.16) 50%, transparent 72%);
   filter: blur(28px);
   animation: lp-aura-pulse 4.5s infinite ease-in-out;
   pointer-events: none;
 }
-
-@keyframes lp-aura-pulse {
-  0%, 100% {
-    opacity: 0.38;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.68;
-    transform: scale(1.08);
+html[data-theme="light"] .lp-hero__aura {
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.16) 0%, rgba(14, 165, 233, 0.10) 50%, transparent 72%);
+}
+@media (prefers-color-scheme: light) {
+  html:not([data-theme="dark"]) .lp-hero__aura {
+    background: radial-gradient(circle, rgba(37, 99, 235, 0.16) 0%, rgba(14, 165, 233, 0.10) 50%, transparent 72%);
   }
 }
 
-/* فریم نشان لوگوی جدید */
+@keyframes lp-aura-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.72; transform: scale(1.06); }
+}
+
 .lp-hero__emblem-frame {
   position: relative;
   z-index: 2;
-  width: min(310px, 72vw);
-  height: min(310px, 72vw);
-  border-radius: 32px;
+  width: min(290px, 68vw);
+  height: min(290px, 68vw);
+  border-radius: 30px;
   padding: 8px;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.4), rgba(37, 99, 235, 0.2), rgba(6, 11, 22, 0.95));
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75), 0 0 40px rgba(14, 165, 233, 0.25);
+  background: var(--lp-emblem-bg);
+  border: 1px solid var(--lp-emblem-border);
+  box-shadow: var(--lp-emblem-shadow);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .lp-hero__emblem-img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: 24px;
-  background: transparent;
-  filter: drop-shadow(0 0 16px rgba(0, 242, 254, 0.3));
+  border-radius: 22px;
 }
 
-/* تگ‌های معلق چهارگانه */
 .lp-hero__floating-tags {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 3;
 }
-
 .lp-float-badge {
   position: absolute;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
+  padding: 8px 13px;
   border-radius: 999px;
-  background: rgba(11, 20, 39, 0.88);
+  background: var(--lp-badge-bg);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  color: #f1f5f9;
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--lp-badge-border);
+  color: var(--lp-badge-fg);
   font-size: 12.5px;
   font-weight: 700;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 15px rgba(14, 165, 233, 0.15);
+  box-shadow: var(--lp-card-shadow);
   pointer-events: auto;
+  max-width: 100%;
 }
-
 .lp-float-badge svg {
-  color: #38bdf8;
+  color: var(--lp-hero-accent);
   flex-shrink: 0;
 }
 
 @keyframes lp-float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
 }
-
 @keyframes lp-float-reverse {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(8px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(7px); }
 }
 
+/* همهٔ برچسب‌ها درون کادر ویترین باقی می‌مانند (بدون آفست منفی) */
 .lp-float-badge--1 {
-  top: 4%;
-  right: -2%;
+  top: 2%;
+  inset-inline-start: 0;
   animation: lp-float 4s infinite ease-in-out;
 }
-
 .lp-float-badge--2 {
-  top: 6%;
-  left: -2%;
+  top: 4%;
+  inset-inline-end: 0;
   animation: lp-float-reverse 4.5s infinite ease-in-out;
 }
-
 .lp-float-badge--3 {
-  bottom: 8%;
-  right: -4%;
+  bottom: 4%;
+  inset-inline-start: 0;
   animation: lp-float-reverse 4.2s infinite ease-in-out;
 }
-
 .lp-float-badge--4 {
-  bottom: 6%;
-  left: -4%;
+  bottom: 2%;
+  inset-inline-end: 0;
   animation: lp-float 4.8s infinite ease-in-out;
 }
 
-/* ══════════════ شاخص‌های آماری پلتفرم ══════════════ */
+@media (max-width: 639px) {
+  .lp-hero__showcase {
+    min-height: auto;
+  }
+  .lp-hero__emblem-frame {
+    width: min(248px, 64vw);
+    height: min(248px, 64vw);
+  }
+  .lp-hero__floating-tags {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+  .lp-float-badge {
+    position: static;
+    animation: none !important;
+    min-width: 0;
+    justify-content: flex-start;
+    text-align: start;
+    font-size: 11.5px;
+    line-height: 1.45;
+    padding: 8px 10px;
+    border-radius: 14px;
+    white-space: normal;
+  }
+}
+
+/* ── شاخص‌های اعتماد و آماری پلتفرم ── */
 .lp-metrics-section {
   border-block: 1px solid var(--lp-line);
-  background: rgba(9, 16, 32, 0.65);
-  padding-block: 28px 36px;
+  background: var(--lp-bg-alt);
+  padding-block: 26px 32px;
+  overflow-x: clip;
 }
-
 .lp-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
 }
-
 .lp-metric-card {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 20px;
+  min-width: 0;
+  padding: 16px 18px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-line);
+  box-shadow: var(--lp-card-shadow);
   transition: border-color .2s var(--lp-ease), transform .2s var(--lp-ease);
 }
-
 .lp-metric-card:hover {
-  border-color: rgba(56, 189, 248, 0.35);
+  border-color: var(--lp-tone-border);
   transform: translateY(-2px);
 }
-
 .lp-metric-icon {
   width: 44px;
   height: 44px;
@@ -543,230 +880,252 @@ img {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(14, 165, 233, 0.12);
-  color: #38bdf8;
+  background: var(--lp-tone-bg);
+  color: var(--lp-tone-fg);
+  border: 1px solid var(--lp-tone-border);
   flex-shrink: 0;
 }
-
 .lp-metric-data {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
-
 .lp-metric-val {
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 800;
-  color: #fff;
-  letter-spacing: -0.02em;
+  color: var(--lp-ink);
 }
-
 .lp-metric-lbl {
-  font-size: 12px;
+  font-size: 12.5px;
+  color: var(--lp-ink-muted);
+  line-height: 1.5;
+}
+
+/* ── بخش‌های عمومی ── */
+.lp-section {
+  padding-block: clamp(44px, 6vw, 84px);
+  overflow-x: clip;
+}
+.lp-section--alt {
+  background: var(--lp-bg-alt);
+  border-block: 1px solid var(--lp-line);
+}
+.lp-section__head {
+  max-width: 62ch;
+  margin-block-end: 28px;
+}
+.lp-section-tag {
+  display: inline-block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--lp-tone-fg);
+  background: var(--lp-tone-bg);
+  padding: 4px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  border: 1px solid var(--lp-tone-border);
+}
+.lp-section__head h2 {
+  margin: 0;
+  font-size: clamp(22px, 3vw, 32px);
+  line-height: 1.4;
+  font-weight: 800;
+  color: var(--lp-ink);
+}
+.lp-section__head p {
+  margin: 10px 0 0;
   color: var(--lp-ink-2);
-  line-height: 1.45;
+  font-size: 15.5px;
 }
 
-/* ══════════════ بخش چهار ستون تعاملی هامزیار ══════════════ */
+/* ── تب‌های ۴ ستون تعاملی ── */
 .lp-pillars-section {
-  padding-block: clamp(48px, 6vw, 88px);
+  overflow-x: clip;
 }
-
 .lp-pillar-tabs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
-
 .lp-pillar-tab-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 10px 18px;
+  min-height: 44px;
+  min-width: 0;
+  padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid var(--hym-border-default);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--lp-line);
+  background: var(--lp-surface);
   color: var(--lp-ink-2);
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
+  text-align: center;
   transition: all 0.2s var(--lp-ease);
 }
-
 .lp-pillar-tab-btn:hover {
-  color: #fff;
-  border-color: rgba(56, 189, 248, 0.35);
-  background: rgba(14, 165, 233, 0.08);
+  color: var(--lp-ink);
+  border-color: var(--lp-brand);
 }
-
 .lp-pillar-tab-btn--active {
-  color: #38bdf8;
-  border-color: rgba(56, 189, 248, 0.5);
-  background: rgba(14, 165, 233, 0.15);
-  box-shadow: 0 0 20px rgba(14, 165, 233, 0.2);
+  color: var(--lp-on-brand);
+  border-color: var(--lp-brand);
+  background: var(--lp-brand);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.25);
+}
+.lp-pillar-tab-btn--active:hover {
+  color: var(--lp-on-brand);
 }
 
 .lp-pillar-panel {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
   align-items: center;
-  padding: clamp(24px, 4vw, 40px);
+  padding: clamp(20px, 4vw, 38px);
   border-radius: 24px;
-  border: 1px solid rgba(56, 189, 248, 0.22);
-  background: linear-gradient(170deg, rgba(14, 25, 50, 0.85), rgba(7, 13, 27, 0.98));
-  backdrop-filter: blur(16px);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--lp-line);
+  background: var(--lp-surface);
+  box-shadow: var(--lp-panel-shadow);
 }
-
+.lp-pillar-panel__content,
+.lp-pillar-panel__preview {
+  min-width: 0;
+}
+.lp-pillar-panel__badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .lp-pillar-panel__content h3 {
   margin: 12px 0 0;
   font-size: clamp(20px, 2.5vw, 28px);
   font-weight: 800;
-  color: #fff;
+  color: var(--lp-ink);
 }
-
 .lp-pillar-panel__lead {
   margin: 12px 0 20px;
   font-size: 15px;
   color: var(--lp-ink-2);
   line-height: 1.85;
 }
-
 .lp-pillar-bullets {
   list-style: none;
   padding: 0;
-  margin: 0 0 28px;
+  margin: 0 0 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .lp-pillar-bullets li {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   font-size: 14px;
-  color: #e2e8f0;
+  color: var(--lp-ink);
   line-height: 1.7;
 }
-
 .lp-pillar-check {
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  background: var(--lp-ok-bg);
+  color: var(--lp-ok-fg);
+  border: 1px solid var(--lp-ok-border);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   margin-top: 3px;
 }
-
 .lp-pillar-cta-row {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 }
 
-/* کارت شبیه‌ساز داخلی ستون فعال */
+/* ── کارت پیش‌نمایش ستون فعال ── */
 .lp-preview-card {
   width: 100%;
   max-width: 440px;
   margin-inline: auto;
-  background: linear-gradient(165deg, rgba(15, 27, 56, 0.85), rgba(8, 14, 28, 0.95));
-  border: 1px solid rgba(37, 99, 235, 0.28);
-  border-radius: 24px;
-  padding: 24px;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55), 0 0 30px rgba(37, 99, 235, 0.12);
-  backdrop-filter: blur(16px);
+  min-width: 0;
+  background: var(--lp-surface-sunken);
+  border: 1px solid var(--lp-line-strong);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--lp-card-shadow);
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  position: relative;
+  gap: 14px;
 }
-
-.lp-preview-card::before {
-  content: '';
-  position: absolute;
-  top: -1px;
-  right: 15%;
-  width: 70%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.8), transparent);
-}
-
 .lp-preview-card__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding-bottom: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--lp-line);
 }
-
 .lp-preview-avatar {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: rgba(37, 99, 235, 0.2);
-  color: #38bdf8;
+  background: var(--lp-tone-bg);
+  color: var(--lp-tone-fg);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  border: 1px solid var(--lp-tone-border);
+  flex-shrink: 0;
 }
-
+.lp-preview-head-text {
+  flex: 1 1 160px;
+  min-width: 0;
+}
 .lp-preview-name {
   font-weight: 700;
   font-size: 14px;
-  color: #fff;
+  color: var(--lp-ink);
 }
-
 .lp-preview-sub {
-  font-size: 11.5px;
-  color: var(--lp-ink-2);
+  font-size: 12px;
+  color: var(--lp-ink-muted);
+  line-height: 1.5;
 }
-
 .lp-preview-badge {
-  margin-right: auto;
-  font-size: 11px;
+  margin-inline-start: auto;
+  font-size: 11.5px;
   font-weight: 700;
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.12);
-  padding: 3px 8px;
+  color: var(--lp-ok-fg);
+  background: var(--lp-ok-bg);
+  padding: 3px 9px;
   border-radius: 999px;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid var(--lp-ok-border);
+  white-space: nowrap;
 }
-
 .lp-preview-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-line);
 }
-
-.lp-preview-item:hover {
-  transform: translateY(-2px);
-  border-color: rgba(37, 99, 235, 0.3);
+.lp-preview-item--sky .lp-preview-icon {
+  background: var(--lp-tone-bg);
+  color: var(--lp-tone-fg);
 }
-
-.lp-preview-item--cyan .lp-preview-icon {
-  background: rgba(14, 165, 233, 0.15);
-  color: #38bdf8;
-}
-
 .lp-preview-item--emerald .lp-preview-icon {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
+  background: var(--lp-ok-bg);
+  color: var(--lp-ok-fg);
 }
-
 .lp-preview-icon {
   width: 36px;
   height: 36px;
@@ -776,495 +1135,521 @@ img {
   justify-content: center;
   flex-shrink: 0;
 }
-
 .lp-preview-details {
-  flex-grow: 1;
+  flex: 1 1 0;
   min-width: 0;
 }
-
 .lp-preview-title {
   font-size: 13.5px;
   font-weight: 700;
-  color: #f1f5f9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--lp-ink);
+  line-height: 1.55;
 }
-
 .lp-preview-meta {
-  font-size: 11.5px;
-  color: var(--lp-ink-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--lp-ink-muted);
+  line-height: 1.6;
+  margin-top: 2px;
 }
-
 .lp-status-tag,
 .lp-score-tag {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 3px 9px;
+  border-radius: 8px;
   white-space: nowrap;
 }
-
 .lp-status-tag {
-  background: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  background: var(--lp-tone-bg);
+  color: var(--lp-tone-fg);
+  border: 1px solid var(--lp-tone-border);
 }
-
 .lp-score-tag {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  background: var(--lp-ok-bg);
+  color: var(--lp-ok-fg);
+  border: 1px solid var(--lp-ok-border);
+  flex-shrink: 0;
 }
-
 .lp-preview-ai {
-  background: rgba(37, 99, 235, 0.08);
-  border: 1px dashed rgba(56, 189, 248, 0.35);
+  background: var(--lp-tone-bg);
+  border: 1px dashed var(--lp-tone-border);
   border-radius: 14px;
   padding: 12px 14px;
 }
-
 .lp-preview-ai__head {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #38bdf8;
-  margin-bottom: 6px;
-}
-
-.lp-preview-ai__text {
-  margin: 0;
-  font-size: 12px;
-  color: var(--lp-ink-2);
-  line-height: 1.7;
-}
-
-/* ══════════════ بخش امکانات عمومی و کارت‌ها ══════════════ */
-.lp-section {
-  padding-block: clamp(44px, 6vw, 84px);
-}
-
-.lp-section--alt {
-  background: linear-gradient(180deg, rgba(12, 21, 38, .55), transparent);
-  border-block: 1px solid var(--lp-line);
-}
-
-.lp-section__head {
-  max-width: 62ch;
-  margin-block-end: 30px;
-}
-
-.lp-section-tag {
-  display: inline-block;
   font-size: 12.5px;
   font-weight: 700;
-  color: #38bdf8;
-  background: rgba(14, 165, 233, 0.12);
-  padding: 4px 12px;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  border: 1px solid rgba(14, 165, 233, 0.25);
+  color: var(--lp-tone-fg);
+  margin-bottom: 6px;
 }
-
-.lp-section__head h2 {
+.lp-preview-ai__text {
   margin: 0;
-  font-size: clamp(22px, 3vw, 32px);
-  line-height: 1.4;
-  font-weight: 800;
-}
-
-.lp-section__head p {
-  margin: 10px 0 0;
+  font-size: 12.5px;
   color: var(--lp-ink-2);
-  font-size: 15.5px;
+  line-height: 1.75;
 }
 
-/* ── کارت‌های امکانات با هاور درخشان ── */
+/* ── کارت‌های امکانات ۸گانه ── */
 .lp-cards {
   display: grid;
   gap: 16px;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
-
 .lp-card {
+  min-width: 0;
   padding: 22px;
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-radius);
   background: var(--lp-surface);
+  box-shadow: var(--lp-card-shadow);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
               border-color 0.25s ease,
               box-shadow 0.25s ease;
 }
-
 .lp-card:hover {
   transform: translateY(-4px);
-  border-color: rgba(56, 189, 248, 0.4);
+  border-color: var(--lp-tone-border);
   box-shadow: 0 12px 30px -10px rgba(14, 165, 233, 0.25);
 }
-
 .lp-card__top {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
-
 .lp-card__icon {
   display: inline-grid;
   place-items: center;
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: rgba(14, 165, 233, 0.12);
-  color: #38bdf8;
+  background: var(--lp-tone-bg);
+  color: var(--lp-tone-fg);
+  border: 1px solid var(--lp-tone-border);
 }
-
 .lp-card__tag {
-  font-size: 11px;
-  color: #38bdf8;
-  background: rgba(37, 99, 235, 0.1);
-  padding: 3px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(37, 99, 235, 0.2);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--lp-tone-fg);
+  background: var(--lp-tone-bg);
+  padding: 3px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--lp-tone-border);
 }
-
 .lp-card h3 {
   margin: 14px 0 0;
   font-size: 16.5px;
-  line-height: 1.6;
+  line-height: 1.55;
   font-weight: 700;
-  color: #fff;
+  color: var(--lp-ink);
 }
-
 .lp-card p {
   margin: 8px 0 0;
   color: var(--lp-ink-2);
   font-size: 14px;
-  line-height: 1.9;
+  line-height: 1.85;
 }
 
-/* ── مراحل اتصال (Steps) ── */
+/* ── مراحل اتصال ۳ گام ── */
 .lp-steps {
   display: grid;
   gap: 14px;
   margin: 0;
   padding: 0;
   list-style: none;
-  counter-reset: step;
+  grid-template-columns: minmax(0, 1fr);
 }
-
 .lp-step {
-  position: relative;
+  min-width: 0;
   padding: 22px;
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-radius);
-  background: var(--lp-surface-2);
+  background: var(--lp-surface);
+  box-shadow: var(--lp-card-shadow);
   transition: border-color .2s var(--lp-ease), transform .2s var(--lp-ease);
 }
-
 .lp-step:hover {
-  border-color: rgba(56, 189, 248, 0.35);
+  border-color: var(--lp-brand);
   transform: translateY(-2px);
 }
-
 .lp-step__num {
   display: inline-grid;
   place-items: center;
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: var(--hym-brand-subtle);
-  color: var(--lp-brand);
+  background: var(--lp-brand);
+  color: var(--lp-on-brand);
   font-weight: 800;
   font-size: 16px;
 }
-
 .lp-step h3 {
   margin: 12px 0 0;
   font-size: 16.5px;
   font-weight: 700;
+  color: var(--lp-ink);
 }
-
 .lp-step p {
   margin: 6px 0 0;
   color: var(--lp-ink-2);
   font-size: 14px;
 }
 
-/* ══════════════ وضعیت زنده سرویس‌ها (Service Status) ══════════════ */
-.lp-status-section {
-  padding-block: 40px 60px;
+/* ── بخش راهنمای نصب تعاملی روی دستگاه‌ها (#platforms) ── */
+.lp-platforms-section {
+  overflow-x: clip;
+}
+.lp-platforms-box {
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-line);
+  border-radius: 22px;
+  padding: clamp(20px, 3.5vw, 34px);
+  box-shadow: var(--lp-panel-shadow);
+  display: grid;
+  gap: 20px;
+}
+.lp-platform-tabs-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.lp-platform-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+  max-width: 460px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--lp-surface-sunken);
+  border: 1px solid var(--lp-line);
+}
+.lp-platform-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lp-ink-2);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color .2s var(--lp-ease), color .2s var(--lp-ease), box-shadow .2s var(--lp-ease);
+}
+.lp-platform-tab--active {
+  background: var(--lp-surface);
+  color: var(--lp-brand);
+  box-shadow: var(--lp-card-shadow);
+}
+html[data-theme="dark"] .lp-platform-tab--active,
+:root:not([data-theme="light"]) .lp-platform-tab--active {
+  background: var(--lp-brand);
+  color: var(--lp-on-brand);
+}
+@media (prefers-color-scheme: light) {
+  html:not([data-theme="dark"]) .lp-platform-tab--active {
+    background: var(--lp-surface);
+    color: var(--lp-brand);
+  }
+}
+.lp-platforms-detected {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--lp-ink-muted);
+}
+.lp-platforms-detected strong {
+  color: var(--lp-ink);
+}
+.lp-platform-panel {
+  display: grid;
+  gap: 16px;
+}
+.lp-platform-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--lp-ink-2);
+}
+.lp-platform-steps {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-platform-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--lp-surface-sunken);
+  border: 1px solid var(--lp-line);
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--lp-ink);
+  min-width: 0;
+}
+.lp-platform-step__num {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  background: var(--lp-brand);
+  color: var(--lp-on-brand);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 13px;
+}
+.lp-platform-cta {
+  display: flex;
+  justify-content: center;
 }
 
+/* ── پایش زنده سرویس‌ها ── */
+.lp-status-section {
+  padding-block: 36px 56px;
+}
 .lp-status-box {
-  background: linear-gradient(175deg, rgba(11, 20, 39, 0.95), rgba(7, 13, 26, 0.98));
-  border: 1px solid rgba(37, 99, 235, 0.25);
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-line);
   border-radius: 22px;
-  padding: clamp(20px, 3.5vw, 36px);
-  box-shadow: 0 15px 45px rgba(0, 0, 0, 0.45);
+  padding: clamp(20px, 3.5vw, 34px);
+  box-shadow: var(--lp-panel-shadow);
   position: relative;
   overflow: hidden;
 }
-
 .lp-status-box::before {
   content: '';
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, #10b981, #38bdf8, #2563eb);
+  inset-inline: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--lp-ok-fg), var(--lp-brand));
 }
-
 .lp-status-box__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--lp-line);
 }
-
 .lp-status-indicator {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-
 .lp-status-indicator h2 {
   margin: 0;
   font-size: clamp(18px, 2.2vw, 24px);
   font-weight: 800;
-  color: #fff;
+  color: var(--lp-ink);
 }
-
 .lp-status-sub {
   margin: 6px 0 0;
-  font-size: 13.5px;
-  color: var(--lp-ink-2);
+  font-size: 13px;
+  color: var(--lp-ink-muted);
 }
-
 .lp-status-indicator__dot {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-
 .lp-status-indicator__dot--up {
-  background: #10b981;
-  box-shadow: 0 0 12px #10b981;
+  background: var(--lp-ok-fg);
+  box-shadow: 0 0 10px var(--lp-ok-fg);
   animation: lp-pulse-anim 2s infinite ease-in-out;
 }
-
 .lp-status-indicator__dot--down {
-  background: #ef4444;
-  box-shadow: 0 0 12px #ef4444;
+  background: var(--lp-danger-fg);
+  box-shadow: 0 0 10px var(--lp-danger-fg);
 }
-
 .lp-status-indicator__dot--checking {
-  background: #eab308;
-  box-shadow: 0 0 12px #eab308;
+  background: var(--lp-warn-fg);
+  box-shadow: 0 0 10px var(--lp-warn-fg);
 }
-
 .lp-status-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
 }
-
 .lp-ping-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 12.5px;
-  font-weight: 600;
-  color: #38bdf8;
-  background: rgba(14, 165, 233, 0.1);
+  font-weight: 700;
+  color: var(--lp-tone-fg);
+  background: var(--lp-tone-bg);
   padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(14, 165, 233, 0.25);
+  border-radius: 10px;
+  border: 1px solid var(--lp-tone-border);
 }
-
 .lp-refresh-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #fff;
-  border-radius: 8px;
-  padding: 6px 14px;
+  min-height: 44px;
+  min-width: 44px;
+  background: var(--lp-surface-sunken);
+  border: 1px solid var(--lp-line-strong);
+  color: var(--lp-ink);
+  border-radius: 10px;
+  padding: 8px 14px;
   font: inherit;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background-color 0.2s, border-color 0.2s;
 }
-
 .lp-refresh-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: var(--lp-brand);
 }
-
 .lp-refresh-btn--spin svg {
   animation: lp-spin 1s linear infinite;
 }
-
 @keyframes lp-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-/* نوار وضعیت ۳۰ روزه */
 .lp-uptime-tracker {
-  padding-block: 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-block: 20px;
+  border-bottom: 1px solid var(--lp-line);
 }
-
 .lp-uptime-tracker__head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   font-size: 13px;
 }
-
 .lp-uptime-label {
   color: var(--lp-ink-2);
-  font-weight: 600;
-}
-
-.lp-uptime-pct {
-  color: #10b981;
   font-weight: 700;
-  font-family: monospace;
 }
-
+.lp-uptime-pct {
+  color: var(--lp-ok-fg);
+  font-weight: 700;
+}
 .lp-uptime-bars {
   display: flex;
-  gap: 4px;
-  height: 38px;
+  gap: 3px;
+  height: 34px;
   align-items: flex-end;
 }
-
 .lp-uptime-bar {
   flex: 1;
   height: 100%;
   border-radius: 4px;
-  transition: transform 0.15s ease, filter 0.15s ease;
-  cursor: pointer;
+  transition: transform 0.15s ease;
 }
-
 .lp-uptime-bar:hover {
-  transform: scaleY(1.15);
-  filter: brightness(1.2);
+  transform: scaleY(1.12);
 }
-
 .lp-uptime-bar--up {
-  background: #10b981;
+  background: var(--lp-ok-fg);
   opacity: 0.85;
 }
-
 .lp-uptime-bar--down {
-  background: #ef4444;
+  background: var(--lp-danger-fg);
 }
-
 .lp-uptime-tracker__legend {
   display: flex;
   justify-content: space-between;
-  font-size: 11.5px;
-  color: var(--hym-text-muted);
+  font-size: 12px;
+  color: var(--lp-ink-muted);
   margin-top: 8px;
 }
 
-/* شبکه سرویس‌ها */
 .lp-service-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
-  padding-top: 24px;
+  padding-top: 20px;
 }
-
 .lp-service-card {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
+  background: var(--lp-surface-sunken);
+  border: 1px solid var(--lp-line);
+  border-radius: 14px;
 }
-
 .lp-service-card__icon {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 10px;
-  background: rgba(37, 99, 235, 0.12);
-  color: #38bdf8;
+  background: var(--lp-tone-bg);
+  color: var(--lp-tone-fg);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-
 .lp-service-card__body {
   display: flex;
   flex-direction: column;
-  flex-grow: 1;
+  flex: 1 1 0;
   min-width: 0;
 }
-
 .lp-service-name {
   font-size: 13px;
   font-weight: 700;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--lp-ink);
 }
-
 .lp-service-status {
-  font-size: 11.5px;
-  color: var(--lp-ink-2);
+  font-size: 12px;
+  color: var(--lp-ink-muted);
 }
-
 .lp-service-badge {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
-  padding: 3px 7px;
-  border-radius: 6px;
+  padding: 3px 8px;
+  border-radius: 8px;
   white-space: nowrap;
 }
-
 .lp-service-badge--ok {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: var(--lp-ok-bg);
+  color: var(--lp-ok-fg);
+  border: 1px solid var(--lp-ok-border);
 }
 
-/* ══════════════ پرسش‌های متداول (FAQ) ══════════════ */
+/* ── پرسش‌های متداول (FAQ) ── */
 .lp-faq {
   display: grid;
   gap: 12px;
 }
-
 .lp-faq__item {
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-radius);
   background: var(--lp-surface);
   padding: 16px 20px;
+  box-shadow: var(--lp-card-shadow);
   transition: border-color .2s var(--lp-ease);
 }
-
 .lp-faq__item:hover {
-  border-color: rgba(56, 189, 248, 0.35);
+  border-color: var(--lp-brand);
 }
-
 .lp-faq__item summary {
   cursor: pointer;
   font-weight: 700;
@@ -1274,40 +1659,36 @@ img {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #fff;
+  min-height: 44px;
+  color: var(--lp-ink);
 }
-
 .lp-faq__item summary::-webkit-details-marker {
   display: none;
 }
-
 .lp-faq__item summary::after {
   content: '+';
   font-size: 20px;
   font-weight: 400;
-  color: #38bdf8;
+  color: var(--lp-brand);
   margin-inline-start: 12px;
-  transition: transform .2s var(--lp-ease);
 }
-
 .lp-faq__item[open] summary::after {
   content: '−';
 }
-
 .lp-faq__item p {
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   color: var(--lp-ink-2);
   font-size: 14.5px;
-  line-height: 1.95;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  line-height: 1.9;
+  border-top: 1px solid var(--lp-line);
   padding-top: 12px;
 }
 
-/* ══════════════ بخش پایانی دعوت به عمل (Final CTA) ══════════════ */
+/* ── بخش پایانی دعوت به عمل ── */
 .lp-final {
   padding-block: clamp(40px, 6vw, 72px);
+  overflow-x: clip;
 }
-
 .lp-final__inner {
   display: grid;
   justify-items: center;
@@ -1315,19 +1696,16 @@ img {
   gap: 12px;
   padding: clamp(28px, 4vw, 48px) 20px;
   border-radius: 24px;
-  border: 1px solid var(--hym-border-strong);
-  background:
-    radial-gradient(600px 240px at 50% 0%, rgba(61, 134, 255, .2), transparent 70%),
-    var(--hym-bg-surface);
+  border: 1px solid var(--lp-line-strong);
+  background: var(--lp-final-bg);
+  box-shadow: var(--lp-panel-shadow);
 }
-
 .lp-final h2 {
   margin: 0;
   font-size: clamp(22px, 3vw, 32px);
   font-weight: 800;
-  color: #fff;
+  color: var(--lp-ink);
 }
-
 .lp-final p {
   margin: 0;
   max-width: 54ch;
@@ -1335,36 +1713,32 @@ img {
   font-size: 15px;
 }
 
-/* ══════════════ پانوشت (Footer) ══════════════ */
+/* ── پانوشت ── */
 .lp-footer {
   border-block-start: 1px solid var(--lp-line);
-  background: rgba(4, 7, 15, .7);
+  background: var(--lp-footer-bg);
 }
-
 .lp-footer__inner {
   display: grid;
   gap: 14px;
   padding-block: 26px 34px;
 }
-
 .lp-footer__brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   color: var(--lp-ink-2);
   font-size: 14px;
+  font-weight: 600;
 }
-
 .lp-footer__brand img {
   border-radius: 8px;
 }
-
 .lp-footer__links {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 18px;
+  gap: 6px 16px;
 }
-
 .lp-footer__links a {
   display: inline-flex;
   align-items: center;
@@ -1373,86 +1747,68 @@ img {
   text-decoration: none;
   font-size: 14px;
 }
-
 .lp-footer__links a:hover {
   color: var(--lp-brand);
   text-decoration: underline;
   text-underline-offset: 4px;
 }
-
 .lp-footer__note {
   margin: 0;
-  color: var(--hym-text-muted);
+  color: var(--lp-ink-muted);
   font-size: 12.5px;
   line-height: 1.9;
 }
 
-/* ══════════════ واکنش‌گرایی بر اساس عرض صفحه (Breakpoints) ══════════════ */
-
-/* موبایل‌های کوچک (< 520px) */
-@media (max-width: 520px) {
+/* ── نقاط شکست واکنش‌گرا ── */
+@media (max-width: 390px) {
   .lp-header__inner {
-    gap: 10px;
-    min-height: 60px;
+    gap: 8px;
   }
   .lp-brand__title {
-    font-size: 16px;
+    font-size: 15.5px;
   }
-  .lp-brand__subtitle {
-    display: none;
+  .lp-theme-toggle {
+    padding: 0 9px;
+    font-size: 12px;
   }
-  .lp-header__cta .lp-btn {
-    min-height: 42px;
-    padding: 8px 12px;
-    font-size: 13.5px;
-    gap: 4px;
-  }
-  .lp-hero__floating-tags {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-top: 16px;
-    width: 100%;
-  }
-  .lp-float-badge {
-    position: static;
-    animation: none !important;
-    justify-content: center;
-    font-size: 11px;
-    padding: 6px 8px;
-    text-align: center;
-  }
-  .lp-metrics-grid {
-    grid-template-columns: 1fr;
+  .lp-btn--header {
+    padding: 8px 10px;
+    font-size: 12.5px;
   }
   .lp-pillar-tabs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
   .lp-pillar-tab-btn {
-    justify-content: center;
     font-size: 12.5px;
     padding: 8px 10px;
   }
 }
 
-/* تبلت کوچک و به بالا (>= 480px) */
 @media (min-width: 480px) {
   .lp-cards,
   .lp-steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-/* تبلت (>= 640px) */
-@media (min-width: 640px) {
-  .lp-service-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .lp-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-/* تبلت بزرگ و لپ‌تاپ (>= 768px) */
+@media (min-width: 640px) {
+  :root {
+    --lp-gutter: 24px;
+  }
+  .lp-brand__subtitle {
+    display: block;
+  }
+  .lp-service-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lp-platform-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (min-width: 768px) {
   :root {
     --lp-gutter: 32px;
@@ -1461,7 +1817,11 @@ img {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
   }
   .lp-metrics-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .lp-pillar-tabs {
+    display: flex;
+    flex-wrap: wrap;
   }
   .lp-footer__inner {
     grid-template-columns: 1fr auto;
@@ -1472,14 +1832,12 @@ img {
   }
 }
 
-/* دسکتاپ (>= 880px) */
 @media (min-width: 880px) {
   .lp-pillar-panel {
-    grid-template-columns: 1.1fr 0.9fr;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   }
 }
 
-/* دسکتاپ بزرگ (>= 1024px) */
 @media (min-width: 1024px) {
   .lp-nav {
     display: flex;
@@ -1491,6 +1849,6 @@ img {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .lp-service-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
