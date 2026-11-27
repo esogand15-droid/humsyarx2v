@@ -625,24 +625,37 @@ export function ScheduleScreen() {
             {meta.conflicts.length > 0 && (
               <div data-section="danger">
                 <DsCard level="accent" role="alert">
-                  <div className="sched-alert">
-                    <Icon name="i-alert-circle" size={18} className="sched-alert__icon" />
-                    <div className="sched-alert__body">
+                  <details className="sched-alert sched-alert--collapsible">
+                    <summary className="sched-alert__summary">
+                      <Icon name="i-alert-circle" size={18} className="sched-alert__icon" />
                       <span className="sched-alert__title">
                         تداخل زمانی ({faNum(meta.conflicts.length)} مورد)
                       </span>
-                      <ul className="sched-conflict-list">
-                        {meta.conflicts.slice(0, 3).map((cf, idx) => (
-                          <li key={idx}>
-                            {faDigits(
-                              cf.message ||
-                                `${cf.lesson_a || ''} و ${cf.lesson_b || ''} (${cf.day_label || ''})`,
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
+                      <Icon name="i-chevron" size={16} className="sched-alert__chev" />
+                    </summary>
+                    <ul className="sched-conflict-list">
+                      {meta.conflicts.map((cf, idx) => (
+                        <li key={idx} className="sched-conflict">
+                          {cf.lesson_a && cf.lesson_b ? (
+                            <>
+                              <span className="sched-conflict__pair">
+                                {faDigits(cf.lesson_a)}
+                                <span className="sched-conflict__sep" aria-label="و">
+                                  ⇄
+                                </span>
+                                {faDigits(cf.lesson_b)}
+                              </span>
+                              <span className="sched-conflict__when">
+                                {[cf.day_label, cf.time_a || cf.time_b].filter(Boolean).map((s) => faDigits(s)).join(' · ')}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="sched-conflict__pair">{faDigits(cf.message || '')}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
                 </DsCard>
               </div>
             )}
