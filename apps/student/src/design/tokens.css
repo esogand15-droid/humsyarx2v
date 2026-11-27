@@ -1051,3 +1051,33 @@ html.dark {
     var(--hym-surface-0);
 }
 
+
+/* Primitive palette. Component CSS refers to these instead of raw hex so the
+   palette lives in one file. Theme-aware colours stay in the semantic tokens above. */
+:root {
+  --pal-amber-500: #f59e0b;
+  --pal-blue-200: #bfdbfe;
+  --pal-blue-300: #93c5fd;
+  --pal-blue-400: #60a5fa;
+  --pal-blue-600: #2563eb;
+  --pal-blue-700: #1d4ed8;
+  --pal-blue-800: #1e40af;
+  --pal-cyan-200: #a5f3fc;
+  --pal-cyan-400: #22d3ee;
+  --pal-cyan-500: #06b6d4;
+  --pal-cyan-600: #0891b2;
+  --pal-cyan-neon: #00f2fe;
+  --pal-emerald-500: #10b981;
+  --pal-red-400: #f87171;
+  --pal-rose-200: #fecdd3;
+  --pal-sky-200: #bae6fd;
+  --pal-sky-400: #38bdf8;
+  --pal-sky-600: #0284c7;
+  --pal-slate-100: #f1f5f9;
+  --pal-slate-300: #cbd5e1;
+  --pal-slate-400: #94a3b8;
+  --pal-slate-50: #f8fafc;
+  --pal-slate-500: #64748b;
+  --pal-white: #ffffff;
+  --pal-yellow-200: #fef08a;
+}
