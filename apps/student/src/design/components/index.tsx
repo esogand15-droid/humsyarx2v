@@ -1,7 +1,7 @@
 /* DS v2 — thin React wrappers over design/components.css (.ds-*).
    They only assemble class names and ARIA; all visuals live in CSS and read --hym-accent-*.
    v1 wrappers in src/components/* stay untouched until Wave 3/4 migrates screens. */
-import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react';
 
 const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(' ');
 
@@ -41,8 +41,53 @@ export interface DsSegmentedProps<T extends string> {
   label: string;
 }
 export function DsSegmented<T extends string>({ value, options, onChange, block, label }: DsSegmentedProps<T>) {
+  const segRef = useRef<HTMLDivElement>(null);
+  const readyRef = useRef(false);
+  const activeIdx = options.findIndex((o) => o.value === value);
+
+  const measure = useCallback(() => {
+    const seg = segRef.current;
+    if (!seg) return;
+    if (activeIdx < 0) {
+      seg.dataset.segReady = 'true';
+      return;
+    }
+    const items = seg.querySelectorAll<HTMLElement>('.ds-seg__item');
+    const el = items[activeIdx];
+    if (!el || el.offsetWidth <= 0) return;
+    const isRtl = getComputedStyle(seg).direction === 'rtl';
+    const x = isRtl ? -(seg.clientWidth - (el.offsetLeft + el.offsetWidth)) : el.offsetLeft;
+    seg.style.setProperty('--lg-seg-x', `${Math.round(x)}px`);
+    seg.style.setProperty('--lg-seg-w', `${Math.round(el.offsetWidth)}px`);
+    seg.dataset.segReady = 'true';
+    if (!readyRef.current) {
+      readyRef.current = true;
+      requestAnimationFrame(() => {
+        if (segRef.current) segRef.current.dataset.segAnim = 'true';
+      });
+    }
+  }, [activeIdx]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure, options.length]);
+
+  useEffect(() => {
+    const seg = segRef.current;
+    if (!seg) return;
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measure()) : null;
+    ro?.observe(seg);
+    window.addEventListener('resize', measure);
+    document.fonts?.ready.then(() => measure()).catch(() => {});
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [measure]);
+
   return (
-    <div className={cx('ds-seg', block && 'ds-seg--block')} role="tablist" aria-label={label}>
+    <div ref={segRef} className={cx('ds-seg', block && 'ds-seg--block')} role="tablist" aria-label={label}>
+      <span className="lg-seg__lens" aria-hidden="true" data-hidden={activeIdx < 0 ? '' : undefined} />
       {options.map((o) => (
         <button key={o.value} type="button" role="tab" className="ds-seg__item" aria-selected={o.value === value} onClick={() => onChange(o.value)}>
           {o.label}

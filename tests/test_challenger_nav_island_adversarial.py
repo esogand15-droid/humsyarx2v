@@ -119,7 +119,7 @@ class TestRapidViewTransitionsAcross22Screens(ChallengerNavIslandBase):
         {"route": "/library/book/gray", "file": "LibraryScreens.tsx", "title": "آناتومی گری", "sub": "کتاب مرجع", "back": True, "actions": None},
         {"route": "/read/pdf/123", "file": "ReaderScreen.tsx", "title": "فیزیولوژی گایتون", "sub": "خواندن داخل هامزیار", "back": True, "actions": ["ai_chat_btn"]},
         {"route": "/me/notes", "file": "NotesScreen.tsx", "title": "دفتر من", "sub": "هر چیزی که روی آن نوشته‌ای", "back": True, "actions": None},
-        {"route": "/exam", "file": "ExamHome.tsx", "title": "تمرین", "sub": "بانک سؤال", "back": True, "actions": None},
+        {"route": "/exam", "file": "ExamHome.tsx", "title": "تمرین", "sub": "بانک سؤال", "back": False, "actions": None},
         {"route": "/exam/practice", "file": "PracticeScreen.tsx", "title": "قلب · فیزیولوژی", "sub": "حل شده", "back": True, "actions": None},
         {"route": "/exam/history", "file": "HistoryScreen.tsx", "title": "تاریخچهٔ پاسخ‌ها", "sub": "هر چه پاسخ داده‌ای", "back": True, "actions": None},
         {"route": "/exam/setup", "file": "ExamSetup.tsx", "title": "آزمون", "sub": "زمان‌دار، بدون پاسخ در میانه", "back": True, "actions": None},

@@ -8,6 +8,7 @@ import { DsBadge, DsButton, DsCard, DsChip, DsEmpty } from '../../design/compone
 import { Icon } from '../../icons';
 import {
   OPTION_LETTERS,
+  diffTone,
   exam,
   type AnswerPayload,
   type NextPayload,
@@ -254,6 +255,9 @@ export function PracticeScreen() {
                   setDiffFilter(d.code);
                 }}
               >
+                {diffTone(d.code) && (
+                  <span className={`exam-diff-dot exam-diff-dot--${diffTone(d.code)}`} aria-hidden="true" />
+                )}
                 {d.label}
               </DsChip>
             ))}

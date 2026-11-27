@@ -981,39 +981,53 @@ html.dark {
    ────────────────────────────────────────────────────────────────────── */
 
 :root {
-  --lg-tint:        rgba(255, 255, 255, 0.70);
-  --lg-tint-strong: rgba(255, 255, 255, 0.86);
-  --lg-tint-card:   rgba(255, 255, 255, 0.82);
+  --lg-tint:        rgba(255, 255, 255, 0.72);
+  --lg-tint-strong: rgba(255, 255, 255, 0.88);
+  --lg-tint-card:   rgba(255, 255, 255, 0.76);
+  --lg-tint-sunken: rgba(241, 245, 249, 0.72);
   --lg-blur:        blur(22px) saturate(180%);
   --lg-blur-subtle: blur(14px) saturate(150%);
-  --lg-edge:        rgba(15, 23, 42, 0.10);
+  --lg-edge:        rgba(15, 23, 42, 0.09);
   --lg-edge-strong: rgba(15, 23, 42, 0.16);
   --lg-spec:        rgba(255, 255, 255, 0.96);
-  --lg-rim-dark:    rgba(15, 23, 42, 0.06);
-  --lg-shadow:      0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 32px -12px rgba(15, 23, 42, 0.22);
+  --lg-rim-dark:    rgba(15, 23, 42, 0.05);
+  --lg-shadow:      0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 32px -12px rgba(15, 23, 42, 0.20);
+  --lg-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.12);
   --lg-lens:        rgba(37, 99, 235, 0.10);
   --lg-lens-rim:    rgba(255, 255, 255, 0.92);
-  --lg-btn:         rgba(255, 255, 255, 0.58);
+  --lg-btn:         rgba(255, 255, 255, 0.62);
   --lg-btn-hover:   rgba(15, 23, 42, 0.06);
   --lg-radius-bar:  30px;
   --lg-spring:      cubic-bezier(.34, 1.32, .64, 1);
+  --hym-canvas-bg:
+    radial-gradient(62% 42% at 15% 0%, rgba(14, 165, 233, 0.10), transparent 68%),
+    radial-gradient(54% 38% at 88% 8%, rgba(37, 99, 235, 0.08), transparent 64%),
+    radial-gradient(45% 32% at 50% 100%, rgba(14, 165, 233, 0.05), transparent 70%),
+    var(--hym-surface-0);
 }
 
 html[data-theme="dark"],
 html.dark {
-  --lg-tint:        rgba(22, 30, 48, 0.62);
-  --lg-tint-strong: rgba(15, 21, 35, 0.82);
-  --lg-tint-card:   rgba(19, 27, 45, 0.74);
+  --lg-tint:        rgba(22, 30, 48, 0.64);
+  --lg-tint-strong: rgba(15, 21, 35, 0.84);
+  --lg-tint-card:   rgba(17, 25, 43, 0.72);
+  --lg-tint-sunken: rgba(9, 14, 26, 0.68);
   --lg-blur:        blur(24px) saturate(165%);
   --lg-blur-subtle: blur(16px) saturate(150%);
   --lg-edge:        rgba(255, 255, 255, 0.12);
   --lg-edge-strong: rgba(255, 255, 255, 0.20);
-  --lg-spec:        rgba(255, 255, 255, 0.18);
+  --lg-spec:        rgba(255, 255, 255, 0.16);
   --lg-rim-dark:    rgba(0, 0, 0, 0.36);
   --lg-shadow:      0 1px 1px rgba(0, 0, 0, 0.32), 0 14px 36px -14px rgba(0, 0, 0, 0.72);
+  --lg-shadow-card: 0 1px 1px rgba(0, 0, 0, 0.28), 0 10px 28px -14px rgba(0, 0, 0, 0.56);
   --lg-lens:        rgba(255, 255, 255, 0.11);
   --lg-lens-rim:    rgba(255, 255, 255, 0.18);
-  --lg-btn:         rgba(255, 255, 255, 0.07);
-  --lg-btn-hover:   rgba(255, 255, 255, 0.13);
+  --lg-btn:         rgba(255, 255, 255, 0.08);
+  --lg-btn-hover:   rgba(255, 255, 255, 0.14);
+  --hym-canvas-bg:
+    radial-gradient(60% 42% at 15% 0%, rgba(0, 242, 254, 0.09), transparent 68%),
+    radial-gradient(52% 38% at 88% 8%, rgba(37, 99, 235, 0.13), transparent 64%),
+    radial-gradient(45% 32% at 50% 100%, rgba(56, 189, 248, 0.06), transparent 70%),
+    var(--hym-surface-0);
 }
 

@@ -168,7 +168,7 @@ export function GradesScreen() {
                             aria-label={`معدل ${sem.term_label}`}
                           >
                             <svg className="acct-trend-bar__svg" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
-                              <rect className="acct-trend-bar__fill" x={100 - pct} y={0} width={pct} height={8} rx={4} />
+                              <rect className="acct-trend-bar__fill" x={100 - pct} y={0} width={pct} height={8} rx={0} />
                             </svg>
                           </div>
                         </div>

@@ -2,10 +2,13 @@
    Enter = ارسال فقط با نشانگر دقیق (دسکتاپ)؛ در لمسی Enter خط تازه است.
    هنگام استریم قابل نوشتن میماند (کیبورد بسته نشود) و دکمه به «توقف» تبدیل میشود.
    چیدمان RTL: ارسال در راست فیزیکی (اولین فرزند)، «+» در چپ فیزیکی (آخرین فرزند).
-   «+» یک پاپاور جمعوجور باز میکند (دوربین، تصاویر، فایل، تحلیل تصویر بالینی)؛
+   «+» یک پاپاور جمعوجور باز میکند (دوربین، تصاویر، فایل)؛
    هر گزینه بیدرنگ انتخابگر بومی را باز میکند و تصویر انتخابشده بالای فیلد
-   بهصورت چیپ میماند تا همراه پیام فرستاده شود. */
+   بهصورت چیپ میماند تا همراه پیام فرستاده شود.
+   پرده و پاپاور در body پورتال میشوند: backdrop-filter نوار نوشتن یک containing block
+   برای position:fixed میسازد و پرده را فقط روی خود نوار (خاکستری) میکشید. */
 import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from '../../icons';
 import type { IconName } from '../../icons';
 import { MOTION, usePresence } from '../../lib/motion';
@@ -32,8 +35,6 @@ export interface ComposerProps {
   draftId: string;
   onSend: (text: string) => Promise<boolean> | boolean;
   onStop: () => void;
-  /** روند کامل «تحلیل تصویر بالینی» (شیت موجود) */
-  onAttach: () => void;
   /** ارسال تصویر پیوستشده همراه متن؛ خطا را throw میکند تا روی چیپ نمایش داده شود. */
   onSendImage?: (file: File, prompt: string) => Promise<void>;
 }
@@ -71,16 +72,18 @@ function validateImage(file: File): string | null {
 
 const finePointer = () => typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
 
-type MenuKey = 'camera' | 'gallery' | 'file' | 'vision';
+type MenuKey = 'camera' | 'gallery' | 'file';
 const MENU: { key: MenuKey; icon: IconName; label: string }[] = [
   { key: 'camera', icon: 'i-video', label: 'دوربین' },
   { key: 'gallery', icon: 'i-layers', label: 'تصاویر' },
   { key: 'file', icon: 'i-file-text', label: 'فایل' },
-  { key: 'vision', icon: 'i-stethoscope', label: 'تحلیل تصویر بالینی' },
 ];
 
+const MENU_GAP = 10;
+const VIEW_MARGIN = 16;
+
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { streaming, disabled, maxChars, canAttach, draftId, onSend, onStop, onAttach, onSendImage },
+  { streaming, disabled, maxChars, canAttach, draftId, onSend, onStop, onSendImage },
   ref,
 ) {
   const [value, setValue] = useState(() => readDraft(draftId));
@@ -173,12 +176,36 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     if (attachment) URL.revokeObjectURL(attachment.url);
   }, [attachment]);
 
+  /* پاپاور پورتالشده با position:fixed بالای «+» لنگر میشود؛ با چرخش، تغییر اندازه و کیبورد بهروز میماند. */
+  useLayoutEffect(() => {
+    if (!menu.mounted) return;
+    const place = () => {
+      const btn = plusRef.current;
+      const el = menuRef.current;
+      if (!btn || !el) return;
+      const r = btn.getBoundingClientRect();
+      const rtl = getComputedStyle(btn).direction === 'rtl';
+      const vw = document.documentElement.clientWidth;
+      // RTL: inline-end is the physical start edge of the button.
+      const end = rtl ? r.x : vw - (r.x + r.width);
+      const maxEnd = Math.max(VIEW_MARGIN, vw - el.offsetWidth - VIEW_MARGIN);
+      el.style.setProperty('--aic-menu-bottom', `${Math.round(window.innerHeight - r.top + MENU_GAP)}px`);
+      el.style.setProperty('--aic-menu-end', `${Math.round(Math.min(Math.max(VIEW_MARGIN, end), maxEnd))}px`);
+    };
+    place();
+    const vv = window.visualViewport;
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    vv?.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+      vv?.removeEventListener('resize', place);
+    };
+  }, [menu.mounted]);
+
   const pick = (key: MenuKey) => {
     setMenuOpen(false);
-    if (key === 'vision') {
-      onAttach();
-      return;
-    }
     const input = key === 'camera' ? cameraInput : key === 'gallery' ? galleryInput : fileInput;
     // باید در همان رویداد لمس صدا زده شود تا iOS انتخابگر را مسدود نکند.
     input.current?.click();
@@ -322,7 +349,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             >
               <Icon name="i-plus" size={22} />
             </button>
-            {menu.mounted && (
+            {menu.mounted &&
+              createPortal(
               <>
                 <div
                   className="aic-attach-scrim"
@@ -348,7 +376,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                     ))}
                   </div>
                 </div>
-              </>
+              </>,
+              document.body,
             )}
           </div>
         )}

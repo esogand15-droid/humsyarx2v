@@ -73,13 +73,25 @@
   color: var(--hym-accent-text);
 }
 
+/* نقطهٔ سطح سختی بهجای ایموجی 🟢🟡🔴 برچسبهای بکاند */
+.exam-diff-dot {
+  flex: 0 0 auto;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: var(--hym-radius-pill);
+  box-shadow: 0 0 0 1px var(--lg-edge, var(--hym-hairline));
+}
+.exam-diff-dot--easy { background: var(--hym-role-grades-solid); }
+.exam-diff-dot--medium { background: var(--hym-role-schedule-solid); }
+.exam-diff-dot--hard { background: var(--hym-role-danger-solid); }
+
 /* ── نوار پیشرفت SVG بدون inline style ────────────────────────────────── */
 .exam-progress {
   width: 100%;
   height: 8px;
   border-radius: var(--hym-radius-pill);
-  background: var(--hym-surface-sunken);
-  box-shadow: inset 0 0 0 1px var(--hym-hairline);
+  background: var(--lg-tint-sunken, var(--hym-surface-sunken));
+  box-shadow: inset 0 1px 0 var(--lg-rim-dark, transparent), inset 0 0 0 1px var(--lg-edge, var(--hym-hairline));
   overflow: hidden;
 }
 
@@ -183,13 +195,22 @@
 }
 
 @media (min-width: 768px) {
+  /* Named areas: the list (main) always takes the wide inline-start column, the
+     stats/actions rail the narrow one — independent of DOM order (ExamHome puts
+     the rail first so it leads on mobile; ExamSetup puts it last). */
   .exam-home-grid,
   .exam-setup-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(290px, 0.9fr);
+    grid-template-areas: "main side";
     gap: var(--hym-space-6);
     align-items: start;
   }
+
+  .exam-home-main,
+  .exam-setup-main { grid-area: main; }
+  .exam-home-side,
+  .exam-setup-side { grid-area: side; }
 
   .exam-home-side,
   .exam-setup-side {

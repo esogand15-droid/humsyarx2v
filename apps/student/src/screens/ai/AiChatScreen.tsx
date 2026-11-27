@@ -15,7 +15,6 @@ import {
   type AiStatus,
   type VisionDiagnosisResult,
 } from '../../lib/ai';
-import { AiVisionModal } from './AiVisionModal';
 import { ChatMessage } from './ChatMessage';
 import { Composer, type ComposerHandle } from './Composer';
 import { ConversationList } from './ConversationList';
@@ -41,11 +40,14 @@ function useChatViewport(root: React.RefObject<HTMLElement | null>) {
       raf = requestAnimationFrame(() => {
         const top = Math.max(0, el.getBoundingClientRect().top + window.scrollY);
         const tab = document.querySelector<HTMLElement>('.app-tabbar, .tabbar');
-        const tabH = tab && getComputedStyle(tab).display !== 'none' ? tab.getBoundingClientRect().height : 0;
+        const tabClearance =
+          tab && getComputedStyle(tab).display !== 'none'
+            ? Math.max(0, window.innerHeight - tab.getBoundingClientRect().top)
+            : 0;
         const kb = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
         const hasKb = kb > 80;
         el.style.setProperty('--aic-top', `${Math.round(top)}px`);
-        el.style.setProperty('--aic-bottom', `${Math.round(hasKb ? kb : tabH)}px`);
+        el.style.setProperty('--aic-bottom', `${Math.round(hasKb ? kb : tabClearance)}px`);
         el.classList.toggle('has-kb', hasKb);
       });
     };
@@ -180,7 +182,6 @@ export function AiChatScreen() {
 
   /* ── کنشها ───────────────────────────────────── */
   const [drawer, setDrawer] = useState(false);
-  const [vision, setVision] = useState(false);
 
   useEffect(() => {
     if (!drawer) return;
@@ -451,7 +452,6 @@ export function AiChatScreen() {
                   draftId={activeId || 'new'}
                   onSend={send}
                   onStop={chat.stop}
-                  onAttach={() => setVision(true)}
                   onSendImage={onSendImage}
                 />
               </>
@@ -460,8 +460,6 @@ export function AiChatScreen() {
           </div>
         </section>
       </div>
-
-      <AiVisionModal open={vision} onClose={() => setVision(false)} onApplyToChat={onVision} />
     </div>
   );
 }

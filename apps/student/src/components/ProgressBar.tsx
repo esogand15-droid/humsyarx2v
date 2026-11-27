@@ -1,4 +1,4 @@
-/** نوار پیشرفت DS v2 — SVG راست‌چین بدون inline style. */
+/** نوار پیشرفت DS v2 — SVG راست‌چین با گوشه‌های گرد بدون کشیدگی. */
 export function ProgressBar({
   value,
   thin = false,
@@ -19,7 +19,7 @@ export function ProgressBar({
       aria-valuemax={100}
     >
       <svg className="ds-progress__svg" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
-        <rect className={`ds-progress__fill${fillTone}`} x={100 - v} y={0} width={v} height={8} rx={4} />
+        <rect className={`ds-progress__fill${fillTone}`} x={100 - v} y={0} width={v} height={8} rx={0} />
       </svg>
     </div>
   );

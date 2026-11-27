@@ -16,7 +16,9 @@ import { Icon } from '../../icons';
 import type { IconName } from '../../icons/sprite';
 import {
   accuracyTone,
+  diffTone,
   exam,
+  plainLabel,
   type CatalogLessonItem,
   type CatalogPayload,
   type ExamPeriodItem,
@@ -224,7 +226,7 @@ export function ExamHome() {
 
   return (
     <>
-      <AppBar title="تمرین" sub="بانک سؤال" back onBack={() => navigate(-1)} />
+      <AppBar title="تمرین" sub="بانک سؤال" />
       <div className="page page-enter exam-page">
         {state === 'loading' && <LoadingBlock rows={4} />}
         {state === 'error' && (
@@ -270,7 +272,7 @@ export function ExamHome() {
                         y={0}
                         width={Math.min(100, Math.max(0, accuracy))}
                         height={8}
-                        rx={4}
+                        rx={0}
                       />
                     </svg>
                   </div>
@@ -449,7 +451,10 @@ export function ExamHome() {
                           selected={selectedDiff === d.code}
                           onClick={() => setSelectedDiff((cur) => (cur === d.code ? '' : d.code))}
                         >
-                          <span>{d.label}</span>
+                          {diffTone(d.code) && (
+                            <span className={`exam-diff-dot exam-diff-dot--${diffTone(d.code)}`} aria-hidden="true" />
+                          )}
+                          <span>{plainLabel(d.label)}</span>
                           <span className="exam-choice-chip__count">· {faNum(d.count)}</span>
                         </DsChip>
                       ))}
@@ -529,7 +534,7 @@ export function ExamHome() {
                                 <span className="exam-group-head__title">{group.title}</span>
                               </span>
                               <span className="exam-group-head__meta">
-                                <DsBadge tone="count">
+                                <DsBadge tone="neutral">
                                   {faNum(group.lessons.length)} درس · {faNum(group.question_count)}{' '}
                                   سؤال
                                 </DsBadge>
@@ -594,7 +599,7 @@ export function ExamHome() {
                                                   y={0}
                                                   width={pct}
                                                   height={4}
-                                                  rx={2}
+                                                  rx={0}
                                                 />
                                               </svg>
                                             </div>

@@ -111,14 +111,18 @@ function normalizeTimeInput(raw: string): string | null | 'invalid' {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
+/* group از بکاند «1» یا «گروه 1» یا «گروه الف» است و educational_group
+   male|female|unknown (کلاسها: male_only|female_only|mixed). پیشوند «گروه»
+   تکرار نمیشود و برچسب جنسیت فقط برای گروه آموزشی قطعی اضافه میشود. */
 function formatCohortTitle(group?: string, edu?: string): string {
-  const g = enDigits(group || '').trim();
-  if (g === '1' && edu === 'male') return 'گروه ۱ (برادران)';
-  if (g === '1' && edu === 'female') return 'گروه ۱ (خواهران)';
-  if (g === '2' && edu === 'male') return 'گروه ۲ (برادران)';
-  if (g === '2' && edu === 'female') return 'گروه ۲ (خواهران)';
-  if (g) return `گروه ${faDigits(g)}`;
-  return '';
+  const raw = enDigits(group || '').replace(/\s+/g, ' ').trim();
+  if (!raw || raw === 'هر دو') return '';
+  const core = raw.replace(/^گروه\s*/, '').trim();
+  if (!core) return '';
+  const e = (edu || '').trim().toLowerCase();
+  const gender = e === 'male' || e === 'male_only' ? 'برادران' : e === 'female' || e === 'female_only' ? 'خواهران' : '';
+  const title = `گروه ${faDigits(core)}`;
+  return gender ? `${title} (${gender})` : title;
 }
 
 function sessionNotes(s: PlannedSession): string[] {

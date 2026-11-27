@@ -1,11 +1,19 @@
 /* ==========================================================================
-   iOS 27 Liquid Glass Surface System — هم‌یار X
+   iOS 27 Liquid Glass Surface System — هامزیار
    All color/alpha values resolve strictly from --lg-* and --hym-* tokens in
    tokens.css so dark/light themes, high contrast, and reduced transparency
    stay synchronized with zero raw hex or rgba literals.
    ========================================================================== */
 
-/* Shared specular rim mixin pattern via class composition & selectors */
+/* ── Ambient Canvas Depth Behind All Liquid Glass Surfaces ────────────── */
+.app-shell,
+.main-stage,
+.auth-screen,
+.welcome-wrap {
+  background: var(--hym-canvas-bg);
+}
+
+/* Shared frosted backdrop-filter across all primary chrome & floating overlays */
 .app-tabbar.ds-tabbar,
 .app-shell--nav .appbar,
 .reader-shell .appbar,
@@ -22,12 +30,15 @@
 .toast,
 .ds-sw-banner,
 .session-banner,
-.welcome-nav {
+.welcome-nav,
+.notif-pop,
+.aic-attach__menu,
+.exam-dialog {
   backdrop-filter: var(--lg-blur);
   -webkit-backdrop-filter: var(--lg-blur);
 }
 
-/* ── Floating Bottom Tab Bar (Mobile) ─────────────────────────────────── */
+/* ── Floating Bottom Tab Bar (Mobile Liquid Glass Dock) ───────────────── */
 .app-tabbar.ds-tabbar {
   background: var(--lg-tint-strong);
   border: 1px solid var(--lg-edge);
@@ -39,6 +50,15 @@
   padding: 5px;
   gap: 2px;
   overflow: visible;
+}
+
+@media (max-width: 767px) {
+  .app-tabbar.ds-tabbar {
+    inset-inline: 10px;
+    bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    padding-block: 5px;
+    padding-inline: 5px;
+  }
 }
 
 .app-tabbar.ds-tabbar::before {
@@ -196,11 +216,13 @@ html .app-shell--nav .desktop-header {
   border-color: var(--lg-edge-strong);
 }
 
-/* ── Sidebar & Tablet Rail ────────────────────────────────────────────── */
+/* ── Sidebar & Tablet Rail (Symmetrical Centering & Liquid Glass) ─────── */
 .app-shell--nav .sidebar {
   background: var(--lg-tint-strong);
   border-inline-end: 1px solid var(--lg-edge);
-  box-shadow: inset -1px 0 0 var(--lg-rim-dark);
+  box-shadow:
+    inset 0 1px 0 var(--lg-spec),
+    inset -1px 0 0 var(--lg-rim-dark);
 }
 
 .sidebar__link {
@@ -213,7 +235,8 @@ html .app-shell--nav .desktop-header {
 }
 
 .sidebar__collapse-toggle,
-.sidebar__user {
+.sidebar__user,
+.sidebar__brand-rail-btn {
   min-width: 44px;
   min-height: 44px;
 }
@@ -221,6 +244,11 @@ html .app-shell--nav .desktop-header {
 .sidebar__collapse-toggle {
   display: inline-grid;
   place-items: center;
+}
+
+.sidebar__brand-rail-btn {
+  justify-content: center;
+  margin-inline: auto;
 }
 
 .sidebar__link.active {
@@ -243,8 +271,30 @@ html .app-shell--nav .desktop-header {
   white-space: nowrap;
 }
 
-@media (min-width: 768px) and (max-width: 1023px) {
-  .sidebar__link {
+/* Keep every icon, logo, and avatar symmetrically centered in tablet & collapsed rails */
+@media (min-width: 768px) and (max-width: 1023px),
+       (min-width: 1024px) and (max-width: 1279px) and (orientation: landscape),
+       (min-width: 1024px) and (hover: none) and (pointer: coarse) {
+  .app-shell--nav .sidebar {
+    scrollbar-width: none;
+    box-shadow:
+      inset 0 1px 0 var(--lg-spec),
+      var(--lg-shadow);
+  }
+  .app-shell--nav .sidebar::-webkit-scrollbar {
+    display: none;
+  }
+  .app-shell--nav .sidebar__header {
+    justify-content: center;
+    padding-inline: 8px;
+  }
+  .app-shell--nav .sidebar__brand-row {
+    width: 100%;
+    justify-content: center;
+    gap: 0;
+  }
+  .app-shell--nav .sidebar__link {
+    width: 100%;
     flex-direction: column;
     justify-content: center;
     gap: 3px;
@@ -252,21 +302,169 @@ html .app-shell--nav .desktop-header {
     padding-inline: 4px;
     min-height: 52px;
   }
-
-  .sidebar__rail-label {
+  .app-shell--nav .sidebar__rail-label {
     display: block;
+  }
+  .app-shell--nav .sidebar__footer {
+    align-items: center;
+    justify-content: center;
+    padding-inline: 6px;
+  }
+  .app-shell--nav .sidebar__user {
+    width: 100%;
+    justify-content: center;
+    padding-inline: 0;
+    margin-inline: auto;
   }
 }
 
-.sidebar.is-collapsed .sidebar__link {
+.app-shell--nav .sidebar.is-collapsed,
+.app-shell--nav .sidebar.sidebar--collapsed {
+  scrollbar-width: none;
+}
+
+.app-shell--nav .sidebar.is-collapsed::-webkit-scrollbar,
+.app-shell--nav .sidebar.sidebar--collapsed::-webkit-scrollbar {
+  display: none;
+}
+
+.app-shell--nav .sidebar.is-collapsed .sidebar__header,
+.app-shell--nav .sidebar.sidebar--collapsed .sidebar__header {
+  justify-content: center;
+  padding-inline: 8px;
+}
+
+.app-shell--nav .sidebar.is-collapsed .sidebar__link,
+.app-shell--nav .sidebar.sidebar--collapsed .sidebar__link {
+  width: 100%;
   flex-direction: column;
   justify-content: center;
   gap: 3px;
   min-height: 52px;
 }
 
-.sidebar.is-collapsed .sidebar__rail-label {
+.app-shell--nav .sidebar.is-collapsed .sidebar__rail-label,
+.app-shell--nav .sidebar.sidebar--collapsed .sidebar__rail-label {
   display: block;
+}
+
+.app-shell--nav .sidebar.is-collapsed .sidebar__footer,
+.app-shell--nav .sidebar.sidebar--collapsed .sidebar__footer {
+  align-items: center;
+  justify-content: center;
+}
+
+.app-shell--nav .sidebar.is-collapsed .sidebar__user,
+.app-shell--nav .sidebar.sidebar--collapsed .sidebar__user {
+  width: 100%;
+  justify-content: center;
+  padding-inline: 0;
+  margin-inline: auto;
+}
+
+/* ── Unified Liquid Glass Content Cards & Surfaces Across All Screens ─── */
+.ds-card:not(.ds-card--sunken):not(.ds-card--accent),
+.card:not(.card--quiet),
+.exam-kpi-tile,
+.acct-kpi-tile,
+.exam-q-card,
+.sched-day-card,
+.auth-card,
+.welcome-preview-card,
+.welcome-step-card,
+.exam-group-head {
+  background: var(--lg-tint-card);
+  border: 1px solid var(--lg-edge);
+  box-shadow:
+    inset 0 1px 0 var(--lg-spec),
+    var(--lg-shadow-card);
+}
+
+.ds-card--raised,
+.ds-card--float {
+  background: var(--lg-tint-strong);
+  border-color: var(--lg-edge-strong);
+  box-shadow:
+    inset 0 1px 0 var(--lg-spec),
+    var(--lg-shadow);
+}
+
+.ds-card--sunken,
+.card--quiet,
+.exam-lesson-drawer,
+.acct-course-row,
+.acct-sheet__item,
+.pwa-step-row,
+.welcome-preview-sheet {
+  background: var(--lg-tint-sunken);
+  border: 1px solid var(--lg-edge);
+  box-shadow: inset 0 1px 0 var(--lg-rim-dark);
+}
+
+.ds-card--interactive:hover,
+.home-mod-card:hover,
+.lib-term-card:hover,
+.exam-lesson-card:hover,
+.welcome-step-card:hover {
+  border-color: var(--lg-edge-strong);
+  box-shadow:
+    inset 0 1px 0 var(--lg-spec),
+    var(--lg-shadow);
+}
+
+.ds-chip {
+  background: var(--lg-btn);
+  border: 1px solid var(--lg-edge);
+  box-shadow: inset 0 1px 0 var(--lg-spec);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms var(--lg-spring);
+}
+
+.ds-chip:hover {
+  background: var(--lg-btn-hover);
+  border-color: var(--lg-edge-strong);
+}
+
+.ds-chip:active {
+  transform: scale(0.96);
+}
+
+.ds-chip[aria-pressed="true"],
+.ds-chip[aria-selected="true"] {
+  background: var(--hym-accent-subtle);
+  border-color: var(--hym-accent-border);
+  color: var(--hym-accent-text);
+  box-shadow: inset 0 1px 0 var(--lg-spec);
+}
+
+.aic-starter,
+.exam-opt:not(.is-picked):not(.is-right):not(.is-wrong),
+.exam-flag-btn:not(.is-flagged) {
+  background: var(--lg-tint-card);
+  border: 1px solid var(--lg-edge);
+  box-shadow: inset 0 1px 0 var(--lg-spec);
+}
+
+.aic-starter:hover,
+.exam-opt:not(:disabled):not(.is-picked):not(.is-right):not(.is-wrong):hover,
+.exam-flag-btn:not(.is-flagged):hover {
+  background: var(--lg-btn-hover);
+  border-color: var(--lg-edge-strong);
+}
+
+/* ── Popovers (Notifications & AI Attach) ─────────────────────────────── */
+.notif-pop,
+.aic-attach__menu,
+.exam-dialog {
+  background: var(--lg-tint-strong);
+  border: 1px solid var(--lg-edge-strong);
+  box-shadow:
+    inset 0 1px 0 var(--lg-spec),
+    inset 0 -1px 0 var(--lg-rim-dark),
+    var(--lg-shadow);
 }
 
 /* ── Audio MiniPlayer Capsule ─────────────────────────────────────────── */
@@ -363,28 +561,70 @@ html .app-shell--nav .desktop-header {
   }
 }
 
-/* ── Segmented Controls & AI Composer ─────────────────────────────────── */
+/* ── Segmented Controls with Sliding Liquid Glass Lens & AI Composer ──── */
 .ds-seg {
-  background: var(--hym-surface-sunken);
-  border: 1px solid var(--hym-hairline);
+  position: relative;
+  background: var(--lg-tint-sunken);
+  border: 1px solid var(--lg-edge);
   border-radius: 16px;
   padding: 4px;
+  box-shadow: inset 0 1px 0 var(--lg-rim-dark);
+}
+
+.lg-seg__lens {
+  position: absolute;
+  inset-block: 4px;
+  inset-inline-start: 0;
+  width: var(--lg-seg-w, 0px);
+  transform: translate3d(var(--lg-seg-x, 0px), 0, 0);
+  opacity: 0;
+  border-radius: 12px;
+  background: var(--lg-tint-strong);
+  border: 1px solid var(--lg-lens-rim);
+  box-shadow:
+    inset 0 1px 0 var(--lg-spec),
+    0 2px 10px color-mix(in srgb, var(--hym-ink) 8%, transparent);
+  pointer-events: none;
+  z-index: 0;
+  transition: none;
+}
+
+.ds-seg[data-seg-anim="true"] .lg-seg__lens {
+  transition:
+    transform 320ms var(--lg-spring),
+    width 320ms var(--lg-spring),
+    opacity 180ms ease;
+}
+
+.ds-seg[data-seg-ready="true"] .lg-seg__lens:not([data-hidden]) {
+  opacity: 1;
+}
+
+.ds-seg .lg-seg__lens[data-hidden] {
+  opacity: 0;
 }
 
 .ds-seg__item {
+  position: relative;
+  z-index: 1;
   min-height: 44px;
   border-radius: 12px;
   transition:
-    background-color 200ms ease,
     color 180ms ease,
     transform 220ms var(--lg-spring);
 }
 
 .ds-seg__item[aria-selected="true"] {
-  background: var(--lg-lens);
-  border: 1px solid var(--lg-lens-rim);
-  box-shadow: inset 0 1px 0 var(--lg-spec);
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
   color: var(--hym-ink);
+}
+
+.ds-seg:not([data-seg-ready="true"]) .ds-seg__item[aria-selected="true"] {
+  background: var(--lg-lens);
+  border-color: var(--lg-lens-rim);
+  box-shadow: inset 0 1px 0 var(--lg-spec);
 }
 
 .aic-composer__box {
@@ -423,13 +663,6 @@ html .app-shell--nav .desktop-header {
   border-color: var(--lg-edge-strong);
 }
 
-.auth-card,
-.welcome-preview-card {
-  background: var(--hym-surface-1);
-  border: 1px solid var(--hym-hairline);
-  box-shadow: var(--hym-elev-2);
-}
-
 /* ── Accessibility & Hardware Fallbacks ───────────────────────────────── */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .app-tabbar.ds-tabbar,
@@ -443,7 +676,10 @@ html .app-shell--nav .desktop-header {
   .ds-sw-banner,
   .session-banner,
   .aic-composer__box,
-  .welcome-nav {
+  .welcome-nav,
+  .notif-pop,
+  .aic-attach__menu,
+  .exam-dialog {
     background: var(--hym-surface-raised);
   }
 }
@@ -465,26 +701,41 @@ html .app-shell--nav .desktop-header {
   .ds-sw-banner,
   .session-banner,
   .aic-composer__box,
-  .welcome-nav {
+  .welcome-nav,
+  .notif-pop,
+  .aic-attach__menu,
+  .exam-dialog {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     background: var(--hym-surface-raised);
     border-color: var(--hym-line-strong);
   }
+
+  .ds-card:not(.ds-card--sunken):not(.ds-card--accent),
+  .card:not(.card--quiet),
+  .auth-card,
+  .welcome-preview-card,
+  .welcome-step-card {
+    background: var(--hym-surface-1);
+    border-color: var(--hym-hairline-strong);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .lg-tabbar__lens,
+  .lg-seg__lens,
   .app-tabbar .ds-tabbar__item,
   .iconbtn,
   .desktop-header__search,
   .sidebar__link,
-  .ds-seg__item {
+  .ds-seg__item,
+  .ds-chip {
     transition: none;
   }
 
   .app-tabbar .ds-tabbar__item:active,
-  .iconbtn:active {
+  .iconbtn:active,
+  .ds-chip:active {
     transform: none;
   }
 }

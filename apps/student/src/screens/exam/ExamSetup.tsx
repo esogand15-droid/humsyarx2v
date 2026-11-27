@@ -8,8 +8,10 @@ import { DsBadge, DsButton, DsCard, DsChip, DsEmpty } from '../../design/compone
 import { Icon } from '../../icons';
 import { ApiError } from '../../lib/api';
 import {
+  diffTone,
   exam,
   mockExam,
+  plainLabel,
   type CatalogGroup,
   type CatalogLessonItem,
   type CatalogPayload,
@@ -480,7 +482,10 @@ export function ExamSetup() {
                                   setDifficulty((cur) => (cur === d.code ? '' : d.code))
                                 }
                               >
-                                <span>{d.label}</span>
+                                {diffTone(d.code) && (
+                                  <span className={`exam-diff-dot exam-diff-dot--${diffTone(d.code)}`} aria-hidden="true" />
+                                )}
+                                <span>{plainLabel(d.label)}</span>
                                 <span className="exam-choice-chip__count">· {faNum(d.count)}</span>
                               </DsChip>
                             ))}

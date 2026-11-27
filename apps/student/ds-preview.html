@@ -20,8 +20,9 @@
 <link rel="stylesheet" href="./src/design/tokens.css" />
 <link rel="stylesheet" href="./src/design/base.css" />
 <link rel="stylesheet" href="./src/design/components.css" />
+<link rel="stylesheet" href="./src/design/glass.css" />
 <style>
-  body { background: var(--hym-surface-0); color: var(--hym-text-primary); font-size: var(--hym-fs-body); line-height: var(--hym-lh-body); }
+  body { background: var(--hym-canvas-bg, var(--hym-surface-0)); background-attachment: fixed; color: var(--hym-text-primary); font-size: var(--hym-fs-body); line-height: var(--hym-lh-body); }
   .pv { max-width: 1120px; margin-inline: auto; padding: var(--hym-space-6) var(--hym-space-page) var(--hym-space-16); }
   .pv h1 { font-size: var(--hym-fs-h1); font-weight: 800; line-height: var(--hym-lh-tight); margin: 0; }
   .pv h2 { font-size: var(--hym-fs-h2); font-weight: 800; line-height: var(--hym-lh-tight); margin: var(--hym-space-10) 0 var(--hym-space-2); }
@@ -56,6 +57,24 @@
   .pv-split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; min-height: 100vh; }
   .pv-split iframe { width: 100%; border: 0; display: block; }
   .pv-split > div { border-inline-end: 1px solid var(--hym-hairline-strong); }
+  /* Liquid Glass: tiers sit on a busy backdrop so tint/blur differences are visible */
+  .lg-stage { position: relative; padding: var(--hym-space-5); border-radius: var(--hym-radius-card); overflow: hidden; background:
+      radial-gradient(40% 60% at 15% 20%, var(--hym-brand-400), transparent 70%),
+      radial-gradient(35% 55% at 85% 30%, var(--hym-violet-400), transparent 70%),
+      radial-gradient(45% 60% at 55% 95%, var(--hym-emerald-400), transparent 70%),
+      var(--hym-surface-0); }
+  .lg-stage::before { content: "هامزیار · HUMSYAR · ۱۴۰۴"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 64px; font-weight: 900; color: var(--hym-text-primary); opacity: .18; pointer-events: none; white-space: nowrap; }
+  .lg-tiers { position: relative; display: grid; gap: var(--hym-space-3); grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .lg-tile { min-height: 96px; padding: var(--hym-space-3); border-radius: 22px; border: 1px solid var(--lg-edge); display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; }
+  .lg-tile b { font-weight: 800; }
+  .lg-tile--bar { background: var(--lg-tint); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur); box-shadow: inset 0 1px 0 var(--lg-spec), var(--lg-shadow); border-radius: var(--lg-radius-bar); }
+  .lg-tile--strong { background: var(--lg-tint-strong); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur); border-color: var(--lg-edge-strong); box-shadow: inset 0 1px 0 var(--lg-spec), inset 0 -1px 0 var(--lg-rim-dark), var(--lg-shadow); }
+  .lg-tile--card { background: var(--lg-tint-card); backdrop-filter: var(--lg-blur-subtle); -webkit-backdrop-filter: var(--lg-blur-subtle); box-shadow: inset 0 1px 0 var(--lg-spec), var(--lg-shadow-card); }
+  .lg-tile--sunken { background: var(--lg-tint-sunken); box-shadow: inset 0 1px 0 var(--lg-rim-dark); }
+  .lg-pop { position: relative; width: min(264px, 100%); padding: 6px; border-radius: 24px; }
+  .lg-pop button { display: flex; width: 100%; align-items: center; gap: var(--hym-space-3); min-height: 44px; padding-inline: var(--hym-space-3); border: 0; border-radius: 16px; background: transparent; color: var(--hym-text-primary); font: inherit; }
+  .lg-pop button:hover { background: var(--lg-btn-hover); }
+  .lg-pop svg, .lg-dock svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 </style>
 </head>
 <body>
@@ -158,11 +177,17 @@
   h += '<div class="phone"><button class="ds-btn ds-btn--lg ds-btn--block">پرداخت و فعال‌سازی اشتراک</button></div></div>';
 
   h += '<h3>چیپ و کنترل تکه‌ای</h3><div class="stack"><div class="wrap"><button class="ds-chip" aria-pressed="true">همه</button><button class="ds-chip" aria-pressed="false">فیزیولوژی</button><button class="ds-chip" aria-pressed="false">بیوشیمی</button><button class="ds-chip" disabled>آناتومی (به‌زودی)</button></div>';
-  h += '<div class="phone"><div class="ds-seg ds-seg--block" role="tablist" aria-label="هفته"><button class="ds-seg__item" role="tab" aria-selected="false">هفتهٔ قبل</button><button class="ds-seg__item" role="tab" aria-selected="true">این هفته</button><button class="ds-seg__item" role="tab" aria-selected="false">هفتهٔ بعد</button></div></div></div>';
+  h += '<div class="phone"><div class="ds-seg ds-seg--block" role="tablist" aria-label="هفته"><span class="lg-seg__lens" aria-hidden="true"></span><button class="ds-seg__item" role="tab" aria-selected="false">هفتهٔ قبل</button><button class="ds-seg__item" role="tab" aria-selected="true">این هفته</button><button class="ds-seg__item" role="tab" aria-selected="false">هفتهٔ بعد</button></div></div></div>';
 
   h += '<h3>کارت و سطوح ارتفاع</h3><div class="elev-row">';
   [['ds-card--flat', 'تخت', 'elev-0 + خط'], ['', 'پیش‌فرض', 'elev-1'], ['ds-card--raised', 'برجسته', 'elev-2'], ['ds-card--float', 'شناور', 'elev-3'], ['ds-card--sunken', 'فرورفته', 'sunken'], ['ds-card--accent', 'تأکیدی', 'accent-subtle']].forEach(function (c) {
     h += '<div class="ds-card ' + c[0] + '"><p class="ds-card__title">' + c[1] + '</p><p class="ds-card__sub">' + c[2] + '</p></div>';
+  });
+  h += '</div>';
+
+  h += '<h3>نوار پیشرفت</h3><p class="note">SVG با <code>preserveAspectRatio="none"</code> و <code>rx=0</code>؛ گردی گوشه از ظرف (<code>overflow:hidden</code>) میآید، پس در هیچ عرضی کشیده نمیشود.</p><div class="stack phone">';
+  [[72, ''], [45, '--warn'], [18, '--danger'], [100, '--good']].forEach(function (p) {
+    h += '<div class="ds-progress" role="progressbar" aria-valuenow="' + p[0] + '" aria-valuemin="0" aria-valuemax="100"><svg class="ds-progress__svg" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><rect class="ds-progress__fill' + (p[1] ? ' ds-progress__fill' + p[1] : '') + '" x="' + (100 - p[0]) + '" y="0" width="' + p[0] + '" height="8" rx="0"/></svg></div>';
   });
   h += '</div>';
 
@@ -194,6 +219,30 @@
     h += '</nav>';
   });
   h += '</div>';
+
+  /* liquid glass */
+  h += '<h2>شیشهٔ مایع · iOS 27</h2><p class="note">لایهٔ <code>--lg-*</code> در <code>tokens.css</code> و قواعد آن در <code>glass.css</code>. چهار سطح: نوار شناور، پاپاور/داک (قوی)، کارت، فرورفته. پشت هر سطح عمداً رنگ و متن شلوغ گذاشته شده تا تفاوت محو و تینت دیده شود. با <code>prefers-reduced-transparency</code> همه مات میشوند.</p>';
+  h += '<div class="pairs">';
+  ['--lg-tint', '--lg-tint-strong', '--lg-tint-card', '--lg-tint-sunken', '--lg-edge', '--lg-edge-strong', '--lg-spec', '--lg-rim-dark', '--lg-lens', '--lg-btn'].forEach(function (v) {
+    h += '<div class="pair"><span class="tok">' + v + '</span><span class="sw" style="width:56px;height:28px;background:var(' + v + ')"></span></div>';
+  });
+  h += '</div>';
+  h += '<div class="lg-stage" style="margin-block-start:var(--hym-space-3)"><div class="lg-tiers">';
+  [['bar', 'نوار شناور', '--lg-tint · blur 22–24 · r30'], ['strong', 'پاپاور / داک', '--lg-tint-strong · rim'], ['card', 'کارت محتوا', '--lg-tint-card · blur-subtle'], ['sunken', 'فرورفته', '--lg-tint-sunken · بدون blur']].forEach(function (t) {
+    h += '<div class="lg-tile lg-tile--' + t[0] + '"><b>' + t[1] + '</b><span class="tok">' + t[2] + '</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="wrap" style="position:relative;margin-block-start:var(--hym-space-4);align-items:flex-end;gap:var(--hym-space-4)">';
+  h += '<div class="lg-pop lg-tile--strong" role="menu" aria-label="افزودن">' +
+    '<button role="menuitem">' + ICON.cal.replace('<svg', '<svg aria-hidden="true"') + 'دوربین</button>' +
+    '<button role="menuitem">' + ICON.book.replace('<svg', '<svg aria-hidden="true"') + 'تصاویر</button>' +
+    '<button role="menuitem">' + ICON.inbox.replace('<svg', '<svg aria-hidden="true"') + 'فایل</button></div>';
+  h += '<div class="phone" style="flex:1;min-width:260px"><div class="ds-seg ds-seg--block" role="tablist" aria-label="دستهبندی"><span class="lg-seg__lens" aria-hidden="true"></span><button class="ds-seg__item" role="tab" aria-selected="true">بر اساس درس</button><button class="ds-seg__item" role="tab" aria-selected="false">دوره و سال</button><button class="ds-seg__item" role="tab" aria-selected="false">مرور هوشمند</button></div>';
+  h += '<nav class="app-tabbar ds-tabbar ds-tabbar--static lg-dock" aria-label="داک شیشهای" style="position:relative;margin-block-start:var(--hym-space-3)">';
+  [['home', 'خانه'], ['book', 'کتابخانه'], ['flask', 'بانک سؤال', 1], ['cal', 'برنامه'], ['user', 'من']].forEach(function (t) {
+    h += '<a class="ds-tabbar__item" href="#"' + (t[2] ? ' aria-current="page"' : '') + '><span class="ds-tabbar__icon">' + ICON[t[0]] + '</span>' + t[1] + '</a>';
+  });
+  h += '</nav></div></div></div>';
 
   /* type */
   h += '<h2>مقیاس حروف</h2><p class="note">بدون فاصله‌گذاری حروف و بدون حروف بزرگ روی متن فارسی؛ ارتفاع خط متن ≥ ۱٫۶.</p>';
@@ -234,6 +283,31 @@
     span.textContent = span.dataset.label;
     span.style.color = lum(c) > 0.35 ? 'var(--hym-slate-900)' : 'var(--hym-slate-0)';
   });
+  /* segmented lens: same measurement as DsSegmented (design/components/index.tsx) */
+  function placeLenses() {
+    document.querySelectorAll('.ds-seg').forEach(function (seg) {
+      var items = seg.querySelectorAll('.ds-seg__item');
+      var idx = Array.prototype.findIndex.call(items, function (b) { return b.getAttribute('aria-selected') === 'true'; });
+      var el = items[idx];
+      if (!el) return;
+      var rtl = getComputedStyle(seg).direction === 'rtl';
+      var x = rtl ? -(seg.clientWidth - (el.offsetLeft + el.offsetWidth)) : el.offsetLeft;
+      seg.style.setProperty('--lg-seg-x', Math.round(x) + 'px');
+      seg.style.setProperty('--lg-seg-w', Math.round(el.offsetWidth) + 'px');
+      seg.dataset.segReady = 'true';
+      seg.dataset.segAnim = 'true';
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.ds-seg__item');
+    if (!b) return;
+    b.parentElement.querySelectorAll('.ds-seg__item').forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); });
+    placeLenses();
+  });
+  window.addEventListener('resize', placeLenses);
+  placeLenses();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeLenses);
+
   /* tell the side-by-side parent our height; also exposed for the screenshot script */
   function report() { var hh = document.documentElement.scrollHeight; window.__DS_HEIGHT = hh; if (parent !== window) parent.postMessage({ dsHeight: hh, theme: theme }, '*'); }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(report); else report();

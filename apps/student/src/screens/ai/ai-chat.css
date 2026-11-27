@@ -502,11 +502,13 @@ ol.md__list[dir="rtl"] { list-style-type: persian; }
 .aic-attach__plus.is-open { background: var(--hym-bg-hover); color: var(--hym-text-primary); }
 .aic-attach__plus.is-open svg { transform: rotate(45deg); }
 
-/* Compact popover anchored above "+", opening upward from its corner. */
+/* Compact popover anchored above "+", opening upward from its corner.
+   Both are portaled to <body>: the composer's backdrop-filter would otherwise be the
+   containing block for position:fixed and the scrim would only grey out the composer. */
 .aic-attach-scrim {
   position: fixed;
   inset: 0;
-  z-index: calc(var(--z-sheet, 30) - 1);
+  z-index: calc(var(--hym-z-overlay) - 1);
   background: color-mix(in srgb, var(--hym-slate-950) 14%, transparent);
   animation: mo-fade-in 150ms ease both;
 }
@@ -517,10 +519,10 @@ ol.md__list[dir="rtl"] { list-style-type: persian; }
 .aic-attach__menu {
   --mo-origin: bottom left;
   --mo-shift: 8px;
-  position: absolute;
-  bottom: calc(100% + 10px);
-  inset-inline-end: 0;
-  z-index: var(--z-sheet, 30);
+  position: fixed;
+  bottom: var(--aic-menu-bottom, 96px);
+  inset-inline-end: var(--aic-menu-end, 16px);
+  z-index: var(--hym-z-overlay);
   width: min(264px, calc(100vw - 32px));
   padding: 6px;
   border-radius: 24px;

@@ -68,6 +68,15 @@ export interface FilterOption {
   count: number;
 }
 
+/* برچسبهای سختی از بکاند (مشترک با بات) ایموجی رنگی دارند: «آسان 🟢».
+   وب بهجای ایموجی نقطهٔ DS میکشد؛ بنابراین فقط متن را نگه میداریم. */
+const EMOJI_DOT = /[\u{1F534}\u{1F7E0}-\u{1F7EB}\u{26AA}\u{26AB}\u{2B24}]\uFE0F?/gu;
+export const plainLabel = (label: string): string => label.replace(EMOJI_DOT, '').replace(/\s{2,}/g, ' ').trim();
+
+export type DiffTone = 'easy' | 'medium' | 'hard';
+export const diffTone = (code: string): DiffTone | null =>
+  code === 'easy' || code === 'medium' || code === 'hard' ? code : null;
+
 export interface CatalogFilters {
   sources: FilterOption[];
   years: string[];
