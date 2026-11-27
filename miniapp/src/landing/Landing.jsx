@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
    لندینگ اختصاصی پلتفرم هوشمند هامزیار — دستیار دانشجوی پزشکی
    • پشتیبانی کامل از تم روشن و تاریک هماهنگ با humsyar.theme
    • پایش زنده سلامت زیرساخت با پینگ مستقیم به /api/health
-   • هدایت صریح ورود و نصب به /student/install
+   • هدایت ورود به /student/welcome و راهنمای نصب به /student/install
    ───────────────────────────────────────────────────────────── */
 
 const ICONS = {
@@ -518,7 +518,7 @@ export default function Landing() {
             </button>
 
             <div className="lp-header__cta">
-              <a className="lp-btn lp-btn--header" href="/student/install">
+              <a className="lp-btn lp-btn--header" href="/student/welcome">
                 <span>ورود</span>
                 <span className="lp-header-cta-full"> به نسخهٔ وب</span>
               </a>
@@ -555,7 +555,7 @@ export default function Landing() {
 
               <div className="lp-hero__actions">
                 <div className="lp-cta-group">
-                  <a className="lp-btn lp-btn--primary lp-btn--lg" href="/student/install">
+                  <a className="lp-btn lp-btn--primary lp-btn--lg" href="/student/welcome">
                     ورود به نسخهٔ وب
                     <Icon name="arrow" size={18} />
                   </a>
@@ -718,7 +718,7 @@ export default function Landing() {
                 </ul>
 
                 <div className="lp-pillar-cta-row">
-                  <a className="lp-btn lp-btn--secondary" href="/student/install">
+                  <a className="lp-btn lp-btn--secondary" href="/student/welcome">
                     ورود به نسخهٔ وب
                     <Icon name="arrow" size={16} />
                   </a>
@@ -1047,7 +1047,7 @@ export default function Landing() {
               برنامه‌ریزی، جزوه‌ها، تست‌زنی و روتیشن‌های خود را در یک محیط سریع و منظم با هامزیار سازمان‌دهی کنید.
             </p>
             <div className="lp-hero__actions lp-hero__actions--center">
-              <a className="lp-btn lp-btn--primary lp-btn--lg" href="/student/install">
+              <a className="lp-btn lp-btn--primary lp-btn--lg" href="/student/welcome">
                 ورود به نسخهٔ وب
                 <Icon name="arrow" size={18} />
               </a>
@@ -1081,7 +1081,7 @@ export default function Landing() {
           </div>
 
           <nav className="lp-footer__links" aria-label="پیوندهای پانوشت">
-            <a href="/student/install">ورود به نسخهٔ وب</a>
+            <a href="/student/welcome">ورود به نسخهٔ وب</a>
             {supportUrl && (
               <a href={supportUrl} target="_blank" rel="noreferrer">
                 ربات تلگرام

@@ -1897,3 +1897,132 @@ html[data-theme="dark"] .lp-platform-tab--active,
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   iOS 27 Liquid Glass — همزبان با /student/welcome (apps/student/src/design/
+   tokens.css › --lg-* و glass.css › .welcome-nav / .welcome-*-card).
+   مقادیر عیناً از tokens.css کپی شدهاند؛ هر تغییری باید در هر دو جا اعمال شود.
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --lg-tint:        rgba(22, 30, 48, 0.64);
+  --lg-tint-strong: rgba(15, 21, 35, 0.84);
+  --lg-tint-card:   rgba(17, 25, 43, 0.72);
+  --lg-tint-sunken: rgba(9, 14, 26, 0.68);
+  --lg-blur:        blur(24px) saturate(165%);
+  --lg-blur-subtle: blur(16px) saturate(150%);
+  --lg-edge:        rgba(255, 255, 255, 0.12);
+  --lg-edge-strong: rgba(255, 255, 255, 0.20);
+  --lg-spec:        rgba(255, 255, 255, 0.16);
+  --lg-rim-dark:    rgba(0, 0, 0, 0.36);
+  --lg-shadow:      0 1px 1px rgba(0, 0, 0, 0.32), 0 14px 36px -14px rgba(0, 0, 0, 0.72);
+  --lg-shadow-card: 0 1px 1px rgba(0, 0, 0, 0.28), 0 10px 28px -14px rgba(0, 0, 0, 0.56);
+  --lg-btn:         rgba(255, 255, 255, 0.08);
+  --lg-btn-hover:   rgba(255, 255, 255, 0.14);
+  --lg-radius-bar:  30px;
+  --lg-spring:      cubic-bezier(.34, 1.32, .64, 1);
+}
+html[data-theme="light"] {
+  --lg-tint:        rgba(255, 255, 255, 0.72);
+  --lg-tint-strong: rgba(255, 255, 255, 0.88);
+  --lg-tint-card:   rgba(255, 255, 255, 0.76);
+  --lg-tint-sunken: rgba(241, 245, 249, 0.72);
+  --lg-blur:        blur(22px) saturate(180%);
+  --lg-blur-subtle: blur(14px) saturate(150%);
+  --lg-edge:        rgba(15, 23, 42, 0.09);
+  --lg-edge-strong: rgba(15, 23, 42, 0.16);
+  --lg-spec:        rgba(255, 255, 255, 0.96);
+  --lg-rim-dark:    rgba(15, 23, 42, 0.05);
+  --lg-shadow:      0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 32px -12px rgba(15, 23, 42, 0.20);
+  --lg-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.12);
+  --lg-btn:         rgba(255, 255, 255, 0.62);
+  --lg-btn-hover:   rgba(15, 23, 42, 0.06);
+}
+
+/* سربرگ: کپسول شناور مثل .welcome-nav */
+.lp-header {
+  top: 12px;
+  margin-block-start: 12px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-block-end: 0;
+}
+.lp-header__inner {
+  width: min(calc(100% - 24px), var(--lp-wrap));
+  padding-inline: 14px;
+  background: var(--lg-tint);
+  backdrop-filter: var(--lg-blur);
+  -webkit-backdrop-filter: var(--lg-blur);
+  border: 1px solid var(--lg-edge);
+  border-radius: var(--lg-radius-bar);
+  box-shadow: inset 0 1px 0 var(--lg-spec), var(--lg-shadow);
+}
+
+/* کارتها و پنلها: سطح شیشهای کارت */
+.lp-card,
+.lp-step,
+.lp-service-card,
+.lp-preview-card,
+.lp-pillar-panel,
+.lp-faq__item {
+  background: var(--lg-tint-card);
+  backdrop-filter: var(--lg-blur-subtle);
+  -webkit-backdrop-filter: var(--lg-blur-subtle);
+  border: 1px solid var(--lg-edge);
+  box-shadow: inset 0 1px 0 var(--lg-spec), var(--lg-shadow-card);
+}
+.lp-card:hover,
+.lp-step:hover,
+.lp-faq__item:hover {
+  border-color: var(--lg-edge-strong);
+  box-shadow: inset 0 1px 0 var(--lg-spec), var(--lg-shadow);
+}
+.lp-pillar-panel { box-shadow: inset 0 1px 0 var(--lg-spec), var(--lg-shadow); }
+.lp-final {
+  border: 1px solid var(--lg-edge);
+  box-shadow: inset 0 1px 0 var(--lg-spec), var(--lg-shadow);
+}
+
+/* تبها و دکمههای ثانویه: پیل شیشهای مثل DsSegmented / .auth-topbar-btn */
+.lp-pillar-tabs,
+.lp-platform-tabs {
+  background: var(--lg-tint-sunken);
+  border: 1px solid var(--lg-edge);
+  box-shadow: inset 0 1px 0 var(--lg-rim-dark);
+}
+.lp-pillar-tab-btn--active,
+.lp-platform-tab--active {
+  box-shadow: inset 0 1px 0 var(--lg-spec), var(--lg-shadow-card);
+}
+.lp-btn--secondary,
+.lp-btn--ghost,
+.lp-btn--header {
+  background: var(--lg-btn);
+  border-color: var(--lg-edge);
+  box-shadow: inset 0 1px 0 var(--lg-spec);
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms var(--lg-spring);
+}
+.lp-btn--secondary:hover,
+.lp-btn--ghost:hover,
+.lp-btn--header:hover {
+  background: var(--lg-btn-hover);
+  border-color: var(--lg-edge-strong);
+}
+.lp-btn:active { transform: scale(0.97); }
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lp-header__inner { background: var(--lp-header-bg); }
+  .lp-card, .lp-step, .lp-service-card, .lp-preview-card, .lp-pillar-panel, .lp-faq__item { background: var(--lp-surface); }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .lp-header__inner,
+  .lp-card, .lp-step, .lp-service-card, .lp-preview-card, .lp-pillar-panel, .lp-faq__item {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--lp-surface);
+    border-color: var(--lp-line-strong);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-btn:active { transform: none; }
+}
