@@ -9,6 +9,7 @@ import { faNum } from '../../lib/fa';
 import { ink } from '../../lib/ink';
 import { reader } from '../../lib/reader';
 import type { Kind, Scope, ViewInfo } from '../../lib/reader';
+import './reader-shell.css';
 import './reader.css';
 
 // pdf.js و پنل‌های جانبی ریدر سنگین‌اند؛ فقط در زمان باز شدن بارگذاری می‌شوند

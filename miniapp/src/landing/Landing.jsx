@@ -605,6 +605,9 @@ export default function Landing() {
               <div className="lp-hero__showcase">
                 <div className="lp-hero__aura" aria-hidden="true" />
                 <div className="lp-hero__emblem-frame">
+                  <picture>
+                  <source srcSet="/icons/hero-emblem-640.avif" type="image/avif" />
+                  <source srcSet="/icons/hero-emblem-640.webp" type="image/webp" />
                   <img
                     className="lp-hero__emblem-img"
                     src="/icons/hero-emblem.jpg"
@@ -615,8 +618,10 @@ export default function Landing() {
                     width="320"
                     height="320"
                     loading="eager"
+                    fetchpriority="high"
                     decoding="async"
                   />
+                  </picture>
                 </div>
 
                 <div className="lp-hero__floating-tags" aria-hidden="true">

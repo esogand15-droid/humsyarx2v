@@ -143,6 +143,9 @@ export function App() {
   // unauthenticated /welcome or /login visitors do not download protected screen bundles.
   useEffect(() => {
     if (status !== 'active') return;
+    // Skip speculative downloads on data-saver or 2G/3G connections.
+    const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (conn?.saveData || /(^|-)(2g|3g)$/.test(conn?.effectiveType ?? '')) return;
     const warm = () => {
       void import('./screens/HomeScreen');
       void import('./screens/library/LibraryScreen');

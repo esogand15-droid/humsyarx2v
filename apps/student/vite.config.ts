@@ -24,6 +24,29 @@ import path from 'node:path';
    hook بیلد: لیست دقیق دارایی‌های استاتیک را می‌نویسد تا SW بتواند
    آن‌ها را مدیریت کند و یک شناسهٔ بیلد SHA-256 برای sw.js می‌سازد.
    ───────────────────────────────────────────────────────────────────── */
+/* Preloads the Persian Vazirmatn subset so first text paints without a font swap. */
+function preloadFontPlugin(): Plugin {
+  let base = '/';
+  return {
+    name: 'vite-preload-fa-font',
+    apply: 'build',
+    configResolved(config: ResolvedConfig) {
+      base = config.base.endsWith('/') ? config.base : `${config.base}/`;
+    },
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        const file = Object.keys(ctx.bundle ?? {}).find((f) => /vazirmatn-arabic-[\w-]+\.woff2$/.test(f));
+        if (!file) return html;
+        return html.replace(
+          '</title>',
+          `</title>\n    <link rel="preload" href="${base}${file}" as="font" type="font/woff2" crossorigin>`,
+        );
+      },
+    },
+  };
+}
+
 function swAssetManifestPlugin(): Plugin {
   let publicDir = '';
   const EXCLUDED = new Set(['sw.js', 'sw-assets.json', 'ds-preview.html']);
@@ -99,7 +122,7 @@ function swAssetManifestPlugin(): Plugin {
 
 export default defineConfig({
   base: process.env.VITE_BASE || '/student/',
-  plugins: [react(), swAssetManifestPlugin()],
+  plugins: [react(), preloadFontPlugin(), swAssetManifestPlugin()],
   server: {
     host: '0.0.0.0',
     port: 5173,
