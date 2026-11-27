@@ -1,25 +1,11 @@
 {
-  "name": "humsyar-proto",
+  "name": "humsyar",
   "private": true,
-  "version": "1.6.0",
-  "type": "module",
-  "description": "پروتوتایپ تعاملی طراحی کلاینت وب دانشجو — هامزیار",
+  "description": "هامزیار — اسکریپت‌های هماهنگ‌کنندهٔ ساخت فرانت‌ها",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.2"
-  },
-  "devDependencies": {
-    "@types/react": "^18.3.11",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.2",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.9"
+    "build:student": "npm --prefix apps/student run build",
+    "build:admin": "npm --prefix webadmin run build",
+    "build:miniapp": "npm --prefix miniapp run build",
+    "build": "npm run build:student && npm run build:admin && npm run build:miniapp"
   }
 }

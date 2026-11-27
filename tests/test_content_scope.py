@@ -648,7 +648,7 @@ class MigrationClassifierTests(unittest.TestCase):
     def setUp(self):
         import sys
         sys.path.insert(0, ROOT)
-        from tools.migration.content_forks import classify_forks, pick_duplicate_keepers
+        from scripts.tools.migration.content_forks import classify_forks, pick_duplicate_keepers
         self.classify = classify_forks
         self.pick = pick_duplicate_keepers
         self.base = {'_id': B1, 'number': 1, 'topic': 'معارفه', 'teacher': 'احمدی'}

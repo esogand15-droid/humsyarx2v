@@ -88,9 +88,9 @@
 
 | ابزار | خروجی | چه می‌سنجد |
 |---|---|---|
-| `tools/audit2/m01_markers.py` | `docs/audit2-data/01_markers.txt` | نشانه‌های ناقص‌کاری (TODO/stub/به‌زودی/…) |
-| `tools/audit2/m02_callback_matrix.py` | `02_callback_matrix.txt` | callback_data ↔ هندلر + پوشش answer() |
-| `tools/audit2/m03_endpoint_matrix.py` | `03_endpoint_matrix.txt` | endpoint ↔ مصرف‌کننده‌ی فرانت + alias |
-| `tools/audit2/m04_settings_dead.py` | `04_settings_matrix.txt` + `05_dead_funcs.txt` | کلیدهای settings + توابع صفرارجاع |
+| `scripts/tools/audit2/m01_markers.py` | `docs/audit2-data/01_markers.txt` | نشانه‌های ناقص‌کاری (TODO/stub/به‌زودی/…) |
+| `scripts/tools/audit2/m02_callback_matrix.py` | `02_callback_matrix.txt` | callback_data ↔ هندلر + پوشش answer() |
+| `scripts/tools/audit2/m03_endpoint_matrix.py` | `03_endpoint_matrix.txt` | endpoint ↔ مصرف‌کننده‌ی فرانت + alias |
+| `scripts/tools/audit2/m04_settings_dead.py` | `04_settings_matrix.txt` + `05_dead_funcs.txt` | کلیدهای settings + توابع صفرارجاع |
 
-همه با `python3 tools/audit2/m0X_*.py` از ریشه‌ی پروژه اجرا می‌شوند و خروجی متنی می‌نویسند (بدون تغییر کد).
+همه با `python3 scripts/tools/audit2/m0X_*.py` از ریشه‌ی پروژه اجرا می‌شوند و خروجی متنی می‌نویسند (بدون تغییر کد).

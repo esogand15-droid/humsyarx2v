@@ -309,7 +309,7 @@ class DBCore:
                 # fork_of رشته‌ای) قید یکتایی می‌گذارد؛ baseها (بدون fork_of)
                 # اصلاً وارد ایندکس نمی‌شوند. اگر داده‌ی legacy کلون تکراری
                 # داشته باشد، ساخت ایندکس خطا می‌خورد → fallback غیر یکتا با
-                # هشدار؛ رفع واقعی با tools/migration/content_forks.py است.
+                # هشدار؛ رفع واقعی با scripts/tools/migration/content_forks.py است.
                 self._index(self.bs_sessions, [('fork_of', 1), ('intake', 1)],
                     unique=True, background=True,
                     partialFilterExpression={'fork_of': {'$type': 'string'}},

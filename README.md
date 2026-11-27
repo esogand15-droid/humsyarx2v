@@ -1,52 +1,45 @@
-# هامزیار — پروتوتایپ طراحی وب‌اپ دانشجوی پزشکی
+# هامزیار (Humsyar)
 
-پروتوتایپ اجراییِ رابط کاربری «هامزیار»، ساخته‌شده با Vite 5 + React 18 + TypeScript و بدون هیچ کتابخانهٔ UI.
-همهٔ داده‌ها نمایشی‌اند و به هیچ سرویس واقعی وصل نیستند.
+پلتفرم آموزشی دانشجویان پزشکی: ربات تلگرام + API (FastAPI) + وب‌اپ دانشجو + مینی‌اپ/لندینگ + پنل ادمین.
 
-## اجرا
-
-```bash
-npm install
-npm run dev -- --host 0.0.0.0 --port 5178
-# سپس: http://localhost:5178
-```
-
-ساخت نسخهٔ تک‌فایل بدون هیچ درخواست بیرونی (برای باز کردن با دوبار کلیک یا آپلود در هر دامنه):
-
-```bash
-npm run build          # خروجی در dist/
-python3 build_single.py # humsyar-prototype.html
-```
-
-## ساختار
+## ساختار پوشه‌ها
 
 | مسیر | چیست |
 |---|---|
-| `src/styles/tokens.css` | توکن‌های رنگ/فاصله/شعاع/حرکت — تنها منبع مقادیر |
-| `src/styles/layout.css` | **تنها لایهٔ واکنش‌گرا**: `@container frame` (≥۱۵۰۰ / ≥۱۰۰۰ / ≤۱۲۷۹ / ≤۱۱۰۰ / ≥۶۰۱ / ≤۶۰۰) |
-| `src/styles/app.css` | کامپوننت‌ها (پنل، ردیف، بج، چیپ، برنامه، پلن…) |
-| `src/styles/notes.css` | ویرایشگر یادداشت و پنل PDF |
-| `src/styles/motion.css` | حرکت ۹۰–۲۴۰ms + احترام به `prefers-reduced-motion` و `data-motion="calm"` |
-| `src/screens/*` | ۱۸ صفحهٔ محصول (خانه، منابع، بانک سؤال، نتایج، برنامه، هوشیار، یادداشت‌ها، پیشرفت، اشتراک، تنظیمات…) |
-| `src/components/*` | Shell، کامپوننت‌های UI، آیکون‌های SVG دست‌ساز |
-| `src/data/*` | دادهٔ نمایشی (درس‌ها، سؤال‌ها، پلن‌ها، برنامه، یادداشت‌ها) |
-| `tests/*.py` | اجرای Playwright: `e2e_smoke`، `e2e_notes`، `contrast_audit`، `viewport_matrix` |
-| `screenshots/round5/` | عکس‌های واقعی اجرا در ۳۹۰ / ۷۶۸ / ۱۴۴۰ / ۱۹۲۰ + نسخهٔ روشن |
+| `backend/` | **کد اصلی** — `api/` (FastAPI)، `bot/` (هندلرهای ربات، python-telegram-bot 21)، `core/`، `database/`، `services/`، `integrations/`، `workers/` |
+| `apps/student/` | وب‌اپ دانشجو (Vite + React + TS) روی `/student/` |
+| `miniapp/` | مینی‌اپ تلگرام، PWA و لندینگ humsyar.ir (`dist`، `dist-pwa`، `dist-landing`) |
+| `webadmin/` | پنل ادمین وب |
+| `tests/` | تست‌های pytest/unittest (قرارداد، runtime و فرانت) |
+| `scripts/` | ابزارهای اپراتور: مایگریشن بانک سؤال، `scripts/tools/` (audit / health / migration) |
+| `docker/` | `supervisord.conf`، `entrypoint.sh`، اسکریپت‌های Bot API |
+| `infrastructure/` | فایل‌های systemd/VPS |
+| `docs/` | معماری، طراحی، گزارش‌ها و runbook |
 
-## قواعد واکنش‌گرایی (خلاصه)
+### فایل‌های shim در ریشه
 
-- اندازه‌گیری روی «قاب» است (`container-name: frame`)، نه پنجره — همین کد در پیش‌نمایش ۳۹۰ داخل دسکتاپ هم درست رفتار می‌کند.
-- فقط `#main` اسکرول می‌کند؛ بدنهٔ صفحه قفل است. تغییر تب، اسکرول را ریست نمی‌کند.
-- در ≤۶۰۰px: یک ستون، کارت‌های مرتبط در یک گروه، ردیف‌های فهرستی به‌جای کارت، و «بیشتر» فقط برای موارد ثانویه.
-- دسکتاپ و تبلت فشرده نمی‌شوند: چندستونه، نمودار و حلقه در اندازهٔ کامل.
-- هیچ فونتی برای جا دادن محتوا کوچک نمی‌شود؛ چگالی از اطلاعات و گروه‌بندی می‌آید.
+فایل‌های `*.py` ریشه (`bot.py`، `database.py`، `utils.py`، …) و پوشه‌های `api/`، `core/`، `db/`، `payments/`، `qbank/`، `question_bank/`، `ring/` فقط **shim سازگاری** هستند و به ماژول متناظر در `backend/` اشاره می‌کنند. استقرار (`supervisord`: `uvicorn api.main:app` و `python -u bot.py`) و صدها import قدیمی به آن‌ها وابسته‌اند؛ **حذفشان نکنید**. کد جدید را مستقیم در `backend/` بنویسید.
 
-## دسترس‌پذیری
+## اجرا (محلی)
 
-تنظیمات کاربر: تم تیره/روشن، «کاهش حرکت»، «اندازهٔ متن یادداشت‌ها» (کوچک/متوسط/بزرگ).
-هر کنش با صفحه‌کلید در دسترس است، فوکوس دیده می‌شود، اهداف لمسی ≥۲۸px، معنا هرگز فقط با رنگ منتقل نمی‌شود.
+```bash
+pip install -r requirements.txt
+export MONGODB_URI=mongodb://127.0.0.1:27017/humsyar ADMIN_ID=<id> TELEGRAM_TOKEN=<token>
+python -m uvicorn backend.api.main:app --port 8000   # API
+python bot.py                                        # ربات
+cd apps/student && npm ci && npm run dev             # وب‌اپ دانشجو
+```
 
-## وضعیت اعتبارسنجی
+متغیرهای محیطی: `.env.example` و `vps.env.example`. ساخت همهٔ فرانت‌ها از ریشه: `npm run build`.
 
-`e2e_smoke` ۲۵/۲۵ · `e2e_notes` ۲۴/۲۴ · `contrast_audit` روشن ۰/۰ و تیره ۰/۰ · `viewport_matrix` ۱۳۰ قاب بدون سرریز.
-تست نشده (و ادعا نمی‌شود): صفحه‌کلید مجازی iOS/اندروید، رفتار PWA نصب‌شده، چرخش و split-screen آیپد، بزرگ‌نمایی مرورگر.
+## تست
+
+```bash
+python -m pytest tests -q
+```
+
+تست‌های دیتابیسی به `MONGODB_URI` نیاز دارند. فهرست خطاهای شناخته‌شده: `tests/known_failures.txt`.
+
+## استقرار
+
+Railway با `Dockerfile` (`railway.json`)؛ فرانت‌ها در مرحلهٔ build ساخته می‌شوند و `supervisord` سرویس‌های api، bot و botapi را اجرا می‌کند. جزئیات: `docs/DEPLOYMENT_GUIDE.md`.
