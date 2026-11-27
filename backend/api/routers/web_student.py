@@ -594,7 +594,25 @@ async def auth_session(request: Request, response: Response):
     if not user:
         return {"authenticated": False, "state": "not_registered", "user": None}
     _refresh_session_cookies(request, response)
-    return {"authenticated": True, "state": account_state(user), "user": _public_user(user)}
+    state = account_state(user)
+    public = _public_user(user)
+    # The profile screen shows the 8-char login code from this payload, but
+    # _public_user never carried it, so the card always rendered empty. Only
+    # the owner's own active session gets it; it is never logged.
+    if state == "active":
+        public["web_login_code"] = await _login_code_for(user)
+    return {"authenticated": True, "state": state, "user": public}
+
+
+async def _login_code_for(user: dict) -> str:
+    code = (user.get("web_login_code") or "").strip()
+    if code:
+        return code
+    try:
+        from backend.core import student_code as sc
+        return await sc.get_or_create_user_code(db, int(user.get("user_id") or 0))
+    except Exception:
+        return ""
 
 
 def _refresh_session_cookies(request: Request, response: Response) -> None:

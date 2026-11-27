@@ -114,8 +114,7 @@ export function MeScreen() {
   const name = user?.name?.trim() || 'دانشجوی هامزیار';
   const rawStudentId = user?.student_id?.trim() || '';
   const studentIdFa = rawStudentId ? faDigits(rawStudentId) : '';
-  const webLoginCode =
-    (user as (typeof user & { web_login_code?: string }) | null)?.web_login_code?.trim() || '';
+  const webLoginCode = user?.web_login_code?.trim() || '';
   const copyTarget = webLoginCode || rawStudentId;
   const group = groupLabel(user?.group);
   const intake = intakeLabel(user?.intake);

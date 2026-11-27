@@ -16,6 +16,8 @@ export interface PublicUser {
   intake: string;
   role: string;
   registered_at: string;
+  /** کد ۸ کاراکتری ورود؛ فقط برای حساب فعال در پاسخ /auth/session میآید. */
+  web_login_code?: string;
 }
 
 export interface SessionPayload {
