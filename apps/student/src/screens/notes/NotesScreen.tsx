@@ -65,7 +65,7 @@ export function NotesScreen() {
 
   return (
     <>
-      <AppBar title="دفتر من" sub="هر چیزی که روی آن نوشته‌ای" back />
+      <AppBar title="دفتر من" sub="هر چیزی که روی آن نوشته‌ای" />
       <div className="page page-enter">
         {state === 'loading' && <LoadingBlock rows={4} />}
         {state === 'error' && <ErrorBlock error={loadErr} onRetry={() => void load()} />}

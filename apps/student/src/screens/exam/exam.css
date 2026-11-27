@@ -88,10 +88,10 @@
 /* ── نوار پیشرفت SVG بدون inline style ────────────────────────────────── */
 .exam-progress {
   width: 100%;
-  height: 8px;
+  height: 5px;
   border-radius: var(--hym-radius-pill);
-  background: var(--lg-tint-sunken, var(--hym-surface-sunken));
-  box-shadow: inset 0 1px 0 var(--lg-rim-dark, transparent), inset 0 0 0 1px var(--lg-edge, var(--hym-hairline));
+  background: var(--hym-surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--hym-hairline);
   overflow: hidden;
 }
 
