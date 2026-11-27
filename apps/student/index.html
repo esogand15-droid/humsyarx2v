@@ -16,23 +16,24 @@
     <link rel="apple-touch-icon" sizes="192x192" href="%BASE_URL%icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="512x512" href="%BASE_URL%icons/icon-512.png" />
     <link rel="mask-icon" href="%BASE_URL%icons/maskable-512.png" color="#0B0F19" />
-    <script>
-      (function() {
-        try {
-          var saved = localStorage.getItem('humsyar.theme');
-          var isDark = saved === 'dark' || (!saved || saved === 'system');
-          document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
-          if (isDark) {
-            document.documentElement.classList.add('dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-          }
-          /* the app theme can differ from the OS: point both theme-color metas at the page colour */
-          var metas = document.querySelectorAll('meta[name="theme-color"]');
-          for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', isDark ? '#0B0F19' : '#F8FAFC');
-        } catch (e) {}
-      })();
-    </script>
+        <script>
+          (function() {
+            try {
+              var saved = localStorage.getItem('humsyar.theme');
+              var prefersDark = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+              var isDark = saved === 'dark' || !saved || (saved === 'system' && prefersDark);
+              document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+              if (isDark) {
+                document.documentElement.classList.add('dark');
+              } else {
+                document.documentElement.classList.remove('dark');
+              }
+              /* the app theme can differ from the OS: point both theme-color metas at the page colour */
+              var metas = document.querySelectorAll('meta[name="theme-color"]');
+              for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', isDark ? '#0B0F19' : '#F8FAFC');
+            } catch (e) {}
+          })();
+        </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -17,11 +17,32 @@ function systemPrefersDark(): boolean {
 
 /** تم: روشن / تاریک / سیستم — انتخاب کاربر حفظ می‌شود. */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>(() => {
+  const [mode, setModeState] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem(KEY);
     return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'dark';
   });
   const [sysDark, setSysDark] = useState(systemPrefersDark);
+  const transitionTimerRef = useRef<number>(0);
+
+  const setMode = useCallback((next: ThemeMode) => {
+    if (
+      typeof document !== 'undefined' &&
+      !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    ) {
+      const root = document.documentElement;
+      root.classList.add('theme-transition');
+      window.clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = window.setTimeout(() => {
+        root.classList.remove('theme-transition');
+      }, 240);
+    }
+    setModeState(next);
+  }, []);
+
+  useEffect(() => () => {
+    window.clearTimeout(transitionTimerRef.current);
+    document.documentElement?.classList.remove('theme-transition');
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -45,7 +66,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', pageBg));
   }, [mode, resolved]);
 
-  const value = useMemo(() => ({ mode, resolved, setMode }), [mode, resolved]);
+  const value = useMemo(() => ({ mode, resolved, setMode }), [mode, resolved, setMode]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

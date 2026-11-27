@@ -15,12 +15,10 @@
 .mark.mark--brand--xl { width: 84px; height: 84px; --brand-r: 24px; }
 .mark.mark--brand--app-icon {
   border-radius: var(--brand-r, 12px);
-  filter: drop-shadow(0 3px 10px color-mix(in srgb, var(--hym-role-ai-vivid) 30%, transparent));
 }
 .mark.mark--brand--emblem {
   border-radius: 0;
   box-shadow: none;
-  filter: drop-shadow(0 2px 8px color-mix(in srgb, var(--hym-role-ai-vivid) 25%, transparent));
 }
 .mark--brand__pic {
   width: 100%;

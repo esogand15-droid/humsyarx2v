@@ -260,8 +260,8 @@ textarea.ds-input { padding-block: var(--hym-space-3); resize: vertical; }
   width: 18px; height: 18px; color: var(--hym-text-muted); pointer-events: none;
 }
 .ds-search__clear {
-  position: absolute; inset-inline-end: var(--hym-space-1);
-  display: grid; place-items: center; width: 36px; height: 36px;
+  position: absolute; inset-inline-end: 2px;
+  display: grid; place-items: center; width: var(--hym-control-h-md); height: var(--hym-control-h-md);
   border: 0; border-radius: 50%; background: transparent; color: var(--hym-text-muted); cursor: pointer;
 }
 .ds-search__clear:hover { background: var(--hym-bg-hover); }

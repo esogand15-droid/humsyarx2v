@@ -3,18 +3,12 @@ import { Icon } from '../icons/Icon';
 import { Brand } from '../components/Brand';
 import { faDigits } from '../lib/fa';
 import { useSession } from '../lib/session';
-import { useTheme } from '../lib/theme';
 import { SIDEBAR_ITEMS } from './nav';
 import { useSidebar } from './SidebarContext';
 
 export function Sidebar() {
   const { user } = useSession();
-  const { resolved, setMode } = useTheme();
   const { collapsed, toggleSidebar } = useSidebar();
-
-  const toggleTheme = () => {
-    setMode(resolved === 'dark' ? 'light' : 'dark');
-  };
 
   const initial = (user?.name || user?.username || 'د').trim().charAt(0) || 'هـ';
 
@@ -99,16 +93,6 @@ export function Sidebar() {
             </span>
           </div>
         </NavLink>
-
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="iconbtn sidebar__theme-btn"
-          aria-label={resolved === 'dark' ? 'حالت روشن' : 'حالت تاریک'}
-          title={resolved === 'dark' ? 'حالت روشن' : 'حالت تاریک'}
-        >
-          <Icon name={resolved === 'dark' ? 'i-sun' : 'i-moon'} size={18} />
-        </button>
       </div>
     </aside>
   );

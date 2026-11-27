@@ -35,10 +35,9 @@ export function Pagination({
   compact = false,
   className = '',
 }: PaginationProps) {
-  if (totalPages <= 1) return null;
-
-  // محاسبه بازه صفحات نمایشی
+  // محاسبه بازه صفحات نمایشی (پیش از بازگشت شرطی تا ترتیب هوک‌ها حفظ شود)
   const pageNumbers = useMemo(() => {
+    if (totalPages <= 1) return [];
     const pages: (number | 'ellipsis-start' | 'ellipsis-end')[] = [];
     const delta = 1; // تعداد صفحات اطراف صفحه فعلی
 
@@ -59,12 +58,12 @@ export function Pagination({
       pages.push('ellipsis-end');
     }
 
-    if (totalPages > 1) {
-      pages.push(totalPages);
-    }
+    pages.push(totalPages);
 
     return pages;
   }, [currentPage, totalPages]);
+
+  if (totalPages <= 1) return null;
 
   const hasPrev = currentPage > 1;
   const hasNext = currentPage < totalPages;
@@ -121,7 +120,6 @@ export function Pagination({
                 onClick={() => onPageChange(p)}
               >
                 <span className="num">{fa(p)}</span>
-                {isCurrent && <span className="pagination__active-glow" aria-hidden="true" />}
               </button>
             );
           })}

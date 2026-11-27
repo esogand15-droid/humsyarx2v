@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Icon } from '../icons/Icon';
 import { activeTabIndex, type NavEntry } from './nav';
@@ -12,17 +12,59 @@ const TAB_DESTINATIONS: ReadonlyArray<NavEntry> = [
   { to: '/me', label: 'من', shortLabel: 'من', icon: 'i-user', section: tabSectionFor('/me') },
 ];
 
-/** تببار پایین (DS v2 `.ds-tabbar`, audit G3; Liquid Glass layer in design/glass.css):
-    a floating glass capsule on phones, safe-area insets, 44px+ targets. The lens slides
-    under the active tab; each item keeps its own `data-section` for the icon and label accent.
-    NavLink sets aria-current="page" on the active item, which is what .ds-tabbar styles. */
+/** تببار پایین (DS v2 `.ds-tabbar`, Liquid Glass layer in design/glass.css):
+    کپسول شناور شیشه‌ای در موبایل که عدسی فعال آن در چیدمان RTL روی آیتم انتخاب‌شده
+    می‌لغزد و در مسیرهای خارج از تب‌های اصلی (مثل هوش مصنوعی) مخفی می‌شود. */
 export function TabBar() {
   const { pathname } = useLocation();
   const active = activeTabIndex(pathname);
+  const navRef = useRef<HTMLElement>(null);
+  const readyRef = useRef(false);
+
+  const measureLens = useCallback(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    if (active < 0) {
+      nav.dataset.lensReady = 'true';
+      return;
+    }
+    const items = nav.querySelectorAll<HTMLElement>('.ds-tabbar__item');
+    const el = items[active];
+    if (!el || el.offsetWidth <= 0) return;
+    const isRtl = getComputedStyle(nav).direction === 'rtl';
+    const x = isRtl ? -(nav.clientWidth - (el.offsetLeft + el.offsetWidth)) : el.offsetLeft;
+    nav.style.setProperty('--lg-lens-x', `${Math.round(x)}px`);
+    nav.style.setProperty('--lg-lens-w', `${Math.round(el.offsetWidth)}px`);
+    nav.dataset.lensReady = 'true';
+    if (!readyRef.current) {
+      readyRef.current = true;
+      requestAnimationFrame(() => {
+        if (navRef.current) navRef.current.dataset.lensAnim = 'true';
+      });
+    }
+  }, [active]);
+
+  useLayoutEffect(() => {
+    measureLens();
+  }, [measureLens]);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measureLens()) : null;
+    ro?.observe(nav);
+    window.addEventListener('resize', measureLens);
+    document.fonts?.ready.then(() => measureLens()).catch(() => {});
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', measureLens);
+    };
+  }, [measureLens]);
+
   const style = { '--lg-i': Math.max(active, 0), '--lg-count': TAB_DESTINATIONS.length } as CSSProperties;
 
   return (
-    <nav className="ds-tabbar ds-tabbar--blur app-tabbar" aria-label="ناوبری اصلی" style={style}>
+    <nav ref={navRef} className="ds-tabbar ds-tabbar--blur app-tabbar" aria-label="ناوبری اصلی" style={style}>
       <span className="lg-tabbar__lens" aria-hidden="true" data-hidden={active < 0 ? '' : undefined} />
       {TAB_DESTINATIONS.map((t) => (
         <NavLink

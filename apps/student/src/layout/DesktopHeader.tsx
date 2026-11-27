@@ -3,7 +3,6 @@ import { Icon } from '../icons/Icon';
 import { useTheme } from '../lib/theme';
 import { useHeader } from './HeaderContext';
 import { useSidebar } from './SidebarContext';
-import { Brand } from '../components/Brand';
 import { IconButton } from '../components/IconButton';
 import { NotificationBell } from '../components/NotificationBell';
 import { fallbackTitleFor } from './nav';
@@ -63,7 +62,6 @@ export function DesktopHeader() {
             className="desktop-header__back"
           />
         )}
-        <Brand size="sm" />
         <div className="desktop-header__titles">
           <h1 className="desktop-header__title">
             <bdi dir="auto">{title}</bdi>

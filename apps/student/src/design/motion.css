@@ -22,14 +22,14 @@
 .sheet-scrim {
   position: fixed;
   inset: 0;
-  z-index: var(--z-sheet);
-  background: color-mix(in srgb, var(--midnight, #0a1222) 16%, transparent);
+  z-index: var(--z-sheet, 30);
+  background: color-mix(in srgb, var(--midnight) 18%, transparent);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   animation: mo-fade-in var(--mo-sheet) var(--mo-ease-out) both;
 }
 .sheet-scrim[data-state="closing"] {
-  animation: mo-fade-out var(--mo-sheet) var(--mo-ease-in) both;
+  animation: mo-fade-out 200ms var(--mo-ease-in) both;
   pointer-events: none;
 }
 
@@ -37,7 +37,7 @@
   position: fixed;
   inset-inline: 0;
   bottom: 0;
-  z-index: calc(var(--z-sheet) + 1);
+  z-index: calc(var(--z-sheet, 30) + 1);
   width: 100%;
   max-width: 560px;
   margin-inline: auto;
@@ -57,7 +57,32 @@
 }
 /* About half the screen; longer lists scroll inside the sheet. */
 .sheet--compact { max-height: min(56dvh, 56vh); }
-.sheet__head { flex: 0 0 auto; }
+.sheet__grip,
+.sheet__head {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.sheet__grip { cursor: grab; }
+.sheet__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sheet__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.sheet__title-wrap .h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .sheet__body {
   flex: 1 1 auto;
   min-height: 0;
@@ -67,12 +92,15 @@
   margin-inline: -16px;
   padding-inline: 16px;
 }
+.mo-sheet-swap {
+  animation: mo-swap-in 190ms var(--mo-ease-out) both;
+}
 
 @media (min-width: 900px) {
   .sheet {
     bottom: 24px;
     border-radius: 22px;
-    border: 1px solid var(--line);
+    border: 1px solid var(--lg-edge-strong);
   }
 }
 
@@ -83,8 +111,45 @@
   to { transform: translate3d(0, 0, 0); }
 }
 @keyframes mo-sheet-out {
-  from { transform: translate3d(0, 0, 0); opacity: 1; }
+  from { transform: translate3d(0, var(--sheet-drag-y, 0px), 0); opacity: 1; }
   to { transform: translate3d(0, 100%, 0); opacity: 0.6; }
+}
+@keyframes mo-swap-in {
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Toast & Floating Banners (enter + exit via usePresence) ── */
+.mo-toast {
+  animation: mo-toast-in 180ms var(--mo-ease-out) both;
+}
+.mo-toast[data-state="closing"] {
+  animation: mo-toast-out 160ms var(--mo-ease-in) both;
+  pointer-events: none;
+}
+@keyframes mo-toast-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes mo-toast-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.97); }
+}
+
+.mo-banner {
+  animation: mo-banner-in 200ms var(--mo-ease-out) both;
+}
+.mo-banner[data-state="closing"] {
+  animation: mo-banner-out 160ms var(--mo-ease-in) both;
+  pointer-events: none;
+}
+@keyframes mo-banner-in {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes mo-banner-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate3d(0, 10px, 0); }
 }
 
 /* ── Anchored popover (notifications, composer + menu) ────── */
@@ -105,11 +170,19 @@
   from { opacity: 1; transform: none; }
   to { opacity: 0; transform: translate3d(0, var(--mo-shift, -6px), 0) scale(0.96); }
 }
-/* Rows arrive one after another; --i is set inline per row. */
+/* Rows arrive sequentially without requiring inline --i styles. */
 .mo-stagger > * {
   animation: mo-row-in 220ms var(--mo-ease-out) both;
-  animation-delay: calc(var(--i, 0) * 25ms + 40ms);
+  animation-delay: calc(var(--i, 0) * 22ms + 30ms);
 }
+.mo-stagger > :nth-child(1) { --i: 0; }
+.mo-stagger > :nth-child(2) { --i: 1; }
+.mo-stagger > :nth-child(3) { --i: 2; }
+.mo-stagger > :nth-child(4) { --i: 3; }
+.mo-stagger > :nth-child(5) { --i: 4; }
+.mo-stagger > :nth-child(6) { --i: 5; }
+.mo-stagger > :nth-child(7) { --i: 6; }
+.mo-stagger > :nth-child(8) { --i: 7; }
 @keyframes mo-row-in {
   from { opacity: 0; transform: translate3d(0, 4px, 0); }
   to { opacity: 1; transform: none; }
@@ -138,28 +211,44 @@
   transform: scale(var(--mo-press-scale));
 }
 
-/* Theme switch fades colours instead of flashing. */
+/* Theme switch fades primary surfaces cleanly without wildcard recalc or !important. */
 html.theme-transition,
-html.theme-transition *,
-html.theme-transition *::before,
-html.theme-transition *::after {
+html.theme-transition body,
+html.theme-transition .app-shell,
+html.theme-transition .app-tabbar,
+html.theme-transition .desktop-header,
+html.theme-transition .sidebar,
+html.theme-transition .appbar,
+html.theme-transition .card,
+html.theme-transition .ds-card,
+html.theme-transition .ds-row,
+html.theme-transition .sheet,
+html.theme-transition .btn,
+html.theme-transition .ds-btn,
+html.theme-transition .aic-side,
+html.theme-transition .aic-composer__box {
   transition: background-color 220ms linear, color 220ms linear, border-color 220ms linear,
-    fill 220ms linear, stroke 220ms linear !important;
+    fill 220ms linear, stroke 220ms linear;
 }
 
 /* Removes the 300ms tap delay on every control. */
 a, button, [role="button"], input, label, select, textarea { touch-action: manipulation; }
 
 @media (prefers-reduced-motion: reduce) {
-  .sheet,
-  .sheet[data-state="closing"],
-  .sheet-scrim,
-  .sheet-scrim[data-state="closing"],
-  .mo-popover,
-  .mo-popover[data-state="closing"],
-  .mo-stagger > * {
-    animation-duration: 1ms !important;
-    animation-delay: 0ms !important;
+  html .sheet,
+  html .sheet[data-state="closing"],
+  html .sheet-scrim,
+  html .sheet-scrim[data-state="closing"],
+  html .mo-sheet-swap,
+  html .mo-toast,
+  html .mo-toast[data-state="closing"],
+  html .mo-banner,
+  html .mo-banner[data-state="closing"],
+  html .mo-popover,
+  html .mo-popover[data-state="closing"],
+  html .mo-stagger > * {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
   }
   .btn:active, .ds-btn:active, .ds-row:active, .iconbtn:active,
   .ds-iconbtn:active, .chip:active, .notif-pop__item:active { transform: none; }
