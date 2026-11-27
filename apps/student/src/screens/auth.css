@@ -863,26 +863,6 @@
   background: var(--lg-btn-hover);
 }
 
-.welcome-nav__cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding-inline: 16px;
-  border-radius: 999px;
-  background: var(--hym-accent);
-  color: var(--hym-accent-on);
-  font-size: var(--hym-fs-small);
-  font-weight: var(--hym-fw-bold);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: transform 200ms var(--lg-spring), opacity 180ms ease;
-}
-
-.welcome-nav__cta:hover {
-  opacity: 0.94;
-}
-
 .welcome-main {
   position: relative;
   z-index: 1;
@@ -1171,16 +1151,11 @@
   .welcome-nav__link {
     display: none;
   }
-
-  .welcome-nav__cta {
-    padding-inline: 12px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .auth-slot-cursor,
-  .auth-spinner,
-  .welcome-nav__cta {
+  .auth-spinner {
     animation: none;
     transition: none;
   }

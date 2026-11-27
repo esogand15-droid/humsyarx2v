@@ -54,9 +54,6 @@ export function WelcomeScreen() {
             label={resolved === 'dark' ? 'تغییر به حالت روشن' : 'تغییر به حالت تیره'}
             onClick={toggleTheme}
           />
-          <Link to={primaryTo} className="welcome-nav__cta">
-            {primaryLabel}
-          </Link>
         </nav>
       </header>
 

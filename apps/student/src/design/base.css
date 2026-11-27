@@ -113,7 +113,8 @@ h1, h2, h3, h4, p {
   transform: translateY(-160%);
   transition: transform var(--mo-fast, 120ms) ease-out;
 }
-.skip-link:focus {
+.skip-link:focus,
+.skip-link:focus-visible {
   transform: none;
 }
 /* The main landmark receives focus from the skip link; no ring on the whole page. */
