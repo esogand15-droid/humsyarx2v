@@ -959,7 +959,7 @@
   font-weight: var(--hym-fw-semibold);
 }
 
-/* ── طبقه‌بندی، جستجو، دوره‌ها و مرور هوشمند (Medofast-structured QBank) ── */
+/* ── طبقه‌بندی، جستجو، دوره‌ها و مرور هوشمند ── */
 .exam-toolbar {
   display: flex;
   flex-direction: column;

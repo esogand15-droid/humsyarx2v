@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Tests for Medofast-structured QBank catalog, period index, filters, and smart queues."""
+"""Tests for the structured QBank catalog, period index, filters, and smart queues."""
 from __future__ import annotations
 
 import copy
