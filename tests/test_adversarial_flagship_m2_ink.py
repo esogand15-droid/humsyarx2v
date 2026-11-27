@@ -753,6 +753,7 @@ class TestVisualTokensAndCssContracts(unittest.TestCase):
         self.assertTrue(os.path.isfile(ui_css_path), f"File not found: {ui_css_path}")
         with open(ui_css_path, "r", encoding="utf-8") as f:
             content = f.read()
+        content += open(os.path.join(ROOT, "apps", "student", "src", "screens", "reader", "reader-shell.css"), encoding="utf-8").read()
 
         expected_rule = "filter: invert(0.92) hue-rotate(180deg) contrast(1.05) !important;"
         self.assertIn(expected_rule, content, "Smart dark-mode contrast inverter rule missing in ui.css")

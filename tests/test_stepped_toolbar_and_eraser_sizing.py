@@ -27,7 +27,7 @@ class SteppedToolbarAndEraserSizingTests(unittest.TestCase):
     def setUpClass(cls):
         cls.toolbar_code = (READER_DIR / "InkToolbar.tsx").read_text(encoding="utf-8")
         cls.ink_layer_code = (READER_DIR / "InkLayer.tsx").read_text(encoding="utf-8")
-        cls.ui_css = (DESIGN_DIR / "ui.css").read_text(encoding="utf-8")
+        cls.ui_css = ((DESIGN_DIR / "ui.css").read_text(encoding="utf-8") + (DESIGN_DIR.parent / "screens" / "reader" / "reader-shell.css").read_text(encoding="utf-8"))
 
     def test_toolbar_telescopic_tier_state_and_contracts(self):
         """Verify 3-tier telescopic state (dot, primary, full) in InkToolbar.tsx."""

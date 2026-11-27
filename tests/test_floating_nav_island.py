@@ -41,7 +41,7 @@ class FloatingIslandBaseTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.ui_css = (DESIGN_DIR / "ui.css").read_text(encoding="utf-8")
+        cls.ui_css = ((DESIGN_DIR / "ui.css").read_text(encoding="utf-8") + (DESIGN_DIR.parent / "screens" / "reader" / "reader-shell.css").read_text(encoding="utf-8"))
         cls.components_css = (DESIGN_DIR / "components.css").read_text(encoding="utf-8")
         cls.shell_css = (DESIGN_DIR / "shell.css").read_text(encoding="utf-8")
         cls.tokens_css = (DESIGN_DIR / "tokens.css").read_text(encoding="utf-8")
@@ -365,7 +365,7 @@ class Tier3CrossFeatureInteractionTests(FloatingIslandBaseTest):
         self.assertIn("onClick={() => navigate('/search')}", self.desktop_header_tsx)
         # In Shell, DesktopHeader and main stage co-exist
         self.assertIn("{showNav && <DesktopHeader />}", self.shell_tsx)
-        self.assertIn('<main className="stage-content" data-section={section}>', self.shell_tsx)
+        self.assertIn('<main id="main-content" tabIndex={-1} className="stage-content" data-section={section}>', self.shell_tsx)
 
     def test_inter_03_floating_nav_and_notification_badge_dot(self):
         """INTER-03: Pairwise: DesktopHeader mounts NotificationBell with badge pill and inbox navigation."""

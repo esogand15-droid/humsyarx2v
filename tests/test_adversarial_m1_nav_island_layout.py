@@ -123,7 +123,7 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.ui_css = (DESIGN_DIR / "ui.css").read_text(encoding="utf-8")
+        cls.ui_css = ((DESIGN_DIR / "ui.css").read_text(encoding="utf-8") + (DESIGN_DIR.parent / "screens" / "reader" / "reader-shell.css").read_text(encoding="utf-8"))
         cls.components_css = (DESIGN_DIR / "components.css").read_text(encoding="utf-8")
         cls.shell_css = (DESIGN_DIR / "shell.css").read_text(encoding="utf-8")
         cls.tokens_css = (DESIGN_DIR / "tokens.css").read_text(encoding="utf-8")

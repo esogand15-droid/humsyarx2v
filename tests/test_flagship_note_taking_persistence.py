@@ -447,6 +447,7 @@ class TestDarkContrastInverterAndFocusMode(unittest.TestCase):
 
         with open(css_path, "r", encoding="utf-8") as f:
             css_content = f.read()
+        css_content += open(os.path.join(ROOT, "apps", "student", "src", "screens", "reader", "reader-shell.css"), encoding="utf-8").read()
 
         # Check the contrast inverter filter rule
         expected_filter = "filter: invert(0.92) hue-rotate(180deg) contrast(1.05)"

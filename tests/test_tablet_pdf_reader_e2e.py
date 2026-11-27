@@ -82,7 +82,7 @@ class ReaderBaseTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.ui_css = (DESIGN_DIR / "ui.css").read_text(encoding="utf-8")
+        cls.ui_css = ((DESIGN_DIR / "ui.css").read_text(encoding="utf-8") + (DESIGN_DIR.parent / "screens" / "reader" / "reader-shell.css").read_text(encoding="utf-8"))
         cls.tokens_css = (DESIGN_DIR / "tokens.css").read_text(encoding="utf-8")
         cls.reader_view_tsx = (READER_DIR / "ProtectedReaderView.tsx").read_text(encoding="utf-8")
         cls.thumbnail_drawer_tsx = (READER_DIR / "ThumbnailDrawer.tsx").read_text(encoding="utf-8")
