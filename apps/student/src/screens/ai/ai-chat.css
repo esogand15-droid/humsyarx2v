@@ -755,3 +755,6 @@ ol.md__list[dir="rtl"] { list-style-type: persian; }
   font-size: var(--hym-fs-caption);
   color: var(--hym-text-muted);
 }
+
+/* Voice button beside Send */
+.aic-composer__voice.is-active { color: var(--hym-accent); background: var(--hym-accent-subtle, var(--hym-bg-hover)); }

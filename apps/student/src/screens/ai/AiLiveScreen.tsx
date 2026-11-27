@@ -6,6 +6,7 @@ import { Icon } from '../../icons/Icon';
 import { ai } from '../../lib/ai';
 import { faNum } from '../../lib/fa';
 import './ai-studio.css';
+import './ai-live-dock.css';
 
 /* پردازشگر ترد بلادرنگ AudioWorklet برای تماس صوتی بدون کلیک و ضد اکوی اسپیکر */
 const HUMSYAR_LIVE_WORKLET_CODE = `
@@ -414,7 +415,8 @@ function formatClock(sec: number): string {
 type LiveStatus = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
 type LiveCfg = Awaited<ReturnType<typeof ai.liveConfig>>;
 
-export function AiLiveScreen() {
+/** `embedded`: همان موتور تماس زنده، به شکل گوی جمع‌وجور بالای نوار نوشتن گفت‌وگو. */
+export function AiLiveScreen({ embedded = false, onClose }: { embedded?: boolean; onClose?: () => void } = {}) {
   const nav = useNavigate();
   const [liveCfg, setLiveCfg] = useState<LiveCfg | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1058,6 +1060,87 @@ export function AiLiveScreen() {
       : status === 'listening'
         ? 1 + Math.min(0.24, micLevel * 0.35)
         : 1;
+
+  const autoStartRef = useRef(false);
+  useEffect(() => {
+    if (!embedded || autoStartRef.current) return;
+    autoStartRef.current = true;
+    void startCall(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded]);
+
+  if (embedded) {
+    const level = status === 'speaking' ? aiLevel : status === 'listening' && !micMuted ? micLevel : 0;
+    const lastTurn = historyTurns.length ? historyTurns[historyTurns.length - 1].text : '';
+    const caption = aiLiveText || userLiveText || lastTurn;
+    const dockLabel = {
+      idle: 'گفت‌وگو تمام شد · برای شروع دوباره روی گوی بزن',
+      connecting: 'در حال اتصال…',
+      listening: micMuted ? 'میکروفون بسته است' : 'گوش می‌دهم…',
+      thinking: 'در حال فکر کردن…',
+      speaking: 'هوشیار صحبت می‌کند · برای قطع روی گوی بزن',
+      error: 'اتصال برقرار نشد',
+    }[status];
+    const orbAction =
+      status === 'speaking' ? interruptAiSpeech : !isCallActive ? () => void startCall(false) : undefined;
+    const closeDock = () => {
+      endCall();
+      onClose?.();
+    };
+    return (
+      <section className={'ail-dock is-' + status} aria-label="گفت‌وگوی صوتی با هوشیار">
+        <button
+          type="button"
+          className="ail-orb"
+          style={{ '--ail-lvl': Math.min(1, level * 1.6).toFixed(3) } as React.CSSProperties}
+          onClick={orbAction}
+          disabled={!orbAction}
+          aria-label={status === 'speaking' ? 'قطع صحبت هوشیار' : 'شروع دوباره'}
+        >
+          <span className="ail-orb__glow" aria-hidden="true" />
+          <span className="ail-orb__core" aria-hidden="true" />
+        </button>
+        <div className="ail-dock__text" aria-live="polite">
+          <span className="ail-dock__status">
+            {dockLabel}
+            {isCallActive && elapsedSec > 0 ? ' · ' + formatClock(elapsedSec) : ''}
+          </span>
+          {caption && (
+            <bdi className="ail-dock__caption" dir="auto">
+              {caption}
+            </bdi>
+          )}
+          {errMsg && (
+            <span className="ail-dock__err">
+              {errMsg}
+              {locked && (
+                <>
+                  {' '}
+                  <Link to="/subscription">مشاهدهٔ اشتراک‌ها</Link>
+                </>
+              )}
+            </span>
+          )}
+        </div>
+        <div className="ail-dock__ctrl">
+          {isCallActive && (
+            <button
+              type="button"
+              className={'ail-btn' + (micMuted ? ' is-off' : '')}
+              onClick={() => setMicMuted((m) => !m)}
+              aria-pressed={micMuted}
+              aria-label={micMuted ? 'باز کردن میکروفون' : 'بستن میکروفون'}
+            >
+              <Icon name={micMuted ? 'i-mic-off' : 'i-mic'} size={20} />
+            </button>
+          )}
+          <button type="button" className="ail-btn ail-btn--end" onClick={closeDock} aria-label="پایان گفت‌وگوی صوتی">
+            <Icon name="i-x" size={20} />
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div className="screen ais-page">

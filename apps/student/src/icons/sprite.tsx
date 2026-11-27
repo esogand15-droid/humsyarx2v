@@ -95,6 +95,9 @@ export const ICON_NAMES = [
   'i-lifebuoy',
   'i-flag',
   'i-pencil-ruler',
+  'i-mic',
+  'i-mic-off',
+  'i-waveform',
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -197,6 +200,9 @@ export function IconSprite() {
       <symbol id="i-lifebuoy" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="3.6"/><path d="M5.9 5.9l3.6 3.6M14.5 14.5l3.6 3.6M18.1 5.9l-3.6 3.6M9.5 14.5l-3.6 3.6"/></symbol>
       <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5.4 21V4.2"/><path d="M5.4 4.6c2.2-1.2 4.4-1.2 6.6 0s4.4 1.2 6.6 0v8.6c-2.2 1.2-4.4 1.2-6.6 0s-4.4-1.2-6.6 0"/></symbol>
       <symbol id="i-pencil-ruler" viewBox="0 0 24 24"><path d="M14.6 4.6l4.8 4.8L9.2 19.6H4.4v-4.8z"/><path d="M12.4 6.8l4.8 4.8"/></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></symbol>
+      <symbol id="i-mic-off" viewBox="0 0 24 24"><path d="M15 9.5V6a3 3 0 0 0-5.6-1.5M9 9v2a3 3 0 0 0 4.6 2.5"/><path d="M18.5 11a6.5 6.5 0 0 1-1 3.4M5.5 11a6.5 6.5 0 0 0 10 5.4M12 17.5V21M8.5 21h7M3.5 3.5l17 17"/></symbol>
+      <symbol id="i-waveform" viewBox="0 0 24 24"><path d="M4 10v4M8 6.5v11M12 3.5v17M16 7.5v9M20 10.5v3"/></symbol>
     </svg>
   );
 }

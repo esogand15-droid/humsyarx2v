@@ -35,7 +35,6 @@ const ScheduleScreen = lazy(() => import('./screens/ScheduleScreen').then((m) =>
 const AiChatScreen = lazy(() => import('./screens/ai/AiChatScreen').then((m) => ({ default: m.AiChatScreen })));
 const AiImageScreen = lazy(() => import('./screens/ai/AiImageScreen').then((m) => ({ default: m.AiImageScreen })));
 const AiScribeScreen = lazy(() => import('./screens/ai/AiScribeScreen').then((m) => ({ default: m.AiScribeScreen })));
-const AiLiveScreen = lazy(() => import('./screens/ai/AiLiveScreen').then((m) => ({ default: m.AiLiveScreen })));
 const GradesScreen = lazy(() => import('./screens/GradesScreen').then((m) => ({ default: m.GradesScreen })));
 const SubscriptionScreen = lazy(() => import('./screens/SubscriptionScreen').then((m) => ({ default: m.SubscriptionScreen })));
 const PaymentVerifyScreen = lazy(() => import('./screens/PaymentVerifyScreen').then((m) => ({ default: m.PaymentVerifyScreen })));
@@ -242,7 +241,7 @@ export function App() {
         <Route path="/ai" element={<Gate><AiChatScreen /></Gate>} />
         <Route path="/ai/image" element={<Gate><AiImageScreen /></Gate>} />
         <Route path="/ai/scribe" element={<Gate><AiScribeScreen /></Gate>} />
-        <Route path="/ai/live" element={<Gate><AiLiveScreen /></Gate>} />
+        <Route path="/ai/live" element={<Navigate to="/ai?voice=1" replace />} />
         <Route path="/ai/:id" element={<Gate><AiChatScreen /></Gate>} />
         <Route path="/grades" element={<Gate><GradesScreen /></Gate>} />
         <Route path="/subscription" element={<Gate><SubscriptionScreen /></Gate>} />

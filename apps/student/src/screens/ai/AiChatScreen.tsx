@@ -3,8 +3,8 @@
    چیدمان: ≥۷۶۸px دو ستون (تاریخچه + گفتوگو)؛ موبایل: کشوی تاریخچه.
    اسکرول: فقط وقتی کاربر پایین است دنبال استریم میرود؛ بالا رفتن ⇒ دکمهٔ «پایین».
    iOS: ارتفاع با 100dvh و --aic-kb (از visualViewport) تا نوار نوشتن بالای کیبورد بماند. */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppBar } from '../../components/AppBar';
 import { Icon } from '../../icons';
 import {
@@ -20,6 +20,8 @@ import { faNum } from './dates';
 import { pickStarters } from './starters';
 import { useAiChat } from './useAiChat';
 import './ai-chat.css';
+
+const LiveVoiceDock = lazy(() => import('./AiLiveScreen').then((m) => ({ default: m.AiLiveScreen })));
 
 const ZW = '\u200c';
 const NEW_TITLE = `گفت${ZW}وگوی جدید`;
@@ -69,6 +71,17 @@ export function AiChatScreen() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<ComposerHandle>(null);
   useChatViewport(rootRef);
+
+  /* گفت‌وگوی صوتی زنده داخل همین صفحه (گوی بالای نوار نوشتن)؛ ?voice=1 از جاهای دیگر بازش می‌کند. */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [voiceOpen, setVoiceOpen] = useState(() => searchParams.get('voice') === '1');
+  useEffect(() => {
+    if (searchParams.get('voice') !== '1') return;
+    setVoiceOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('voice');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   /* ── وضعیت سرویس ─────────────────────────────── */
   const [status, setStatus] = useState<AiStatus | null>(null);
@@ -338,7 +351,7 @@ export function AiChatScreen() {
   const headerActions = useMemo(
     () => (
       <div className="aic-head-actions">
-        <button type="button" className="iconbtn" onClick={() => navigate('/ai/live')} aria-label="تماس صوتی زنده" title="تماس صوتی زنده">
+        <button type="button" className="iconbtn" onClick={() => setVoiceOpen(true)} aria-label="تماس صوتی زنده" title="تماس صوتی زنده">
           <Icon name="i-headphones" size={18} />
         </button>
         <button type="button" className="iconbtn" onClick={() => navigate('/ai/scribe')} aria-label="جزوه‌نویس PDF" title="جزوه‌نویس PDF">
@@ -432,7 +445,7 @@ export function AiChatScreen() {
                     {`دستیار آموزشی تو برای علوم پایه و بالینی، فارماکولوژی، تفسیر آزمایش${ZW}ها و مرور پیش از امتحان.`}
                   </p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 14 }}>
-                    <button type="button" className="ds-chip" onClick={() => navigate('/ai/live')}>
+                    <button type="button" className="ds-chip" onClick={() => setVoiceOpen(true)}>
                       <Icon name="i-headphones" size={14} />
                       <span>تماس صوتی زنده</span>
                     </button>
@@ -522,6 +535,11 @@ export function AiChatScreen() {
                     <span className="ds-badge ds-badge--warning">{`${faNum(status!.remaining!)} پرسش باقی${ZW}مانده امروز`}</span>
                   </div>
                 )}
+                {voiceOpen && (
+                  <Suspense fallback={null}>
+                    <LiveVoiceDock embedded onClose={() => setVoiceOpen(false)} />
+                  </Suspense>
+                )}
                 <Composer
                   ref={composerRef}
                   streaming={chat.streaming}
@@ -531,6 +549,8 @@ export function AiChatScreen() {
                   onSend={send}
                   onStop={chat.stop}
                   onSendMedia={onSendMedia}
+                  onVoice={() => setVoiceOpen((v) => !v)}
+                  voiceActive={voiceOpen}
                 />
               </>
             )}

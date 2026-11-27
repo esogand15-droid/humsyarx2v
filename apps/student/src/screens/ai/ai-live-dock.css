@@ -1,0 +1,68 @@
+/* Live voice dock: premium orb above the chat composer. Level drives --ail-lvl (0..1). */
+.ail-dock {
+  display: flex; align-items: center; gap: 12px;
+  margin: 0 0 8px; padding: 10px 12px;
+  border-radius: 24px;
+  background: var(--hym-surface-2, var(--hym-surface-1));
+  box-shadow: inset 0 0 0 1px var(--hym-hairline), var(--hym-elev-1, 0 4px 16px rgb(0 0 0 / .08));
+  animation: ail-in .28s var(--hym-ease-default, ease) both;
+}
+@keyframes ail-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+
+.ail-orb {
+  --ail-lvl: 0;
+  position: relative; flex: 0 0 auto;
+  width: 56px; height: 56px; padding: 0;
+  border: 0; border-radius: 50%; background: none;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.ail-orb:disabled { cursor: default; }
+.ail-orb:focus-visible { outline: none; box-shadow: var(--hym-focus-ring-v2); }
+.ail-orb__glow {
+  position: absolute; inset: -8px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--hym-accent) 50%, transparent), transparent 70%);
+  opacity: calc(.3 + var(--ail-lvl) * .7);
+  transform: scale(calc(1 + var(--ail-lvl) * .4));
+  transition: transform 90ms linear, opacity 90ms linear;
+}
+.ail-orb__core {
+  position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
+  background: conic-gradient(from 0deg, var(--hym-accent), #7dd3fc, #c4b5fd, #f0abfc, var(--hym-accent));
+  box-shadow: inset 0 0 14px rgb(255 255 255 / .45), 0 6px 18px color-mix(in srgb, var(--hym-accent) 35%, transparent);
+  transform: scale(calc(1 + var(--ail-lvl) * .12));
+  transition: transform 90ms linear, filter .3s ease, opacity .3s ease;
+  animation: ail-spin 7s linear infinite;
+}
+.ail-orb__core::after {
+  content: ''; position: absolute; inset: 14%; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgb(255 255 255 / .85), rgb(255 255 255 / .12) 58%, transparent 70%);
+}
+@keyframes ail-spin { to { rotate: 360deg; } }
+.ail-dock.is-connecting .ail-orb__core { animation-duration: 1.4s; opacity: .75; }
+.ail-dock.is-thinking .ail-orb__core { animation-duration: 2.4s; }
+.ail-dock.is-idle .ail-orb__core,
+.ail-dock.is-error .ail-orb__core { animation: none; filter: grayscale(.7); opacity: .6; }
+
+.ail-dock__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ail-dock__status { font-size: var(--hym-fs-caption, .8rem); font-weight: 700; color: var(--hym-text-secondary); }
+.ail-dock__caption {
+  font-size: var(--hym-fs-body, .95rem); line-height: 1.6; color: var(--hym-text-primary);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.ail-dock__err { font-size: var(--hym-fs-caption, .8rem); color: var(--hym-role-danger-text, var(--danger)); }
+
+.ail-dock__ctrl { display: flex; gap: 6px; flex: 0 0 auto; }
+.ail-btn {
+  display: grid; place-items: center;
+  width: var(--hym-control-h-md, 44px); height: var(--hym-control-h-md, 44px);
+  border: 0; border-radius: 50%; cursor: pointer;
+  background: var(--hym-surface-sunken); color: var(--hym-text-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+.ail-btn.is-off { color: var(--hym-role-danger-text, var(--danger)); }
+.ail-btn--end { background: var(--hym-text-primary); color: var(--hym-surface-1); }
+.ail-btn:focus-visible { outline: none; box-shadow: var(--hym-focus-ring-v2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ail-dock, .ail-orb__core { animation: none; }
+}

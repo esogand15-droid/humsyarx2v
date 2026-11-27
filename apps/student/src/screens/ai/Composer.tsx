@@ -39,8 +39,11 @@ export interface ComposerProps {
   onStop: () => void;
   /** ارسال تصویر پیوستشده همراه متن؛ خطا را throw میکند تا روی چیپ نمایش داده شود. */
   onSendImage?: (file: File, prompt: string) => Promise<void>;
-  /** ارسال PDF یا فایل صوتی (شامل ضبط زنده میکروفون) از طریق /api/ai/ask-media */
+  /** ارسال PDF یا فایل صوتی از طریق /api/ai/ask-media */
   onSendMedia?: (file: File, kind: 'image' | 'pdf' | 'audio', prompt: string) => Promise<void>;
+  /** دکمهٔ گفت‌وگوی صوتی زنده کنار «ارسال» */
+  onVoice?: () => void;
+  voiceActive?: boolean;
 }
 
 interface Attachment {
@@ -85,19 +88,18 @@ function writeDraft(id: string, v: string) {
 
 const finePointer = () => typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
 
-type MenuKey = 'camera' | 'gallery' | 'file' | 'voice';
+type MenuKey = 'camera' | 'gallery' | 'file';
 const MENU: { key: MenuKey; icon: IconName; label: string }[] = [
   { key: 'camera', icon: 'i-video', label: 'دوربین' },
   { key: 'gallery', icon: 'i-layers', label: 'تصاویر' },
-  { key: 'file', icon: 'i-file-text', label: 'سند PDF یا صوت' },
-  { key: 'voice', icon: 'i-headphones', label: 'ضبط ویس سوال' },
+  { key: 'file', icon: 'i-file-text', label: 'پیوست فایل' },
 ];
 
 const MENU_GAP = 10;
 const VIEW_MARGIN = 16;
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { streaming, disabled, maxChars, canAttach, draftId, onSend, onStop, onSendImage, onSendMedia },
+  { streaming, disabled, maxChars, canAttach, draftId, onSend, onStop, onSendImage, onSendMedia, onVoice, voiceActive },
   ref,
 ) {
   const [value, setValue] = useState(() => readDraft(draftId));
@@ -105,10 +107,6 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [attachError, setAttachError] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const recRef = useRef<MediaRecorder | null>(null);
-  const recChunksRef = useRef<Blob[]>([]);
-  const recStreamRef = useRef<MediaStream | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
   const plusRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -222,51 +220,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     };
   }, [menu.mounted]);
 
-  const startOrStopRecording = useCallback(async () => {
-    if (recording && recRef.current) {
-      recRef.current.stop();
-      setRecording(false);
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      recStreamRef.current = stream;
-      recChunksRef.current = [];
-      const mr = new MediaRecorder(stream);
-      mr.ondataavailable = (ev) => {
-        if (ev.data.size > 0) recChunksRef.current.push(ev.data);
-      };
-      mr.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        recStreamRef.current = null;
-        const mime = mr.mimeType || 'audio/webm';
-        const blob = new Blob(recChunksRef.current, { type: mime });
-        if (blob.size > 200) {
-          const ext = mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm';
-          const f = new File([blob], `voice-${Date.now()}.${ext}`, { type: mime });
-          setAttachment({ file: f, kind: 'audio', url: URL.createObjectURL(f) });
-          setAttachError('');
-        }
-      };
-      recRef.current = mr;
-      mr.start();
-      setRecording(true);
-      setAttachError('');
-    } catch {
-      setAttachError('دسترسی به میکروفون داده نشد.');
-    }
-  }, [recording]);
-
-  useEffect(() => () => {
-    recStreamRef.current?.getTracks().forEach((t) => t.stop());
-  }, []);
-
   const pick = (key: MenuKey) => {
     setMenuOpen(false);
-    if (key === 'voice') {
-      void startOrStopRecording();
-      return;
-    }
     const input = key === 'camera' ? cameraInput : key === 'gallery' ? galleryInput : fileInput;
     // باید در همان رویداد لمس صدا زده شود تا iOS انتخابگر را مسدود نکند.
     input.current?.click();
@@ -339,21 +294,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         void submit();
       }}
     >
-      {(attachment || attachError || recording) && (
+      {(attachment || attachError) && (
         <div className="aic-attach-tray">
-          {recording && (
-            <div className="aic-attach-chip">
-              <Icon name="i-headphones" size={16} />
-              <span className="aic-attach-chip__name">در حال ضبط صدای شما…</span>
-              <button
-                type="button"
-                className="ds-btn ds-btn--danger ds-btn--sm"
-                onClick={() => void startOrStopRecording()}
-              >
-                پایان ضبط
-              </button>
-            </div>
-          )}
           {attachment && (
             <div className={`aic-attach-chip${uploading ? ' is-uploading' : ''}`}>
               {attachment.kind === 'image' ? (
@@ -402,6 +344,19 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             title="ارسال"
           >
             <Icon name="i-arrow-up" size={20} />
+          </button>
+        )}
+        {onVoice && !streaming && (
+          <button
+            type="button"
+            className={'aic-composer__icon aic-composer__voice' + (voiceActive ? ' is-active' : '')}
+            onClick={onVoice}
+            disabled={disabled}
+            aria-pressed={voiceActive}
+            aria-label="گفت‌وگوی صوتی زنده"
+            title="گفت‌وگوی صوتی زنده"
+          >
+            <Icon name="i-waveform" size={20} />
           </button>
         )}
         <textarea

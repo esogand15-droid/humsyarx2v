@@ -206,7 +206,7 @@ export function EmbeddedAiStudyPanel({ fileId, bookletName, page }: Props) {
           <button type="button" className="iconbtn" onClick={newChat} aria-label={`گفت${ZW}وگوی جدید`} title={`گفت${ZW}وگوی جدید`}>
             <Icon name="i-pen" size={16} />
           </button>
-          <button type="button" className="iconbtn" onClick={() => navigate('/ai/live')} aria-label="تماس صوتی زنده" title="تماس صوتی زنده">
+          <button type="button" className="iconbtn" onClick={() => navigate('/ai?voice=1')} aria-label="تماس صوتی زنده" title="تماس صوتی زنده">
             <Icon name="i-headphones" size={16} />
           </button>
           <button type="button" className="iconbtn" onClick={() => navigate('/ai/scribe')} aria-label="جزوه‌نویس PDF" title="جزوه‌نویس PDF">
