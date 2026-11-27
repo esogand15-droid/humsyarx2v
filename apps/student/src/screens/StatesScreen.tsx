@@ -19,7 +19,7 @@ const STATES: StateSpec[] = [
   { id: 'expired', title: 'برای ادامه وارد شو', icon: 'i-lock', code: '401 login_required', tone: 'neutral',
     message: 'نشست شما منقضی شده است. بعد از ورود، به همین صفحه برمی‌گردید.', action: 'ورود با کد کاربری' },
   { id: 'pending', title: 'حساب در انتظار تأیید', icon: 'i-clock', code: '403 pending_approval', tone: 'warn',
-    message: 'حساب شما ساخته شده ولی هنوز تأیید نشده است. تأیید از ربات هامزیار انجام می‌شود.', action: 'راهنمای تأیید' },
+    message: 'حساب شما ساخته شده ولی هنوز تأیید نهایی نشده است. پس از بررسی و تأیید توسط پشتیبانی، دسترسی فعال می‌شود.', action: 'بررسی دوباره' },
   { id: 'suspended', title: 'دسترسی حساب بسته است', icon: 'i-lock', code: '403 suspended', tone: 'danger',
     message: 'دسترسی این حساب موقتاً متوقف شده است. برای بررسی با پشتیبانی در تماس باشید.', action: 'پشتیبانی' },
   { id: 'locked', title: 'این جزوه برای مشترکین است', icon: 'i-book', code: '402 feature_disabled', tone: 'neutral',

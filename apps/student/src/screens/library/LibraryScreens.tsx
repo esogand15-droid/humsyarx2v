@@ -173,19 +173,18 @@ export function SessionScreen() {
                   key={f.id}
                   icon={iconFor(f.type)}
                   title={f.name}
-                  sub={[fileLabel(f.type), humanSize(f.size)]
+                  sub={[fileLabel(f.type, f.mime, f.name), humanSize(f.size)]
                     .filter(Boolean)
                     .join(' · ')}
-                  trailing={!f.preview ? <DsBadge tone="neutral">فقط از ربات تلگرام</DsBadge> : undefined}
-                  to={f.preview ? readerPath('res', f.id) : undefined}
-                  chevron={f.preview}
+                  to={readerPath('res', f.id)}
+                  chevron
                 />
               ))}
             </div>
           </DsCard>
           <DsCard level="sunken" className="lib-note-card">
-            فایل‌های PDF، ویدیو و صوت مستقیماً داخل هامزیار باز می‌شوند. فایل‌های اسلاید و ضمایمی که
-            برچسب «فقط از ربات تلگرام» دارند را در ربات رسمی تلگرام دریافت کنید.
+            تمامی فایل‌های جلسه — از جمله جزوه‌های PDF، اسلایدهای پاورپوینت، ویدیو، صوت، فایل‌های متنی،
+            اکسل و ضمایم — مستقیماً داخل برنامه باز و نمایش داده می‌شوند.
           </DsCard>
         </div>
       )}
@@ -246,9 +245,8 @@ function RefRow({ f }: { f: ReferenceFile }) {
       sub={[f.lang === 'fa' ? 'فارسی' : 'انگلیسی', `جلد ${faNum(f.volume)}`, humanSize(f.size)]
         .filter(Boolean)
         .join(' · ')}
-      trailing={!f.preview ? <DsBadge tone="neutral">بدون پیش‌نمایش</DsBadge> : undefined}
-      to={f.preview ? readerPath('ref', f.id) : undefined}
-      chevron={f.preview}
+      to={readerPath('ref', f.id)}
+      chevron
     />
   );
 }

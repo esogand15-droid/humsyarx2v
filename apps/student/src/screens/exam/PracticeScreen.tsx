@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import './exam.css';
-import { AppBar } from '../../components';
+import { AppBar, ReportSheet } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
 import { DsBadge, DsButton, DsCard, DsChip, DsEmpty } from '../../design/components';
 import { Icon } from '../../icons';
@@ -65,6 +65,7 @@ export function PracticeScreen() {
   const [answered, setAnswered] = useState(0);
   const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
   const [flagging, setFlagging] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const inFlight = useRef(false);
   const seenIdsRef = useRef<string[]>([]);
 
@@ -384,6 +385,16 @@ export function PracticeScreen() {
                     <Icon name="i-bookmark" size={16} />
                     <span>{isFlagged ? 'نشان‌شده' : 'نشان‌کردن'}</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportOpen(true)}
+                    className="exam-flag-btn"
+                    title="گزارش ایراد سؤال"
+                    aria-label="گزارش ایراد سؤال"
+                  >
+                    <Icon name="i-alert-circle" size={16} />
+                    <span>گزارش ایراد</span>
+                  </button>
                 </div>
               </div>
 
@@ -468,6 +479,15 @@ export function PracticeScreen() {
           </div>
         )}
       </div>
+      {q && (
+        <ReportSheet
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          targetType="question"
+          targetId={q.id}
+          targetLabel={q.lesson || 'سؤال تمرین'}
+        />
+      )}
     </>
   );
 }

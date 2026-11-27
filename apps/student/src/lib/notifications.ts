@@ -121,6 +121,70 @@ export async function markNotificationsRead(ids: string[] | null): Promise<void>
   }
 }
 
+export async function pinInboxNotification(id: string, pinned: boolean): Promise<void> {
+  const prev = state.items;
+  if (state.items) {
+    state.items = state.items.map((item) => (item.id === id ? { ...item, pinned } : item));
+    emit();
+  }
+  try {
+    await apiCall<{ ok: boolean; pinned: boolean }>(`/api/notifications/inbox/${encodeURIComponent(id)}/pin`, {
+      method: 'POST',
+      body: JSON.stringify({ pinned }),
+    });
+  } catch (err) {
+    state.items = prev;
+    emit();
+    throw err;
+  }
+}
+
+export async function deleteInboxNotification(id: string): Promise<void> {
+  const prevItems = state.items;
+  const prevUnread = state.unread;
+  if (state.items) {
+    state.items = state.items.filter((item) => item.id !== id);
+    state.unread = countUnread(state.items);
+    emit();
+  }
+  try {
+    const res = await apiCall<{ ok: boolean; unread?: number }>(
+      `/api/notifications/inbox/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+    );
+    if (typeof res?.unread === 'number') {
+      state.unread = Math.max(0, res.unread);
+      emit();
+    }
+  } catch (err) {
+    state.items = prevItems;
+    state.unread = prevUnread;
+    emit();
+    throw err;
+  }
+}
+
+export interface NotificationSettingItem {
+  key: string;
+  label: string;
+  desc: string;
+  enabled: boolean;
+}
+
+export const notifSettingsApi = {
+  get: () => apiCall<{ settings: NotificationSettingItem[] }>('/api/notifications/settings'),
+  update: (settings: Record<string, boolean>) =>
+    apiCall<{ ok: boolean }>('/api/notifications/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ settings }),
+    }),
+  toggleAll: (enabled: boolean) =>
+    apiCall<{ ok: boolean; enabled: boolean }>('/api/notifications/settings/all', {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
+};
+
 export function resetNotificationsStore(): void {
   state.items = null;
   state.unread = null;

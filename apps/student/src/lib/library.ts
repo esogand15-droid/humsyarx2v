@@ -107,18 +107,39 @@ export const library = {
     ),
 };
 
-/** برچسب فارسی نوع فایل — همان واژگان ربات، یک‌جا. */
+/** برچسب فارسی نوع فایل — یکپارچه برای کل اپلیکیشن وب. */
 export const FILE_LABEL: Record<string, string> = {
   video: 'ویدیو کلاس',
-  ppt: 'پاورپوینت',
+  ppt: 'اسلاید پاورپوینت',
+  pptx: 'اسلاید پاورپوینت',
+  slides: 'اسلایدها',
   pdf: 'جزوه PDF',
+  doc: 'سند متنی / ورد',
+  docx: 'سند ورد',
+  xls: 'فایل اکسل',
+  xlsx: 'فایل اکسل',
+  zip: 'فایل فشرده',
   note: 'نکات',
   test: 'تست',
   voice: 'ویس استاد',
-  file: 'فایل آموزشی',
+  file: 'فایل ضمیمه',
 };
 
-export function fileLabel(kind: string): string {
+export function fileLabel(kind: string, mime?: string, name?: string): string {
+  const m = (mime || '').toLowerCase();
+  const n = (name || '').toLowerCase();
+  if (kind === 'ppt' || m.includes('presentation') || m.includes('powerpoint') || /\.(pptx?|ppsx?|odp)$/.test(n)) {
+    return 'اسلاید پاورپوینت';
+  }
+  if (m.includes('wordprocessing') || m.includes('msword') || /\.(docx?|rtf)$/.test(n)) {
+    return 'سند ورد';
+  }
+  if (m.includes('spreadsheet') || m.includes('ms-excel') || /\.(xlsx?|csv)$/.test(n)) {
+    return 'جدول / اکسل';
+  }
+  if (m.includes('zip') || /\.(zip|rar|7z)$/.test(n)) {
+    return 'فایل فشرده';
+  }
   return FILE_LABEL[kind] ?? FILE_LABEL.file;
 }
 

@@ -2206,6 +2206,35 @@ async def _authenticate_live_ws(websocket: WebSocket) -> dict | None:
         except Exception:
             return None
 
+    # 🌐 نشست وب دانشجویی (hu_session / hy_student_session)
+    hu_tok = (websocket.cookies.get("hu_session") or "").strip()
+    if hu_tok:
+        try:
+            from backend.api.auth import resolve_web_user_session
+            sess = await resolve_web_user_session(hu_tok)
+            if sess:
+                uid = int(sess.get("uid") or 0)
+                if uid == 99999999 and os.getenv("DEMO_SESSIONS", "").strip() == "1":
+                    return {"id": uid, "name": "دکتر علی رضایی", "_db": {"user_id": uid, "name": "دکتر علی رضایی", "approved": True, "subscription_active": True}}
+                db_user = await db.get_user(uid)
+                if db_user and db_user.get("approved") and not db_user.get("suspended") and not db_user.get("blacklisted"):
+                    return {"id": uid, "name": db_user.get("name", ""), "_db": db_user}
+        except Exception:
+            pass
+
+    legacy_tok = (websocket.cookies.get("hy_student_session") or "").strip()
+    if legacy_tok:
+        try:
+            from backend.api.auth import resolve_student_legacy_session
+            sess = await resolve_student_legacy_session(legacy_tok)
+            if sess:
+                uid = int(sess.get("uid") or 0)
+                db_user = await db.get_user(uid)
+                if db_user and db_user.get("approved") and not db_user.get("suspended") and not db_user.get("blacklisted"):
+                    return {"id": uid, "name": db_user.get("name", ""), "_db": db_user}
+        except Exception:
+            pass
+
     cookie_tok = websocket.cookies.get(WA_SESSION_COOKIE, "")
     if cookie_tok:
         try:

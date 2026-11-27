@@ -38,6 +38,13 @@ export interface AiHistoryMessage {
   index?: number;
 }
 
+export interface AiActiveReference {
+  name?: string;
+  filename?: string;
+  mime?: string;
+  size_bytes?: number;
+}
+
 export interface AiStatus {
   enabled: boolean;
   banned: boolean;
@@ -47,6 +54,7 @@ export interface AiStatus {
   unlimited: boolean;
   disabled_message: string;
   max_input_chars: number;
+  active_reference?: AiActiveReference | null;
   capabilities?: { text?: boolean; image?: boolean; pdf?: boolean; audio?: boolean };
 }
 
@@ -55,6 +63,14 @@ export interface VisionDiagnosisResult {
   detected_structures: string[];
   confidence_level: string;
   tokens_used: number;
+}
+
+export interface AskMediaResult {
+  answer: string;
+  tokens_used?: number;
+  conversation_id?: string;
+  active_reference?: AiActiveReference | null;
+  attachment?: { kind: 'image' | 'pdf' | 'audio'; name: string; mime: string; size_bytes: number; reference_active?: boolean };
 }
 
 /** کد خطاهایی که رابط کاربری برایشان رفتار جدا دارد. */
@@ -388,4 +404,121 @@ export const ai = {
     apiCall<{ ok: boolean }>(`${C}/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ pinned }) }),
 
   remove: (id: string) => apiCall<{ ok: boolean }>(`${C}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  askMedia: async (file: File, message = '', conversationId?: string | null): Promise<AskMediaResult> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (message.trim()) fd.append('message', message.trim());
+    if (conversationId) fd.append('conversation_id', conversationId);
+    const res = await fetch('/api/ai/ask-media', { method: 'POST', credentials: 'same-origin', body: fd });
+    if (!res.ok) {
+      let body: unknown = null;
+      try { body = JSON.parse(await res.text()); } catch { /* fallback */ }
+      throw toAiError(res.status, body);
+    }
+    return (await res.json()) as AskMediaResult;
+  },
+
+  attachReference: async (file: File): Promise<{ ok: boolean; active_reference: AiActiveReference | null }> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiCall<{ ok: boolean; active_reference: AiActiveReference | null }>('/api/ai/reference', {
+      method: 'POST',
+      body: fd,
+    });
+  },
+
+  clearReference: () => apiCall<{ ok: boolean }>('/api/ai/reference', { method: 'DELETE' }),
+
+  report: (question: string, answer: string) =>
+    apiCall<{ ok: boolean; message?: string }>('/api/ai/report', {
+      method: 'POST',
+      body: JSON.stringify({ question: question || 'سؤال کاربر', answer }),
+    }),
+
+  generateImage: (prompt: string, aspect_ratio = '1:1') =>
+    apiCall<{
+      ok: boolean;
+      image: string;
+      mime: string;
+      model?: string;
+      usage?: { used_today: number; daily_limit: number; remaining: number | null; unlimited: boolean };
+    }>('/api/ai/generate-image', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, aspect_ratio }),
+    }),
+
+  liveConfig: () =>
+    apiCall<{
+      enabled: boolean;
+      live_enabled: boolean;
+      model: string;
+      voice: string;
+      thinking_level: string;
+      target_language: string;
+      max_session_sec: number;
+      models?: Array<{ id: string; label: string; free?: boolean }>;
+      voices?: Array<{ id: string; label: string }>;
+      translate_languages?: Array<{ code: string; label: string }>;
+      usage?: { used_today_sec: number; daily_limit_sec: number; remaining_sec: number | null; unlimited: boolean };
+    }>('/api/ai/live/config'),
+};
+
+/* ── جزوه‌نویس هوشمند چندرسانه‌ای ── */
+export interface LectureJob {
+  id: string;
+  title: string;
+  subject: string;
+  professor: string;
+  status: 'processing' | 'ready' | 'failed';
+  stage: string;
+  status_text: string;
+  error: string;
+  pdf_ready: boolean;
+  pdf_size: number;
+  summary?: {
+    title?: string;
+    subject?: string;
+    professor?: string;
+    session?: string;
+    executive_summary?: string;
+    topics_count?: number;
+    pearls_count?: number;
+    traps_count?: number;
+    qna_count?: number;
+  };
+  created_at: string;
+}
+
+export const lectureApi = {
+  config: () =>
+    apiCall<{
+      enabled: boolean;
+      daily_limit: number;
+      used_today: number;
+      remaining_today: number;
+      unlimited: boolean;
+      max_upload_mb: number;
+    }>('/lecture/config'),
+
+  jobs: () => apiCall<{ jobs: LectureJob[] }>('/lecture/jobs'),
+
+  job: (id: string) => apiCall<{ job: LectureJob }>(`/lecture/jobs/${encodeURIComponent(id)}`),
+
+  create: (params: { audio?: File | null; slides?: File | null; notes?: string }) => {
+    const fd = new FormData();
+    if (params.audio) fd.append('audio', params.audio);
+    if (params.slides) fd.append('slides', params.slides);
+    if (params.notes?.trim()) fd.append('notes', params.notes.trim());
+    return apiCall<{ ok: boolean; job_id: string; status: string }>('/lecture/create', {
+      method: 'POST',
+      body: fd,
+    });
+  },
+
+  deleteJob: (id: string) =>
+    apiCall<{ ok: boolean }>(`/lecture/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  pdfUrl: (id: string, inline = false) =>
+    `/api/web/lecture/jobs/${encodeURIComponent(id)}/pdf${inline ? '?inline=1' : ''}`,
 };

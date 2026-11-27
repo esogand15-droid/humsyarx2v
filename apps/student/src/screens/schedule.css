@@ -712,6 +712,41 @@
   text-align: end;
 }
 
+.sched-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sched-toolbar--wide {
+  gap: 8px;
+}
+
+.sched-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sched-bold {
+  font-weight: 700;
+}
+
+.sched-note {
+  margin: 0;
+}
+
+.sched-off-list {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.sched-off-card {
+  padding: 12px;
+}
+
 .sched-tasks-col {
   display: flex;
   flex-direction: column;

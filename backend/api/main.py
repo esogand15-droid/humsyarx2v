@@ -49,7 +49,9 @@ from backend.api.routers import (
     web_admin,
     web_exam,
     web_ink,
+    web_lecture,
     web_library,
+    web_quiz,
     web_reader,
     me_bridge,
     web_auth,
@@ -568,6 +570,18 @@ app.include_router(
 )
 
 app.include_router(
+    web_quiz.router,
+    prefix="/api/web",
+    tags=["web-quiz"],
+)
+
+app.include_router(
+    web_lecture.router,
+    prefix="/api/web",
+    tags=["web-lecture"],
+)
+
+app.include_router(
     payment_gateway.router,
     prefix="/api",
     tags=["payment-gateway"],
@@ -749,7 +763,7 @@ async def health_deep():
 # حالا تست واقعاً وجود دارد و روی هر push اجرا می‌شود.
 # هر تغییر عمدیِ سطح API باید این عدد و EXPECTED_OPENAPI_OPERATIONS در
 # tests/test_route_inventory.py را هم‌زمان به‌روز کند.
-_ROUTE_BASELINE = 764  # +2: GET /api/web/exam/catalog, /exam/filters (ed9b6f0)
+_ROUTE_BASELINE = 785  # +21: web_reader(+3), schedule pdf(+2), web_quiz(+9), web_lecture(+6), profile regen(+1)
 
 
 def _walk_included_routes(routes, prefix: str = "") -> list:

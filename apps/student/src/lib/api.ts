@@ -69,11 +69,19 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
   let res: Response;
   const url = path.startsWith('/api/') ? path : `${BASE}${path}`;
+  const isForm = typeof FormData !== 'undefined' && init?.body instanceof FormData;
+  const baseHeaders: Record<string, string> = isForm
+    ? { Accept: 'application/json' }
+    : { 'Content-Type': 'application/json', Accept: 'application/json' };
+  const mergedHeaders =
+    init?.headers instanceof Headers
+      ? init.headers
+      : { ...baseHeaders, ...(init?.headers as Record<string, string> | undefined) };
   try {
     res = await fetch(url, {
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       ...init,
+      headers: mergedHeaders,
     });
   } catch {
     // No network. In production: an honest error (offline), never fake data.

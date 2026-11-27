@@ -111,7 +111,7 @@ function Row({
           <span className="aic-conv__text">{c.title || NEW_TITLE}</span>
         </span>
         <span className="aic-conv__meta">
-          {c.legacy && <span className="ds-badge">تلگرام</span>}
+          {c.legacy && <span className="ds-badge">حافظهٔ پیشین</span>}
           <span className="aic-conv__date">{relativeLabel(d)}</span>
         </span>
       </button>
@@ -219,7 +219,7 @@ export function ConversationList(p: ConversationListProps) {
             <div className="aic-sheet">
               <p className="aic-sheet__text">
                 {menuConv.legacy
-                  ? `حافظهٔ گفت${ZW}وگوی مشترک با ربات تلگرام پاک می${ZW}شود. این کار برگشت${ZW}پذیر نیست.`
+                  ? `حافظهٔ گفت${ZW}وگوی پیشین پاک می${ZW}شود. این کار برگشت${ZW}پذیر نیست.`
                   : `این گفت${ZW}وگو و همهٔ پیام${ZW}هایش حذف می${ZW}شود. این کار برگشت${ZW}پذیر نیست.`}
               </p>
               <div className="aic-sheet__row">
@@ -290,7 +290,7 @@ export function ConversationList(p: ConversationListProps) {
                     <Icon name="i-trash" size={20} />
                   </span>
                   <span className="ds-row__body">
-                    <span className="ds-row__title">{menuConv.legacy ? `پاک${ZW}کردن حافظهٔ تلگرام` : `حذف گفت${ZW}وگو`}</span>
+                    <span className="ds-row__title">{menuConv.legacy ? `پاک${ZW}کردن حافظهٔ پیشین` : `حذف گفت${ZW}وگو`}</span>
                   </span>
                 </button>
               </li>

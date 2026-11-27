@@ -434,3 +434,207 @@ export function clockFa(seconds: number): string {
       .replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
   return `${fa2(m)}:${fa2(r)}`;
 }
+
+/* ── طراحی سؤال و سؤال‌های من ── */
+export interface MyQuestionDesign {
+  id: string;
+  lesson: string;
+  topic: string;
+  question: string;
+  options: string[];
+  correct: number;
+  explanation?: string;
+  difficulty?: string;
+  status: string;
+  status_label?: string;
+  approved?: boolean;
+  review_note?: string;
+  created_at?: string;
+}
+
+export interface QuestionDesignPayload {
+  lesson_id?: string | null;
+  topic_id?: string | null;
+  lesson: string;
+  topic: string;
+  question: string;
+  options: string[];
+  correct: number;
+  explanation?: string;
+  difficulty?: string;
+}
+
+export const questionDesignApi = {
+  mine: (skip = 0, limit = 50) =>
+    apiCall<{ questions: MyQuestionDesign[] }>(`/api/questions/my-designs?skip=${skip}&limit=${limit}`),
+
+  create: (body: QuestionDesignPayload) =>
+    apiCall<{ ok: boolean; question_id: string; message?: string }>('/api/questions/design', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  update: (id: string, body: QuestionDesignPayload, resubmit = false) =>
+    apiCall<{ ok: boolean; status?: string }>(`/api/questions/my-designs/${encodeURIComponent(id)}?resubmit=${resubmit}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  resubmit: (id: string, body: QuestionDesignPayload) =>
+    apiCall<{ ok: boolean; status?: string }>(`/api/questions/my-designs/${encodeURIComponent(id)}/resubmit`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  withdraw: (id: string) =>
+    apiCall<{ ok: boolean; message?: string }>(`/api/questions/my-designs/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+};
+
+/* ── چالش ارتقای رتبه (Promotion Challenge) ── */
+export interface PromotionStartResult {
+  session_id: string;
+  total: number;
+  promotion: boolean;
+  resume?: boolean;
+  index?: number;
+  target_rank?: string;
+  target_title?: string;
+  target_icon?: string;
+  apex?: boolean;
+  pass_pct?: number;
+}
+
+export const promotionApi = {
+  start: () =>
+    apiCall<PromotionStartResult>('/api/questions/custom-exam/start', {
+      method: 'POST',
+      body: JSON.stringify({ count: 10, minutes: 0, output_mode: 'app', promotion: true }),
+    }),
+
+  next: (sid: string) =>
+    apiCall<MockNext>(`/api/questions/custom-exam/${encodeURIComponent(sid)}/next`),
+
+  answer: (sid: string, selected: number) =>
+    apiCall<{
+      is_correct?: boolean;
+      correct_answer?: number;
+      finished?: boolean;
+      promotion_result?: {
+        win: boolean;
+        pct: number;
+        pass_pct: number;
+        need: number;
+        reward: number;
+        target_rank?: string;
+        cooldown_h?: number;
+      };
+    }>(`/api/questions/custom-exam/${encodeURIComponent(sid)}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({ selected }),
+    }),
+};
+
+/* ── آزمون‌ساز هوشمند از روی PDF ── */
+export interface QuizDocTopic {
+  id: number;
+  title: string;
+  page_start: number;
+  page_end: number;
+}
+
+export interface QuizDocItem {
+  id: string;
+  name: string;
+  status: 'processing' | 'ready' | 'failed';
+  error?: string;
+  size_bytes: number;
+  page_count: number;
+  quality: number;
+  quality_note?: string;
+  topics: QuizDocTopic[];
+  created_at: string;
+}
+
+export interface PdfQuizQuestion {
+  id: string;
+  order_index: number;
+  stem: string;
+  options: string[];
+  topic_title?: string;
+  difficulty?: string;
+  page_refs?: number[];
+  status: string;
+  answered_option?: number | null;
+  is_correct?: boolean | null;
+  correct_index?: number;
+  explanation_short?: string;
+  explanation_long?: string;
+  source_evidence?: string;
+}
+
+export interface PdfQuizSession {
+  id: string;
+  doc_id: string;
+  doc_name: string;
+  status: string;
+  total_planned: number;
+  answered: number;
+  correct: number;
+  wrong: number;
+  settings?: Record<string, unknown>;
+}
+
+export const pdfQuizApi = {
+  config: () =>
+    apiCall<{
+      enabled: boolean;
+      max_pdf_mb: number;
+      max_pages: number;
+      max_questions_per_session: number;
+      daily_limit: number;
+      used_today: number;
+      remaining_today: number;
+    }>('/quiz/config'),
+
+  docs: () => apiCall<{ docs: QuizDocItem[] }>('/quiz/docs'),
+
+  getDoc: (docId: string) => apiCall<{ doc: QuizDocItem }>(`/quiz/docs/${encodeURIComponent(docId)}`),
+
+  deleteDoc: (docId: string) =>
+    apiCall<{ ok: boolean }>(`/quiz/docs/${encodeURIComponent(docId)}`, { method: 'DELETE' }),
+
+  upload: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiCall<{ ok: boolean; doc_id: string; status: string }>('/quiz/upload', {
+      method: 'POST',
+      body: fd,
+    });
+  },
+
+  startSession: (body: {
+    doc_id: string;
+    topic_id?: number;
+    page_from?: number;
+    page_to?: number;
+    count: number;
+    difficulty: 'easy' | 'medium' | 'hard' | 'mixed';
+  }) =>
+    apiCall<{ ok: boolean; session_id: string; doc_name: string; topic_title: string; total: number }>(
+      '/quiz/sessions/start',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  sessions: () => apiCall<{ sessions: PdfQuizSession[] }>('/quiz/sessions'),
+
+  session: (sid: string) =>
+    apiCall<{ session: PdfQuizSession; questions: PdfQuizQuestion[] }>(`/quiz/sessions/${encodeURIComponent(sid)}`),
+
+  answer: (sid: string, question_id: string, selected: number, time_ms?: number) =>
+    apiCall<{ ok: boolean; question: PdfQuizQuestion; session: PdfQuizSession }>(
+      `/quiz/sessions/${encodeURIComponent(sid)}/answer`,
+      { method: 'POST', body: JSON.stringify({ question_id, selected, time_ms }) },
+    ),
+};

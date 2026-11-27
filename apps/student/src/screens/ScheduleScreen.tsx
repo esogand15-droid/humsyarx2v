@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { AppBar } from '../components/AppBar';
+import { AppBar, Sheet, Toast } from '../components';
 import {
   DsBadge,
   DsButton,
   DsCard,
+  DsChip,
   DsEmpty,
   DsInput,
   DsSegmented,
@@ -20,8 +21,8 @@ import {
   formatJalaliDate,
   formatTerm,
 } from '../lib/fa';
-import { schedule, studyTasks } from '../lib/schedule';
-import type { ScheduleConflict, ScheduleItem, StudyTask } from '../lib/schedule';
+import { downloadScheduleBlob, schedule, studyTasks } from '../lib/schedule';
+import type { CourseSelectionsPayload, ScheduleConflict, ScheduleItem, StudyTask } from '../lib/schedule';
 import { peek, put } from '../lib/swr';
 
 interface ScheduleMeta {
@@ -31,6 +32,10 @@ interface ScheduleMeta {
   has_custom_selection: boolean;
   term: string;
   conflicts: ScheduleConflict[];
+  needsEduGroup: boolean;
+  aiSuggestedEdu: string;
+  mismatchedCount: number;
+  unselectedCount: number;
 }
 import {
   addDays,
@@ -318,8 +323,25 @@ export function ScheduleScreen() {
       has_custom_selection: false,
       term: '',
       conflicts: [],
+      needsEduGroup: false,
+      aiSuggestedEdu: 'unknown',
+      mismatchedCount: 0,
+      unselectedCount: 0,
     },
   );
+  const [toast, setToast] = useState<string | null>(null);
+  const [selectOpen, setSelectOpen] = useState(false);
+  const [selData, setSelData] = useState<CourseSelectionsPayload | null>(null);
+  const [selLoading, setSelLoading] = useState(false);
+  const [selDraft, setSelDraft] = useState<Record<string, string>>({});
+  const [savingSel, setSavingSel] = useState(false);
+  const [eduBusy, setEduBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState<'ical' | 'pdf' | null>(null);
+
+  const flash = (msg: string) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 3200);
+  };
 
   const now = useMemo(() => tehranNow(), []);
   const thisWeek = useMemo(() => weekStart(now.iso), [now.iso]);
@@ -355,6 +377,10 @@ export function ScheduleScreen() {
         has_custom_selection: Boolean(res.has_custom_selection),
         term: formatTerm(res.term),
         conflicts: res.conflicts || [],
+        needsEduGroup: Boolean(res.needs_educational_group_confirmation),
+        aiSuggestedEdu: res.educational_group_info?.ai_suggested_group || 'unknown',
+        mismatchedCount: Array.isArray(res.mismatched_selections) ? res.mismatched_selections.length : 0,
+        unselectedCount: Array.isArray(res.unselected_lessons) ? res.unselected_lessons.length : 0,
       };
       put('schedule', { items: rawList, meta: nextMeta });
       setItems(rawList);
@@ -386,6 +412,94 @@ export function ScheduleScreen() {
   useEffect(() => {
     void loadTasks();
   }, [loadTasks]);
+
+  const openCourseSelection = async () => {
+    setSelectOpen(true);
+    setSelLoading(true);
+    try {
+      const data = await schedule.courseSelections();
+      setSelData(data);
+      const map: Record<string, string> = { ...(data.selections_map || {}) };
+      for (const off of data.offerings || []) {
+        if (off.single_group && off.auto_selected_group && !map[off.lesson]) {
+          map[off.lesson] = off.auto_selected_group;
+        }
+      }
+      setSelDraft(map);
+    } catch (err) {
+      flash(errorText(err, 'دریافت لیست دروس ترم ناموفق بود.'));
+    } finally {
+      setSelLoading(false);
+    }
+  };
+
+  const liveMajorityGroup = useMemo(() => {
+    const offerings = selData?.offerings || [];
+    const fallback = selData?.registered_group || '1';
+    let c1 = 0;
+    let c2 = 0;
+    let u1 = 0;
+    let u2 = 0;
+    for (const off of offerings) {
+      const g = selDraft[off.lesson];
+      const cr = Number(off.credit || 1) || 1;
+      if (g === '1') { c1 += 1; u1 += cr; }
+      else if (g === '2') { c2 += 1; u2 += cr; }
+    }
+    let grp = fallback;
+    if (c1 > c2) grp = '1';
+    else if (c2 > c1) grp = '2';
+    else if (c1 > 0) grp = u1 > u2 ? '1' : u2 > u1 ? '2' : fallback;
+    return { group: grp, total: c1 + c2 };
+  }, [selData, selDraft]);
+
+  const saveCourseSelection = async () => {
+    if (savingSel) return;
+    setSavingSel(true);
+    try {
+      const selections = Object.entries(selDraft)
+        .filter(([, g]) => ['1', '2', '3', '4'].includes(g))
+        .map(([lesson, grp]) => ({ lesson, group: grp }));
+      const res = await schedule.saveCourseSelections({
+        selections,
+        term: selData?.term,
+      });
+      setSelectOpen(false);
+      flash(`انتخاب واحد ذخیره شد · گروه اکثریت: گروه ${faNum(res.computed_group || liveMajorityGroup.group)}`);
+      await loadTimetable();
+    } catch (err) {
+      flash(errorText(err, 'ذخیرهٔ انتخاب واحد ناموفق بود.'));
+    } finally {
+      setSavingSel(false);
+    }
+  };
+
+  const confirmEduGroup = async (val: 'male' | 'female') => {
+    if (eduBusy) return;
+    setEduBusy(true);
+    try {
+      await schedule.setEducationalGroup(val);
+      flash(val === 'male' ? 'گروه آموزشی آقایان ثبت شد.' : 'گروه آموزشی بانوان ثبت شد.');
+      await loadTimetable();
+    } catch (err) {
+      flash(errorText(err, 'ثبت گروه آموزشی ناموفق بود.'));
+    } finally {
+      setEduBusy(false);
+    }
+  };
+
+  const exportSchedule = async (kind: 'ical' | 'pdf') => {
+    if (exportBusy) return;
+    setExportBusy(kind);
+    try {
+      await downloadScheduleBlob(kind);
+      flash(kind === 'pdf' ? 'فایل PDF برنامه دانلود شد.' : 'فایل تقویم (.ics) دانلود شد.');
+    } catch (err) {
+      flash(errorText(err, 'دریافت فایل خروجی انجام نشد.'));
+    } finally {
+      setExportBusy(null);
+    }
+  };
 
   const plan = useMemo(
     () => buildWeekPlan(items, weekStartIso, { now, group }),
@@ -564,7 +678,7 @@ export function ScheduleScreen() {
         {/* ═══════════ تب برنامه کلاسی و امتحانات ═══════════ */}
         {activeTab === 'timetable' && (
           <div key="timetable" className="sched-stack mo-sheet-swap">
-            {(meta.cohortTitle || termBadgeText) && (
+            {(meta.cohortTitle || termBadgeText || items.length > 0) && (
               <DsCard level="raised">
                 <div className="sched-cohort">
                   <div className="sched-cohort__lead">
@@ -580,6 +694,70 @@ export function ScheduleScreen() {
                       </p>
                     </div>
                   </div>
+                  <div className="sched-toolbar">
+                    <DsButton variant="secondary" size="sm" onClick={() => void openCourseSelection()}>
+                      <Icon name="i-grid" size={14} />
+                      انتخاب واحد
+                    </DsButton>
+                    <DsButton
+                      variant="ghost"
+                      size="sm"
+                      loading={exportBusy === 'pdf'}
+                      onClick={() => void exportSchedule('pdf')}
+                    >
+                      <Icon name="i-file-text" size={14} />
+                      PDF
+                    </DsButton>
+                    <DsButton
+                      variant="ghost"
+                      size="sm"
+                      loading={exportBusy === 'ical'}
+                      onClick={() => void exportSchedule('ical')}
+                    >
+                      <Icon name="i-download" size={14} />
+                      تقویم .ics
+                    </DsButton>
+                  </div>
+                </div>
+              </DsCard>
+            )}
+
+            {meta.needsEduGroup && (
+              <DsCard level="accent">
+                <div className="core-stack">
+                  <div className="sched-between">
+                    <span className="small sched-bold">
+                      تأیید گروه آموزشی (آقایان / بانوان) برای نمایش کلاس‌های تفکیک‌شده
+                    </span>
+                    {meta.aiSuggestedEdu === 'male' || meta.aiSuggestedEdu === 'female' ? (
+                      <DsBadge tone="accent">
+                        پیشنهاد هوشمند: {meta.aiSuggestedEdu === 'male' ? 'آقایان' : 'بانوان'}
+                      </DsBadge>
+                    ) : null}
+                  </div>
+                  <div className="sched-toolbar sched-toolbar--wide">
+                    <DsButton size="sm" variant="secondary" loading={eduBusy} onClick={() => void confirmEduGroup('male')}>
+                      کلاس‌های آقایان
+                    </DsButton>
+                    <DsButton size="sm" variant="secondary" loading={eduBusy} onClick={() => void confirmEduGroup('female')}>
+                      کلاس‌های بانوان
+                    </DsButton>
+                  </div>
+                </div>
+              </DsCard>
+            )}
+
+            {(meta.mismatchedCount > 0 || meta.unselectedCount > 0) && (
+              <DsCard level="sunken">
+                <div className="sched-between">
+                  <span className="small">
+                    {meta.mismatchedCount > 0 && `${faNum(meta.mismatchedCount)} درس با گروه آموزشی مغایرت دارد`}
+                    {meta.mismatchedCount > 0 && meta.unselectedCount > 0 ? ' · ' : ''}
+                    {meta.unselectedCount > 0 && `${faNum(meta.unselectedCount)} درس هنوز انتخاب گروه نشده`}
+                  </span>
+                  <DsButton size="sm" variant="ghost" onClick={() => void openCourseSelection()}>
+                    اصلاح انتخاب واحد
+                  </DsButton>
                 </div>
               </DsCard>
             )}
@@ -1028,6 +1206,74 @@ export function ScheduleScreen() {
           </div>
         )}
       </div>
+
+      <Sheet
+        open={selectOpen}
+        onClose={() => setSelectOpen(false)}
+        title="انتخاب گروه درس‌به‌درس"
+        size="compact"
+      >
+        <div className="core-stack">
+          {selLoading ? (
+            <DsSkeleton shape="row" />
+          ) : !(selData?.offerings?.length) ? (
+            <p className="small muted sched-note">
+              کاتالوگ دروس ارائه‌شده برای این ترم ثبت نشده است.
+            </p>
+          ) : (
+            <>
+              <p className="small muted sched-note">
+                برای هر درس گروه خود را مشخص کنید · گروه اکثریت: <strong>گروه {faNum(liveMajorityGroup.group)}</strong>{' '}
+                ({faNum(liveMajorityGroup.total)} درس انتخاب‌شده)
+              </p>
+              <div className="core-stack sched-off-list">
+                {selData.offerings.map((off) => {
+                  const chosen = selDraft[off.lesson];
+                  const groups = off.groups || [];
+                  return (
+                    <DsCard key={off.lesson} level="sunken" className="core-stack sched-off-card">
+                      <div className="sched-between">
+                        <strong className="small">{faDigits(off.lesson)}</strong>
+                        {off.credit ? <DsBadge tone="neutral">{faNum(off.credit)} واحد</DsBadge> : null}
+                      </div>
+                      <div className="sched-toolbar">
+                        {off.single_group && off.auto_selected_group ? (
+                          <DsBadge tone="accent">فقط گروه {faNum(off.auto_selected_group)}</DsBadge>
+                        ) : groups.length === 0 ? (
+                          <span className="tiny muted">گروه‌ها هنوز ثبت نشده</span>
+                        ) : (
+                          groups.map((g) => (
+                            <DsChip
+                              key={g.group}
+                              selected={chosen === g.group}
+                              onClick={() =>
+                                setSelDraft((prev) => {
+                                  const next = { ...prev };
+                                  if (next[off.lesson] === g.group) delete next[off.lesson];
+                                  else next[off.lesson] = g.group;
+                                  return next;
+                                })
+                              }
+                            >
+                              گروه {faNum(g.group)}
+                              {g.teacher ? ` · ${faDigits(g.teacher)}` : ''}
+                            </DsChip>
+                          ))
+                        )}
+                      </div>
+                    </DsCard>
+                  );
+                })}
+              </div>
+              <DsButton variant="primary" block loading={savingSel} onClick={() => void saveCourseSelection()}>
+                <Icon name="i-check" size={16} />
+                ذخیرهٔ انتخاب واحد و بروزرسانی برنامه
+              </DsButton>
+            </>
+          )}
+        </div>
+      </Sheet>
+      <Toast message={toast} />
     </>
   );
 }

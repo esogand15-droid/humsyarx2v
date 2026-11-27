@@ -1,0 +1,192 @@
+/* استودیوی هوشیار: تصویرساز، جزوه‌نویس کلاسی و تماس صوتی/تصویری زنده */
+.ais-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: calc(96px + var(--sab, 0px));
+}
+
+.ais-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ais-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ais-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.ais-sub {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+
+.ais-textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 12px 14px;
+  border-radius: var(--r-md, 14px);
+  border: 1px solid var(--line);
+  background: var(--surface-2, var(--glass));
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.ais-textarea:focus,
+.ais-select:focus,
+.ais-input:focus {
+  outline: none;
+  border-color: var(--hym-accent, var(--brand));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hym-accent, var(--brand)) 18%, transparent);
+}
+
+.ais-select,
+.ais-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--r-md, 14px);
+  border: 1px solid var(--line);
+  background: var(--surface-2, var(--glass));
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+
+.ais-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ais-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.ais-img-wrap {
+  border-radius: var(--r-lg, 18px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-2, var(--glass));
+  text-align: center;
+}
+
+.ais-img-wrap img {
+  display: block;
+  max-width: 100%;
+  max-height: 440px;
+  margin-inline: auto;
+  object-fit: contain;
+}
+
+.ais-dropgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.ais-file-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--r-md, 14px);
+  border: 1.5px dashed var(--line-strong, var(--line));
+  background: var(--surface-2, rgba(255, 255, 255, 0.03));
+}
+
+.ais-file-box--filled {
+  border-style: solid;
+  border-color: var(--hym-accent, var(--brand));
+}
+
+.ais-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ais-live-stage {
+  text-align: center;
+  padding: 24px 16px;
+  border-radius: 22px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--surface-1) 88%, #0f172a), color-mix(in srgb, var(--surface-2) 72%, #020617));
+  border: 1px solid var(--line);
+}
+
+.ais-orb {
+  width: 124px;
+  height: 124px;
+  margin: 14px auto;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  transition: transform 120ms ease-out, box-shadow 220ms ease;
+}
+
+.ais-orb--compact {
+  width: 82px;
+  height: 82px;
+}
+
+.ais-video-box {
+  position: relative;
+  max-width: 320px;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid var(--hym-accent, var(--brand));
+  background: #000;
+}
+
+.ais-video-box video {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+}
+
+.ais-transcript {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ais-turn {
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.ais-turn--user {
+  background: color-mix(in srgb, var(--hym-accent, #2563eb) 14%, transparent);
+}
+
+.ais-turn--ai {
+  background: color-mix(in srgb, #10b981 13%, transparent);
+}

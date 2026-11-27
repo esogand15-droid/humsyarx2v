@@ -42,12 +42,41 @@ export interface SchedulePayload {
   computed_group?: string;
   registered_group?: string;
   educational_group?: string;
+  educational_group_info?: { ai_suggested_group?: string };
+  needs_educational_group_confirmation?: boolean;
+  mismatched_selections?: Array<{ lesson?: string; reason?: string }>;
   has_custom_selection?: boolean;
   selected_count?: number;
   total_offered_count?: number;
   unselected_lessons?: string[];
   conflicts?: ScheduleConflict[];
   term?: string;
+}
+
+export interface CourseOfferingGroup {
+  group: string;
+  teacher?: string;
+}
+
+export interface CourseOffering {
+  lesson: string;
+  credit?: number;
+  single_group?: boolean;
+  auto_selected_group?: string;
+  groups?: CourseOfferingGroup[];
+}
+
+export interface CourseSelectionsPayload {
+  term?: string;
+  registered_group?: string;
+  computed_group?: string;
+  educational_group?: string;
+  educational_group_info?: { ai_suggested_group?: string };
+  needs_educational_group_confirmation?: boolean;
+  has_selections?: boolean;
+  selections_map?: Record<string, string>;
+  offerings?: CourseOffering[];
+  mismatched_selections?: Array<{ lesson?: string }>;
 }
 
 export interface ScheduleQueryOptions {
@@ -98,7 +127,36 @@ export const schedule = {
     const res = await apiCall<SchedulePayload>(`/schedule${qs}`);
     return normalizePayload(res);
   },
+
+  courseSelections: () => apiCall<CourseSelectionsPayload>('/schedule/course-selections'),
+
+  saveCourseSelections: (body: { selections: Array<{ lesson: string; group: string }>; term?: string; educational_group?: 'male' | 'female' }) =>
+    apiCall<{ ok?: boolean; computed_group?: string; selected_count?: number }>('/schedule/course-selections', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  setEducationalGroup: (educational_group: 'male' | 'female') =>
+    apiCall<{ ok?: boolean }>('/api/profile/educational-group', {
+      method: 'PATCH',
+      body: JSON.stringify({ educational_group }),
+    }),
 };
+
+export async function downloadScheduleBlob(kind: 'ical' | 'pdf'): Promise<void> {
+  const url = kind === 'pdf' ? '/api/web/schedule/pdf' : '/api/web/schedule/ical';
+  const res = await fetch(url, { credentials: 'same-origin' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const obj = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = obj;
+  a.download = kind === 'pdf' ? 'humsyar-schedule.pdf' : 'humsyar-schedule.ics';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(obj), 4000);
+}
 
 /* تسک‌های مطالعه شخصی تقویم جلالی (Wave 6 Feature 35) */
 export interface StudyTask {

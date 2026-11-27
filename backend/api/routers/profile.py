@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.api.auth import ADMIN_ID, get_current_user
+from backend.api.rate_limit import rate_limit_dependency
 from backend.api.user_metrics import non_negative_int, normalize_stats, normalize_weekly
 from backend.database.database import db
 from backend.core.request_context import current_request_id
@@ -280,6 +281,29 @@ async def update_intake(body: IntakeUpdate, user=Depends(get_current_user)):
     await db.update_user(user["id"], {"intake": intake})
     await _profile_audit(user, "ویرایش ورودی", before={"intake": (user.get("_db") or {}).get("intake")}, after={"intake": intake})
     return {"ok": True, "intake": intake}
+
+
+@router.post(
+    "/web-code/regenerate",
+    dependencies=[Depends(rate_limit_dependency("profile_web_code_regen", 10, 3600, by_user=True))],
+)
+async def regenerate_web_code(user=Depends(get_current_user)):
+    """🔄 بازتولید کد ۸ کاراکتری ورود وب‌اپ بدون نیاز به ربات تلگرام."""
+    from backend.core import student_code as sc
+
+    uid = int(user["id"])
+    new_code = ""
+    for _ in range(15):
+        cand = sc.format_code(sc.generate_raw_code(), prefix=True)
+        collision = await db.users.find_one({"web_login_code": cand}, {"_id": 1})
+        if not collision:
+            new_code = cand
+            break
+    if not new_code:
+        raise HTTPException(status_code=503, detail="امکان تولید کد یکتا در این لحظه نبود؛ دوباره تلاش کنید.")
+    await db.users.update_one({"user_id": uid}, {"$set": {"web_login_code": new_code}})
+    await _profile_audit(user, "بازتولید کد ورود وب‌اپ")
+    return {"ok": True, "web_login_code": new_code}
 
 
 class StudentIdUpdate(BaseModel):

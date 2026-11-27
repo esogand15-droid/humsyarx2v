@@ -1,5 +1,6 @@
 """Class and exam schedule endpoints."""
 
+import asyncio
 from typing import Any, Literal, Mapping
 
 from bson import ObjectId
@@ -366,6 +367,28 @@ async def get_ical(
         content=body.encode("utf-8"), media_type="text/calendar",
         headers={"Content-Disposition":
                  "attachment; filename=humsyar-schedule.ics"})
+
+
+@router.get("/pdf")
+async def get_schedule_pdf(
+    user=Depends(get_current_user),
+    stype: ScheduleType | None = Query(default=None),
+):
+    """خروجی PDF پریمیوم از برنامه شخصی‌سازی‌شده کلاسی و امتحانات (بدون نیاز به ربات تلگرام)."""
+    from backend.services.schedule_pdf import generate_schedule_pdf
+    personalized = await db.get_personalized_schedules(user["id"], stype=stype, upcoming=True)
+    items = personalized.get("items") or []
+    eff_group = str(personalized.get("computed_group") or _text(user["_db"].get("group")) or "1")
+    student_name = _text(user["_db"].get("name"))
+    pdf_bytes = await asyncio.to_thread(generate_schedule_pdf, items, eff_group, student_name, stype)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": "attachment; filename=humsyar-schedule.pdf",
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 @router.get("/conflicts")

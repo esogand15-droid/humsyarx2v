@@ -33,10 +33,13 @@ from collections import OrderedDict
 import copy
 import hashlib
 import hmac
+import inspect
 import logging
 import os
+import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
@@ -51,9 +54,21 @@ from backend.core.time_utils import now_utc
 try:
     from backend.services.pdf_renderer import PdfRenderer, WatermarkStamper, get_singleflight
     from backend.services.storage import get_storage_driver, HIGH_WATERMARK_BYTES, LOW_WATERMARK_BYTES
+    from backend.services.office_viewer import (
+        detect_web_kind,
+        get_office_asset,
+        parse_office_or_attachment,
+        sniff_format_from_bytes,
+    )
 except ImportError:
     from services.pdf_renderer import PdfRenderer, WatermarkStamper, get_singleflight
     from services.storage import get_storage_driver, HIGH_WATERMARK_BYTES, LOW_WATERMARK_BYTES
+    from services.office_viewer import (
+        detect_web_kind,
+        get_office_asset,
+        parse_office_or_attachment,
+        sniff_format_from_bytes,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -87,19 +102,9 @@ def _key(uid: int, scope: str, file_id: str) -> str:
     return f"{int(uid)}:{scope}:{file_id}"
 
 
-def _kind(mime: str, ext: str) -> str:
-    """نوع محتوا برای انتخاب رندرر — همان دسته‌بندی مینی‌اپ، نه بیشتر."""
-    m = (mime or "").lower()
-    e = (ext or "").lower().lstrip(".")
-    if m == "application/pdf" or e == "pdf":
-        return "pdf"
-    if m.startswith("video/") or e in {"mp4", "webm", "mkv", "mov", "m4v"}:
-        return "video"
-    if m.startswith("audio/") or e in {"mp3", "ogg", "oga", "wav", "m4a", "flac"}:
-        return "audio"
-    if m.startswith("image/") or e in {"jpg", "jpeg", "png", "gif", "webp"}:
-        return "image"
-    return "other"
+def _kind(mime: str, ext: str, content_type: str = "") -> str:
+    """نوع محتوا برای انتخاب رندرر وب — شامل اسلاید، مستندات، اکسل و آرشیو."""
+    return detect_web_kind(mime, ext, content_type)
 
 
 async def _item(scope: str, file_id: str) -> dict | None:
@@ -112,13 +117,75 @@ async def _item(scope: str, file_id: str) -> dict | None:
 def _public(item: dict) -> dict:
     name = (str(item.get("display_file_name") or item.get("name") or "").strip()
             or str(item.get("description") or "").strip() or "فایل آموزشی")
+    mime = str(item.get("mime_type") or "")
+    ext = str(item.get("file_extension") or "")
+    ctype = str(item.get("type") or "")
     return {
         "id": str(item.get("_id") or ""),
         "name": name,
-        "mime": str(item.get("mime_type") or ""),
+        "mime": mime,
+        "ext": ext,
+        "type": ctype,
         "size": int(item.get("file_size") or 0),
-        "kind": _kind(str(item.get("mime_type") or ""), str(item.get("file_extension") or "")),
+        "kind": _kind(mime, ext, ctype),
     }
+
+
+def _allow_download_for(kind: str, ext: str, protect_enabled: bool, item: dict) -> bool:
+    """دانلود مستقیم وقتی مجاز است که قفل محتوا خاموش باشد یا فرمت فایل ذاتاً نیازمند دانلود باشد."""
+    e = (ext or "").strip().lower().lstrip(".")
+    if item.get("allow_web_download"):
+        return True
+    if not protect_enabled:
+        return True
+    if kind in ("archive", "attachment"):
+        return True
+    return e in {"ppt", "pps", "doc", "xls", "rar", "7z", "tar", "gz"}
+
+
+async def _guard_and_resolve_item(scope: str, file_id: str, item: dict, web: dict) -> dict:
+    """بررسی محدودیت ورودی و جایگزینی فورک فعال — مطابق resources/references."""
+    if scope == "ref":
+        filt = await ref_router._viewer_intake(web)
+        item_intake = str(item.get("intake") or "").strip()
+        try:
+            item_intake = await db.ref_file_intake(file_id)
+        except AttributeError:
+            pass
+        ref_router._intake_guard(item_intake, filt, "این فایل")
+        if filt is not None:
+            try:
+                fork_b = await db.book_superseded_by_fork(
+                    item.get("book_id", ""),
+                    (web.get("_db") or {}).get("intake", ""),
+                )
+                if fork_b:
+                    fk_file = await db.ref_files.find_one({"book_id": str(fork_b["_id"]), "fork_of": file_id})
+                    if fk_file:
+                        return fk_file
+            except Exception:
+                pass
+    else:
+        filt = await res_router._viewer_intake(web)
+        item_intake = str(item.get("intake") or "").strip()
+        try:
+            item_intake = await db.content_intake(file_id)
+        except AttributeError:
+            pass
+        res_router._intake_guard(item_intake, filt, "این فایل")
+        if filt is not None:
+            try:
+                sess_fk = await db.session_superseded_by_fork(
+                    item.get("session_id", ""),
+                    (web.get("_db") or {}).get("intake", ""),
+                )
+                if sess_fk:
+                    fk_content = await db.bs_content.find_one({"session_id": str(sess_fk["_id"]), "fork_of": file_id})
+                    if fk_content:
+                        return fk_content
+            except Exception:
+                pass
+    return item
 
 
 # ─────────────────────────────────────────────────────────────
@@ -126,15 +193,7 @@ def _public(item: dict) -> dict:
 # ─────────────────────────────────────────────────────────────
 @router.get("/library/view-url/{scope}/{file_id}")
 async def view_url(scope: str, file_id: str, request: Request, user: dict = Depends(current_student)):
-    """آدرس امضاشدهٔ ریدر برای یک فایل.
-
-    پاسخ همیشه ۲۰۰ است و خودش می‌گوید «قابل خواندن هست یا نه»:
-        {available: true,  url, kind, mime, name, size, expires_in}
-        {available: false, reason, kind, name}
-
-    چرا ۲۰۰ و نه خطا: «این نوع فایل پیش‌نمایش ندارد» یک حالت عادی UI
-    است، نه نقص. خطا فقط برای دسترسی/ورودی/نشست می‌ماند (۴۰۱/۴۰۳/۴۰۲).
-    """
+    """آدرس امضاشدهٔ ریدر برای یک فایل — همهٔ انواع فایل (PDF، مدیا، اسلاید، ورد، اکسل، آرشیو) باز می‌شوند."""
     if scope not in SCOPES:
         raise HTTPException(status_code=422, detail="scope_invalid")
     if file_id in ("demo", "sample", "test"):
@@ -153,30 +212,65 @@ async def view_url(scope: str, file_id: str, request: Request, user: dict = Depe
     item = await _item(scope, file_id)
     if not item:
         raise HTTPException(status_code=404, detail="file_not_found")
+    item = await _guard_and_resolve_item(scope, file_id, item, web)
     meta = _public(item)
-
+    kind = meta["kind"]
+    uid = int(user.get("user_id") or user.get("id") or 0)
     try:
-        if scope == "ref":
-            out = await ref_router.preview_url(file_id=file_id, user=web)
-        else:
-            out = await res_router.preview_url(content_id=file_id, user=web)
-    except HTTPException as exc:
-        # ۴۱۵ = نوع فایل قابل پیش‌نمایش نیست (قانون خود مینی‌اپ)
-        if exc.status_code == 415:
-            return {**meta, "available": False, "reason": "not_previewable"}
-        if exc.status_code == 404:
-            raise HTTPException(status_code=404, detail="file_not_found")
-        if exc.status_code == 403:
-            raise HTTPException(status_code=403, detail={"code": "not_in_scope",
-                                                         "message": str(exc.detail)})
-        raise
+        protect_enabled = bool(await db.get_setting("protect_content_enabled", True))
+    except Exception:
+        protect_enabled = True
+    allow_dl = _allow_download_for(kind, meta.get("ext", ""), protect_enabled, item)
 
-    from backend.api.telegram_send import PREVIEW_TTL_SEC
-    # expires_at (افزوده): کلاینت زمان تازهسازی را دقیق میداند، حتی اگر
-    # پاسخ با تأخیر برسد. فیلدهای قبلی دست نخوردهاند (سازگاری مینیاپ).
-    return {**meta, "available": True, "url": out.get("url", ""),
-            "expires_in": PREVIEW_TTL_SEC,
-            "expires_at": int(time.time()) + PREVIEW_TTL_SEC}
+    dl_exp = int(time.time()) + READER_URL_TTL_SEC
+    dl_tok = generate_asset_token(uid, scope, file_id, "__dl__", dl_exp)
+    download_url = (
+        f"/api/web/library/download/{scope}/{quote(file_id, safe='')}"
+        f"?token={dl_tok}&expires={dl_exp}&uid={uid}"
+    ) if allow_dl else None
+
+    if kind in ("pdf", "video", "audio", "image"):
+        try:
+            if scope == "ref":
+                out = await ref_router.preview_url(file_id=file_id, user=web)
+            else:
+                out = await res_router.preview_url(content_id=file_id, user=web)
+            from backend.api.telegram_send import PREVIEW_TTL_SEC
+            return {
+                **meta,
+                "available": True,
+                "url": out.get("url", ""),
+                "expires_in": PREVIEW_TTL_SEC,
+                "expires_at": int(time.time()) + PREVIEW_TTL_SEC,
+                "allow_download": allow_dl,
+                "download_url": download_url,
+            }
+        except HTTPException as exc:
+            if exc.status_code == 404:
+                raise HTTPException(status_code=404, detail="file_not_found")
+            if exc.status_code == 403:
+                raise HTTPException(status_code=403, detail={"code": "not_in_scope", "message": str(exc.detail)})
+            if exc.status_code != 415:
+                raise
+
+    if kind not in ("slides", "document", "sheet", "archive", "attachment"):
+        meta["kind"] = "document"
+        kind = "document"
+        allow_dl = _allow_download_for(kind, meta.get("ext", ""), protect_enabled, item)
+        download_url = (
+            f"/api/web/library/download/{scope}/{quote(file_id, safe='')}"
+            f"?token={dl_tok}&expires={dl_exp}&uid={uid}"
+        ) if allow_dl else None
+
+    return {
+        **meta,
+        "available": True,
+        "url": f"/api/web/reader/office/{scope}/{quote(file_id, safe='')}",
+        "allow_download": allow_dl,
+        "download_url": download_url,
+        "expires_in": READER_URL_TTL_SEC,
+        "expires_at": dl_exp,
+    }
 
 
 # ─────────────────────────────────────────────────────────────
@@ -389,6 +483,8 @@ async def _resolve_student_identity(
     if hasattr(app, "dependency_overrides") and current_student in app.dependency_overrides:
         override = app.dependency_overrides[current_student]
         user = override() if callable(override) else override
+        if inspect.isawaitable(user):
+            user = await user
         if user:
             resolved_uid = int(user.get("user_id") or user.get("id") or 0)
     else:
@@ -668,3 +764,256 @@ async def get_reader_thumbnail(
         "X-Content-Type-Options": "nosniff",
     }
     return Response(content=thumb_webp, media_type="image/webp", headers=headers)
+
+
+# ─────────────────────────────────────────────────────────────
+#  📊 نمایشگر اسلایدها (PPTX/PPT)، مستندات (DOCX/TXT)، جداول و دانلود وب
+# ─────────────────────────────────────────────────────────────
+_OFFICE_PARSED_CACHE: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+
+
+def generate_asset_token(user_id: int, scope: str, file_id: str, asset: str, expires: int) -> str:
+    msg = f"asset:{int(user_id)}:{scope}:{file_id}:{asset}:{int(expires)}".encode("utf-8")
+    return hmac.new(READER_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()[:40]
+
+
+def verify_asset_token(token: str, user_id: int, scope: str, file_id: str, asset: str, expires: int) -> bool:
+    if int(time.time()) > int(expires):
+        return False
+    expected = generate_asset_token(user_id, scope, file_id, asset, expires)
+    return hmac.compare_digest(str(token), expected)
+
+
+async def _fetch_raw_file_bytes(file_id: str, item: dict) -> bytes:
+    """دریافت بایت‌های خام هر فایل (اسلاید/ورد/اکسل/ضمایم) از حافظه، دیسک یا تلگرام و کش آن."""
+    storage = get_storage_driver()
+    storage_key = f"raw_{file_id}"
+
+    for key in ("raw_bytes", "file_bytes", "pdf_bytes"):
+        val = item.get(key)
+        if isinstance(val, (bytes, bytearray)):
+            raw = bytes(val)
+            try:
+                await storage.save_original(storage_key, raw)
+            except Exception:
+                pass
+            return raw
+
+    cached = await storage.get_original(storage_key)
+    if cached:
+        return cached
+
+    local_path = item.get("file_path") or item.get("local_path")
+    if local_path and os.path.isfile(local_path):
+        with open(local_path, "rb") as f:
+            raw = f.read()
+        try:
+            await storage.save_original(storage_key, raw)
+        except Exception:
+            pass
+        return raw
+
+    tg_id = str(item.get("file_id") or item.get("telegram_file_id") or "")
+    if tg_id:
+        try:
+            from backend.api.telegram_send import download_telegram_file_any_size
+            tg_bytes = await download_telegram_file_any_size(tg_id)
+            if tg_bytes:
+                try:
+                    await storage.save_original(storage_key, tg_bytes)
+                except Exception:
+                    pass
+                return tg_bytes
+        except Exception as exc:
+            logger.warning("download_telegram_file_any_size failed for %s: %s", tg_id, exc)
+
+    raise HTTPException(status_code=404, detail="raw_file_not_found")
+
+
+@router.get("/reader/office/{scope}/{file_id}")
+async def get_reader_office(
+    scope: str,
+    file_id: str,
+    user: dict = Depends(current_student),
+):
+    """استخراج و ارائهٔ ساختاریافتهٔ اسلایدها، مستندات و جداول برای نمایش داخل برنامه."""
+    if scope not in SCOPES:
+        raise HTTPException(status_code=422, detail="scope_invalid")
+
+    web = _web_user(user)
+    await _gate("references" if scope == "ref" else "resources", web)
+    item = await _item(scope, file_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="file_not_found")
+    item = await _guard_and_resolve_item(scope, file_id, item, web)
+    meta = _public(item)
+    resolved_fid = str(item.get("_id") or file_id)
+
+    cached_doc = _OFFICE_PARSED_CACHE.get(resolved_fid)
+    if cached_doc is not None:
+        _OFFICE_PARSED_CACHE.move_to_end(resolved_fid)
+        parsed = copy.deepcopy(cached_doc)
+    else:
+        raw_bytes = await _fetch_raw_file_bytes(resolved_fid, item)
+        sniffed = sniff_format_from_bytes(raw_bytes, ext=meta.get("ext", ""), mime=meta.get("mime", ""))
+        if sniffed == "pdf":
+            storage = get_storage_driver()
+            await storage.save_original(resolved_fid, raw_bytes)
+            return {
+                "kind": "pdf",
+                "format": "pdf",
+                "name": meta["name"],
+                "redirect_manifest": f"/api/web/reader/manifest/{scope}/{quote(resolved_fid, safe='')}",
+            }
+        parsed = await asyncio.to_thread(
+            parse_office_or_attachment,
+            raw_bytes,
+            resolved_fid,
+            meta.get("mime", ""),
+            meta.get("ext", ""),
+            meta.get("name", ""),
+        )
+        while len(_OFFICE_PARSED_CACHE) >= 48:
+            _OFFICE_PARSED_CACHE.popitem(last=False)
+        _OFFICE_PARSED_CACHE[resolved_fid] = copy.deepcopy(parsed)
+
+    uid = int(user.get("user_id") or user.get("id") or 0)
+    exp = int(time.time()) + READER_URL_TTL_SEC
+    asset_urls: Dict[str, str] = {}
+    for asset_name in parsed.get("assets") or []:
+        tok = generate_asset_token(uid, scope, resolved_fid, asset_name, exp)
+        asset_urls[asset_name] = (
+            f"/api/web/reader/asset/{scope}/{quote(resolved_fid, safe='')}"
+            f"?name={quote(asset_name, safe='')}&token={tok}&expires={exp}&uid={uid}"
+        )
+
+    try:
+        protect_enabled = bool(await db.get_setting("protect_content_enabled", True))
+    except Exception:
+        protect_enabled = True
+    allow_dl = _allow_download_for(parsed.get("kind") or meta["kind"], meta.get("ext", ""), protect_enabled, item)
+    dl_tok = generate_asset_token(uid, scope, resolved_fid, "__dl__", exp)
+    download_url = (
+        f"/api/web/library/download/{scope}/{quote(resolved_fid, safe='')}"
+        f"?token={dl_tok}&expires={exp}&uid={uid}"
+    ) if allow_dl else None
+
+    return {
+        **parsed,
+        "scope": scope,
+        "name": meta["name"],
+        "mime": meta["mime"],
+        "ext": meta.get("ext", ""),
+        "size": meta["size"],
+        "asset_urls": asset_urls,
+        "allow_download": allow_dl,
+        "download_url": download_url,
+        "expires_in": READER_URL_TTL_SEC,
+        "expires_at": exp,
+    }
+
+
+@router.get("/reader/asset/{scope}/{file_id}")
+async def get_reader_office_asset(
+    scope: str,
+    file_id: str,
+    request: Request,
+    name: str = Query(..., min_length=1, max_length=256),
+    token: str = Query(..., min_length=8),
+    expires: int = Query(...),
+    uid: Optional[int] = Query(None),
+):
+    """سرو تصاویر جاسازی‌شده داخل اسلایدهای PPTX یا فایل‌های DOCX با توکن امضاشده."""
+    if scope not in SCOPES:
+        raise HTTPException(status_code=422, detail="scope_invalid")
+    resolved_uid, _, _ = await _resolve_student_identity(request, uid, allow_uid_only=True)
+    if int(time.time()) > int(expires):
+        raise HTTPException(status_code=403, detail="SIGNATURE_EXPIRED")
+    if not verify_asset_token(token, resolved_uid, scope, file_id, name, expires):
+        raise HTTPException(status_code=403, detail="INVALID_SIGNATURE")
+
+    storage = get_storage_driver()
+    raw_bytes = await storage.get_original(f"raw_{file_id}")
+    if not raw_bytes:
+        item = await _item(scope, file_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="file_not_found")
+        raw_bytes = await _fetch_raw_file_bytes(file_id, item)
+
+    res = await asyncio.to_thread(get_office_asset, raw_bytes, name)
+    if not res:
+        raise HTTPException(status_code=404, detail="asset_not_found")
+    img_bytes, mime = res
+    return Response(
+        content=img_bytes,
+        media_type=mime,
+        headers={
+            "Cache-Control": "private, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/library/download/{scope}/{file_id}")
+async def get_library_download(
+    scope: str,
+    file_id: str,
+    request: Request,
+    token: Optional[str] = Query(None),
+    expires: Optional[int] = Query(None),
+    uid: Optional[int] = Query(None),
+):
+    """دانلود مستقیم فایل در مرورگر وب (بدون نیاز به ربات تلگرام) با ثبت آمار دانلود."""
+    if scope not in SCOPES:
+        raise HTTPException(status_code=422, detail="scope_invalid")
+
+    if token and expires is not None and uid is not None:
+        if int(time.time()) > int(expires):
+            raise HTTPException(status_code=403, detail="SIGNATURE_EXPIRED")
+        if not verify_asset_token(token, int(uid), scope, file_id, "__dl__", int(expires)):
+            raise HTTPException(status_code=403, detail="INVALID_SIGNATURE")
+        db_user = await db.get_user(int(uid))
+        if not db_user:
+            raise HTTPException(status_code=401, detail="login_required")
+        web = _web_user(db_user)
+        user_id = int(uid)
+    else:
+        student = await current_student(request)
+        web = _web_user(student)
+        user_id = int(student.get("user_id") or student.get("id") or 0)
+
+    await _gate("references" if scope == "ref" else "resources", web)
+    item = await _item(scope, file_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="file_not_found")
+    item = await _guard_and_resolve_item(scope, file_id, item, web)
+    meta = _public(item)
+
+    try:
+        protect_enabled = bool(await db.get_setting("protect_content_enabled", True))
+    except Exception:
+        protect_enabled = True
+    if not _allow_download_for(meta["kind"], meta.get("ext", ""), protect_enabled, item):
+        raise HTTPException(status_code=403, detail="download_protected")
+
+    raw_bytes = await _fetch_raw_file_bytes(str(item.get("_id") or file_id), item)
+
+    # ثبت آمار دانلود مثل ربات
+    try:
+        if scope == "ref":
+            await db.ref_inc_download(file_id, user_id)
+        else:
+            await db.bs_inc_download(file_id, user_id)
+    except Exception:
+        pass
+
+    ext = (meta.get("ext") or "").strip().lstrip(".")
+    base_name = (meta.get("name") or "file").replace('"', "").replace("\n", " ").strip()
+    filename = base_name if (not ext or base_name.lower().endswith("." + ext.lower())) else f"{base_name}.{ext}"
+    ascii_fallback = re.sub(r"[^a-zA-Z0-9._-]+", "_", filename).strip("_") or (f"file.{ext}" if ext else "file")
+    headers = {
+        "Content-Disposition": f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quote(filename)}",
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+    }
+    return Response(content=raw_bytes, media_type=meta.get("mime") or "application/octet-stream", headers=headers)

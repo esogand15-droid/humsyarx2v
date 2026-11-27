@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { AppBar } from '../../components';
+import { AppBar, ReportSheet } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
 import { DsButton, DsEmpty } from '../../design/components';
 import { Icon } from '../../icons';
@@ -15,6 +15,8 @@ import './reader.css';
 // pdf.js و پنل‌های جانبی ریدر سنگین‌اند؛ فقط در زمان باز شدن بارگذاری می‌شوند
 const PdfView = lazy(() => import('./PdfView').then((m) => ({ default: m.PdfView })));
 const MediaView = lazy(() => import('./MediaView').then((m) => ({ default: m.MediaView })));
+const SlidesView = lazy(() => import('./SlidesView').then((m) => ({ default: m.SlidesView })));
+const DocumentView = lazy(() => import('./DocumentView').then((m) => ({ default: m.DocumentView })));
 const EmbeddedAiStudyPanel = lazy(() =>
   import('./EmbeddedAiStudyPanel').then((m) => ({ default: m.EmbeddedAiStudyPanel })),
 );
@@ -56,6 +58,7 @@ export function ReaderScreen() {
   const [notebookKey, setNotebookKey] = useState(0);
   const [activePage, setActivePage] = useState(1);
   const [jumpRequest, setJumpRequest] = useState<{ page: number; seq: number } | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
   const dividerCleanupRef = useRef<(() => void) | null>(null);
 
   const scopeTyped = (scope === 'ref' ? 'ref' : 'res') as Scope;
@@ -237,26 +240,52 @@ export function ReaderScreen() {
         back
         onBack={() => navigate(-1)}
         actions={
-          kind === 'pdf' ? (
+          info ? (
             <div className="reader-shell__actions">
-              <button
-                type="button"
-                className={`iconbtn ${sidePanel === 'ai_chat' ? 'is-active' : ''}`}
-                onClick={() => setSidePanel((p) => (p === 'ai_chat' ? 'none' : 'ai_chat'))}
-                title="دستیار هوشیار همزمان (\)"
-                aria-label="دستیار هوشیار"
-              >
-                <Icon name="i-chat" size={18} />
-              </button>
-              <button
-                type="button"
-                className={`iconbtn ${sidePanel === 'notes' ? 'is-active' : ''}`}
-                onClick={() => setSidePanel((p) => (p === 'notes' ? 'none' : 'notes'))}
-                title="دفترچه یادداشت"
-                aria-label="دفترچه یادداشت"
-              >
-                <Icon name="i-pen" size={18} />
-              </button>
+              {kind === 'pdf' && (
+                <>
+                  <button
+                    type="button"
+                    className={`iconbtn ${sidePanel === 'ai_chat' ? 'is-active' : ''}`}
+                    onClick={() => setSidePanel((p) => (p === 'ai_chat' ? 'none' : 'ai_chat'))}
+                    title="دستیار هوشیار همزمان (\)"
+                    aria-label="دستیار هوشیار"
+                  >
+                    <Icon name="i-chat" size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    className={`iconbtn ${sidePanel === 'notes' ? 'is-active' : ''}`}
+                    onClick={() => setSidePanel((p) => (p === 'notes' ? 'none' : 'notes'))}
+                    title="دفترچه یادداشت"
+                    aria-label="دفترچه یادداشت"
+                  >
+                    <Icon name="i-pen" size={18} />
+                  </button>
+                </>
+              )}
+              {info.allow_download && info.download_url && (
+                <a
+                  href={info.download_url}
+                  download
+                  className="iconbtn"
+                  title="دانلود فایل"
+                  aria-label="دانلود فایل"
+                >
+                  <Icon name="i-download" size={18} />
+                </a>
+              )}
+              {scopeTyped === 'res' && (
+                <button
+                  type="button"
+                  className="iconbtn"
+                  onClick={() => setReportOpen(true)}
+                  title="گزارش ایراد فایل"
+                  aria-label="گزارش ایراد"
+                >
+                  <Icon name="i-alert-circle" size={18} />
+                </button>
+              )}
             </div>
           ) : undefined
         }
@@ -278,22 +307,25 @@ export function ReaderScreen() {
         <div className="page page-enter">
           <DsEmpty
             icon={<Icon name="i-lock" size={28} />}
-            title="این فایل داخل برنامه خوانده نمی‌شود"
-            body={
-              info.reason === 'not_previewable'
-                ? 'فرمت این فایل برای نمایش درون‌برنامه‌ای مناسب نیست (مثلاً پاورپوینت یا فایل فشرده). برای دیدنش باید از مسیر دریافت فایل استفاده کنی.'
-                : 'این فایل در حال حاضر قابل نمایش نیست.'
-            }
+            title="این فایل در حال حاضر آماده نیست"
+            body="در صورت تداوم مشکل می‌توانید ایراد فایل را گزارش دهید یا کمی بعد دوباره امتحان کنید."
             action={
-              <DsButton variant="ghost" size="sm" onClick={() => navigate(-1)}>
-                بازگشت به فهرست
-              </DsButton>
+              info.download_url ? (
+                <a className="ds-btn ds-btn--primary ds-btn--sm" href={info.download_url} download>
+                  <Icon name="i-download" size={15} />
+                  دانلود فایل
+                </a>
+              ) : (
+                <DsButton variant="ghost" size="sm" onClick={() => navigate(-1)}>
+                  بازگشت به فهرست
+                </DsButton>
+              )
             }
           />
         </div>
       )}
 
-      {!loading && !error && info && info.available && (url || kind === 'pdf') && (
+      {!loading && !error && info && info.available && (url || kind === 'pdf' || kind === 'slides' || kind === 'document' || kind === 'sheet' || kind === 'archive' || kind === 'attachment') && (
         <div className={`study-workspace reader-workspace ${sidePanel === 'notes' ? 'is-split' : ''}`}>
           <div className="study-workspace__primary">
             <div className="reader-shell">
@@ -323,6 +355,30 @@ export function ReaderScreen() {
                     onInkChanged={() => setNotebookKey((k) => k + 1)}
                     isAiOpen={sidePanel === 'ai_chat'}
                   />
+                ) : kind === 'slides' ? (
+                  <SlidesView
+                    scope={scopeTyped}
+                    id={id}
+                    startSlide={startPage}
+                    onProgress={(slide, total) => {
+                      latest.current = { ...latest.current, page: slide, total };
+                      setActivePage(slide);
+                      persist('slides', { page: slide, total });
+                    }}
+                    onSwitchToPdf={(manifestUrl) => {
+                      setUrl(manifestUrl);
+                      setInfo((prev) => (prev ? { ...prev, kind: 'pdf', url: manifestUrl } : prev));
+                    }}
+                  />
+                ) : kind === 'document' || kind === 'sheet' || kind === 'archive' || kind === 'attachment' ? (
+                  <DocumentView
+                    scope={scopeTyped}
+                    id={id}
+                    onSwitchToPdf={(manifestUrl) => {
+                      setUrl(manifestUrl);
+                      setInfo((prev) => (prev ? { ...prev, kind: 'pdf', url: manifestUrl } : prev));
+                    }}
+                  />
                 ) : kind === 'video' || kind === 'audio' || kind === 'image' ? (
                   <MediaView
                     url={url}
@@ -336,13 +392,14 @@ export function ReaderScreen() {
                     bg={kind === 'audio' ? { scope: scopeTyped, id } : undefined}
                   />
                 ) : (
-                  <div className="page page-enter">
-                    <DsEmpty
-                      icon={<Icon name="i-doc" size={28} />}
-                      title="نمایش این نوع فایل پشتیبانی نمی‌شود"
-                      body="فقط PDF، ویدیو، صدا و تصویر داخل برنامه باز می‌شوند."
-                    />
-                  </div>
+                  <DocumentView
+                    scope={scopeTyped}
+                    id={id}
+                    onSwitchToPdf={(manifestUrl) => {
+                      setUrl(manifestUrl);
+                      setInfo((prev) => (prev ? { ...prev, kind: 'pdf', url: manifestUrl } : prev));
+                    }}
+                  />
                 )}
               </Suspense>
 
@@ -467,6 +524,13 @@ export function ReaderScreen() {
           )}
         </div>
       )}
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="resource"
+        targetId={id}
+        targetLabel={info?.name}
+      />
     </>
   );
 }

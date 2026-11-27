@@ -10,10 +10,8 @@ import { Icon } from '../../icons';
 import {
   ai,
   aiErrorFrom,
-  diagnoseClinicalImage,
   type AiConversation,
   type AiStatus,
-  type VisionDiagnosisResult,
 } from '../../lib/ai';
 import { ChatMessage } from './ChatMessage';
 import { Composer, type ComposerHandle } from './Composer';
@@ -251,20 +249,59 @@ export function AiChatScreen() {
     [activeId, navigate],
   );
 
-  const onVision = (result: VisionDiagnosisResult, imageUrl: string, prompt: string) => {
+  /* تصویر، PDF یا فایل صوتی پیوست‌شده از منوی «+» (شامل ضبط زنده میکروفون). */
+  const onSendMedia = async (file: File, kind: 'image' | 'pdf' | 'audio', prompt: string) => {
+    let cid = activeId;
+    if (!cid) {
+      const created = await ai.createConversation(prompt.trim().slice(0, 36) || file.name.slice(0, 36));
+      cid = created.id;
+      const nowC = new Date().toISOString();
+      setConvs((prev) => [{ id: cid!, title: prompt.trim().slice(0, 36) || file.name, created_at: nowC, updated_at: nowC, count: 0 }, ...prev]);
+      navigate(`/ai/${encodeURIComponent(cid)}`, { replace: true });
+    }
+    const res = await ai.askMedia(file, prompt, cid);
     stickRef.current = true;
     const now = new Date().toISOString();
+    const tag = kind === 'pdf' ? `[PDF مرجع: ${file.name}]` : kind === 'audio' ? `[فایل صوتی: ${file.name}]` : `[تصویر: ${file.name}]`;
+    const userDisplay = prompt.trim() ? `${tag}\n${prompt.trim()}` : tag;
     chat.append([
-      { role: 'user', text: prompt || `تحلیل این تصویر بالینی`, image: imageUrl, at: now, status: 'done' },
-      { role: 'assistant', text: result.analysis, chips: result.detected_structures, image: imageUrl, at: now, status: 'done' },
+      {
+        role: 'user',
+        text: userDisplay,
+        image: kind === 'image' ? URL.createObjectURL(file) : undefined,
+        at: now,
+        status: 'done',
+      },
+      {
+        role: 'assistant',
+        text: res.answer,
+        at: now,
+        status: 'done',
+      },
     ]);
+    ai.status()
+      .then(setStatus)
+      .catch(() => undefined);
+    void fetchConvs(queryRef.current);
   };
 
-  /* تصویر پیوستشده از منوی «+»: همان سرویس تحلیل تصویر، بدون شیت میانی.
-     خطا به Composer برمیگردد تا زیر چیپ نمایش داده شود. */
-  const onSendImage = async (file: File, prompt: string) => {
-    const result = await diagnoseClinicalImage(file, prompt);
-    onVision(result, URL.createObjectURL(file), prompt);
+  const onReportMessage = useCallback(
+    async (msgKey: string, answerText: string) => {
+      const list = chat.msgs;
+      const idx = list.findIndex((m) => m.key === msgKey);
+      const userMsg = idx > 0 ? [...list.slice(0, idx)].reverse().find((m) => m.role === 'user') : undefined;
+      await ai.report(userMsg?.text || 'سؤال کاربر', answerText);
+    },
+    [chat.msgs],
+  );
+
+  const clearRefDoc = async () => {
+    try {
+      await ai.clearReference();
+      setStatus((prev) => (prev ? { ...prev, active_reference: null } : prev));
+    } catch {
+      /* ignore */
+    }
   };
 
   const loadOlder = () => {
@@ -301,6 +338,12 @@ export function AiChatScreen() {
   const headerActions = useMemo(
     () => (
       <div className="aic-head-actions">
+        <button type="button" className="iconbtn" onClick={() => navigate('/ai/live')} aria-label="تماس صوتی زنده" title="تماس صوتی زنده">
+          <Icon name="i-headphones" size={18} />
+        </button>
+        <button type="button" className="iconbtn" onClick={() => navigate('/ai/scribe')} aria-label="جزوه‌نویس PDF" title="جزوه‌نویس PDF">
+          <Icon name="i-file-text" size={18} />
+        </button>
         <button type="button" className="iconbtn aic-hist-toggle" onClick={() => setDrawer(true)} aria-label={`تاریخچهٔ گفت${ZW}وگوها`} title={`تاریخچهٔ گفت${ZW}وگوها`}>
           <Icon name="i-menu" size={20} />
         </button>
@@ -309,7 +352,7 @@ export function AiChatScreen() {
         </button>
       </div>
     ),
-    [newChat],
+    [navigate, newChat],
   );
 
   const empty = chat.msgs.length === 0 && !chat.loading && !chat.loadError;
@@ -388,6 +431,20 @@ export function AiChatScreen() {
                   <p className="aic-hero__sub">
                     {`دستیار آموزشی تو برای علوم پایه و بالینی، فارماکولوژی، تفسیر آزمایش${ZW}ها و مرور پیش از امتحان.`}
                   </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 14 }}>
+                    <button type="button" className="ds-chip" onClick={() => navigate('/ai/live')}>
+                      <Icon name="i-headphones" size={14} />
+                      <span>تماس صوتی زنده</span>
+                    </button>
+                    <button type="button" className="ds-chip" onClick={() => navigate('/ai/scribe')}>
+                      <Icon name="i-file-text" size={14} />
+                      <span>جزوه‌نویس هوشمند PDF</span>
+                    </button>
+                    <button type="button" className="ds-chip" onClick={() => navigate('/ai/image')}>
+                      <Icon name="i-palette" size={14} />
+                      <span>ساخت تصویر پزشکی</span>
+                    </button>
+                  </div>
                   {!blocked && !quotaOut && (
                     <div className="aic-starters" role="list" aria-label={`پیشنهادهای شروع`}>
                       {starters.map((s) => (
@@ -405,7 +462,14 @@ export function AiChatScreen() {
               )}
 
               {chat.msgs.map((m) => (
-                <ChatMessage key={m.key} msg={m} isLast={m.key === lastAssistant} busy={chat.streaming} onRegenerate={(k) => void chat.regenerate(k)} />
+                <ChatMessage
+                  key={m.key}
+                  msg={m}
+                  isLast={m.key === lastAssistant}
+                  busy={chat.streaming}
+                  onRegenerate={(k) => void chat.regenerate(k)}
+                  onReport={onReportMessage}
+                />
               ))}
             </div>
           </div>
@@ -439,6 +503,20 @@ export function AiChatScreen() {
               </div>
             ) : (
               <>
+                {status?.active_reference && (status.active_reference.name || status.active_reference.filename) && (
+                  <div className="aic-quota" role="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span className="ds-badge ds-badge--accent">
+                      سند مرجع فعال: {status.active_reference.name || status.active_reference.filename}
+                    </span>
+                    <button
+                      type="button"
+                      className="ds-btn ds-btn--ghost ds-btn--sm"
+                      onClick={() => void clearRefDoc()}
+                    >
+                      حذف مرجع
+                    </button>
+                  </div>
+                )}
                 {lowQuota && (
                   <div className="aic-quota" role="status">
                     <span className="ds-badge ds-badge--warning">{`${faNum(status!.remaining!)} پرسش باقی${ZW}مانده امروز`}</span>
@@ -452,7 +530,7 @@ export function AiChatScreen() {
                   draftId={activeId || 'new'}
                   onSend={send}
                   onStop={chat.stop}
-                  onSendImage={onSendImage}
+                  onSendMedia={onSendMedia}
                 />
               </>
             )}

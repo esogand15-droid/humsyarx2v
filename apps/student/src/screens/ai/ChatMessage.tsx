@@ -25,10 +25,12 @@ export interface ChatMessageProps {
   isLast: boolean;
   busy: boolean;
   onRegenerate: (key: string) => void;
+  onReport?: (key: string, answerText: string) => Promise<void>;
 }
 
-export const ChatMessage = memo(function ChatMessage({ msg, isLast, busy, onRegenerate }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ msg, isLast, busy, onRegenerate, onReport }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
+  const [reported, setReported] = useState(false);
 
   if (msg.role === 'user') {
     return (
@@ -123,6 +125,21 @@ export const ChatMessage = memo(function ChatMessage({ msg, isLast, busy, onRege
             <button type="button" className="aic-act" onClick={() => onRegenerate(msg.key)} aria-label="پاسخ دوباره" title="پاسخ دوباره">
               <Icon name="i-refresh" size={16} />
               <span className="aic-act__label">پاسخ دوباره</span>
+            </button>
+          )}
+          {onReport && msg.status !== 'error' && (
+            <button
+              type="button"
+              className="aic-act"
+              disabled={reported}
+              onClick={() => {
+                void onReport(msg.key, msg.text).then(() => setReported(true));
+              }}
+              aria-label="گزارش پاسخ نادرست"
+              title="گزارش پاسخ نادرست"
+            >
+              <Icon name={reported ? 'i-check' : 'i-alert-circle'} size={15} />
+              <span className="aic-act__label">{reported ? 'گزارش شد' : 'گزارش خطا'}</span>
             </button>
           )}
         </div>

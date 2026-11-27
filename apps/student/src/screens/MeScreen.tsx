@@ -1,20 +1,30 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import './account.css';
-import { AppBar, Brand, Sheet } from '../components';
+import { AppBar, Brand, Sheet, Switch, Toast } from '../components';
 import { DeviceListPanel } from '../components/DeviceListModal';
-import { DsBadge, DsButton, DsCard, DsSegmented } from '../design/components';
+import { DsBadge, DsButton, DsCard, DsChip, DsSegmented } from '../design/components';
 import { Icon } from '../icons';
 import type { IconName } from '../icons';
-import { faDigits } from '../lib/fa';
+import { errorText } from '../lib/api';
+import { faDigits, faNum } from '../lib/fa';
 import { groupLabel, intakeLabel } from '../lib/intake';
+import {
+  profileApi,
+  type FaqItem,
+  type IntakeItem,
+  type PrestigeState,
+  type ProfileUser,
+  type ReferralMine,
+} from '../lib/profile';
 import { useSession } from '../lib/session';
 import { useTheme } from '../lib/theme';
 
-type AccountSheetKind = 'security' | 'devices' | 'faq' | 'about' | null;
+type AccountSheetKind = 'profile' | 'security' | 'devices' | 'faq' | 'about' | null;
 
 const SHEET_TITLE: Record<Exclude<AccountSheetKind, null>, string> = {
+  profile: 'ویرایش پروفایل و اطلاعات تحصیلی',
   security: 'امنیت حساب کاربری',
   devices: 'دستگاه‌های متصل',
   faq: 'راهنما و سوالات متداول',
@@ -66,28 +76,122 @@ function MeNavRow({
   );
 }
 
-/** «هامزیار من» — هویت دانشجویی، کد ۸ کاراکتری مخفی‌پذیر، تنظیمات ظاهر و شیت یکپارچه حساب/دستگاه‌ها. */
+/** «هامزیار من» — پروفایل قابل‌ویرایش، کد ورود وب‌اپ، نشان‌ها/رقابت، دعوت از دوستان و راهنمای زنده. */
 export function MeScreen() {
   const navigate = useNavigate();
   const { mode, setMode } = useTheme();
   const { user, signOut, refresh } = useSession();
+
+  const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
+  const [prestige, setPrestige] = useState<PrestigeState | null>(null);
+  const [referral, setReferral] = useState<ReferralMine | null>(null);
+  const [donation, setDonation] = useState<{ enabled: boolean; link: string } | null>(null);
+  const [intakes, setIntakes] = useState<IntakeItem[]>([]);
+
   const [leaving, setLeaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedRef, setCopiedRef] = useState(false);
   const [codeVisible, setCodeVisible] = useState(false);
-  const [refreshingCode, setRefreshingCode] = useState(false);
+  const [regenBusy, setRegenBusy] = useState(false);
+  const [localCodeOverride, setLocalCodeOverride] = useState('');
   const [activeSheet, setActiveSheet] = useState<AccountSheetKind>(null);
   const [devicesFromSecurity, setDevicesFromSecurity] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
-  const name = user?.name?.trim() || 'دانشجوی هامزیار';
-  const rawStudentId = user?.student_id?.trim() || '';
+  // فیلدهای فرم ویرایش پروفایل
+  const [nameInput, setNameInput] = useState('');
+  const [nicknameInput, setNicknameInput] = useState('');
+  const [studentIdInput, setStudentIdInput] = useState('');
+  const [selectedIntake, setSelectedIntake] = useState('');
+  const [savingField, setSavingField] = useState<string | null>(null);
+
+  // FAQ زنده
+  const [faqCategories, setFaqCategories] = useState<Array<{ name: string; items: FaqItem[] }>>([]);
+  const [faqQuery, setFaqQuery] = useState('');
+  const [faqSearchResults, setFaqSearchResults] = useState<FaqItem[] | null>(null);
+  const [faqOpenId, setFaqOpenId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const t = window.setTimeout(() => setToast(null), 2800);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  const loadExtendedProfile = useCallback(async () => {
+    const [pRes, prRes, rRes, dRes, iRes] = await Promise.allSettled([
+      profileApi.get(),
+      profileApi.prestige(),
+      profileApi.referral(),
+      profileApi.donation(),
+      profileApi.intakes(),
+    ]);
+    if (pRes.status === 'fulfilled' && pRes.value?.user) {
+      const u = pRes.value.user;
+      setProfileUser(u);
+      setNameInput(u.name || '');
+      setNicknameInput(u.nickname || '');
+      setStudentIdInput(u.student_id || '');
+      setSelectedIntake(u.intake || '');
+    }
+    if (prRes.status === 'fulfilled') {
+      setPrestige(prRes.value?.prestige || null);
+    }
+    if (rRes.status === 'fulfilled') {
+      setReferral(rRes.value || null);
+    }
+    if (dRes.status === 'fulfilled') {
+      setDonation(dRes.value || null);
+    }
+    if (iRes.status === 'fulfilled') {
+      setIntakes(iRes.value?.intakes || []);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadExtendedProfile();
+  }, [loadExtendedProfile]);
+
+  useEffect(() => {
+    if (activeSheet !== 'faq' || faqCategories.length > 0) return;
+    profileApi
+      .faq()
+      .then((res) => setFaqCategories(res.categories || []))
+      .catch(() => undefined);
+  }, [activeSheet, faqCategories.length]);
+
+  useEffect(() => {
+    const q = faqQuery.trim();
+    if (q.length < 2) {
+      setFaqSearchResults(null);
+      return undefined;
+    }
+    const t = window.setTimeout(() => {
+      profileApi
+        .faqSearch(q)
+        .then((res) => setFaqSearchResults(res.results || []))
+        .catch(() => setFaqSearchResults([]));
+    }, 260);
+    return () => window.clearTimeout(t);
+  }, [faqQuery]);
+
+  const displayName = profileUser?.display_name?.trim() || user?.name?.trim() || 'دانشجوی هامزیار';
+  const realName = profileUser?.name?.trim() || user?.name?.trim() || '';
+  const rawStudentId = profileUser?.student_id?.trim() || user?.student_id?.trim() || '';
   const studentIdFa = rawStudentId ? faDigits(rawStudentId) : '';
-  const webLoginCode = user?.web_login_code?.trim() || '';
-  const group = groupLabel(user?.group);
-  const intake = intakeLabel(user?.intake);
+  const webLoginCode = localCodeOverride || profileUser?.web_login_code?.trim() || user?.web_login_code?.trim() || '';
+  const group = groupLabel(profileUser?.group || user?.group);
+  const intake = profileUser?.intake_label || intakeLabel(user?.intake);
+  const eduGroupLabel =
+    profileUser?.educational_group === 'male'
+      ? 'برادران'
+      : profileUser?.educational_group === 'female'
+        ? 'خواهران'
+        : '';
 
   const copyCode = () => {
     if (!webLoginCode) return;
-    navigator.clipboard?.writeText(webLoginCode)
+    navigator.clipboard
+      ?.writeText(webLoginCode)
       .then(() => {
         setCopied(true);
         window.setTimeout(() => setCopied(false), 2000);
@@ -95,10 +199,114 @@ export function MeScreen() {
       .catch(() => undefined);
   };
 
-  const handleRefreshCode = () => {
-    if (refreshingCode) return;
-    setRefreshingCode(true);
-    void refresh().finally(() => setRefreshingCode(false));
+  const handleRegenCode = async () => {
+    if (regenBusy) return;
+    setRegenBusy(true);
+    try {
+      const res = await profileApi.regenerateWebCode();
+      if (res.web_login_code) {
+        setLocalCodeOverride(res.web_login_code);
+        setCodeVisible(true);
+      }
+      await Promise.all([refresh(), loadExtendedProfile()]);
+      setToast('کد ورود جدید تولید شد.');
+    } catch (e) {
+      setToast(errorText(e, 'بازتولید کد ورود ناموفق بود.'));
+    } finally {
+      setRegenBusy(false);
+    }
+  };
+
+  const saveName = async () => {
+    if (!nameInput.trim() || savingField) return;
+    setSavingField('name');
+    try {
+      await profileApi.updateName(nameInput.trim());
+      await Promise.all([refresh(), loadExtendedProfile()]);
+      setToast('نام نمایشی ذخیره شد.');
+    } catch (e) {
+      setToast(errorText(e, 'ذخیره نام ناموفق بود.'));
+    } finally {
+      setSavingField(null);
+    }
+  };
+
+  const saveNickname = async () => {
+    if (savingField) return;
+    setSavingField('nickname');
+    try {
+      await profileApi.updateNickname(nicknameInput.trim());
+      await loadExtendedProfile();
+      setToast(nicknameInput.trim() ? 'لقب ذخیره شد.' : 'لقب حذف شد.');
+    } catch (e) {
+      setToast(errorText(e, 'ذخیره لقب ناموفق بود.'));
+    } finally {
+      setSavingField(null);
+    }
+  };
+
+  const savePrivacy = async (showReal: boolean) => {
+    try {
+      await profileApi.updatePrivacy(showReal);
+      setProfileUser((prev) => (prev ? { ...prev, show_real_name: showReal } : prev));
+      setToast('تنظیم نمایش نام بروزرسانی شد.');
+    } catch (e) {
+      setToast(errorText(e, 'تغییر وضعیت نمایش نام ناموفق بود.'));
+    }
+  };
+
+  const saveGroup = async (g: '1' | '2') => {
+    setSavingField('group');
+    try {
+      await profileApi.updateGroup(g);
+      await Promise.all([refresh(), loadExtendedProfile()]);
+      setToast(`گروه ${faNum(g)} ثبت شد.`);
+    } catch (e) {
+      setToast(errorText(e, 'تغییر گروه ناموفق بود.'));
+    } finally {
+      setSavingField(null);
+    }
+  };
+
+  const saveEduGroup = async (eg: 'male' | 'female') => {
+    setSavingField('edu');
+    try {
+      await profileApi.updateEducationalGroup(eg);
+      await loadExtendedProfile();
+      setToast('گروه آموزشی ذخیره شد.');
+    } catch (e) {
+      setToast(errorText(e, 'ثبت گروه آموزشی ناموفق بود.'));
+    } finally {
+      setSavingField(null);
+    }
+  };
+
+  const saveIntake = async (code: string) => {
+    setSelectedIntake(code);
+    setSavingField('intake');
+    try {
+      await profileApi.updateIntake(code);
+      await Promise.all([refresh(), loadExtendedProfile()]);
+      setToast('ورودی تحصیلی ذخیره شد.');
+    } catch (e) {
+      setToast(errorText(e, 'تغییر ورودی ناموفق بود.'));
+    } finally {
+      setSavingField(null);
+    }
+  };
+
+  const saveStudentId = async () => {
+    if (!studentIdInput.trim() || savingField) return;
+    setSavingField('sid');
+    try {
+      await profileApi.updateStudentId(studentIdInput.trim());
+      await Promise.all([refresh(), loadExtendedProfile()]);
+      setToast('شماره دانشجویی ذخیره شد.');
+    } catch (e) {
+      setToast(errorText(e, 'ذخیره شماره دانشجویی ناموفق بود.'));
+    } finally {
+      setSavingField(null);
+    }
   };
 
   const openSheet = (kind: Exclude<AccountSheetKind, null>, fromSecurity = false) => {
@@ -115,13 +323,27 @@ export function MeScreen() {
 
   return (
     <>
-      <AppBar title="هامزیار من" sub="حساب، دستگاه‌ها و ظاهر" />
+      <AppBar
+        title="هامزیار من"
+        sub="هویت دانشجویی، پرستیژ، دستگاه‌ها و تنظیمات"
+        actions={
+          <DsButton variant="ghost" size="sm" onClick={() => openSheet('profile', false)}>
+            <Icon name="i-pen" size={16} />
+            <span>ویرایش</span>
+          </DsButton>
+        }
+      />
       <div className="page page-enter acct-page">
         <div className="acct-two-col">
           <aside className="acct-col-side">
             <DsCard className="acct-identity">
               <Brand size="xl" />
-              <h2 className="acct-identity__name">{name}</h2>
+              <h2 className="acct-identity__name">{displayName}</h2>
+              {profileUser?.nickname && realName && (
+                <p className="acct-identity__meta" style={{ marginTop: 0 }}>
+                  نام واقعی: {realName}
+                </p>
+              )}
               <p className="acct-identity__meta">
                 {user?.username && <bdi dir="ltr">@{user.username}</bdi>}
                 {user?.username && studentIdFa ? <span aria-hidden="true">·</span> : null}
@@ -137,6 +359,18 @@ export function MeScreen() {
                 </DsBadge>
                 {group && <DsBadge tone="accent">{group}</DsBadge>}
                 {intake && <DsBadge tone="neutral">{intake}</DsBadge>}
+                {eduGroupLabel && <DsBadge tone="neutral">{eduGroupLabel}</DsBadge>}
+                {prestige?.tier_name && (
+                  <DsBadge tone="warning">
+                    {prestige.tier_icon || '🏅'} {prestige.tier_name}
+                  </DsBadge>
+                )}
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <DsButton variant="secondary" size="sm" onClick={() => openSheet('profile', false)}>
+                  <Icon name="i-pen" size={14} />
+                  <span>ویرایش اطلاعات تحصیلی و لقب</span>
+                </DsButton>
               </div>
             </DsCard>
 
@@ -146,14 +380,14 @@ export function MeScreen() {
                   <h3 className="ds-card__title">کد ورود اختصاصی (۸ کاراکتری)</h3>
                   <p className="ds-card__sub">
                     {webLoginCode
-                      ? 'برای ورود در صفحهٔ ورود وب‌اپ استفاده می‌شود؛ آن را محرمانه نگه دارید.'
-                      : 'کد اختصاصی ورود هنوز دریافت نشد. از دکمهٔ تازه‌سازی استفاده کنید یا کد خود را در ربات تلگرام ببینید.'}
+                      ? 'برای ورود به وب‌اپ روی دستگاه‌های دیگر استفاده می‌شود؛ در صورت نیاز می‌توانید آن را مستقیم تغییر دهید.'
+                      : 'کد اختصاصی ورود هنوز دریافت نشد. دکمهٔ تولید کد را بزنید.'}
                   </p>
                 </div>
               </div>
 
               {webLoginCode ? (
-                <div className="acct-code-row">
+                <div className="acct-code-row" style={{ flexWrap: 'wrap' }}>
                   <div className="acct-code-box" aria-live="polite">
                     <bdi dir="ltr" className="acct-code-box__val">
                       {codeVisible ? webLoginCode : maskedCode}
@@ -178,21 +412,64 @@ export function MeScreen() {
                     <Icon name={copied ? 'i-check' : 'i-copy'} size={16} />
                     <span>{copied ? 'کپی شد' : 'کپی'}</span>
                   </DsButton>
+
+                  <DsButton
+                    variant="ghost"
+                    size="md"
+                    disabled={regenBusy}
+                    onClick={() => void handleRegenCode()}
+                  >
+                    <Icon name="i-refresh" size={16} />
+                    <span>{regenBusy ? 'در حال تغییر…' : 'بازتولید کد'}</span>
+                  </DsButton>
                 </div>
               ) : (
                 <div className="acct-code-fallback">
                   <DsButton
                     variant="secondary"
                     size="md"
-                    disabled={refreshingCode}
-                    onClick={handleRefreshCode}
+                    disabled={regenBusy}
+                    onClick={() => void handleRegenCode()}
                   >
                     <Icon name="i-refresh" size={16} />
-                    <span>{refreshingCode ? 'در حال دریافت…' : 'تازه‌سازی کد'}</span>
+                    <span>{regenBusy ? 'در حال دریافت…' : 'تولید کد ورود'}</span>
                   </DsButton>
                 </div>
               )}
             </DsCard>
+
+            {referral?.enabled && (
+              <DsCard className="acct-card-stack">
+                <div>
+                  <h3 className="ds-card__title">دعوت از هم‌دانشگاهی‌ها</h3>
+                  <p className="ds-card__sub">
+                    کد معرف شما: <bdi dir="ltr">{referral.code}</bdi> · دعوت‌شده:{' '}
+                    {faNum(referral.stats?.invited ?? 0)} · فعال‌شده:{' '}
+                    {faNum(referral.stats?.activated ?? 0)}
+                  </p>
+                </div>
+                {referral.link && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <DsButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard
+                          ?.writeText(referral.link || referral.code || '')
+                          .then(() => {
+                            setCopiedRef(true);
+                            window.setTimeout(() => setCopiedRef(false), 2000);
+                          })
+                          .catch(() => undefined);
+                      }}
+                    >
+                      <Icon name={copiedRef ? 'i-check' : 'i-copy'} size={15} />
+                      <span>{copiedRef ? 'لینک دعوت کپی شد' : 'کپی لینک دعوت'}</span>
+                    </DsButton>
+                  </div>
+                )}
+              </DsCard>
+            )}
 
             <DsCard className="acct-card-stack">
               <div>
@@ -243,6 +520,18 @@ export function MeScreen() {
             <DsCard flush>
               <div className="ds-list">
                 <MeNavRow
+                  icon="i-trend"
+                  title="میدان رقابت و تازه‌ها"
+                  sub="جدول رده‌بندی هفته، ماه، سیزن و واکنش‌ها"
+                  to="/leaderboard"
+                />
+                <MeNavRow
+                  icon="i-award"
+                  title="نشان‌ها و پرستیژ من"
+                  sub={prestige ? `${faNum(prestige.xp ?? 0)} XP · ویترین افتخارات و سفر من` : 'کلکسیون نشان‌ها'}
+                  to="/me/badges"
+                />
+                <MeNavRow
                   icon="i-award"
                   title="کارنامه تحصیلی"
                   sub="مشاهده نمرات و معدل وزنی"
@@ -255,6 +544,12 @@ export function MeScreen() {
                   to="/me/notes"
                 />
                 <MeNavRow
+                  icon="i-file-text"
+                  title="سوال‌های طراحی‌شده و بانک من"
+                  sub="سوال‌سازی، پیگیری تأیید و چالش پرستیژ"
+                  to="/exam/my-designs"
+                />
+                <MeNavRow
                   icon="i-smartphone"
                   title="دستگاه‌های من"
                   sub="مدیریت نشست‌ها و دستگاه‌های متصل"
@@ -262,15 +557,21 @@ export function MeScreen() {
                 />
                 <MeNavRow
                   icon="i-credit-card"
-                  title="اشتراک"
-                  sub="وضعیت فعلی و تمدید دسترسی"
+                  title="اشتراک و کیف‌پول"
+                  sub="وضعیت اشتراک، کارت‌به‌کارت، خانواده، هدیه و زرین‌پال"
                   to="/subscription"
                 />
                 <MeNavRow
                   icon="i-bell"
-                  title="اعلان‌ها"
-                  sub="پیام‌ها و اطلاعیه‌های سامانه"
+                  title="صندوق اعلان‌ها"
+                  sub="پیام‌ها، سنجاق‌کردن و بایگانی"
                   to="/notifications"
+                />
+                <MeNavRow
+                  icon="i-settings"
+                  title="تنظیمات اطلاع‌رسانی"
+                  sub="کنترل ۱۶ دسته اعلان (آزمون، برنامه، منابع، هوشیار…)"
+                  to="/notifications?tab=settings"
                 />
                 <MeNavRow
                   icon="i-shield"
@@ -290,11 +591,29 @@ export function MeScreen() {
                   to="/tickets"
                 />
                 <MeNavRow
+                  icon="i-alert-circle"
+                  title="گزارش‌های ایراد محتوا"
+                  sub="ثبت و پیگیری ایراد سؤال‌ها و فایل‌ها"
+                  to="/me/reports"
+                />
+                <MeNavRow
                   icon="i-help-circle"
                   title="راهنما و سوالات متداول"
-                  sub="نصب وب‌اپ، راهنما و استفاده از امکانات"
+                  sub="جست‌وجو در پرسش‌های پرتکرار و راهنمای نصب"
                   onClick={() => openSheet('faq', false)}
                 />
+                {donation?.enabled && donation.link && (
+                  <a className="ds-row" href={donation.link} target="_blank" rel="noopener noreferrer">
+                    <span className="ds-row__icon" aria-hidden="true">
+                      <Icon name="i-award" size={20} />
+                    </span>
+                    <span className="ds-row__body">
+                      <span className="ds-row__title">حمایت از هامزیار</span>
+                      <span className="ds-row__sub">همراهی برای توسعه امکانات رایگان دانشجویی</span>
+                    </span>
+                    <Icon name="i-chevron-r" size={18} className="ds-row__chev" />
+                  </a>
+                )}
                 <MeNavRow
                   icon="i-info"
                   title="دربارهٔ هامزیار"
@@ -337,7 +656,7 @@ export function MeScreen() {
         open={activeSheet !== null}
         onClose={closeSheet}
         title={activeSheet ? SHEET_TITLE[activeSheet] : ''}
-        size="compact"
+        size={activeSheet === 'profile' || activeSheet === 'faq' ? 'auto' : 'compact'}
         onBack={
           activeSheet === 'devices' && devicesFromSecurity
             ? () => openSheet('security', false)
@@ -345,14 +664,123 @@ export function MeScreen() {
         }
         backLabel="بازگشت به امنیت حساب"
       >
+        {activeSheet === 'profile' && (
+          <div key="profile" className="acct-sheet-body mo-sheet-swap" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <DsCard level="sunken" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label className="ds-field__label">نام و نام خانوادگی</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  className="ds-input"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  maxLength={50}
+                />
+                <DsButton variant="primary" size="sm" disabled={savingField === 'name'} onClick={() => void saveName()}>
+                  ذخیره
+                </DsButton>
+              </div>
+            </DsCard>
+
+            <DsCard level="sunken" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label className="ds-field__label">لقب نمایشی (برای نمایش در لیدربرد)</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  className="ds-input"
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                  placeholder="خالی بگذارید تا حذف شود"
+                  maxLength={40}
+                />
+                <DsButton
+                  variant="secondary"
+                  size="sm"
+                  disabled={savingField === 'nickname' || profileUser?.can_change_nickname === false}
+                  onClick={() => void saveNickname()}
+                >
+                  ثبت
+                </DsButton>
+              </div>
+              {profileUser && !profileUser.can_change_nickname && profileUser.next_change_at && (
+                <span className="ds-field__hint">
+                  تغییر لقب بعدی از: {profileUser.next_change_at}
+                </span>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                <span style={{ fontSize: '0.84rem' }}>نمایش نام واقعی کنار/جایگزین لقب</span>
+                <Switch
+                  label="نمایش نام واقعی"
+                  checked={profileUser?.show_real_name ?? true}
+                  onChange={(v) => void savePrivacy(v)}
+                />
+              </div>
+            </DsCard>
+
+            <DsCard level="sunken" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label className="ds-field__label">شمارهٔ دانشجویی</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  className="ds-input ds-input--ltr"
+                  value={studentIdInput}
+                  onChange={(e) => setStudentIdInput(e.target.value)}
+                  maxLength={20}
+                />
+                <DsButton variant="secondary" size="sm" disabled={savingField === 'sid'} onClick={() => void saveStudentId()}>
+                  ثبت
+                </DsButton>
+              </div>
+            </DsCard>
+
+            <DsCard level="sunken" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label className="ds-field__label">گروه ثابت کلاسی</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <DsChip selected={(profileUser?.registered_group || profileUser?.group || user?.group) === '1'} onClick={() => void saveGroup('1')}>
+                  گروه ۱
+                </DsChip>
+                <DsChip selected={(profileUser?.registered_group || profileUser?.group || user?.group) === '2'} onClick={() => void saveGroup('2')}>
+                  گروه ۲
+                </DsChip>
+              </div>
+
+              <label className="ds-field__label" style={{ marginTop: 6 }}>گروه آموزشی برنامه هفتگی</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <DsChip selected={profileUser?.educational_group === 'male'} onClick={() => void saveEduGroup('male')}>
+                  برادران
+                </DsChip>
+                <DsChip selected={profileUser?.educational_group === 'female'} onClick={() => void saveEduGroup('female')}>
+                  خواهران
+                </DsChip>
+              </div>
+            </DsCard>
+
+            {intakes.length > 0 && (
+              <DsCard level="sunken" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label className="ds-field__label" htmlFor="me-intake-select">ورودی تحصیلی</label>
+                <select
+                  id="me-intake-select"
+                  className="ds-input"
+                  value={selectedIntake}
+                  disabled={savingField === 'intake'}
+                  onChange={(e) => void saveIntake(e.target.value)}
+                >
+                  {intakes.map((it) => (
+                    <option key={it.code} value={it.code}>
+                      {it.label}
+                    </option>
+                  ))}
+                </select>
+              </DsCard>
+            )}
+          </div>
+        )}
+
         {activeSheet === 'security' && (
           <div key="security" className="acct-sheet-body mo-sheet-swap">
             <ul className="acct-sheet__list">
               <li className="acct-sheet__item">
                 <span className="acct-sheet__item-title">کد ورود اختصاصی (۸ کاراکتری)</span>
                 <p className="acct-sheet__item-body">
-                  ورود به وب‌اپ با کد ۸ کاراکتری و تأیید آنی در ربات تلگرام انجام می‌شود. این کد را در
-                  اختیار افراد دیگر قرار ندهید.
+                  برای ورود روی دستگاه‌های دیگر از این کد ۸ کاراکتری استفاده کنید. هر زمان بخواهید می‌توانید از
+                  کارت کد ورود همین صفحه یک کد تازه بسازید تا کد قبلی منقضی شود.
                 </p>
               </li>
               <li className="acct-sheet__item">
@@ -380,23 +808,82 @@ export function MeScreen() {
         )}
 
         {activeSheet === 'faq' && (
-          <div key="faq" className="acct-sheet-body mo-sheet-swap">
-            <ul className="acct-sheet__list">
-              <li className="acct-sheet__item">
-                <span className="acct-sheet__item-title">یادداشت‌های جزوه کجا ذخیره می‌شوند؟</span>
-                <p className="acct-sheet__item-body">
-                  همهٔ خط‌کشیده‌ها و حاشیه‌نویسی‌های شما داخل کتابخوان به‌صورت خودکار ذخیره و در
-                  بخش «دفتر من» نگهداری می‌شوند.
-                </p>
-              </li>
-              <li className="acct-sheet__item">
-                <span className="acct-sheet__item-title">آزمون زمان‌دار چطور کار می‌کند؟</span>
-                <p className="acct-sheet__item-body">
-                  مهلت آزمون از سرور کنترل می‌شود و در میانهٔ آزمون پاسخ درست نمایش داده نمی‌شود تا
-                  شبیه‌سازی واقعی امتحان حفظ شود.
-                </p>
-              </li>
-            </ul>
+          <div key="faq" className="acct-sheet-body mo-sheet-swap" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input
+              type="search"
+              className="ds-input"
+              placeholder="جست‌وجو در پرسش‌ها (مثلاً: اشتراک، آزمون، جزوه)…"
+              value={faqQuery}
+              onChange={(e) => setFaqQuery(e.target.value)}
+            />
+
+            {faqSearchResults !== null ? (
+              faqSearchResults.length === 0 ? (
+                <p className="ds-card__sub">پاسخی با این عبارت پیدا نشد.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {faqSearchResults.map((item) => (
+                    <DsCard key={item.id} level="sunken">
+                      <strong style={{ display: 'block', marginBottom: 4 }}>{item.question}</strong>
+                      <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ink-2)', lineHeight: 1.7 }}>
+                        {item.answer}
+                      </p>
+                    </DsCard>
+                  ))}
+                </div>
+              )
+            ) : faqCategories.length > 0 ? (
+              faqCategories.map((cat) => (
+                <div key={cat.name} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <h4 style={{ margin: '6px 0 2px', fontSize: '0.88rem', color: 'var(--brand)' }}>{cat.name}</h4>
+                  {cat.items.map((item) => {
+                    const isOpen = faqOpenId === item.id;
+                    return (
+                      <DsCard key={item.id} level="sunken">
+                        <button
+                          type="button"
+                          onClick={() => setFaqOpenId(isOpen ? null : item.id)}
+                          style={{
+                            width: '100%',
+                            textAlign: 'right',
+                            background: 'none',
+                            border: 0,
+                            color: 'inherit',
+                            font: 'inherit',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            padding: 0,
+                          }}
+                        >
+                          {item.question}
+                        </button>
+                        {isOpen && (
+                          <p style={{ margin: '8px 0 0', fontSize: '0.84rem', color: 'var(--ink-2)', lineHeight: 1.7 }}>
+                            {item.answer}
+                          </p>
+                        )}
+                      </DsCard>
+                    );
+                  })}
+                </div>
+              ))
+            ) : (
+              <ul className="acct-sheet__list">
+                <li className="acct-sheet__item">
+                  <span className="acct-sheet__item-title">یادداشت‌های جزوه کجا ذخیره می‌شوند؟</span>
+                  <p className="acct-sheet__item-body">
+                    همهٔ خط‌کشیده‌ها و حاشیه‌نویسی‌های شما داخل کتابخوان به‌صورت خودکار ذخیره و در بخش «دفتر من» نگهداری می‌شوند.
+                  </p>
+                </li>
+                <li className="acct-sheet__item">
+                  <span className="acct-sheet__item-title">آزمون زمان‌دار چطور کار می‌کند؟</span>
+                  <p className="acct-sheet__item-body">
+                    مهلت آزمون از سرور کنترل می‌شود و در میانهٔ آزمون پاسخ درست نمایش داده نمی‌شود تا شبیه‌سازی واقعی امتحان حفظ شود.
+                  </p>
+                </li>
+              </ul>
+            )}
+
             <DsButton
               variant="secondary"
               size="md"
@@ -417,8 +904,8 @@ export function MeScreen() {
               <li className="acct-sheet__item">
                 <span className="acct-sheet__item-title">هامزیار · نسخهٔ ۲٫۰</span>
                 <p className="acct-sheet__item-body">
-                  پلتفرم یکپارچهٔ دانشجویان علوم پزشکی برای دسترسی سریع به جزوه‌ها، بانک سؤال بالینی،
-                  آزمون‌های زمان‌دار، برنامهٔ مطالعه و دستیار هوشمند در یک فضای یکدست.
+                  پلتفرم یکپارچهٔ دانشجویان علوم پزشکی برای دسترسی سریع به جزوه‌ها و اسلایدها، بانک سؤال بالینی،
+                  آزمون‌های زمان‌دار، برنامهٔ مطالعه و دستیار هوشمند هوشیار در یک فضای یکدست.
                 </p>
               </li>
             </ul>
@@ -436,6 +923,8 @@ export function MeScreen() {
           </div>
         )}
       </Sheet>
+
+      <Toast message={toast} />
     </>
   );
 }

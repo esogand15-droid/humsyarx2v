@@ -79,8 +79,9 @@ function ContinueStudyCard({ item }: { item: ContinueItem | null }) {
 
   const isMedia = item.kind === 'video' || item.kind === 'audio';
   const isPdf = item.kind === 'pdf';
+  const isSlides = item.kind === 'slides';
   const resumeUrl =
-    isPdf && item.page > 0
+    (isPdf || isSlides) && item.page > 0
       ? `${readerPath(item.scope, item.id)}?p=${item.page}`
       : readerPath(item.scope, item.id);
   const percentVal = Math.min(100, Math.max(0, Math.round(item.percent || 0)));
@@ -96,10 +97,12 @@ function ContinueStudyCard({ item }: { item: ContinueItem | null }) {
         : item.kind === 'video'
           ? 'پخش ویدیوی آموزشی از ابتدا'
           : 'پخش فایل صوتی از ابتدا';
-  } else if (isPdf && item.total > 0) {
-    subtitle = `صفحهٔ ${faNum(Math.max(1, item.page))} از ${faNum(item.total)} · ادامه از همین صفحه`;
+  } else if ((isPdf || isSlides) && item.total > 0) {
+    subtitle = `${isSlides ? 'اسلاید' : 'صفحهٔ'} ${faNum(Math.max(1, item.page))} از ${faNum(item.total)} · ادامه از همین بخش`;
   } else if (item.kind === 'image') {
     subtitle = 'مشاهدهٔ تصویر آموزشی';
+  } else if (item.kind === 'document' || item.kind === 'sheet') {
+    subtitle = 'مشاهدهٔ سند آموزشی';
   }
 
   return (

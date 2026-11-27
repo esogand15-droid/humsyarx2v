@@ -17,8 +17,10 @@ import { faNum } from './dates';
 const DRAFT_KEY = 'hy.ai.draft';
 const MAX_H = 200;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_MEDIA_BYTES = 20 * 1024 * 1024;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const IMAGE_ACCEPT = IMAGE_TYPES.join(',');
+const ALL_MEDIA_ACCEPT = `${IMAGE_ACCEPT},application/pdf,.pdf,audio/*,.mp3,.wav,.ogg,.m4a,.webm`;
 const DEFAULT_IMAGE_PROMPT = 'لطفاً این تصویر پزشکی را تحلیل و نکات آموزشی آن را توضیح دهید.';
 
 export interface ComposerHandle {
@@ -37,11 +39,32 @@ export interface ComposerProps {
   onStop: () => void;
   /** ارسال تصویر پیوستشده همراه متن؛ خطا را throw میکند تا روی چیپ نمایش داده شود. */
   onSendImage?: (file: File, prompt: string) => Promise<void>;
+  /** ارسال PDF یا فایل صوتی (شامل ضبط زنده میکروفون) از طریق /api/ai/ask-media */
+  onSendMedia?: (file: File, kind: 'image' | 'pdf' | 'audio', prompt: string) => Promise<void>;
 }
 
 interface Attachment {
   file: File;
+  kind: 'image' | 'pdf' | 'audio';
   url: string;
+}
+
+function classifyMediaFile(file: File): { kind?: 'image' | 'pdf' | 'audio'; error?: string } {
+  const mime = (file.type || '').toLowerCase();
+  const lower = (file.name || '').toLowerCase();
+  if (IMAGE_TYPES.includes(mime) || /\.(jpe?g|png|webp)$/.test(lower)) {
+    if (file.size > MAX_IMAGE_BYTES) return { error: 'حجم تصویر نباید بیشتر از ۱۰ مگابایت باشد.' };
+    return { kind: 'image' };
+  }
+  if (mime === 'application/pdf' || lower.endsWith('.pdf')) {
+    if (file.size > MAX_MEDIA_BYTES) return { error: 'حجم فایل PDF نباید بیشتر از ۲۰ مگابایت باشد.' };
+    return { kind: 'pdf' };
+  }
+  if (mime.startsWith('audio/') || /\.(mp3|wav|ogg|oga|m4a|flac|aac|webm|opus)$/.test(lower)) {
+    if (file.size > MAX_MEDIA_BYTES) return { error: 'حجم فایل صوتی نباید بیشتر از ۲۰ مگابایت باشد.' };
+    return { kind: 'audio' };
+  }
+  return { error: 'فرمت مجاز: تصویر (JPG/PNG/WebP)، سند PDF یا فایل صوتی (MP3/WAV/M4A/OGG).' };
 }
 
 function readDraft(id: string): string {
@@ -60,30 +83,21 @@ function writeDraft(id: string, v: string) {
   }
 }
 
-function validateImage(file: File): string | null {
-  const lower = (file.name || '').toLowerCase();
-  const validExt = lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp');
-  if (!IMAGE_TYPES.includes(file.type) && !(file.type === '' && validExt)) {
-    return 'در گفتگو فعلاً تصویر JPG، PNG یا WebP پشتیبانی می‌شود.';
-  }
-  if (file.size > MAX_IMAGE_BYTES) return 'حجم تصویر نباید بیشتر از ۱۰ مگابایت باشد.';
-  return null;
-}
-
 const finePointer = () => typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
 
-type MenuKey = 'camera' | 'gallery' | 'file';
+type MenuKey = 'camera' | 'gallery' | 'file' | 'voice';
 const MENU: { key: MenuKey; icon: IconName; label: string }[] = [
   { key: 'camera', icon: 'i-video', label: 'دوربین' },
   { key: 'gallery', icon: 'i-layers', label: 'تصاویر' },
-  { key: 'file', icon: 'i-file-text', label: 'فایل' },
+  { key: 'file', icon: 'i-file-text', label: 'سند PDF یا صوت' },
+  { key: 'voice', icon: 'i-headphones', label: 'ضبط ویس سوال' },
 ];
 
 const MENU_GAP = 10;
 const VIEW_MARGIN = 16;
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { streaming, disabled, maxChars, canAttach, draftId, onSend, onStop, onSendImage },
+  { streaming, disabled, maxChars, canAttach, draftId, onSend, onStop, onSendImage, onSendMedia },
   ref,
 ) {
   const [value, setValue] = useState(() => readDraft(draftId));
@@ -91,6 +105,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [attachError, setAttachError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const recChunksRef = useRef<Blob[]>([]);
+  const recStreamRef = useRef<MediaStream | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
   const plusRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -204,8 +222,51 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     };
   }, [menu.mounted]);
 
+  const startOrStopRecording = useCallback(async () => {
+    if (recording && recRef.current) {
+      recRef.current.stop();
+      setRecording(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recStreamRef.current = stream;
+      recChunksRef.current = [];
+      const mr = new MediaRecorder(stream);
+      mr.ondataavailable = (ev) => {
+        if (ev.data.size > 0) recChunksRef.current.push(ev.data);
+      };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        recStreamRef.current = null;
+        const mime = mr.mimeType || 'audio/webm';
+        const blob = new Blob(recChunksRef.current, { type: mime });
+        if (blob.size > 200) {
+          const ext = mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm';
+          const f = new File([blob], `voice-${Date.now()}.${ext}`, { type: mime });
+          setAttachment({ file: f, kind: 'audio', url: URL.createObjectURL(f) });
+          setAttachError('');
+        }
+      };
+      recRef.current = mr;
+      mr.start();
+      setRecording(true);
+      setAttachError('');
+    } catch {
+      setAttachError('دسترسی به میکروفون داده نشد.');
+    }
+  }, [recording]);
+
+  useEffect(() => () => {
+    recStreamRef.current?.getTracks().forEach((t) => t.stop());
+  }, []);
+
   const pick = (key: MenuKey) => {
     setMenuOpen(false);
+    if (key === 'voice') {
+      void startOrStopRecording();
+      return;
+    }
     const input = key === 'camera' ? cameraInput : key === 'gallery' ? galleryInput : fileInput;
     // باید در همان رویداد لمس صدا زده شود تا iOS انتخابگر را مسدود نکند.
     input.current?.click();
@@ -215,13 +276,13 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const err = validateImage(file);
-    if (err) {
-      setAttachError(err);
+    const classified = classifyMediaFile(file);
+    if (classified.error || !classified.kind) {
+      setAttachError(classified.error || 'فایل نامعتبر است.');
       return;
     }
     setAttachError('');
-    setAttachment({ file, url: URL.createObjectURL(file) });
+    setAttachment({ file, kind: classified.kind, url: URL.createObjectURL(file) });
     ta.current?.focus();
   };
 
@@ -239,17 +300,20 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   const submit = async () => {
     if (!canSend) return;
     const text = value;
-    if (attachment && onSendImage) {
+    if (attachment && (onSendMedia || (attachment.kind === 'image' && onSendImage))) {
       setUploading(true);
       setAttachError('');
       try {
-        // URL شیء را نگه میداریم: پیام چت همان تصویر را نمایش میدهد.
-        const { file } = attachment;
-        await onSendImage(file, text.trim() || DEFAULT_IMAGE_PROMPT);
+        const { file, kind } = attachment;
+        if (onSendMedia) {
+          await onSendMedia(file, kind, text.trim());
+        } else if (kind === 'image' && onSendImage) {
+          await onSendImage(file, text.trim() || DEFAULT_IMAGE_PROMPT);
+        }
         setAttachment(null);
         setValue('');
       } catch (err) {
-        setAttachError(err instanceof Error && err.message ? err.message : 'ارسال تصویر انجام نشد. دوباره تلاش کن.');
+        setAttachError(err instanceof Error && err.message ? err.message : 'ارسال پیوست انجام نشد. دوباره تلاش کن.');
       } finally {
         setUploading(false);
       }
@@ -275,23 +339,44 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         void submit();
       }}
     >
-      {(attachment || attachError) && (
+      {(attachment || attachError || recording) && (
         <div className="aic-attach-tray">
+          {recording && (
+            <div className="aic-attach-chip">
+              <Icon name="i-headphones" size={16} />
+              <span className="aic-attach-chip__name">در حال ضبط صدای شما…</span>
+              <button
+                type="button"
+                className="ds-btn ds-btn--danger ds-btn--sm"
+                onClick={() => void startOrStopRecording()}
+              >
+                پایان ضبط
+              </button>
+            </div>
+          )}
           {attachment && (
             <div className={`aic-attach-chip${uploading ? ' is-uploading' : ''}`}>
-              <img className="aic-attach-chip__thumb" src={attachment.url} alt="" />
+              {attachment.kind === 'image' ? (
+                <img className="aic-attach-chip__thumb" src={attachment.url} alt="" />
+              ) : (
+                <span className="aic-attach-chip__thumb" style={{ display: 'grid', placeItems: 'center' }}>
+                  <Icon name={attachment.kind === 'pdf' ? 'i-file-text' : 'i-headphones'} size={18} />
+                </span>
+              )}
               <span className="aic-attach-chip__name">
                 <bdi dir="auto">{attachment.file.name}</bdi>
                 <span className="aic-attach-chip__meta">
-                  {uploading ? 'در حال ارسال و تحلیل…' : `${faNum(Math.max(1, Math.round(attachment.file.size / 1024)))} کیلوبایت`}
+                  {uploading
+                    ? 'در حال ارسال و تحلیل…'
+                    : `${attachment.kind === 'pdf' ? 'PDF مرجع' : attachment.kind === 'audio' ? 'فایل صوتی' : 'تصویر'} · ${faNum(Math.max(1, Math.round(attachment.file.size / 1024)))} کیلوبایت`}
                 </span>
               </span>
               {!uploading && (
-                <button type="button" className="aic-attach-chip__remove" onClick={removeAttachment} aria-label="حذف تصویر">
+                <button type="button" className="aic-attach-chip__remove" onClick={removeAttachment} aria-label="حذف پیوست">
                   <Icon name="i-x" size={14} />
                 </button>
               )}
-              {uploading && <span className="aic-attach-chip__bar" role="progressbar" aria-label="در حال ارسال تصویر" />}
+              {uploading && <span className="aic-attach-chip__bar" role="progressbar" aria-label="در حال ارسال پیوست" />}
             </div>
           )}
           {attachError && (
@@ -328,7 +413,15 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           disabled={disabled}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={attachment ? 'دربارهٔ این تصویر بپرس…' : 'از هوشیار بپرس…'}
+          placeholder={
+            attachment
+              ? attachment.kind === 'pdf'
+                ? 'دربارهٔ این فایل PDF بپرس یا بدون متن ارسال کن…'
+                : attachment.kind === 'audio'
+                  ? 'پرسش دربارهٔ این فایل صوتی (اختیاری)…'
+                  : 'دربارهٔ این تصویر بپرس…'
+              : 'از هوشیار بپرس…'
+          }
           aria-label="پیام به هوشیار"
           enterKeyHint="enter"
           aria-invalid={over || undefined}
@@ -385,7 +478,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
       <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={onPicked} />
       <input ref={galleryInput} type="file" accept={IMAGE_ACCEPT} hidden onChange={onPicked} />
-      <input ref={fileInput} type="file" accept={IMAGE_ACCEPT} hidden onChange={onPicked} />
+      <input ref={fileInput} type="file" accept={ALL_MEDIA_ACCEPT} hidden onChange={onPicked} />
 
       {showCount && (
         <div id="aic-count" className="aic-composer__count" aria-live="polite">

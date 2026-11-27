@@ -94,15 +94,16 @@ export function LibraryScreen() {
             <div className="ds-list">
               {recent.map((r) => {
                 const isMedia = r.kind === 'video' || r.kind === 'audio';
+                const unitLabel = r.kind === 'slides' ? 'اسلاید' : 'صفحهٔ';
                 const sub = isMedia
                   ? r.position > 0
                     ? `ادامه از ${clockFa(r.position)}`
                     : 'آمادهٔ پخش'
                   : r.total > 0
-                    ? `صفحهٔ ${faNum(Math.max(1, r.page))} از ${faNum(r.total)} · ${faPercent(r.percent)}`
+                    ? `${unitLabel} ${faNum(Math.max(1, r.page))} از ${faNum(r.total)} · ${faPercent(r.percent)}`
                     : 'در حال مطالعه';
                 const href =
-                  r.kind === 'pdf' && r.page > 0
+                  (r.kind === 'pdf' || r.kind === 'slides') && r.page > 0
                     ? `${readerPath(r.scope, r.id)}?p=${r.page}`
                     : readerPath(r.scope, r.id);
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import './exam.css';
-import { AppBar } from '../../components';
+import { AppBar, ReportSheet } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
 import { DsBadge, DsButton, DsCard } from '../../design/components';
 import { Icon } from '../../icons';
@@ -27,6 +27,7 @@ export function ExamResult() {
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'active'>('loading');
   const [downloading, setDownloading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ id: string; label: string } | null>(null);
 
   const load = useCallback(async () => {
     setState('loading');
@@ -193,6 +194,16 @@ export function ExamResult() {
                     </div>
 
                     {r.explanation && <p className="exam-review-expl">{r.explanation}</p>}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                      <DsButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setReportTarget({ id: r.question_id, label: `سؤال ${faNum(idx + 1)}` })}
+                      >
+                        <Icon name="i-alert-circle" size={14} />
+                        <span>گزارش ایراد</span>
+                      </DsButton>
+                    </div>
                   </DsCard>
                 ))}
               </div>
@@ -200,6 +211,15 @@ export function ExamResult() {
           </div>
         )}
       </div>
+      {reportTarget && (
+        <ReportSheet
+          open={Boolean(reportTarget)}
+          onClose={() => setReportTarget(null)}
+          targetType="question"
+          targetId={reportTarget.id}
+          targetLabel={reportTarget.label}
+        />
+      )}
     </>
   );
 }

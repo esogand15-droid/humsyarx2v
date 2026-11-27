@@ -143,6 +143,7 @@ WA_SESSION_COOKIE = "wa_session"
 #: 📲 کوکی نشست وب/PWA (کاربر عادی) — نامش با کوکی ادمین یکی نیست
 #: تا هرگز نشست ادمین و کاربر قاطی نشود.
 WEB_SESSION_COOKIE = "hu_session"
+STUDENT_LEGACY_COOKIE = "hy_student_session"
 WA_SESSION_TTL_H = 12
 
 
@@ -251,6 +252,20 @@ async def resolve_web_user_session(token: str) -> dict | None:
     return doc
 
 
+async def resolve_student_legacy_session(token: str) -> dict | None:
+    """پشتیبانی کوکی نشست `hy_student_session` برای همهٔ مسیرهای /api/*."""
+    if not token:
+        return None
+    try:
+        coll = db.users.database["web_sessions"]
+        doc = await coll.find_one({"_id": _hash_token(token), "revoked": False})
+    except Exception:
+        return None
+    if not doc or expiry_is_past(doc.get("expires_at")):
+        return None
+    return doc
+
+
 async def _user_from_web_session(request: Request, sess: dict) -> dict:
     """سند نشست معتبر web_user_sessions → dict کاربر (همان گاردهای initData)."""
     uid = int(sess.get("uid") or 0)
@@ -325,6 +340,10 @@ async def get_current_user(
                 raise HTTPException(status_code=403, detail="suspended")
             return {"id": uid, "first_name": db_user.get("name", ""),
                     "_db": db_user, "_web_session": _web_user}
+        _legacy_sess = await resolve_student_legacy_session(
+            request.cookies.get(STUDENT_LEGACY_COOKIE, ""))
+        if _legacy_sess:
+            return await _user_from_web_session(request, _legacy_sess)
         sess = await resolve_web_session(request.cookies.get(WA_SESSION_COOKIE, ""))
         if sess:
             uid = int(sess["uid"])

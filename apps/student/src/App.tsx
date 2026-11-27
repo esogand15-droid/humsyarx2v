@@ -26,12 +26,22 @@ const ExamSetup = lazy(() => import('./screens/exam/ExamSetup').then((m) => ({ d
 const MockExamHistory = lazy(() => import('./screens/exam/ExamSetup').then((m) => ({ default: m.MockExamHistory })));
 const MockRun = lazy(() => import('./screens/exam/MockRun').then((m) => ({ default: m.MockRun })));
 const ExamResult = lazy(() => import('./screens/exam/ExamResult').then((m) => ({ default: m.ExamResult })));
+const MyQuestionsScreen = lazy(() => import('./screens/exam/MyQuestionsScreen').then((m) => ({ default: m.MyQuestionsScreen })));
+const PdfQuizScreen = lazy(() => import('./screens/exam/PdfQuizScreen').then((m) => ({ default: m.PdfQuizScreen })));
+const PromotionChallengeScreen = lazy(() => import('./screens/exam/PromotionChallengeScreen').then((m) => ({ default: m.PromotionChallengeScreen })));
 const SearchScreen = lazy(() => import('./screens/SearchScreen').then((m) => ({ default: m.SearchScreen })));
 const WelcomeScreen = lazy(() => import('./screens/WelcomeScreen').then((m) => ({ default: m.WelcomeScreen })));
 const ScheduleScreen = lazy(() => import('./screens/ScheduleScreen').then((m) => ({ default: m.ScheduleScreen })));
 const AiChatScreen = lazy(() => import('./screens/ai/AiChatScreen').then((m) => ({ default: m.AiChatScreen })));
+const AiImageScreen = lazy(() => import('./screens/ai/AiImageScreen').then((m) => ({ default: m.AiImageScreen })));
+const AiScribeScreen = lazy(() => import('./screens/ai/AiScribeScreen').then((m) => ({ default: m.AiScribeScreen })));
+const AiLiveScreen = lazy(() => import('./screens/ai/AiLiveScreen').then((m) => ({ default: m.AiLiveScreen })));
 const GradesScreen = lazy(() => import('./screens/GradesScreen').then((m) => ({ default: m.GradesScreen })));
 const SubscriptionScreen = lazy(() => import('./screens/SubscriptionScreen').then((m) => ({ default: m.SubscriptionScreen })));
+const PaymentVerifyScreen = lazy(() => import('./screens/PaymentVerifyScreen').then((m) => ({ default: m.PaymentVerifyScreen })));
+const LeaderboardScreen = lazy(() => import('./screens/LeaderboardScreen').then((m) => ({ default: m.LeaderboardScreen })));
+const BadgesScreen = lazy(() => import('./screens/BadgesScreen').then((m) => ({ default: m.BadgesScreen })));
+const MyReportsScreen = lazy(() => import('./screens/MyReportsScreen').then((m) => ({ default: m.MyReportsScreen })));
 const NotificationsScreen = lazy(() => import('./screens/NotificationsScreen').then((m) => ({ default: m.NotificationsScreen })));
 const TicketsScreen = lazy(() => import('./screens/TicketsScreen').then((m) => ({ default: m.TicketsScreen })));
 const MeScreen = lazy(() => import('./screens/MeScreen').then((m) => ({ default: m.MeScreen })));
@@ -223,12 +233,20 @@ export function App() {
         <Route path="/exam/mock/history" element={<Gate><MockExamHistory /></Gate>} />
         <Route path="/exam/run/:sid" element={<Gate><MockRun /></Gate>} />
         <Route path="/exam/result/:sid" element={<Gate><ExamResult /></Gate>} />
+        <Route path="/exam/my-designs" element={<Gate><MyQuestionsScreen /></Gate>} />
+        <Route path="/exam/pdf-quiz" element={<Gate><PdfQuizScreen /></Gate>} />
+        <Route path="/exam/challenge" element={<Gate><PromotionChallengeScreen /></Gate>} />
         <Route path="/search" element={<Gate><SearchScreen /></Gate>} />
         <Route path="/schedule" element={<Gate><ScheduleScreen /></Gate>} />
         <Route path="/ai" element={<Gate><AiChatScreen /></Gate>} />
+        <Route path="/ai/image" element={<Gate><AiImageScreen /></Gate>} />
+        <Route path="/ai/scribe" element={<Gate><AiScribeScreen /></Gate>} />
+        <Route path="/ai/live" element={<Gate><AiLiveScreen /></Gate>} />
         <Route path="/ai/:id" element={<Gate><AiChatScreen /></Gate>} />
         <Route path="/grades" element={<Gate><GradesScreen /></Gate>} />
         <Route path="/subscription" element={<Gate><SubscriptionScreen /></Gate>} />
+        <Route path="/payment/verify" element={<Gate><PaymentVerifyScreen /></Gate>} />
+        <Route path="/leaderboard" element={<Gate><LeaderboardScreen /></Gate>} />
         <Route path="/notifications" element={<Gate><NotificationsScreen /></Gate>} />
         <Route path="/tickets" element={<Gate><TicketsScreen /></Gate>} />
         <Route path="/tickets/:id" element={<Gate><TicketsScreen /></Gate>} />
@@ -240,6 +258,8 @@ export function App() {
             </Gate>
           }
         />
+        <Route path="/me/badges" element={<Gate><BadgesScreen /></Gate>} />
+        <Route path="/me/reports" element={<Gate><MyReportsScreen /></Gate>} />
         <Route
           path="*"
           element={

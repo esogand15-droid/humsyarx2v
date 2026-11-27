@@ -347,6 +347,33 @@ export function ExamHome() {
                   variant="ghost"
                   size="md"
                   className="exam-btn-tall"
+                  onClick={() => navigate('/exam/pdf-quiz')}
+                >
+                  <Icon name="i-zap" size={16} />
+                  <span>آزمون‌ساز از روی PDF</span>
+                </DsButton>
+                <DsButton
+                  variant="ghost"
+                  size="md"
+                  className="exam-btn-tall"
+                  onClick={() => navigate('/exam/my-designs')}
+                >
+                  <Icon name="i-pen" size={16} />
+                  <span>طراحی و سؤال‌های من</span>
+                </DsButton>
+                <DsButton
+                  variant="ghost"
+                  size="md"
+                  className="exam-btn-tall"
+                  onClick={() => navigate('/exam/challenge')}
+                >
+                  <Icon name="i-award" size={16} />
+                  <span>چالش ارتقای رتبه</span>
+                </DsButton>
+                <DsButton
+                  variant="ghost"
+                  size="md"
+                  className="exam-btn-tall"
                   onClick={() => navigate('/exam/history')}
                 >
                   <Icon name="i-clock" size={16} />
