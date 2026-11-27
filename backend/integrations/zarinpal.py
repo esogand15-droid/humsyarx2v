@@ -180,7 +180,7 @@ async def zarinpal_request(amount_toman: int, description: str, callback_url: st
     if amount_rial < 1000:
         raise ValueError("amount too small for Zarinpal (min 1000 Rial)")
     if not description:
-        description = "خرید اشتراک هامشیار"
+        description = "خرید اشتراک هامزیار"
     description = description[:120]
     cb = (callback_url or callback_base or "https://humsyar.ir/payment/verify").strip()
     # Mock

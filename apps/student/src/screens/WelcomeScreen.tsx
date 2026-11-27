@@ -42,7 +42,7 @@ export function WelcomeScreen() {
       <header className="welcome-nav" role="banner">
         <div className="welcome-nav__brand">
           <Brand size="sm" />
-          <span className="welcome-nav__name">هم‌یار X</span>
+          <span className="welcome-nav__name">هامزیار</span>
         </div>
 
         <nav className="welcome-nav__actions" aria-label="ناوبری صفحهٔ اصلی">
@@ -159,7 +159,7 @@ export function WelcomeScreen() {
               <div className="gate-step-num" aria-hidden="true">۱</div>
               <h3 className="welcome-step-title">دریافت کد در ربات تلگرام</h3>
               <p className="welcome-step-desc">
-                ربات هم‌یار را باز کنید تا کد یکتای دانشجویی با قالب <span className="ltr-num">HY-XXXX-XXXX</span> برایتان ارسال شود.
+                ربات هامزیار را باز کنید تا کد یکتای دانشجویی با قالب <span className="ltr-num">HY-XXXX-XXXX</span> برایتان ارسال شود.
               </p>
             </article>
             <article className="welcome-step-card">
@@ -182,7 +182,7 @@ export function WelcomeScreen() {
 
       <footer className="welcome-footer">
         <div className="welcome-footer__inner">
-          <span className="welcome-footer__brand">پورتال دانشجویی هم‌یار X</span>
+          <span className="welcome-footer__brand">پورتال دانشجویی هامزیار</span>
           <div className="welcome-footer__links">
             <Link to={primaryTo}>ورود با کد</Link>
             <Link to="/install">راهنمای نصب</Link>

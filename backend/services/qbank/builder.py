@@ -121,7 +121,7 @@ def generate_exam_pdf(questions: list, meta: ExamMeta, mode: str = 'practice',
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(PAGE_W, PAGE_H))
     try:
-        c.setTitle(f"Hamsyar — آزمون {meta.lesson} — {meta.exam_code}")
+        c.setTitle(f"Humsyar — آزمون {meta.lesson} — {meta.exam_code}")
         c.setAuthor("humsyarbot")
     except Exception:
         pass

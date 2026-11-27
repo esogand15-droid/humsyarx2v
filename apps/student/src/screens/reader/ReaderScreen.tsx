@@ -32,7 +32,7 @@ function expiryFromView(view: ViewInfo): number {
 }
 
 /** ریدر — یک صفحه برای هر سه نوع محتوا (PDF / ویدیو-ویس / تصویر)
- *  همراه با محیط مطالعه چندپنله و دستیار هوش‌یار همزمان در دسکتاپ. */
+ *  همراه با محیط مطالعه چندپنله و دستیار هوشیار همزمان در دسکتاپ. */
 export function ReaderScreen() {
   const { scope = 'res', id = '' } = useParams();
   const navigate = useNavigate();

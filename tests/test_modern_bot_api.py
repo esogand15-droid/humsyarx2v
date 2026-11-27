@@ -428,8 +428,8 @@ class TestModernBotApi(unittest.IsolatedAsyncioTestCase):
 
     def test_f5_compact_table_persian_zwnj_alignment(self):
         """Verify display width ignores zero-width non-joiners (ZWNJ)."""
-        w_without = CompactTableBuilder._display_width("همیار")
-        w_with = CompactTableBuilder._display_width("هم‌يار")
+        w_without = CompactTableBuilder._display_width("میخواهم")
+        w_with = CompactTableBuilder._display_width("می‌خواهم")
         self.assertEqual(w_without, w_with)
 
     def test_f5_compact_table_boundary_safeguard(self):

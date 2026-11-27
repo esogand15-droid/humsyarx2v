@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 API_BASE = f"https://api.telegram.org/bot{BOT_TOKEN}"
-BRAND_NAME = os.getenv("BRAND_NAME", "HumsyarX")
+BRAND_NAME = os.getenv("BRAND_NAME", "هامزیار")
 
 CONTENT_ICONS = {
     "video": "🎥 ویدیو کلاس",
@@ -309,7 +309,7 @@ def _branding_caption(caption: str, item: dict) -> str:
     if not item.get("branding_enabled"):
         return caption
     # do not inject into filename, only caption
-    brand = (BRAND_NAME or "HumsyarX").strip()
+    brand = (BRAND_NAME or "هامزیار").strip()
     if brand and brand not in caption:
         return caption + f"\n🏷 {brand}"
     return caption

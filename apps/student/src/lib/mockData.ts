@@ -103,7 +103,7 @@ export const MOCK_WEEKLY: WeeklyActivity = {
 export const MOCK_SUBSCRIPTION: SubscriptionStatus = {
   active: true,
   days_left: 180,
-  plan_name: 'اشتراک ویژه هوش‌یار (VIP)',
+  plan_name: 'اشتراک ویژه هوشیار (VIP)',
   expires: '2027-05-10',
   resource_access: true,
   enforced: true,
@@ -135,7 +135,7 @@ export const MOCK_CONTINUE_ITEMS: ContinueItem[] = [
   {
     scope: 'res',
     id: 'pdf_preintern_01',
-    name: 'سؤالات منتخب آزمون جامع علوم پایه با پاسخ تشریحی هوش‌یار',
+    name: 'سؤالات منتخب آزمون جامع علوم پایه با پاسخ تشریحی هوشیار',
     kind: 'pdf',
     page: 5,
     total: 32,
@@ -172,7 +172,7 @@ export const MOCK_STUDY_TASKS: StudyTask[] = [
   },
   {
     task_id: 'task_4',
-    title: 'شرکت در آزمون شبیه‌ساز آنلاین هوش‌یار (بانک سؤال فارماکولوژی)',
+    title: 'شرکت در آزمون شبیه‌ساز آنلاین هوشیار (بانک سؤال فارماکولوژی)',
     jalali_date: '۱۴۰۵/۰۸/۲۱',
     reminder_time: '۲۱:۳۰',
     completed: false,
@@ -257,7 +257,7 @@ export const MOCK_FILES: ContentFile[] = [
     id: 'pdf_cardio_01',
     type: 'pdf',
     name: 'جزوه تایپ‌شده جلسه ۱ — الکتروفیزیولوژی قلب (ویرایش پاییز)',
-    description: 'کامل با شکل‌های رنگی، الگوریتم‌های درمانی و حاشیه‌نویسی هوش‌یار',
+    description: 'کامل با شکل‌های رنگی، الگوریتم‌های درمانی و حاشیه‌نویسی هوشیار',
     downloads: 184,
     mime: 'application/pdf',
     size: 12582912,

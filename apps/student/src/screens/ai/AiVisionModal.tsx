@@ -130,7 +130,7 @@ export function AiVisionModal({ open, onClose, onApplyToChat }: AiVisionModalPro
     <Sheet open={open} onClose={handleClose} title="تحلیل بالینی تصویر پزشکی">
       <div className="aic-vision">
         <p className="aic-vision__intro">
-          تصاویر رادیولوژی، پاتولوژی، نوار قلب (ECG) یا دیاگرام‌های آناتومیک را بارگذاری کنید تا هوش‌یار آن‌ها را تحلیل آموزشی کند.
+          تصاویر رادیولوژی، پاتولوژی، نوار قلب (ECG) یا دیاگرام‌های آناتومیک را بارگذاری کنید تا هوشیار آن‌ها را تحلیل آموزشی کند.
         </p>
 
         {error && (

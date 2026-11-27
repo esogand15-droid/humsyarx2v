@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""HamzyarX E2E Test Suite — Tier 1: Feature Coverage (Happy Path).
+"""Humsyar E2E Test Suite — Tier 1: Feature Coverage (Happy Path).
 
 Covers all 24 Features and Feature Domains from PROJECT.md:
   F01: TextLayer Syntax & Build Fix
@@ -524,7 +524,7 @@ class Tier1Feature08Thumbnail72DpiRouteTests(Tier1BaseTest):
             import fitz
             doc = fitz.open()
             page = doc.new_page(width=595, height=842)
-            page.insert_text((50, 100), "HamzyarX Thumbnail Test", fontsize=18)
+            page.insert_text((50, 100), "Humsyar Thumbnail Test", fontsize=18)
             pdf_bytes = doc.tobytes()
             doc.close()
             thumb = PdfRenderer.render_thumbnail(pdf_bytes, page_num=1)

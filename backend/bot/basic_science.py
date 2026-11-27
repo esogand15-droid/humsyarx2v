@@ -10,7 +10,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from database import db
 from utils import TERMS, CONTENT_ICONS
-BRAND_NAME = os.getenv("BRAND_NAME", "HumsyarX")
+BRAND_NAME = os.getenv("BRAND_NAME", "هامزیار")
 
 logger = logging.getLogger(__name__)
 

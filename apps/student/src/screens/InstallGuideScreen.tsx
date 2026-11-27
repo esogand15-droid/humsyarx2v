@@ -315,7 +315,7 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
               <div className="pwa-step-row">
                 <div className="pwa-step-num">۲</div>
                 <div className="pwa-step-desc">
-                  یا از منوی سه‌نقطهٔ مرورگر، گزینهٔ <strong>«Install Humsyar»</strong> یا <strong>«نصب هامزیار»</strong> را برگزینید
+                  یا از منوی سه‌نقطهٔ مرورگر، گزینهٔ <strong>«Install هامزیار»</strong> یا <strong>«نصب هامزیار»</strong> را برگزینید
                 </div>
                 <div className="pwa-step-visual" title="منوی نصب">
                   <Icon name="i-plus" size={22} />

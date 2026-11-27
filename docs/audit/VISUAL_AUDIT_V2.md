@@ -106,7 +106,7 @@ Redesign: neutral grey ramp (not blue-tinted), one accent, `surface-0/1/2` steps
 ### AI chat (`ai-chat`)
 
 **AI1 — P0 — Composer hidden behind install banner on iPhone Safari** (G1). `…/ai-chat__iphone-15__dark.png`
-**AI2 — P1 — textarea 14px** (G7). **AI3 — P2 — Header name "هوشیار پزشکی" vs greeting "هوش‌یار"** (G5).
+**AI2 — P1 — textarea 14px** (G7). **AI3 — P2 — Header name "هوشیار پزشکی" vs greeting "هوشیار"** (G5).
 
 ### PDF reader (`reader-pdf`)
 

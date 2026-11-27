@@ -186,7 +186,7 @@ const ALL_22_VIEWS = [
   { path: '/schedule', name: 'ScheduleScreen', title: 'برنامه و تسک‌های مطالعه', sub: 'تقویم جلالی، کلاس‌ها و امتحانات', back: false },
   { path: '/me', name: 'MeScreen', title: 'هامزیار من', sub: 'حساب، دستگاه‌ها و ظاهر', back: false },
   { path: '/search', name: 'SearchScreen', title: 'جستجو', sub: 'جستجوی سراسری در محتوا', back: false },
-  { path: '/ai', name: 'AiChatScreen', title: 'هوش‌یار پزشکی', sub: 'دستیار هوشمند و تحلیل بالینی', back: false, actions: ['upload_vision', 'clear_chat'] },
+  { path: '/ai', name: 'AiChatScreen', title: 'هوشیار پزشکی', sub: 'دستیار هوشمند و تحلیل بالینی', back: false, actions: ['upload_vision', 'clear_chat'] },
   { path: '/grades', name: 'GradesScreen', title: 'کارنامه و معدل کل', sub: 'سوابق تحصیلی و معدل وزنی (GPA)', back: false },
   { path: '/subscription', name: 'SubscriptionScreen', title: 'طرح‌های اشتراک', sub: 'دسترسی جامع به منابع و هوش پزشکی', back: false },
   { path: '/notifications', name: 'NotificationsScreen', title: 'مرکز اعلان‌ها', sub: 'پیام‌ها و اطلاعیه‌های سامانه', back: false, actions: ['mark_all_read'] },

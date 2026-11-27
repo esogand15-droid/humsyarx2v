@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes
 from database import db
 
 logger = logging.getLogger(__name__)
-BRAND_NAME = os.getenv("BRAND_NAME", "HumsyarX")
+BRAND_NAME = os.getenv("BRAND_NAME", "هامزیار")
 
 
 async def references_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

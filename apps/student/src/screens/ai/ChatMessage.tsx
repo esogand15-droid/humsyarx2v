@@ -1,5 +1,5 @@
-/* یک پیام در گفتوگوی هوش‌یار: کاربر = حباب در سمت انتهای خط؛
-   هوش‌یار = تمامعرض با آواتار، مارکداون، نوار کنش (کپی، پاسخ دوباره) و خطای درجا. */
+/* یک پیام در گفتوگوی هوشیار: کاربر = حباب در سمت انتهای خط؛
+   هوشیار = تمامعرض با آواتار، مارکداون، نوار کنش (کپی، پاسخ دوباره) و خطای درجا. */
 import { memo, useState } from 'react';
 import { Icon } from '../../icons';
 import { Markdown, copyText, textDir } from './markdown';
@@ -59,13 +59,13 @@ export const ChatMessage = memo(function ChatMessage({ msg, isLast, busy, onRege
         <span className="aic-avatar" aria-hidden="true">
           <Icon name="logo-mark" size={16} />
         </span>
-        <span className="aic-msg__name">هوش‌یار</span>
+        <span className="aic-msg__name">هوشیار</span>
         {!streaming && <Time at={msg.at} />}
       </div>
 
       <div className="aic-msg__body">
         {streaming && empty ? (
-          <div className="aic-typing" role="status" aria-label={`هوش‌یار در حال نوشتن است`}>
+          <div className="aic-typing" role="status" aria-label={`هوشیار در حال نوشتن است`}>
             <span />
             <span />
             <span />

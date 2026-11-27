@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Automated verification test suite for Hamsyar Landing Page Redesign & Logo Assets.
+"""Automated verification test suite for Humsyar Landing Page Redesign & Logo Assets.
 
 Covers Feature F7 (Logo Asset Serving & Verification) and Feature F8 (Landing Page Structure
 & Modern Redesign Content) across the systematic 4-tier verification architecture:
@@ -216,7 +216,7 @@ class TestLandingPageRedesign(unittest.TestCase):
         self.assertIn('/student/install', self.dist_js_content, "Compiled bundle must route to /student/install")
 
     def test_f8_05_presence_of_core_capabilities(self):
-        """Tier 1: Comprehensive presence of Hamsyar core platform capabilities."""
+        """Tier 1: Comprehensive presence of Humsyar core platform capabilities."""
         required_keywords = [
             "ربات تعاملی تلگرام",
             "شبیه‌ساز",

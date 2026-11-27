@@ -110,7 +110,7 @@ class TestRapidViewTransitionsAcross22Screens(ChallengerNavIslandBase):
     """Adversarial stress-testing of view transitions and header propagation."""
 
     ALL_SCREEN_SPECS = [
-        {"route": "/", "file": "HomeScreen.tsx", "title": "مرکز فرماندهی هوش‌یار", "sub": "مرکز جامع فرماندهی", "back": False, "actions": ["search_link", "bell_link"]},
+        {"route": "/", "file": "HomeScreen.tsx", "title": "مرکز فرماندهی هوشیار", "sub": "مرکز جامع فرماندهی", "back": False, "actions": ["search_link", "bell_link"]},
         {"route": "/library", "file": "LibraryScreen.tsx", "title": "کتابخانه", "sub": "جزوه‌ها و منابع", "back": False, "actions": None},
         {"route": "/library/term/1", "file": "LibraryScreens.tsx", "title": "ترم ۱", "sub": "علوم پایه", "back": True, "actions": None},
         {"route": "/library/lesson/anatomy", "file": "LibraryScreens.tsx", "title": "آناتومی عمومی", "sub": "جلسات", "back": True, "actions": None},
@@ -129,7 +129,7 @@ class TestRapidViewTransitionsAcross22Screens(ChallengerNavIslandBase):
         {"route": "/schedule", "file": "ScheduleScreen.tsx", "title": "برنامه و تسک‌های مطالعه", "sub": "تقویم جلالی، کلاس‌ها و امتحانات", "back": False, "actions": None},
         {"route": "/me", "file": "MeScreen.tsx", "title": "هامزیار من", "sub": "حساب، دستگاه‌ها و ظاهر", "back": False, "actions": None},
         {"route": "/search", "file": "SearchScreen.tsx", "title": "جستجو", "sub": "جستجوی سراسری در محتوا", "back": False, "actions": None},
-        {"route": "/ai", "file": "AiChatScreen.tsx", "title": "هوش‌یار پزشکی", "sub": "دستیار هوشمند و تحلیل بالینی", "back": False, "actions": ["vision_upload", "clear_btn"]},
+        {"route": "/ai", "file": "AiChatScreen.tsx", "title": "هوشیار پزشکی", "sub": "دستیار هوشمند و تحلیل بالینی", "back": False, "actions": ["vision_upload", "clear_btn"]},
         {"route": "/grades", "file": "GradesScreen.tsx", "title": "کارنامه و معدل کل", "sub": "سوابق تحصیلی و معدل وزنی (GPA)", "back": False, "actions": None},
         {"route": "/subscription", "file": "SubscriptionScreen.tsx", "title": "طرح‌های اشتراک", "sub": "دسترسی جامع به منابع و هوش پزشکی", "back": False, "actions": None},
         {"route": "/notifications", "file": "NotificationsScreen.tsx", "title": "مرکز اعلان‌ها", "sub": "پیام‌ها و اطلاعیه‌های سامانه", "back": False, "actions": ["mark_all_read"]},

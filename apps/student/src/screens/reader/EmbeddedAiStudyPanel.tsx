@@ -132,7 +132,7 @@ export function EmbeddedAiStudyPanel({ fileId, bookletName, page, onClose }: Pro
                 m.id === aiMsgId && !m.text
                   ? {
                       ...m,
-                      text: 'پاسخ هوش‌یار در دسترس نیست. لطفاً اتصال اینترنت خود را بررسی و دوباره تلاش کنید.',
+                      text: 'پاسخ هوشیار در دسترس نیست. لطفاً اتصال اینترنت خود را بررسی و دوباره تلاش کنید.',
                     }
                   : m,
               ),

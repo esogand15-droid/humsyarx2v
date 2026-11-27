@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-🧠 HumsyarCore — هسته واحد هامشیار (W8)
+🧠 HumsyarCore — هسته واحد هامزیار (W8)
 
 چرا هسته؟
   قبل از W8، هر لایه (Bot / MiniApp / WebAdmin) منطق خودش را برای

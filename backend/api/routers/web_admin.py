@@ -3255,7 +3255,7 @@ async def questions_export_pdf(
     body: QuestionsExportPdfInput,
     user=Depends(_perm_any("questions.review", "questions.review_scoped", "questions.edit")),
 ):
-    """📄 خروجی PDF از سؤال‌های منتخب — پرمیوم Hamsyar (practice/exam).
+    """📄 خروجی PDF از سؤال‌های منتخب — پرمیوم Humsyar (practice/exam).
 
     حد ۱۰۰ سؤال، با موتور مشترک qbank.generate_exam_pdf تا طراحی و فونت
     دقیقاً یکدست با ربات/مینی‌اپ باشد. دسترسی: questions.review یا scoped.

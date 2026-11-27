@@ -14,7 +14,7 @@ export const SIDEBAR_ITEMS: ReadonlyArray<NavEntry> = [
   { to: '/', label: 'خانه', shortLabel: 'خانه', icon: 'i-home', section: 'brand' },
   { to: '/library', label: 'کتابخانه', shortLabel: 'کتابخانه', icon: 'i-book', section: 'resources' },
   { to: '/exam', label: 'بانک سؤال', shortLabel: 'آزمون', icon: 'i-flask', section: 'qbank' },
-  { to: '/ai', label: 'هوش‌یار', shortLabel: 'هوش‌یار', icon: 'i-chat', section: 'ai' },
+  { to: '/ai', label: 'هوشیار', shortLabel: 'هوشیار', icon: 'i-chat', section: 'ai' },
   { to: '/grades', label: 'کارنامه و معدل', shortLabel: 'کارنامه', icon: 'i-award', section: 'grades' },
   { to: '/schedule', label: 'برنامه مطالعه', shortLabel: 'برنامه', icon: 'i-calendar', section: 'schedule' },
   { to: '/me/notes', label: 'دفترچه من', shortLabel: 'دفترچه', icon: 'i-pen', section: 'notes' },
@@ -33,7 +33,7 @@ export const ROUTE_TITLES: Record<string, string> = {
   '/': 'داشبورد دانشجو',
   '/library': 'کتابخانه آموزشی',
   '/exam': 'بانک سؤال و آزمون',
-  '/ai': 'دستیار هوش‌یار',
+  '/ai': 'دستیار هوشیار',
   '/grades': 'کارنامه و معدل کل',
   '/schedule': 'برنامه مطالعه',
   '/me/notes': 'دفترچه من',
@@ -54,7 +54,7 @@ export function activeTabIndex(pathname: string): number {
 export function fallbackTitleFor(pathname: string): string {
   if (ROUTE_TITLES[pathname]) return ROUTE_TITLES[pathname];
   if (pathname.startsWith('/exam/')) return 'بانک سؤال و آزمون';
-  if (pathname.startsWith('/ai/')) return 'دستیار هوش‌یار';
+  if (pathname.startsWith('/ai/')) return 'دستیار هوشیار';
   if (pathname.startsWith('/tickets/')) return 'پشتیبانی و تیکت‌ها';
   return '';
 }

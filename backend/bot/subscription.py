@@ -248,7 +248,7 @@ async def _zarinpal_start(query, context, uid: int, kind: str, ref: str):
             await query.answer("کد ۱۰۰٪ با هدیه ترکیب نمی‌شود.", show_alert=True)
             return
         plan_id, plan_name = str(plan["_id"]), plan.get("name", "")
-        desc = f"اشتراک {plan_name} هامشیار"
+        desc = f"اشتراک {plan_name} هامزیار"
         idem = f"zpb:{uid}:{plan_id[:8]}:{price}"
         back_cb, back_label = "sub:back", "🔙 بازگشت به پلن‌ها"
     else:
@@ -261,7 +261,7 @@ async def _zarinpal_start(query, context, uid: int, kind: str, ref: str):
             await query.answer(f"مبلغ شارژ باید بین {tmin:,} و {tmax:,} تومان باشد.", show_alert=True)
             return
         plan_id, plan_name = "wallet_topup", "شارژ کیف پول"
-        desc = f"شارژ کیف پول هامشیار — کاربر {uid}"
+        desc = f"شارژ کیف پول هامزیار — کاربر {uid}"
         idem = f"zpb:{uid}:topup:{price}"
         back_cb, back_label = "sub:wallet", "🔙 بازگشت به کیف پول"
     try:

@@ -1,5 +1,5 @@
 """
-📅 schedule_pdf — خروجی پریمیوم PDF از برنامه‌ی کلاس/امتحان/جبرانی — Hamsyar v2
+📅 schedule_pdf — خروجی پریمیوم PDF از برنامه‌ی کلاس/امتحان/جبرانی — Humsyar v2
 
 ویژگی‌های v2 (Shahrivar 1405):
   • هماهنگ با هسته‌ی interval-aware جدید: نمایش «۰۸:۰۰ تا ۱۰:۰۰» (time + end_time)
@@ -960,7 +960,7 @@ def generate_schedule_pdf(items: list, group_label: str, student_name: str = '',
     c = canvas.Canvas(buf, pagesize=(PAGE_W, PAGE_H))
     # improve PDF metadata
     try:
-        c.setTitle("Hamsyar — برنامه‌ی کلاس/امتحان")
+        c.setTitle("Humsyar — برنامه‌ی کلاس/امتحان")
         c.setAuthor("humsyarbot")
     except Exception:
         pass

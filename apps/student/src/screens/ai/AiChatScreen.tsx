@@ -1,4 +1,4 @@
-/* هوش‌یار — گفتوگوی چندگانه در سطح ChatGPT.
+/* هوشیار — گفتوگوی چندگانه در سطح ChatGPT.
    مسیرها: /ai (گفتوگوی تازه، ساخت تنبل با اولین ارسال) و /ai/:id.
    چیدمان: ≥۷۶۸px دو ستون (تاریخچه + گفتوگو)؛ موبایل: کشوی تاریخچه.
    اسکرول: فقط وقتی کاربر پایین است دنبال استریم میرود؛ بالا رفتن ⇒ دکمهٔ «پایین».
@@ -316,7 +316,7 @@ export function AiChatScreen() {
 
   return (
     <div ref={rootRef} className="aic" data-section="ai">
-      <AppBar title="هوش‌یار" sub={active?.title && active.title !== NEW_TITLE ? active.title : `دستیار آموزشی پزشکی`} actions={isWide ? undefined : headerActions} />
+      <AppBar title="هوشیار" sub={active?.title && active.title !== NEW_TITLE ? active.title : `دستیار آموزشی پزشکی`} actions={isWide ? undefined : headerActions} />
 
       <div className="aic-layout">
         <div className={`aic-scrim${drawer ? ' is-open' : ''}`} onClick={() => setDrawer(false)} aria-hidden="true" />
@@ -338,7 +338,7 @@ export function AiChatScreen() {
           />
         </aside>
 
-        <section className="aic-pane" aria-label={`گفت${ZW}وگو با هوش‌یار`}>
+        <section className="aic-pane" aria-label={`گفت${ZW}وگو با هوشیار`}>
           <div ref={scrollRef} className="aic-scroll" onScroll={onScroll}>
             <div className="aic-thread">
               {chat.hasMore && (
@@ -428,7 +428,7 @@ export function AiChatScreen() {
             {blocked ? (
               <div className="aic-banner aic-banner--danger" role="status">
                 <Icon name="i-lock" size={18} />
-                <span>{status?.disabled_message || (status?.banned ? `دسترسی تو به هوش‌یار مسدود شده است.` : `هوش‌یار موقتاً غیرفعال است.`)}</span>
+                <span>{status?.disabled_message || (status?.banned ? `دسترسی تو به هوشیار مسدود شده است.` : `هوشیار موقتاً غیرفعال است.`)}</span>
               </div>
             ) : quotaOut ? (
               <div className="aic-banner" role="status">
@@ -456,7 +456,7 @@ export function AiChatScreen() {
                 />
               </>
             )}
-            <p className="aic-disclaimer">{`هوش‌یار ممکن است اشتباه کند؛ برای تصمیم بالینی به منابع معتبر مراجعه کن.`}</p>
+            <p className="aic-disclaimer">{`هوشیار ممکن است اشتباه کند؛ برای تصمیم بالینی به منابع معتبر مراجعه کن.`}</p>
           </div>
         </section>
       </div>

@@ -273,7 +273,7 @@ async def get_status(
         return {
             "active": True,
             "days_left": 180,
-            "plan_name": "اشتراک ویژه هوش‌یار (VIP)",
+            "plan_name": "اشتراک ویژه هوشیار (VIP)",
             "expires": "1405-08-30",
             "resource_access": True,
             "enforced": True,
@@ -1314,7 +1314,7 @@ async def zarinpal_request_ep(body: ZarinpalRequestBody, user=Depends(get_curren
     # discount not consumed yet — will be consumed atomically at verify (after payment) to avoid stuck reservation
     # gateway request
     cb = _clamp_callback_url(body.callback_url, _gateway_callback_default())
-    desc = f"اشتراک {plan.get('name','')} هامشیار"
+    desc = f"اشتراک {plan.get('name','')} هامزیار"
     try:
         zp = await _zp_req(price, desc, cb)
     except Exception as e:
@@ -1367,7 +1367,7 @@ async def zarinpal_topup_ep(body: ZarinpalTopupBody, user=Depends(get_current_us
                 "final_price": int(ex.get("final_price") or amount)}
     cb = _clamp_callback_url(body.callback_url, _gateway_callback_default())
     try:
-        zp = await _zp_req(amount, f"شارژ کیف پول هامشیار — کاربر {user_id}", cb)
+        zp = await _zp_req(amount, f"شارژ کیف پول هامزیار — کاربر {user_id}", cb)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"درگاه زرین‌پال پاسخ نداد: {e}")
     try:

@@ -178,7 +178,7 @@ let demoNotifications = [
   {
     id: 'notif_demo_3',
     title: 'اشتراک ماهانه VIP فعال است',
-    body: 'دسترسی کامل به جزوه‌ها، آزمون‌ها و هوش‌یار تا ۳۰ روز آینده برقرار است.',
+    body: 'دسترسی کامل به جزوه‌ها، آزمون‌ها و هوشیار تا ۳۰ روز آینده برقرار است.',
     category: 'general',
     read: true,
     pinned: false,
