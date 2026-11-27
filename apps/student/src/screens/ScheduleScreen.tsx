@@ -576,10 +576,6 @@ export function ScheduleScreen() {
                       </p>
                     </div>
                   </div>
-                  <DsBadge tone="success">
-                    <Icon name="i-check" size={12} />
-                    <span>همگام با ربات</span>
-                  </DsBadge>
                 </div>
               </DsCard>
             )}
