@@ -18,15 +18,16 @@ const PRESET_PROMPTS: ReadonlyArray<{ icon: IconName; text: string }> = [
   { icon: 'i-pill', text: 'نکات فارماکولوژی، دوزاژ و تشخیص‌های افتراقی این مبحث چیست؟' },
 ];
 
-export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
+export function EmbeddedAiStudyPanel({ fileId, bookletName, page, onClose }: Props) {
   void onClose;
-  const defaultWelcomeText = `سلام! من هوشیار هستم؛ همکار هوشمند مطالعهٔ شما در پلتفرم هامزیار.\nدر حال حاضر جزوهٔ «${bookletName || 'این بخش'}»${page ? ` (صفحهٔ ${faNum(page)})` : ''} را مرور می‌کنید. هر سؤالی پیرامون فارماکولوژی، پاتوفیزیولوژی، تشخیص‌های افتراقی، یا تفسیر ECG دارید بپرسید تا با شواهد علمی پاسخ دهم.`;
+  const welcomeForContext = (name?: string, pg?: number) =>
+    `سلام! من هوشیار هستم؛ همکار هوشمند مطالعهٔ شما در پلتفرم هامزیار.\nدر حال حاضر جزوهٔ «${name || 'این بخش'}»${pg ? ` (صفحهٔ ${faNum(pg)})` : ''} را مرور می‌کنید. هر سؤالی پیرامون فارماکولوژی، پاتوفیزیولوژی، تشخیص‌های افتراقی، یا تفسیر ECG دارید بپرسید تا با شواهد علمی پاسخ دهم.`;
 
   const [messages, setMessages] = useState<AiMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      text: defaultWelcomeText,
+      text: welcomeForContext(bookletName, page),
       timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -34,6 +35,21 @@ export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const copyTimerRef = useRef<number>(0);
+
+  useEffect(() => {
+    setMessages((prev) =>
+      prev.length === 1 && prev[0].id === 'welcome'
+        ? [{ ...prev[0], text: welcomeForContext(bookletName, page) }]
+        : prev,
+    );
+  }, [bookletName, page]);
+
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    window.clearTimeout(copyTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -42,11 +58,13 @@ export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
   }, [messages, loading]);
 
   const handleReset = () => {
+    abortRef.current?.abort();
+    setLoading(false);
     setMessages([
       {
-        id: `welcome_${Date.now()}`,
+        id: 'welcome',
         role: 'assistant',
-        text: defaultWelcomeText,
+        text: welcomeForContext(bookletName, page),
         timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
@@ -57,7 +75,8 @@ export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
     if (!text) return;
     navigator.clipboard?.writeText(text).catch(() => {});
     setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    window.clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = window.setTimeout(() => setCopiedId(null), 2000);
   };
 
   const handleSend = async (customPrompt?: string) => {
@@ -65,6 +84,12 @@ export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
     if (!textToSend || loading) return;
 
     if (!customPrompt) setInput('');
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    const contextHeader = `[زمینه مطالعه در کتابخوان — فایل: ${fileId}${bookletName ? ` | جزوه: «${bookletName}»` : ''}${page ? ` | صفحه: ${page}` : ''}]\n`;
+    const promptWithContext = `${contextHeader}${textToSend}`;
 
     const userMsg: AiMessage = {
       id: `usr_${Date.now()}`,
@@ -85,32 +110,37 @@ export function EmbeddedAiStudyPanel({ bookletName, page, onClose }: Props) {
     setLoading(true);
 
     try {
-      await streamAiChat(textToSend, null, {
-        onToken: (token) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiMsgId ? { ...m, text: m.text + token } : m)),
-          );
+      await streamAiChat(
+        promptWithContext,
+        null,
+        {
+          onToken: (token) => {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === aiMsgId ? { ...m, text: m.text + token } : m)),
+            );
+          },
+          onDone: (tokens) => {
+            setLoading(false);
+            setMessages((prev) =>
+              prev.map((m) => (m.id === aiMsgId ? { ...m, tokens_used: tokens } : m)),
+            );
+          },
+          onError: () => {
+            setLoading(false);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiMsgId && !m.text
+                  ? {
+                      ...m,
+                      text: 'پاسخ هوش‌یار در دسترس نیست. لطفاً اتصال اینترنت خود را بررسی و دوباره تلاش کنید.',
+                    }
+                  : m,
+              ),
+            );
+          },
         },
-        onDone: (tokens) => {
-          setLoading(false);
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiMsgId ? { ...m, tokens_used: tokens } : m)),
-          );
-        },
-        onError: () => {
-          setLoading(false);
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === aiMsgId && !m.text
-                ? {
-                    ...m,
-                    text: 'پاسخ هوش‌یار در دسترس نیست. لطفاً اتصال اینترنت خود را بررسی و دوباره تلاش کنید.',
-                  }
-                : m,
-            ),
-          );
-        },
-      });
+        ac.signal,
+      );
     } catch {
       setLoading(false);
     }

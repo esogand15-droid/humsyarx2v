@@ -286,13 +286,24 @@ export function AiChatScreen() {
 
   const starters = useMemo(() => pickStarters(4), []);
 
+  const [isWide, setIsWide] = useState(() =>
+    typeof window !== 'undefined' && !!window.matchMedia?.('(min-width: 768px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia?.('(min-width: 768px)');
+    if (!mq) return;
+    const sync = () => setIsWide(mq.matches);
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
   const headerActions = useMemo(
     () => (
       <div className="aic-head-actions">
         <button type="button" className="iconbtn aic-hist-toggle" onClick={() => setDrawer(true)} aria-label={`تاریخچهٔ گفت${ZW}وگوها`} title={`تاریخچهٔ گفت${ZW}وگوها`}>
           <Icon name="i-menu" size={20} />
         </button>
-        <button type="button" className="iconbtn" onClick={newChat} aria-label={NEW_TITLE} title={NEW_TITLE}>
+        <button type="button" className="iconbtn aic-head-new" onClick={newChat} aria-label={NEW_TITLE} title={NEW_TITLE}>
           <Icon name="i-pen" size={18} />
         </button>
       </div>
@@ -304,7 +315,7 @@ export function AiChatScreen() {
 
   return (
     <div ref={rootRef} className="aic" data-section="ai">
-      <AppBar title="هوش‌یار" sub={active?.title && active.title !== NEW_TITLE ? active.title : `دستیار آموزشی پزشکی`} actions={headerActions} />
+      <AppBar title="هوش‌یار" sub={active?.title && active.title !== NEW_TITLE ? active.title : `دستیار آموزشی پزشکی`} actions={isWide ? undefined : headerActions} />
 
       <div className="aic-layout">
         <div className={`aic-scrim${drawer ? ' is-open' : ''}`} onClick={() => setDrawer(false)} aria-hidden="true" />

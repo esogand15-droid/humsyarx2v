@@ -5,7 +5,7 @@
    «+» یک پاپاور جمعوجور باز میکند (دوربین، تصاویر، فایل، تحلیل تصویر بالینی)؛
    هر گزینه بیدرنگ انتخابگر بومی را باز میکند و تصویر انتخابشده بالای فیلد
    بهصورت چیپ میماند تا همراه پیام فرستاده شود. */
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../../icons';
 import type { IconName } from '../../icons';
 import { MOTION, usePresence } from '../../lib/motion';
@@ -60,7 +60,11 @@ function writeDraft(id: string, v: string) {
 }
 
 function validateImage(file: File): string | null {
-  if (!IMAGE_TYPES.includes(file.type)) return 'فقط تصویر JPG، PNG یا WebP مجاز است.';
+  const lower = (file.name || '').toLowerCase();
+  const validExt = lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp');
+  if (!IMAGE_TYPES.includes(file.type) && !(file.type === '' && validExt)) {
+    return 'در گفتگو فعلاً تصویر JPG، PNG یا WebP پشتیبانی می‌شود.';
+  }
   if (file.size > MAX_IMAGE_BYTES) return 'حجم تصویر نباید بیشتر از ۱۰ مگابایت باشد.';
   return null;
 }
@@ -90,6 +94,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   const cameraInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const menuToken = useId();
   const menu = usePresence(menuOpen, MOTION.popover);
 
   useEffect(() => setValue(readDraft(draftId)), [draftId]);
@@ -118,9 +123,23 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     },
   }));
 
-  /* بستن پاپاور با لمس بیرون یا Esc؛ فوکوس به «+» برمیگردد. */
+  /* بستن پاپاور با لمس بیرون، Esc یا دکمهٔ Back؛ فوکوس به «+» برمی‌گردد. */
   useEffect(() => {
     if (!menuOpen) return;
+    let popped = false;
+    try {
+      const curr = window.history.state && typeof window.history.state === 'object' ? window.history.state : {};
+      window.history.pushState({ ...curr, _hyAttach: menuToken }, '');
+    } catch {
+      /* ignore */
+    }
+    const onPop = () => {
+      const st = window.history.state as { _hyAttach?: string } | null;
+      if (st?._hyAttach !== menuToken) {
+        popped = true;
+        setMenuOpen(false);
+      }
+    };
     const onDown = (e: PointerEvent) => {
       const t = e.target as Node;
       if (menuRef.current?.contains(t) || plusRef.current?.contains(t)) return;
@@ -131,14 +150,24 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       setMenuOpen(false);
       plusRef.current?.focus();
     };
+    window.addEventListener('popstate', onPop);
     document.addEventListener('pointerdown', onDown);
     document.addEventListener('keydown', onKey);
     requestAnimationFrame(() => menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus());
     return () => {
+      window.removeEventListener('popstate', onPop);
       document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('keydown', onKey);
+      const st = window.history.state as { _hyAttach?: string } | null;
+      if (!popped && st?._hyAttach === menuToken) {
+        try {
+          window.history.back();
+        } catch {
+          /* ignore */
+        }
+      }
     };
-  }, [menuOpen]);
+  }, [menuOpen, menuToken]);
 
   useEffect(() => () => {
     if (attachment) URL.revokeObjectURL(attachment.url);
@@ -294,25 +323,32 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               <Icon name="i-plus" size={22} />
             </button>
             {menu.mounted && (
-              <div ref={menuRef} className="aic-attach__menu mo-popover" data-state={menu.state} role="menu" aria-label="افزودن">
-                <div className="mo-stagger">
-                  {MENU.map((m, i) => (
-                    <button
-                      key={m.key}
-                      type="button"
-                      role="menuitem"
-                      className="aic-attach__item"
-                      style={{ '--i': i } as React.CSSProperties}
-                      onClick={() => pick(m.key)}
-                    >
-                      <span className="aic-attach__item-icon" aria-hidden="true">
-                        <Icon name={m.icon} size={18} />
-                      </span>
-                      <span>{m.label}</span>
-                    </button>
-                  ))}
+              <>
+                <div
+                  className="aic-attach-scrim"
+                  data-state={menu.state}
+                  onClick={() => setMenuOpen(false)}
+                  aria-hidden="true"
+                />
+                <div ref={menuRef} className="aic-attach__menu mo-popover" data-state={menu.state} role="menu" aria-label="افزودن">
+                  <div className="mo-stagger">
+                    {MENU.map((m) => (
+                      <button
+                        key={m.key}
+                        type="button"
+                        role="menuitem"
+                        className="aic-attach__item"
+                        onClick={() => pick(m.key)}
+                      >
+                        <span className="aic-attach__item-icon" aria-hidden="true">
+                          <Icon name={m.icon} size={18} />
+                        </span>
+                        <span>{m.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
         )}
