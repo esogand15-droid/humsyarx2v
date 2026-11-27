@@ -183,6 +183,8 @@ export function App() {
       void import('./screens/notes/NotesScreen');
       void import('./screens/MeScreen');
       void import('./screens/reader/ReaderScreen');
+      // Account data too, so the account screen opens complete instead of filling in.
+      void import('./lib/accountData').then((m) => m.loadAccount()).catch(() => undefined);
     };
     const ric = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
     const id = ric ? ric(warm) : window.setTimeout(warm, 1500);

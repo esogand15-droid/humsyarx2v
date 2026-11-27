@@ -10,6 +10,7 @@ import type { IconName } from '../icons';
 import { errorText } from '../lib/api';
 import { faDigits, faNum } from '../lib/fa';
 import { groupLabel, intakeLabel } from '../lib/intake';
+import { loadAccount, peekAccount, type AccountData } from '../lib/accountData';
 import {
   profileApi,
   type FaqItem,
@@ -82,11 +83,14 @@ export function MeScreen() {
   const { mode, setMode } = useTheme();
   const { user, signOut, refresh } = useSession();
 
-  const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
-  const [prestige, setPrestige] = useState<PrestigeState | null>(null);
-  const [referral, setReferral] = useState<ReferralMine | null>(null);
-  const [donation, setDonation] = useState<{ enabled: boolean; link: string } | null>(null);
-  const [intakes, setIntakes] = useState<IntakeItem[]>([]);
+  // The cached account paints the final first frame; the fetch below only refreshes it.
+  const [cached] = useState(() => peekAccount());
+  const [profileUser, setProfileUser] = useState<ProfileUser | null>(cached?.profile ?? null);
+  const [prestige, setPrestige] = useState<PrestigeState | null>(cached?.prestige ?? null);
+  const [referral, setReferral] = useState<ReferralMine | null>(cached?.referral ?? null);
+  const [donation, setDonation] = useState<{ enabled: boolean; link: string } | null>(cached?.donation ?? null);
+  const [intakes, setIntakes] = useState<IntakeItem[]>(cached?.intakes ?? []);
+  const [accountReady, setAccountReady] = useState(Boolean(cached?.profile));
 
   const [leaving, setLeaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -99,10 +103,10 @@ export function MeScreen() {
   const [toast, setToast] = useState<string | null>(null);
 
   // فیلدهای فرم ویرایش پروفایل
-  const [nameInput, setNameInput] = useState('');
-  const [nicknameInput, setNicknameInput] = useState('');
-  const [studentIdInput, setStudentIdInput] = useState('');
-  const [selectedIntake, setSelectedIntake] = useState('');
+  const [nameInput, setNameInput] = useState(cached?.profile?.name || '');
+  const [nicknameInput, setNicknameInput] = useState(cached?.profile?.nickname || '');
+  const [studentIdInput, setStudentIdInput] = useState(cached?.profile?.student_id || '');
+  const [selectedIntake, setSelectedIntake] = useState(cached?.profile?.intake || '');
   const [savingField, setSavingField] = useState<string | null>(null);
 
   // FAQ زنده
@@ -117,35 +121,28 @@ export function MeScreen() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  const loadExtendedProfile = useCallback(async () => {
-    const [pRes, prRes, rRes, dRes, iRes] = await Promise.allSettled([
-      profileApi.get(),
-      profileApi.prestige(),
-      profileApi.referral(),
-      profileApi.donation(),
-      profileApi.intakes(),
-    ]);
-    if (pRes.status === 'fulfilled' && pRes.value?.user) {
-      const u = pRes.value.user;
+  const applyAccount = useCallback((a: AccountData) => {
+    const u = a.profile;
+    if (u) {
       setProfileUser(u);
       setNameInput(u.name || '');
       setNicknameInput(u.nickname || '');
       setStudentIdInput(u.student_id || '');
       setSelectedIntake(u.intake || '');
     }
-    if (prRes.status === 'fulfilled') {
-      setPrestige(prRes.value?.prestige || null);
-    }
-    if (rRes.status === 'fulfilled') {
-      setReferral(rRes.value || null);
-    }
-    if (dRes.status === 'fulfilled') {
-      setDonation(dRes.value || null);
-    }
-    if (iRes.status === 'fulfilled') {
-      setIntakes(iRes.value?.intakes || []);
-    }
+    setPrestige(a.prestige);
+    setReferral(a.referral);
+    setDonation(a.donation);
+    setIntakes(a.intakes);
   }, []);
+
+  const loadExtendedProfile = useCallback(async () => {
+    try {
+      applyAccount(await loadAccount());
+    } finally {
+      setAccountReady(true);
+    }
+  }, [applyAccount]);
 
   useEffect(() => {
     void loadExtendedProfile();
@@ -180,7 +177,9 @@ export function MeScreen() {
   const studentIdFa = rawStudentId ? faDigits(rawStudentId) : '';
   const webLoginCode = localCodeOverride || profileUser?.web_login_code?.trim() || user?.web_login_code?.trim() || '';
   const group = groupLabel(profileUser?.group || user?.group);
-  const intake = profileUser?.intake_label || intakeLabel(user?.intake);
+  // One label from first paint on: derived from the intake code (session or profile),
+  // the server label only for codes the client cannot read.
+  const intake = intakeLabel(profileUser?.intake || user?.intake) || profileUser?.intake_label || '';
   const eduGroupLabel =
     profileUser?.educational_group === 'male'
       ? 'برادران'
@@ -360,6 +359,7 @@ export function MeScreen() {
                 {group && <DsBadge tone="accent">{group}</DsBadge>}
                 {intake && <DsBadge tone="neutral">{intake}</DsBadge>}
                 {eduGroupLabel && <DsBadge tone="neutral">{eduGroupLabel}</DsBadge>}
+                {!accountReady && <span className="skeleton skeleton--shimmer acct-badge-skel" aria-hidden="true" />}
                 {prestige?.tier_name && (
                   <DsBadge tone="warning">
                     {prestige.tier_icon || '🏅'} {prestige.tier_name}
@@ -517,99 +517,113 @@ export function MeScreen() {
           </aside>
 
           <section className="acct-col-main" aria-label="مدیریت حساب و تنظیمات">
+            <h3 className="acct-group__title">پیشرفت من</h3>
             <DsCard flush>
               <div className="ds-list">
                 <MeNavRow
-                  icon="i-trend"
-                  title="میدان رقابت و تازه‌ها"
-                  sub="جدول رده‌بندی هفته، ماه، سیزن و واکنش‌ها"
-                  to="/leaderboard"
-                />
-                <MeNavRow
-                  icon="i-award"
-                  title="نشان‌ها و پرستیژ من"
-                  sub={prestige ? `${faNum(prestige.xp ?? 0)} XP · ویترین افتخارات و سفر من` : 'کلکسیون نشان‌ها'}
+                  icon="i-trophy"
+                  title="رقابت و دستاوردها"
+                  sub="نشانها، پرستیژ، جدول رقابت و تازهها"
                   to="/me/badges"
                 />
                 <MeNavRow
-                  icon="i-award"
+                  icon="i-graduation"
                   title="کارنامه تحصیلی"
-                  sub="مشاهده نمرات و معدل وزنی"
+                  sub="نمرهها و معدل وزنی"
                   to="/grades"
                 />
                 <MeNavRow
-                  icon="i-pen"
+                  icon="i-notebook"
                   title="دفتر من"
-                  sub="یادداشت‌ها و خط‌کشیده‌های جزوه‌ها"
+                  sub="یادداشتها و خطکشیدههای جزوهها"
                   to="/me/notes"
                 />
                 <MeNavRow
-                  icon="i-file-text"
-                  title="سوال‌های طراحی‌شده و بانک من"
-                  sub="سوال‌سازی، پیگیری تأیید و چالش پرستیژ"
+                  icon="i-pencil-ruler"
+                  title="سؤالهای طراحیشده"
+                  sub="سؤالسازی، پیگیری تأیید و چالش پرستیژ"
                   to="/exam/my-designs"
                 />
+              </div>
+            </DsCard>
+
+            <h3 className="acct-group__title">حساب و اشتراک</h3>
+            <DsCard flush>
+              <div className="ds-list">
                 <MeNavRow
-                  icon="i-smartphone"
-                  title="دستگاه‌های من"
-                  sub="مدیریت نشست‌ها و دستگاه‌های متصل"
-                  onClick={() => openSheet('devices', false)}
-                />
-                <MeNavRow
-                  icon="i-credit-card"
-                  title="اشتراک و کیف‌پول"
-                  sub="وضعیت اشتراک، کارت‌به‌کارت، خانواده، هدیه و زرین‌پال"
+                  icon="i-wallet"
+                  title="اشتراک و کیفپول"
+                  sub="وضعیت اشتراک، خانواده، هدیه و پرداخت"
                   to="/subscription"
                 />
                 <MeNavRow
-                  icon="i-bell"
-                  title="صندوق اعلان‌ها"
-                  sub="پیام‌ها، سنجاق‌کردن و بایگانی"
-                  to="/notifications"
-                />
-                <MeNavRow
-                  icon="i-settings"
-                  title="تنظیمات اطلاع‌رسانی"
-                  sub="کنترل ۱۶ دسته اعلان (آزمون، برنامه، منابع، هوشیار…)"
-                  to="/notifications?tab=settings"
+                  icon="i-smartphone"
+                  title="دستگاههای من"
+                  sub="نشستها و دستگاههای متصل"
+                  onClick={() => openSheet('devices', false)}
                 />
                 <MeNavRow
                   icon="i-shield"
                   title="امنیت حساب"
-                  sub="محافظت از کد ورود و بررسی نشست‌ها"
+                  sub="محافظت از کد ورود و بررسی نشستها"
                   onClick={() => openSheet('security', false)}
                 />
               </div>
             </DsCard>
 
+            <h3 className="acct-group__title">اعلانها</h3>
             <DsCard flush>
               <div className="ds-list">
                 <MeNavRow
-                  icon="i-message-circle"
-                  title="پشتیبانی و تیکت‌ها"
+                  icon="i-inbox"
+                  title="صندوق اعلانها"
+                  sub="پیامها، سنجاقشدهها و بایگانی"
+                  to="/notifications"
+                />
+                <MeNavRow
+                  icon="i-sliders"
+                  title="تنظیمات اطلاعرسانی"
+                  sub="انتخاب دستههای اعلان (آزمون، برنامه، منابع، هوشیار…)"
+                  to="/notifications?tab=settings"
+                />
+              </div>
+            </DsCard>
+
+            <h3 className="acct-group__title">کمک و پشتیبانی</h3>
+            <DsCard flush>
+              <div className="ds-list">
+                <MeNavRow
+                  icon="i-help-circle"
+                  title="راهنما و پرسشهای متداول"
+                  sub="جستوجو در پرسشهای پرتکرار و راهنمای نصب"
+                  onClick={() => openSheet('faq', false)}
+                />
+                <MeNavRow
+                  icon="i-lifebuoy"
+                  title="پشتیبانی و تیکتها"
                   sub="ارسال درخواست و گفتگو با تیم پشتیبانی"
                   to="/tickets"
                 />
                 <MeNavRow
-                  icon="i-alert-circle"
-                  title="گزارش‌های ایراد محتوا"
-                  sub="ثبت و پیگیری ایراد سؤال‌ها و فایل‌ها"
+                  icon="i-flag"
+                  title="گزارشهای ایراد محتوا"
+                  sub="ثبت و پیگیری ایراد سؤالها و فایلها"
                   to="/me/reports"
                 />
-                <MeNavRow
-                  icon="i-help-circle"
-                  title="راهنما و سوالات متداول"
-                  sub="جست‌وجو در پرسش‌های پرتکرار و راهنمای نصب"
-                  onClick={() => openSheet('faq', false)}
-                />
+              </div>
+            </DsCard>
+
+            <h3 className="acct-group__title">هامزیار</h3>
+            <DsCard flush>
+              <div className="ds-list">
                 {donation?.enabled && donation.link && (
-                  <a className="ds-row" href={donation.link} target="_blank" rel="noopener noreferrer">
+                  <a className="ds-row acct-row--heart" href={donation.link} target="_blank" rel="noopener noreferrer">
                     <span className="ds-row__icon" aria-hidden="true">
-                      <Icon name="i-award" size={20} />
+                      <Icon name="i-heart" size={20} />
                     </span>
                     <span className="ds-row__body">
                       <span className="ds-row__title">حمایت از هامزیار</span>
-                      <span className="ds-row__sub">همراهی برای توسعه امکانات رایگان دانشجویی</span>
+                      <span className="ds-row__sub">همراهی برای توسعهٔ امکانات رایگان دانشجویی</span>
                     </span>
                     <Icon name="i-chevron-r" size={18} className="ds-row__chev" />
                   </a>

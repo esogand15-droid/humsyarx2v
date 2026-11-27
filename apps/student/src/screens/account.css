@@ -1156,3 +1156,11 @@ button.acct-notif-card:hover {
   font-size: var(--hym-fs-small);
   color: var(--hym-text-muted);
 }
+
+/* Reserves the gender/intake badge slot until the first account fetch lands. */
+.acct-badge-skel{display:inline-block;width:64px;height:22px;border-radius:999px;vertical-align:middle}
+
+/* Account menu groups */
+.acct-group__title{margin:14px 6px 6px;font-size:.78rem;font-weight:700;color:var(--ink-3, var(--ink-2));letter-spacing:0}
+.acct-col-main > .acct-group__title:first-child{margin-top:0}
+.acct-row--heart .ds-row__icon{color:#e5484d}

@@ -85,6 +85,16 @@ export const ICON_NAMES = [
   'i-eye-off',
   'i-tablet',
   'i-monitor',
+  'i-trophy',
+  'i-heart',
+  'i-graduation',
+  'i-notebook',
+  'i-wallet',
+  'i-inbox',
+  'i-sliders',
+  'i-lifebuoy',
+  'i-flag',
+  'i-pencil-ruler',
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -177,6 +187,16 @@ export function IconSprite() {
       <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M17.9 17.9A10.6 10.6 0 0 1 12 18.6c-6.2 0-9.8-6.6-9.8-6.6a19.7 19.7 0 0 1 5.1-5.2M9.9 5.6A9.4 9.4 0 0 1 12 5.4c6.2 0 9.8 6.6 9.8 6.6a19.4 19.4 0 0 1-2.7 3.6M14.1 14.1a3 3 0 0 1-4.2-4.2"/><path d="M3 3l18 18"/></symbol>
       <symbol id="i-tablet" viewBox="0 0 24 24"><rect x="4.5" y="2.8" width="15" height="18.4" rx="2.2"/><path d="M12 17.8h.01"/></symbol>
       <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.6" y="3.6" width="18.8" height="12.6" rx="2"/><path d="M8.5 20.4h7M12 16.2v4.2"/></symbol>
+      <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7.5 4h9v5.2a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 6H4.6v1.4a3 3 0 0 0 3 3M16.5 6h2.9v1.4a3 3 0 0 1-3 3"/><path d="M12 13.7V17M8.6 20.4h6.8M9.6 20.4l.6-3.4h3.6l.6 3.4"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.2s-7.6-4.6-8.9-9.4C2.3 7.6 4.3 4.6 7.4 4.6c2 0 3.4 1.1 4.6 2.8 1.2-1.7 2.6-2.8 4.6-2.8 3.1 0 5.1 3 4.3 6.2-1.3 4.8-8.9 9.4-8.9 9.4z"/></symbol>
+      <symbol id="i-graduation" viewBox="0 0 24 24"><path d="M2.6 9.2L12 4.6l9.4 4.6L12 13.8z"/><path d="M6.4 11.1v4.6c1.6 1.5 3.4 2.2 5.6 2.2s4-.7 5.6-2.2v-4.6M21.4 9.2v5.4"/></symbol>
+      <symbol id="i-notebook" viewBox="0 0 24 24"><rect x="5" y="3" width="14.4" height="18" rx="2"/><path d="M9 3v18M3.6 7.5H6.4M3.6 12H6.4M3.6 16.5H6.4M12 8h4.4M12 11.6h4.4"/></symbol>
+      <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M4 7.4h14.6a1.8 1.8 0 0 1 1.8 1.8v9a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 18.2z"/><path d="M4 7.4V6.2a2 2 0 0 1 2.4-2l9.6 1.6v1.6"/><path d="M20.4 11.6h-3.6a1.9 1.9 0 0 0 0 3.8h3.6"/></symbol>
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.6 13.2l2.6-7.4a1.8 1.8 0 0 1 1.7-1.2h8.2a1.8 1.8 0 0 1 1.7 1.2l2.6 7.4v5a1.8 1.8 0 0 1-1.8 1.8H5.4a1.8 1.8 0 0 1-1.8-1.8z"/><path d="M3.6 13.2h4.6l1.4 2.4h4.8l1.4-2.4h4.6"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9.4M17.6 7H20M4 17h3.4M11.6 17H20"/><circle cx="15.5" cy="7" r="2.1"/><circle cx="9.5" cy="17" r="2.1"/></symbol>
+      <symbol id="i-lifebuoy" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="3.6"/><path d="M5.9 5.9l3.6 3.6M14.5 14.5l3.6 3.6M18.1 5.9l-3.6 3.6M9.5 14.5l-3.6 3.6"/></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5.4 21V4.2"/><path d="M5.4 4.6c2.2-1.2 4.4-1.2 6.6 0s4.4 1.2 6.6 0v8.6c-2.2 1.2-4.4 1.2-6.6 0s-4.4-1.2-6.6 0"/></symbol>
+      <symbol id="i-pencil-ruler" viewBox="0 0 24 24"><path d="M14.6 4.6l4.8 4.8L9.2 19.6H4.4v-4.8z"/><path d="M12.4 6.8l4.8 4.8"/></symbol>
     </svg>
   );
 }
