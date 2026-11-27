@@ -127,6 +127,16 @@ export function ProtectedReaderView({
   const [shapeSnap, setShapeSnap] = useState(false);
   const [stylusOnly, setStylusOnly] = useState(false);
 
+  // While any ink tool is active, nothing on the page (headers, toolbar labels,
+  // PDF text layer) may be picked up as a text selection by the pen.
+  useEffect(() => {
+    if (!tool) return;
+    const root = document.documentElement;
+    root.classList.add('is-inking');
+    window.getSelection()?.removeAllRanges();
+    return () => root.classList.remove('is-inking');
+  }, [tool]);
+
   // یادداشت‌های چسبان و نشان‌ها
   const [pageNotes, setPageNotes] = useState<Map<number, StickyNote[]>>(new Map());
   const [bookmarkedPages, setBookmarkedPages] = useState<number[]>(() => bookmarks.get(scope, id));
@@ -1231,7 +1241,10 @@ function VirtualPageContainer({
               searchMatches={searchMatches}
               onSelectionChange={onTextSelection}
               onAnchorAnnotation={onAnchorAnnotation}
-              enableSelection={enableTextSelection}
+              // While an ink tool is active the text layer (z-index 10) sits above
+              // the ink canvas; leaving it selectable lets Apple Pencil strokes
+              // start a native text selection instead of drawing.
+              enableSelection={enableTextSelection && !tool}
               className="virtual-page__text-layer"
               renderScale={1}
             />

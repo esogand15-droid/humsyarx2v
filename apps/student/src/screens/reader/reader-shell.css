@@ -12,7 +12,11 @@
 .pdf-page{position:relative;line-height:0;flex:0 0 auto}
 /* نام عمداً ink-canvas است: `.ink-layer` از P0 برای ماکت کاغذ رزرو شده است */
 .ink-canvas{position:absolute;inset:0;z-index:2;touch-action:auto;pointer-events:none}
-.ink-canvas--active{cursor:crosshair;pointer-events:auto;box-shadow:inset 0 0 0 1px var(--brand-soft)}
+.ink-canvas--active{cursor:crosshair;pointer-events:auto;box-shadow:inset 0 0 0 1px var(--brand-soft);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+/* وقتی ابزار قلم فعال است هیچ متنی در صفحه (عنوان، سرصفحه، لایهٔ متن PDF) نباید
+   با قلم انتخاب شود؛ html.is-inking را ProtectedReaderView میگذارد. */
+html.is-inking,html.is-inking body,html.is-inking .text-layer span{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
+html.is-inking input,html.is-inking textarea,html.is-inking [contenteditable="true"]{-webkit-user-select:text!important;user-select:text!important}
 .notebook__head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .notebook__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .notebook__num{font-size:13px;font-weight:700}

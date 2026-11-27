@@ -761,10 +761,37 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
   }, [tool, paint]);
 
   // ── رویدادهای اشاره‌گر (PointerEvents) ────────────────────────
+  // iPadOS also fires a touchstart with touchType 'stylus' for Apple Pencil.
+  // Only cancelling that (non-passive) touchstart stops WebKit from starting a
+  // native text selection / loupe / Copy-Look Up callout under the pen;
+  // preventDefault on pointerdown alone does not.
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onTouchStart = (ev: TouchEvent) => {
+      if (!toolRef.current) return;
+      for (let i = 0; i < ev.touches.length; i++) {
+        if ((ev.touches[i] as Touch & { touchType?: string }).touchType === 'stylus') {
+          ev.preventDefault();
+          return;
+        }
+      }
+    };
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    return () => canvas.removeEventListener('touchstart', onTouchStart);
+  }, []);
+
   const onDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!tool) return;
     if (isPalmRejected(e)) return;
-    if (e.pointerType === 'touch') e.preventDefault();
+    if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+      e.preventDefault();
+      // Drop a selection made before the pen came down so the iOS callout menu does not linger.
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) sel.removeAllRanges();
+    }
 
     const rect = e.currentTarget.getBoundingClientRect();
     strokeStartTime.current = performance.now();

@@ -175,6 +175,19 @@ const TextLayer = forwardRef<TextLayerRef, TextLayerProps>(({
     }
   }, [searchQuery, searchMatches, pdfToCss]);
 
+  // Drop any selection left inside this layer when selection gets disabled
+  // (e.g. the student picks a pen), so the iOS callout menu does not linger.
+  useEffect(() => {
+    if (enableSelection) return;
+    const sel = window.getSelection();
+    const container = containerRef.current;
+    if (sel && sel.rangeCount > 0 && container?.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      sel.removeAllRanges();
+      selectionRef.current = null;
+      onSelectionChange?.('', []);
+    }
+  }, [enableSelection, onSelectionChange]);
+
   // Selection handling
   useEffect(() => {
     if (!enableSelection || !containerRef.current) return;
