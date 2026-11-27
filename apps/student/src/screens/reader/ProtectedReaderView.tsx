@@ -11,6 +11,7 @@ import { INK_COLORS, InkToolbar, type ReaderTool } from './InkToolbar';
 import { NotebookPanel } from './NotebookPanel';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { ThumbnailDrawer } from './ThumbnailDrawer';
+import { PageOverview } from './PageOverview';
 import { TextLayer } from './components/TextLayer';
 import {
   acquirePageUrl,
@@ -177,6 +178,7 @@ export function ProtectedReaderView({
   const [focusMode, setFocusMode] = useState(false);
   const [invertContrast, setInvertContrast] = useState(false);
   const [thumbnailDrawerOpen, setThumbnailDrawerOpen] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const [notebookOpen, setNotebookOpen] = useState(false);
   const [notebookKey, setNotebookKey] = useState(0);
 
@@ -1018,7 +1020,7 @@ export function ProtectedReaderView({
           onOpenNotebook={() => setNotebookOpen((v) => !v)}
           onAddStickyNote={handleAddStickyNote}
           onToggleFocus={() => setFocusMode(true)}
-          onOpenThumbnails={() => setThumbnailDrawerOpen(true)}
+          onOpenThumbnails={() => setOverviewOpen(true)}
           onToggleInvert={() => setInvertContrast((v) => !v)}
           inverted={invertContrast}
           eraserMode={eraserMode}
@@ -1054,6 +1056,19 @@ export function ProtectedReaderView({
           </button>
         </>
       )}
+
+      <PageOverview
+        open={overviewOpen}
+        onClose={() => setOverviewOpen(false)}
+        manifest={manifest}
+        currentPage={currentPage}
+        onJump={(p) => scrollToPage(p, true)}
+        scope={scope}
+        id={id}
+        bookmarkedPages={bookmarkedPages}
+        onToggleBookmark={handleToggleBookmark}
+        targetRect={() => scrollRef.current?.getBoundingClientRect() ?? null}
+      />
 
       <ThumbnailDrawer
         open={thumbnailDrawerOpen}

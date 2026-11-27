@@ -6,7 +6,7 @@ import { ink, type InkSummaryPage, type Scope } from '../../lib/ink';
 import type { DocumentManifest } from './ProtectedReaderView';
 import { acquireThumbUrl, getCachedThumbUrl } from './readerPageCache';
 
-function CachedThumbImg({
+export function CachedThumbImg({
   scope,
   id,
   page,
