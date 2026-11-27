@@ -195,11 +195,18 @@ function ClinicalAnalyticsGrid({
               <span className="home-stat-card__num">{faNum(streak)}</span>
               <span className="home-stat-card__unit">روز</span>
             </div>
-            <div className="home-stat-card__sub">
-              <span>بهترین رکورد:</span>
-              <strong>{faNum(bestStreak)}</strong>
-              <span>روز مداوم</span>
-            </div>
+            {streak === 0 && bestStreak === 0 ? (
+              // «۰» در فونت فارسی شبیه نقطه است؛ بدون این راهنما کارت خالی بهنظر میرسید.
+              <div className="home-stat-card__sub">
+                <span>امروز یک جلسه مطالعه کن تا پیوستگی شروع شود.</span>
+              </div>
+            ) : (
+              <div className="home-stat-card__sub">
+                <span>بهترین رکورد:</span>
+                <strong>{faNum(bestStreak)}</strong>
+                <span>روز مداوم</span>
+              </div>
+            )}
           </DsCard>
         </div>
 
