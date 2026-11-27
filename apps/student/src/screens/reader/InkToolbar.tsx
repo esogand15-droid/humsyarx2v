@@ -19,6 +19,59 @@ export const INK_COLORS = [
 export const INK_WIDTHS = [0.0015, 0.0035, 0.007] as const;
 
 export type ReaderTool = InkTool | 'eraser' | 'lasso' | null;
+
+type DockEdge = 'bottom' | 'top' | 'left' | 'right' | 'free';
+
+const DOCK_KEY = 'hz.reader.dock';
+
+interface DockPrefs {
+  edge: DockEdge;
+  y?: number;
+  free?: { x: number; y: number } | null;
+}
+
+/** iPad: top (like Noteful); Android and phones: bottom, within thumb reach; desktop: top. */
+function defaultDockEdge(): DockEdge {
+  if (typeof window === 'undefined') return 'bottom';
+  const ua = navigator.userAgent || '';
+  const isIPad = /iPad/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1);
+  if (isIPad) return 'top';
+  if (/Android|iPhone|iPod|Mobile/i.test(ua) || window.innerWidth <= 640) return 'bottom';
+  return 'top';
+}
+
+function readDockPrefs(): DockPrefs | null {
+  try {
+    const raw = window.localStorage.getItem(DOCK_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Partial<DockPrefs>;
+    const edges: DockEdge[] = ['bottom', 'top', 'left', 'right', 'free'];
+    if (!p || !edges.includes(p.edge as DockEdge)) return null;
+    let free: DockPrefs['free'] = null;
+    if (p.free && Number.isFinite(p.free.x) && Number.isFinite(p.free.y)) {
+      // The window may be smaller now than when the bar was dropped there.
+      free = {
+        x: Math.max(8, Math.min(window.innerWidth - 56, p.free.x)),
+        y: Math.max(56, Math.min(window.innerHeight - 56, p.free.y)),
+      };
+    }
+    return {
+      edge: p.edge === 'free' && !free ? defaultDockEdge() : (p.edge as DockEdge),
+      y: Number.isFinite(p.y) ? Math.max(70, Math.min(window.innerHeight - 120, p.y as number)) : undefined,
+      free,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeDockPrefs(p: DockPrefs): void {
+  try {
+    window.localStorage.setItem(DOCK_KEY, JSON.stringify(p));
+  } catch {
+    // private mode: position just isn't remembered
+  }
+}
 export type EraserMode = 'stroke' | 'partial';
 
 function setCssVar(name: string, value: string) {
@@ -107,9 +160,22 @@ export function InkToolbar({
   const [toolbarTier, setToolbarTier] = useState<'dot' | 'primary' | 'full'>('primary');
   const isCollapsed = toolbarTier === 'dot';
 
-  const [dockEdge, setDockEdge] = useState<'bottom' | 'top' | 'left' | 'right' | 'free'>('bottom');
-  const [dockY, setDockY] = useState<number>(220);
-  const [freePos, setFreePos] = useState<{ x: number; y: number } | null>(null);
+  // Where the bar sits is remembered per device; first visit uses the device default.
+  const [initialDock] = useState(() => (typeof window === 'undefined' ? null : readDockPrefs()));
+  const [dockEdge, setDockEdge] = useState<DockEdge>(() => initialDock?.edge ?? defaultDockEdge());
+  const [dockY, setDockY] = useState<number>(() => initialDock?.y ?? 220);
+  const [freePos, setFreePos] = useState<{ x: number; y: number } | null>(() => initialDock?.free ?? null);
+
+  useEffect(() => {
+    writeDockPrefs({ edge: dockEdge, y: dockY, free: freePos });
+  }, [dockEdge, dockY, freePos]);
+
+  const floatDock = () => {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    setFreePos({ x: Math.max(12, Math.round(W / 2 - 160)), y: Math.max(80, H - 150) });
+    setDockEdge('free');
+  };
 
   // تشخیص هوشمند دستگاه‌های موبایل (آیفون و اندروید <= 640px)
   const [isMobile, setIsMobile] = useState<boolean>(() => {
@@ -801,6 +867,45 @@ export function InkToolbar({
                     <span>پاک‌کردن</span>
                   </button>
                 )}
+                <button
+                  type="button"
+                  className={`ink-dock__sheet-item${dockEdge === 'top' ? ' is-on' : ''}`}
+                  aria-pressed={dockEdge === 'top'}
+                  onClick={() => {
+                    setDockEdge('top');
+                    setToolbarTier('primary');
+                  }}
+                >
+                  <Icon name="i-arrow-up" size={18} />
+                  <span>نوار بالا</span>
+                </button>
+                <button
+                  type="button"
+                  className={`ink-dock__sheet-item${dockEdge === 'bottom' ? ' is-on' : ''}`}
+                  aria-pressed={dockEdge === 'bottom'}
+                  onClick={() => {
+                    setDockEdge('bottom');
+                    setToolbarTier('primary');
+                  }}
+                >
+                  <Icon name="i-arrow-down" size={18} />
+                  <span>نوار پایین</span>
+                </button>
+                <button
+                  type="button"
+                  className="ink-dock__sheet-item"
+                  onClick={() => {
+                    setFreePos({
+                      x: Math.max(8, window.innerWidth - 68),
+                      y: Math.round(window.innerHeight * 0.6),
+                    });
+                    setDockEdge('free');
+                    setToolbarTier('dot');
+                  }}
+                >
+                  <Icon name="i-pin" size={18} />
+                  <span>دکمهٔ شناور</span>
+                </button>
               </div>
             </div>
           )}
@@ -1215,6 +1320,16 @@ export function InkToolbar({
                         }}
                       >
                         <Icon name="i-arrow-up" size={14} /> بالا (افقی)
+                      </button>
+                      <button
+                        type="button"
+                        className={`ink-dock__pop-item${dockEdge === 'free' ? ' is-active' : ''}`}
+                        onClick={() => {
+                          floatDock();
+                          setShowDockMenu(false);
+                        }}
+                      >
+                        <Icon name="i-pin" size={14} /> شناور (با دستگیره جابهجا کن)
                       </button>
                     </div>
                   )}

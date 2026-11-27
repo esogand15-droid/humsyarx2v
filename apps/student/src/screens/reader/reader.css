@@ -678,6 +678,16 @@ html.dark .reader-workspace {
   inset-inline-start: auto;
 }
 
+/* Docked at the top, menus and the full sheet open downward instead of off-screen. */
+.ink-dock.dock-top .ink-dock__sheet {
+  inset-block-start: calc(100% + 8px);
+  inset-block-end: auto;
+}
+
+.ink-dock.dock-top.is-mobile-dock {
+  inset-block-start: calc(var(--hym-app-bar-height, 58px) + env(safe-area-inset-top, 0px) + 8px);
+}
+
 .ink-dock.dock-free,
 .ink-dock.is-dragged {
   inset-inline-start: var(--ink-inline, 20px);
