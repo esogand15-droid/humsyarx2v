@@ -448,3 +448,272 @@ textarea.ds-input { padding-block: var(--hym-space-3); resize: vertical; }
 .ds-progress__fill--good { fill: var(--hym-role-grades-solid); }
 .ds-progress__fill--warn { fill: var(--hym-role-schedule-solid); }
 .ds-progress__fill--danger { fill: var(--hym-role-danger-solid); }
+
+/* ── Update overlay (SW apply → reload) ─────────────────────────────────
+   Full-screen, blocks input from the tap on «بهروزرسانی» until the reload.
+   The boot splash in index.html reuses the same ring so the hand-off is seamless. */
+html[data-updating="true"] body { overflow: hidden; }
+.ds-update {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--hym-z-toast) + 10);
+  display: grid;
+  place-items: center;
+  padding: var(--hym-space-6);
+  background: color-mix(in oklch, var(--hym-bg-page) 78%, transparent);
+  -webkit-backdrop-filter: var(--blur-lg);
+  backdrop-filter: var(--blur-lg);
+  animation: ds-update-in 260ms var(--mo-ease-out) both;
+}
+.ds-update__glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(40rem 28rem at 50% 38%, color-mix(in oklch, var(--hym-role-brand-solid) 22%, transparent), transparent 70%),
+    radial-gradient(30rem 22rem at 50% 80%, color-mix(in oklch, var(--hym-brand-300) 10%, transparent), transparent 70%);
+  animation: ds-update-breathe 3.2s ease-in-out infinite;
+}
+.ds-update__card {
+  position: relative;
+  width: min(100%, 380px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--hym-space-3);
+  padding: var(--hym-space-8) var(--hym-space-6) var(--hym-space-6);
+  text-align: center;
+  border-radius: var(--hym-radius-sheet);
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  box-shadow: var(--hym-shadow-xl);
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
+  animation: ds-update-card-in 420ms var(--mo-ease-out) 60ms both;
+}
+.ds-update__mark {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: grid;
+  place-items: center;
+  margin-block-end: var(--hym-space-2);
+}
+.ds-update__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation: ds-update-spin 1.4s linear infinite;
+}
+.ds-update__ring-track { stroke: var(--hym-hairline-strong); }
+.ds-update__ring-arc {
+  stroke: var(--hym-role-brand-solid);
+  stroke-linecap: round;
+  stroke-dasharray: 90 327;
+  animation: ds-update-dash 1.4s ease-in-out infinite;
+}
+.ds-update__logo {
+  display: grid;
+  place-items: center;
+  animation: ds-update-pulse 2.4s ease-in-out infinite;
+}
+.ds-update__title {
+  margin: 0;
+  font-size: var(--hym-fs-h3);
+  font-weight: var(--hym-fw-heavy);
+  color: var(--hym-text-primary);
+}
+.ds-update__step {
+  margin: 0;
+  min-height: 1.6em;
+  font-size: var(--hym-fs-small);
+  font-weight: var(--hym-fw-semibold);
+  color: var(--hym-text-secondary);
+  animation: mo-swap-in 220ms var(--mo-ease-out) both;
+}
+.ds-update__bar {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  margin-block: var(--hym-space-2);
+  overflow: hidden;
+  border-radius: var(--hym-radius-pill);
+  background: var(--hym-hairline);
+}
+.ds-update__bar > span {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--hym-brand-300), var(--hym-role-brand-solid));
+  transform-origin: right center;
+  transform: scaleX(0.08);
+  transition: transform 900ms var(--mo-ease-out);
+}
+:dir(ltr) .ds-update__bar > span { transform-origin: left center; }
+.ds-update[data-phase="applying"] .ds-update__bar > span { animation: ds-update-fill 6s cubic-bezier(0.1, 0.7, 0.2, 1) forwards; }
+.ds-update[data-phase="reloading"] .ds-update__bar > span { transform: scaleX(1); }
+.ds-update__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  gap: var(--hym-space-2);
+  text-align: start;
+}
+.ds-update__steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--hym-space-2);
+  font-size: var(--hym-fs-small);
+  color: var(--hym-text-muted);
+  transition: color var(--hym-duration-normal) var(--hym-ease-default);
+}
+.ds-update__steps li[data-s="active"] { color: var(--hym-text-primary); font-weight: var(--hym-fw-semibold); }
+.ds-update__steps li[data-s="done"] { color: var(--hym-text-secondary); }
+.ds-update__dot {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--hym-hairline-strong);
+  color: var(--hym-role-brand-on-solid);
+  transition: background var(--hym-duration-normal) var(--hym-ease-default), border-color var(--hym-duration-normal) var(--hym-ease-default);
+}
+li[data-s="done"] > .ds-update__dot { background: var(--hym-role-brand-solid); border-color: var(--hym-role-brand-solid); }
+li[data-s="active"] > .ds-update__dot {
+  border-color: var(--hym-role-brand-solid);
+  border-block-start-color: transparent;
+  animation: ds-update-spin 0.9s linear infinite;
+}
+.ds-update__hint {
+  margin: var(--hym-space-2) 0 0;
+  font-size: var(--hym-fs-caption);
+  color: var(--hym-text-muted);
+}
+@keyframes ds-update-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ds-update-card-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ds-update-spin { to { transform: rotate(360deg); } }
+@keyframes ds-update-dash {
+  0% { stroke-dasharray: 20 327; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 150 327; stroke-dashoffset: -40; }
+  100% { stroke-dasharray: 20 327; stroke-dashoffset: -307; }
+}
+@keyframes ds-update-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.94); } }
+@keyframes ds-update-breathe { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+@keyframes ds-update-fill { from { transform: scaleX(0.08); } to { transform: scaleX(0.86); } }
+
+/* ── Post-update confirmation toast ────────────────────────────────── */
+.ds-updated-toast-wrap {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-start: calc(env(safe-area-inset-top, 0px) + var(--hym-space-4));
+  z-index: var(--hym-z-toast);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.ds-updated-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hym-space-2);
+  padding: var(--hym-space-2) var(--hym-space-4) var(--hym-space-2) var(--hym-space-3);
+  border-radius: var(--hym-radius-pill);
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  box-shadow: var(--hym-shadow-lg);
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
+  font-size: var(--hym-fs-small);
+  font-weight: var(--hym-fw-semibold);
+  color: var(--hym-text-primary);
+}
+.ds-updated-toast__icon {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--hym-role-brand-solid);
+  color: var(--hym-role-brand-on-solid);
+}
+
+/* ── SW banner: icon + secondary line ─────────────────────────────── */
+.ds-sw-banner__icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--hym-radius-md);
+  background: var(--hym-role-brand-subtle);
+  color: var(--hym-role-brand-text);
+}
+.ds-sw-banner__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ds-sw-banner__sub {
+  font-size: var(--hym-fs-caption);
+  color: var(--hym-text-muted);
+  line-height: var(--hym-lh-ui);
+}
+.ds-sw-banner .ds-btn { gap: var(--hym-space-1); }
+/* Narrow phones: the copy takes the first row, actions drop to a second row instead of
+   squeezing the text into a 3-word column. Near-opaque glass so page text never shows through. */
+.ds-sw-banner-wrap .ds-sw-banner {
+  flex-wrap: wrap;
+  row-gap: var(--hym-space-2);
+  background: color-mix(in oklch, var(--hym-bg-surface-raised) 94%, transparent);
+  -webkit-backdrop-filter: var(--blur-lg);
+  backdrop-filter: var(--blur-lg);
+}
+.ds-sw-banner-wrap .ds-sw-banner__body { flex: 1 1 200px; }
+.ds-sw-banner-wrap .ds-sw-banner__actions { margin-inline-start: auto; }
+
+/* ── Crash / chunk-failure card (AppErrorBoundary) ────────────────── */
+.ds-crash {
+  min-height: 70dvh;
+  display: grid;
+  place-items: center;
+}
+.ds-crash__card {
+  width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--hym-space-3);
+  padding: var(--hym-space-8) var(--hym-space-6);
+  text-align: center;
+}
+.ds-crash__icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--hym-role-brand-subtle);
+  color: var(--hym-role-brand-text);
+}
+.ds-crash__title { margin: 0; font-size: var(--hym-fs-h3); font-weight: var(--hym-fw-bold); color: var(--hym-text-primary); }
+.ds-crash__text { margin: 0; font-size: var(--hym-fs-small); color: var(--hym-text-secondary); line-height: 1.8; }
+.ds-crash__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--hym-space-2); margin-block-start: var(--hym-space-2); }
+.ds-crash__actions .ds-btn { gap: var(--hym-space-1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-update, .ds-update__card, .ds-update__glow, .ds-update__logo, .ds-update__step { animation: none; }
+  .ds-update__ring { animation-duration: 3s; }
+  .ds-update__ring-arc { animation: none; }
+  li[data-s="active"] > .ds-update__dot { animation: none; border-block-start-color: var(--hym-role-brand-solid); }
+}

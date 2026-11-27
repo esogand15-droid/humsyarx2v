@@ -6,7 +6,8 @@ import { usePresence } from '../lib/motion';
 import { applySwUpdate, subscribeSwUpdate } from '../lib/swUpdate';
 
 /**
- * بنر غیرمسدودکنندهٔ اطلاع‌رسانی نسخهٔ جدید PWA با توکن‌های DS v2 و خروج انیمیشنی.
+ * بنر غیرمسدودکنندهٔ اطلاعرسانی نسخهٔ جدید PWA با توکنهای DS v2 و خروج انیمیشنی.
+ * زدن «بهروزرسانی» بلافاصله صفحهٔ بهروزرسانی (UpdateOverlay) را باز میکند.
  */
 export function SwUpdateBanner() {
   const [ready, setReady] = useState(false);
@@ -33,15 +34,24 @@ export function SwUpdateBanner() {
       aria-live="polite"
     >
       <DsCard level="float" className="ds-sw-banner">
-        <span className="ds-sw-banner__text">نسخهٔ جدید هامزیار آماده است</span>
+        <span className="ds-sw-banner__icon" aria-hidden="true">
+          <Icon name="i-zap" size={18} />
+        </span>
+        <span className="ds-sw-banner__body">
+          <span className="ds-sw-banner__text">نسخهٔ جدید هامزیار آماده است</span>
+          <span className="ds-sw-banner__sub">چند ثانیه طول می‌کشد و اطلاعات شما حفظ می‌شود.</span>
+        </span>
         <div className="ds-sw-banner__actions">
-          <DsButton onClick={() => applySwUpdate()}>به‌روزرسانی</DsButton>
+          <DsButton onClick={() => applySwUpdate()}>
+            <Icon name="i-refresh" size={16} />
+            به‌روزرسانی
+          </DsButton>
           <DsButton
             variant="ghost"
             className="ds-btn--icon"
             onClick={() => setDismissed(true)}
             aria-label="بستن اعلان به‌روزرسانی"
-            title="بستن"
+            title="بعداً"
           >
             <Icon name="i-x" size={18} />
           </DsButton>

@@ -35,9 +35,57 @@
             } catch (e) {}
           })();
         </script>
+    <style>
+      /* Boot splash: painted before any JS/CSS chunk loads; createRoot() replaces it on first render. */
+      .boot { position: fixed; inset: 0; display: grid; place-items: center; background: #F8FAFC; color: #334155;
+        font: 600 14px/1.6 system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; }
+      html.dark .boot { background: #0B0F19; color: #CBD5E1; }
+      .boot__glow { position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(40rem 28rem at 50% 42%, rgba(37, 99, 235, 0.16), transparent 70%); }
+      .boot__col { position: relative; display: flex; flex-direction: column; align-items: center; gap: 18px;
+        opacity: 0; animation: boot-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) 120ms forwards; }
+      .boot__mark { position: relative; width: 120px; height: 120px; display: grid; place-items: center; }
+      .boot__mark img { width: 64px; height: 64px; border-radius: 16px; animation: boot-pulse 2.4s ease-in-out infinite; }
+      .boot__ring { position: absolute; inset: 0; animation: boot-spin 1.4s linear infinite; }
+      .boot__ring circle { fill: none; }
+      .boot__track { stroke: rgba(148, 163, 184, 0.26); stroke-width: 3; }
+      .boot__arc { stroke: #2563EB; stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 90 327;
+        animation: boot-dash 1.4s ease-in-out infinite; }
+      .boot__word { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; color: #0F172A; }
+      html.dark .boot__word { color: #F8FAFC; }
+      .boot__word b { color: #2563EB; font-weight: inherit; }
+      @keyframes boot-in { to { opacity: 1; } }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @keyframes boot-pulse { 50% { transform: scale(0.94); } }
+      @keyframes boot-dash {
+        0% { stroke-dasharray: 20 327; stroke-dashoffset: 0; }
+        50% { stroke-dasharray: 150 327; stroke-dashoffset: -40; }
+        100% { stroke-dasharray: 20 327; stroke-dashoffset: -307; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot__col { animation: none; opacity: 1; }
+        .boot__mark img, .boot__arc { animation: none; }
+        .boot__ring { animation-duration: 3s; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" role="status" aria-live="polite" aria-label="در حال بارگذاری هامزیار">
+        <div class="boot__glow" aria-hidden="true"></div>
+        <div class="boot__col">
+          <div class="boot__mark" aria-hidden="true">
+            <svg class="boot__ring" viewBox="0 0 120 120">
+              <circle class="boot__track" cx="60" cy="60" r="52" />
+              <circle class="boot__arc" cx="60" cy="60" r="52" />
+            </svg>
+            <img src="%BASE_URL%brand-app-icon.webp" alt="" width="64" height="64" decoding="async" fetchpriority="high" />
+          </div>
+          <div class="boot__word">هامز<b>یار</b></div>
+          <div>در حال آماده‌سازی…</div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -488,7 +488,7 @@
 }
 .embedded-ai-typing-label {
   font-size: 11px;
-  color: var(--hym-info);
+  color: var(--hym-info-default);
   margin-inline-start: 6px;
 }
 .embedded-ai-sender-tag {

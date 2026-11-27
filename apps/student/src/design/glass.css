@@ -87,7 +87,7 @@
   border: 1px solid var(--lg-lens-rim);
   box-shadow:
     inset 0 1px 0 var(--lg-spec),
-    0 2px 10px color-mix(in srgb, var(--hym-ink) 8%, transparent);
+    0 2px 10px color-mix(in srgb, var(--hym-slate-950) 8%, transparent);
   pointer-events: none;
   z-index: 0;
   transition: none;
@@ -128,7 +128,7 @@
 .app-tabbar .ds-tabbar__item.active,
 .app-tabbar .ds-tabbar__item[aria-current="page"] {
   background: transparent;
-  color: var(--hym-ink);
+  color: var(--hym-text-primary);
 }
 
 .app-tabbar[data-lens-ready="true"] .ds-tabbar__item[aria-current="page"] .ds-tabbar__icon {
@@ -155,7 +155,7 @@
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.01em;
-  color: var(--hym-ink);
+  color: var(--hym-text-primary);
 }
 
 .iconbtn {
@@ -196,7 +196,7 @@ html .app-shell--nav .desktop-header {
   font-weight: 750;
   line-height: 1.3;
   letter-spacing: -0.015em;
-  color: var(--hym-ink);
+  color: var(--hym-text-primary);
 }
 
 .desktop-header__search {
@@ -255,7 +255,7 @@ html .app-shell--nav .desktop-header {
   background: var(--lg-lens);
   border: 1px solid var(--lg-lens-rim);
   box-shadow: inset 0 1px 0 var(--lg-spec);
-  color: var(--hym-ink);
+  color: var(--hym-text-primary);
 }
 
 .sidebar__rail-label {
@@ -583,7 +583,7 @@ html .app-shell--nav .desktop-header {
   border: 1px solid var(--lg-lens-rim);
   box-shadow:
     inset 0 1px 0 var(--lg-spec),
-    0 2px 10px color-mix(in srgb, var(--hym-ink) 8%, transparent);
+    0 2px 10px color-mix(in srgb, var(--hym-slate-950) 8%, transparent);
   pointer-events: none;
   z-index: 0;
   transition: none;
@@ -618,7 +618,7 @@ html .app-shell--nav .desktop-header {
   background: transparent;
   border: 1px solid transparent;
   box-shadow: none;
-  color: var(--hym-ink);
+  color: var(--hym-text-primary);
 }
 
 .ds-seg:not([data-seg-ready="true"]) .ds-seg__item[aria-selected="true"] {
@@ -680,7 +680,7 @@ html .app-shell--nav .desktop-header {
   .notif-pop,
   .aic-attach__menu,
   .exam-dialog {
-    background: var(--hym-surface-raised);
+    background: var(--hym-bg-surface-raised);
   }
 }
 
@@ -707,8 +707,8 @@ html .app-shell--nav .desktop-header {
   .exam-dialog {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    background: var(--hym-surface-raised);
-    border-color: var(--hym-line-strong);
+    background: var(--hym-bg-surface-raised);
+    border-color: var(--hym-hairline-strong);
   }
 
   .ds-card:not(.ds-card--sunken):not(.ds-card--accent),
