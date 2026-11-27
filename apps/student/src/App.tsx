@@ -76,6 +76,23 @@ function ScrollToTop() {
   return null;
 }
 
+/** One soft entrance per route change. Opacity only: a transform on the main
+    landmark would re-anchor its position:fixed children for the duration. */
+function RouteEntrance() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const main = document.getElementById('main-content');
+    if (!main || typeof main.animate !== 'function') return;
+    const anim = main.animate([{ opacity: 0.001 }, { opacity: 1 }], {
+      duration: 200,
+      easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+    });
+    return () => anim.cancel();
+  }, [pathname]);
+  return null;
+}
+
 /** ورودی روت: کاربر ناشناس صفحهٔ معرفی را می‌بیند، کاربر فعال مستقیم به خانه می‌رود. */
 function RootEntry() {
   const { status } = useSession();
@@ -167,6 +184,7 @@ export function App() {
   return (
     <Layout>
       <ScrollToTop />
+      <RouteEntrance />
       {/* T3: session expired mid-use, non-blocking banner (screen stays) */}
       <SessionExpiredBanner />
       <SwUpdateBanner />
