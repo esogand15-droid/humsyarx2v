@@ -552,16 +552,18 @@ class MilestoneM1NavIslandAdversarialTests(unittest.TestCase):
         self.assertIn("return prev;", self.header_context_tsx)
 
     def test_adv_desktop_header_subcomponents_and_accessibility(self):
-        """Verify DesktopHeader renders required accessibility roles, brand emblem,
-        theme switcher, and notification indicator.
+        """Verify DesktopHeader renders required accessibility roles, deduplicated brand,
+        search trigger, and NotificationBell component.
         """
+        notif_bell_tsx = (COMPONENTS_DIR / "NotificationBell.tsx").read_text(encoding="utf-8")
         self.assertIn('className="desktop-header"', self.desktop_header_tsx)
         self.assertIn('aria-label="سربرگ دسکتاپ"', self.desktop_header_tsx)
-        self.assertIn('<Brand size="sm" />', self.desktop_header_tsx)
+        self.assertNotIn('<Brand', self.desktop_header_tsx)
         self.assertIn('className="desktop-header__search"', self.desktop_header_tsx)
         self.assertIn('aria-label="جستجو در محتوا و منابع"', self.desktop_header_tsx)
         self.assertIn('className="desktop-header__search-label"', self.desktop_header_tsx)
-        self.assertIn('badge-dot badge-dot--cyan', self.desktop_header_tsx)
+        self.assertIn('<NotificationBell', self.desktop_header_tsx)
+        self.assertIn('notif-bell__badge', notif_bell_tsx)
 
 
 if __name__ == "__main__":

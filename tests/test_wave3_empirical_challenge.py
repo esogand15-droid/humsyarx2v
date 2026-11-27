@@ -189,7 +189,9 @@ class TestWave3FrontendEmpiricalChallenge(unittest.TestCase):
         ui = self.ui_css_path.read_text(encoding="utf-8")
         tablet_block_idx = ui.find("@media (min-width: 768px) and (max-width: 1023px)")
         self.assertGreater(tablet_block_idx, 0)
-        mobile_block_idx = ui.find("@media (max-width: 767px)")
+        mobile_block_idx = ui.find("@media (max-width: 767px)", tablet_block_idx)
+        if mobile_block_idx < 0:
+            mobile_block_idx = len(ui)
         tablet_block = ui[tablet_block_idx:mobile_block_idx]
 
         # In 72px rail with padding: 12px 6px, available width is 60px.

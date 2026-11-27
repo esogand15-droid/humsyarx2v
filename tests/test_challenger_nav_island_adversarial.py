@@ -359,7 +359,7 @@ class TestNavIslandCSSAndDesignInvariants(ChallengerNavIslandBase):
         self.assertIn("-webkit-backdrop-filter: var(--glass-blur);", self.ui_css)
 
     def test_dark_mode_obsidian_navy_and_neon_glow(self):
-        """Verify dark mode Obsidian Navy background (rgba(15,23,42,0.78)) and neon cyan glow."""
+        """Verify dark mode Obsidian Navy background and subtle elevation without header cyan glow."""
         dark_section_match = re.search(
             r'html\[data-theme="dark"\]\s+\.desktop-header,\s*html\.dark\s+\.desktop-header\s*\{([^}]+)\}',
             self.ui_css,
@@ -367,9 +367,8 @@ class TestNavIslandCSSAndDesignInvariants(ChallengerNavIslandBase):
         self.assertIsNotNone(dark_section_match, "Dark mode .desktop-header block not found")
         content = dark_section_match.group(1)
         self.assertIn("rgba(15, 23, 42, 0.78)", content)
-        self.assertIn("rgba(56, 189, 248, 0.22)", content)
-        self.assertIn("rgba(37, 99, 235, 0.35)", content)
-        self.assertIn("rgba(0, 242, 254, 0.25)", content)
+        self.assertIn("rgba(148, 163, 184, 0.16)", content)
+        self.assertIn("rgba(0, 0, 0, 0.35)", content)
 
     def test_light_mode_medical_white_and_soft_aura(self):
         """Verify light mode Medical White background (rgba(255,255,255,0.86)) and soft shadow."""

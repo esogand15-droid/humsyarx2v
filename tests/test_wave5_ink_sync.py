@@ -602,6 +602,89 @@ class TestWebInkSyncEndpoints(unittest.TestCase):
         page_doc = self.mock_pages._data.get("88881234:res:doc_del:1")
         self.assertEqual(len(page_doc["strokes"]), 0)
 
+    def test_clear_page_clears_sticky_notes_too(self):
+        """clear_page must remove both strokes and sticky notes on that page."""
+        self.client.post(
+            "/api/web/ink/sync",
+            json={
+                "client_id": "device-1",
+                "mutations": [
+                    {
+                        "mutation_id": "m-note-1",
+                        "scope": "res",
+                        "file_id": "doc_clear_notes",
+                        "page": 3,
+                        "action": "upsert_note",
+                        "note": {"note_id": "n1", "x": 0.4, "y": 0.5, "text": "نکته بالینی"},
+                    },
+                    {
+                        "mutation_id": "m-stroke-1",
+                        "scope": "res",
+                        "file_id": "doc_clear_notes",
+                        "page": 3,
+                        "action": "upsert_stroke",
+                        "stroke": {"stroke_id": "s1", "points": [{"x": 0.2, "y": 0.2}]},
+                    },
+                ],
+            },
+        )
+        before = self.mock_pages._data.get("88881234:res:doc_clear_notes:3")
+        self.assertEqual(len(before["notes"]), 1)
+        self.assertEqual(len(before["strokes"]), 1)
+
+        self.client.post(
+            "/api/web/ink/sync",
+            json={
+                "client_id": "device-1",
+                "mutations": [
+                    {
+                        "mutation_id": "m-clear-1",
+                        "scope": "res",
+                        "file_id": "doc_clear_notes",
+                        "page": 3,
+                        "action": "clear_page",
+                    }
+                ],
+            },
+        )
+        after = self.mock_pages._data.get("88881234:res:doc_clear_notes:3")
+        self.assertEqual(after["strokes"], [])
+        self.assertEqual(after["notes"], [])
+
+    def test_mutation_id_isolated_across_different_users(self):
+        """User B reusing User A's mutation_id must not skip applying User B's mutation."""
+        shared_batch = {
+            "client_id": "client-1",
+            "mutations": [
+                {
+                    "mutation_id": "same-mut-id-1",
+                    "scope": "res",
+                    "file_id": "doc_shared_mut",
+                    "page": 1,
+                    "action": "upsert_stroke",
+                    "stroke": {"stroke_id": "s-user", "points": [{"x": 0.3, "y": 0.3}]},
+                    "timestamp": 1000,
+                }
+            ],
+        }
+        r_a = self.client.post("/api/web/ink/sync", json=shared_batch)
+        self.assertEqual(r_a.status_code, 200)
+        self.assertIn("88881234:res:doc_shared_mut:1", self.mock_pages._data)
+
+        other_user = {
+            "user_id": 99995678,
+            "name": "Other Student",
+            "approved": True,
+            "suspended": False,
+        }
+        app.dependency_overrides[current_student] = lambda: other_user
+        try:
+            r_b = self.client.post("/api/web/ink/sync", json=shared_batch)
+            self.assertEqual(r_b.status_code, 200)
+            self.assertIn("99995678:res:doc_shared_mut:1", self.mock_pages._data)
+        finally:
+            app.dependency_overrides[current_student] = lambda: self.mock_user
+
     def test_sync_batch_size_cap_50(self):
         """Batch size > 50 must be rejected with HTTP 422."""
         excess_mutations = [

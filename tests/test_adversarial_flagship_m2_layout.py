@@ -278,7 +278,9 @@ class DesktopMultiPanelWorkspaceTests(unittest.TestCase):
         """Verify ReaderScreen mounts EmbeddedAiStudyPanel in secondary panel."""
         self.assertIn("<EmbeddedAiStudyPanel", self.reader_screen)
         self.assertIn("fileId={id}", self.reader_screen)
-        self.assertIn("page={latest.current.page}", self.reader_screen)
+        # The panel follows the page the student is on (state), not a ref that never re-renders.
+        self.assertIn("page={activePage}", self.reader_screen)
+        self.assertNotIn("page={latest.current.page}", self.reader_screen)
 
     def test_top_flow_ai_assistant_sheet_contracts(self):
         """Verify top-flow AI assistant modal sheet architecture and smooth drop-down styling."""

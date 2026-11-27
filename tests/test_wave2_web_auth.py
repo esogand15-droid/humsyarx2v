@@ -549,6 +549,88 @@ class TestWebAuthChallengeAndSessionFlow(unittest.TestCase):
         # Verify OTP record was deleted
         self.assertEqual(len(otp_coll.docs), 0)
 
+    def test_fallback_verify_blocks_after_max_attempts(self):
+        """Exceeding OTP_MAX_ATTEMPTS returns HTTP 429 and refuses verification even with right code."""
+        otp_coll = self.fake_db.client["medicalbot"]["web_user_otps"]
+        salt = secrets.token_hex(8)
+        code = "839102"
+        code_hash = hashlib.sha256((salt + ":" + code).encode("utf-8")).hexdigest()
+        otp_coll.docs.append({
+            "uid": 100200300,
+            "code_salt": salt,
+            "code_hash": code_hash,
+            "attempts": web_auth.core.OTP_MAX_ATTEMPTS,
+            "expires_at": datetime.now(timezone.utc) + timedelta(minutes=5),
+        })
+
+        blocked = self.client.post("/api/web-auth/fallback/verify", json={
+            "user_code": "HY-7K9M-2P4X",
+            "fallback_otp": code,
+        })
+        self.assertEqual(blocked.status_code, 429)
+
+    def test_device_id_rotates_existing_session_without_duplicates(self):
+        """Re-authenticating from the same device_id rotates the old session instead of creating duplicates."""
+        cid_1 = self.client.post("/api/web-auth/challenge/create", json={
+            "user_code": "HY-7K9M-2P4X",
+            "client_info": {"device_name": "Safari Mobile", "device_id": "dev-uuid-123", "device_type": "mobile"},
+        }).json()["challenge_id"]
+        chal_coll = self.fake_db.client["medicalbot"]["web_login_challenges"]
+        for c in chal_coll.docs:
+            if c["_id"] == cid_1:
+                c["status"] = "approved"
+        r1 = self.client.get(f"/api/web-auth/challenge/{cid_1}")
+        self.assertEqual(r1.status_code, 200)
+
+        cid_2 = self.client.post("/api/web-auth/challenge/create", json={
+            "user_code": "HY-7K9M-2P4X",
+            "client_info": {"device_name": "Safari Mobile", "device_id": "dev-uuid-123", "device_type": "mobile"},
+        }).json()["challenge_id"]
+        for c in chal_coll.docs:
+            if c["_id"] == cid_2:
+                c["status"] = "approved"
+        r2 = self.client.get(f"/api/web-auth/challenge/{cid_2}")
+        self.assertEqual(r2.status_code, 200)
+
+        sess_coll = self.fake_db.client["medicalbot"]["web_user_sessions"]
+        active = [s for s in sess_coll.docs if not s.get("revoked")]
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0].get("device_type"), "mobile")
+
+    def test_revoke_legacy_session_by_id_prefix(self):
+        """Legacy sessions lacking session_id can be revoked via their id_<20-char-hash> alias."""
+        token1 = secrets.token_hex(32)
+        legacy_token = secrets.token_hex(32)
+        legacy_hash = hashlib.sha256(legacy_token.encode("utf-8")).hexdigest()
+        sess_coll = self.fake_db.client["medicalbot"]["web_user_sessions"]
+        now = datetime.now(timezone.utc)
+        sess_coll.docs.append({
+            "_id": hashlib.sha256(token1.encode("utf-8")).hexdigest(),
+            "session_id": "sess_active",
+            "uid": 100200300,
+            "device_name": "Desktop",
+            "created_at": now,
+            "last_active": now,
+            "expires_at": now + timedelta(days=30),
+            "revoked": False,
+        })
+        sess_coll.docs.append({
+            "_id": legacy_hash,
+            "uid": 100200300,
+            "device_name": "Legacy Device",
+            "created_at": now - timedelta(days=1),
+            "last_active": now - timedelta(hours=2),
+            "expires_at": now + timedelta(days=20),
+            "revoked": False,
+        })
+
+        self.client.cookies.set("hu_session", token1)
+        legacy_alias = f"id_{legacy_hash[:20]}"
+        del_resp = self.client.delete(f"/api/web-auth/sessions/{legacy_alias}")
+        self.assertEqual(del_resp.status_code, 200)
+        legacy_doc = [s for s in sess_coll.docs if s["_id"] == legacy_hash][0]
+        self.assertTrue(legacy_doc["revoked"])
+
     def test_session_listing_and_remote_revocation(self):
         """Listing active sessions and remotely revoking another device session."""
         # Create 2 sessions for the user

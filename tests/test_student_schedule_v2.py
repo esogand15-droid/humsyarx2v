@@ -163,6 +163,45 @@ class ScheduleRouterTests(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_c2_gender_title_fallback_in_schedules_and_offerings(self):
+        """C2: get_schedules و get_term_course_offerings عنوانِ جنسیت‌دار را بدون educational_group صریح فیلتر می‌کنند."""
+        from backend.database.core import DBCore
+
+        class _FakeSchedDB(_FakeDB, DBCore):
+            def __init__(self, settings=None):
+                _FakeDB.__init__(self, settings)
+
+        async def _run():
+            fake = _FakeSchedDB({"current_academic_term": "1404-2"})
+            rows = [
+                {"_id": "1", "type": "class", "lesson": "آناتومی عملی دختران", "date": "2026-11-26", "time": "08:00", "term": "1404-2", "educational_group": "mixed"},
+                {"_id": "2", "type": "class", "lesson": "آناتومی عملی پسران", "date": "2026-11-26", "time": "10:00", "term": "1404-2", "educational_group": "mixed"},
+                {"_id": "3", "type": "class", "lesson": "فیزیولوژی عمومی", "date": "2026-11-26", "time": "12:00", "term": "1404-2", "educational_group": "mixed"},
+            ]
+            fake.schedules.find.return_value.sort.return_value.to_list = AsyncMock(return_value=list(rows))
+            male_items = await fake.get_schedules(stype="class", upcoming=False, educational_group="male")
+            self.assertEqual([x["_id"] for x in male_items], ["2", "3"])
+
+            female_items = await fake.get_schedules(stype="class", upcoming=False, educational_group="female")
+            self.assertEqual([x["_id"] for x in female_items], ["1", "3"])
+
+            fake.course_offerings = MagicMock()
+            fake.course_offerings.find.return_value.to_list = AsyncMock(return_value=[
+                {"_id": "o1", "term": "1404-2", "lesson": "بافت‌شناسی بانوان", "group": "1", "educational_group": "mixed"},
+                {"_id": "o2", "term": "1404-2", "lesson": "بافت‌شناسی آقایان", "group": "1", "educational_group": "mixed"},
+                {"_id": "o3", "term": "1404-2", "lesson": "بیوشیمی", "group": "1", "educational_group": "mixed"},
+            ])
+            fake.schedule_templates = MagicMock()
+            fake.schedule_templates.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            fake.schedules.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            offerings_female = await fake.get_term_course_offerings(term="1404-2", educational_group="female")
+            offering_titles = [o.get("lesson") for o in offerings_female]
+            self.assertIn("بافت‌شناسی بانوان", offering_titles)
+            self.assertIn("بیوشیمی", offering_titles)
+            self.assertNotIn("بافت‌شناسی آقایان", offering_titles)
+
+        asyncio.run(_run())
+
 
 ESBUILD = ROOT / "apps" / "student" / "node_modules" / "esbuild" / "lib" / "main.js"
 FA_TS = ROOT / "apps" / "student" / "src" / "lib" / "fa.ts"

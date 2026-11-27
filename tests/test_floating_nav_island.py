@@ -46,6 +46,7 @@ class FloatingIslandBaseTest(unittest.TestCase):
         cls.shell_css = (DESIGN_DIR / "shell.css").read_text(encoding="utf-8")
         cls.tokens_css = (DESIGN_DIR / "tokens.css").read_text(encoding="utf-8")
         cls.desktop_header_tsx = (LAYOUT_DIR / "DesktopHeader.tsx").read_text(encoding="utf-8")
+        cls.notif_bell_tsx = (COMPONENTS_DIR / "NotificationBell.tsx").read_text(encoding="utf-8")
         cls.appbar_tsx = (COMPONENTS_DIR / "AppBar.tsx").read_text(encoding="utf-8")
         cls.shell_tsx = (LAYOUT_DIR / "Shell.tsx").read_text(encoding="utf-8")
         
@@ -294,9 +295,10 @@ class Tier2BoundaryCornerCaseTests(FloatingIslandBaseTest):
         self.assertIn("{sub && <div className=\"appbar__sub\">{sub}</div>}", self.appbar_tsx)
 
     def test_bva_dedup_03_duplicate_search_and_notification_filtering(self):
-        """BVA-DEDUP-03: Verify DesktopHeader provides dedicated search and notification buttons."""
+        """BVA-DEDUP-03: Verify DesktopHeader provides dedicated search and NotificationBell widget."""
         self.assertIn("onClick={() => navigate('/search')}", self.desktop_header_tsx)
-        self.assertIn("onClick={() => navigate('/notifications')}", self.desktop_header_tsx)
+        self.assertIn("<NotificationBell", self.desktop_header_tsx)
+        self.assertIn("navigate('/notifications')", self.notif_bell_tsx)
 
     def test_bva_dedup_04_subroute_prefix_resolution(self):
         """BVA-DEDUP-04: Verify library subroutes dynamically resolve appropriate header titles."""
@@ -366,9 +368,10 @@ class Tier3CrossFeatureInteractionTests(FloatingIslandBaseTest):
         self.assertIn('<main className="stage-content" data-section={section}>', self.shell_tsx)
 
     def test_inter_03_floating_nav_and_notification_badge_dot(self):
-        """INTER-03: Pairwise: Notification bell renders cyan aura dot without badge overflow."""
-        self.assertIn("className=\"badge-dot badge-dot--cyan\"", self.desktop_header_tsx)
-        self.assertIn("onClick={() => navigate('/notifications')}", self.desktop_header_tsx)
+        """INTER-03: Pairwise: DesktopHeader mounts NotificationBell with badge pill and inbox navigation."""
+        self.assertIn("<NotificationBell", self.desktop_header_tsx)
+        self.assertIn("notif-bell__badge", self.notif_bell_tsx)
+        self.assertIn("navigate('/notifications')", self.notif_bell_tsx)
 
     def test_inter_04_back_navigation_and_header_context_sync(self):
         """INTER-04: Pairwise: AppBar back button triggers navigation or custom onBack handler."""
@@ -431,9 +434,10 @@ class Tier4RealWorldScenarioTests(FloatingIslandBaseTest):
         """SCENARIO-04: Student checks urgent clinical broadcast notification from header bell."""
         notif_screen = (SCREENS_DIR / "NotificationsScreen.tsx").read_text(encoding="utf-8")
         self.assertIn("مرکز اعلان‌ها", notif_screen)
-        # DesktopHeader has notification bell with cyan badge
-        self.assertIn("aria-label=\"اعلان‌ها\"", self.desktop_header_tsx)
-        self.assertIn("badge-dot--cyan", self.desktop_header_tsx)
+        # DesktopHeader mounts NotificationBell which exposes unread pill badge and inbox navigation
+        self.assertIn("<NotificationBell", self.desktop_header_tsx)
+        self.assertIn("aria-haspopup=\"dialog\"", self.notif_bell_tsx)
+        self.assertIn("notif-bell__badge", self.notif_bell_tsx)
 
     def test_scenario_05_multi_device_responsive_adaptation_flow(self):
         """SCENARIO-05: Student resizes from 390px mobile to 820px iPad portrait to 1440px desktop."""

@@ -3,7 +3,7 @@
  * Verifies:
  * 1. Normalized coordinate validator isValidPoint (NaN, Infinity, bounds).
  * 2. Euclidean projection eraser collision math (zero-length, parallel, fast sweeps).
- * 3. Software palm rejection engine (25px dimension threshold, multi-touch >= 2, 750ms decay).
+ * 3. Software palm rejection engine (70px dimension threshold, multi-touch >= 2, 750ms decay).
  * 4. 50-step undo/redo stack bounded memory capacity.
  * 5. Highlighter multiply blend mode contract.
  */
@@ -188,13 +188,16 @@ palm.isStylusActive = false;
 assert.strictEqual(palm.isPalmRejected(2, 'touch', 15, 15, 1800), false);
 palm.onTouchUp(2); // Finger lifts
 
-// Contact dimensions: 25px boundary accepted, 26px rejected
-assert.strictEqual(palm.isPalmRejected(3, 'touch', 25, 25, 2500), false);
+// Contact dimensions: a 70px fingertip is accepted, 71px is treated as a palm
+assert.strictEqual(palm.isPalmRejected(3, 'touch', 70, 70, 2500), false);
 palm.onTouchUp(3);
-assert.strictEqual(palm.isPalmRejected(4, 'touch', 26, 20, 2500), true);
+assert.strictEqual(palm.isPalmRejected(4, 'touch', 71, 20, 2500), true);
 palm.onTouchUp(4);
-assert.strictEqual(palm.isPalmRejected(5, 'touch', 15, 30, 2500), true);
+assert.strictEqual(palm.isPalmRejected(5, 'touch', 15, 90, 2500), true);
 palm.onTouchUp(5);
+// An ordinary 40px fingertip must draw (the old 25px bound rejected it)
+assert.strictEqual(palm.isPalmRejected(6, 'touch', 40, 40, 2500), false);
+palm.onTouchUp(6);
 
 // Multi-touch passthrough
 palm.touchPointers.clear();
