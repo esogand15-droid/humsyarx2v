@@ -231,7 +231,9 @@ function ClinicalAnalyticsGrid({
               <div className="core-stack">
                 <span className="home-stat-card__sub">پاسخ‌های درست</span>
                 <span className="home-stat-card__label">
-                  {faNum(correctAnswers)} از {faNum(totalAnswers)}
+                  {totalAnswers > 0
+                    ? `${faNum(correctAnswers)} از ${faNum(totalAnswers)}`
+                    : 'هنوز آزمونی ثبت نشده'}
                 </span>
               </div>
             </div>
@@ -251,7 +253,9 @@ function ClinicalAnalyticsGrid({
               <span className="home-stat-card__num">{faNum(totalAnswers)}</span>
               <span className="home-stat-card__unit">سؤال</span>
             </div>
-            <div className="home-stat-card__sub">ارزیابی هوشمند در بانک سؤال</div>
+            <div className="home-stat-card__sub">
+              {totalAnswers > 0 ? 'ارزیابی هوشمند در بانک سؤال' : 'برای شروع وارد آزمون شوید'}
+            </div>
           </DsCard>
         </div>
 
@@ -267,8 +271,9 @@ function ClinicalAnalyticsGrid({
             <div className="home-weekly" aria-label="نمودار فعالیت ۷ روز اخیر">
               {PERSIAN_WEEK_DAYS.map((d, idx) => {
                 const count = weeklyCounts[idx]?.count ?? 0;
-                const pct =
-                  maxActivity > 0 ? Math.max(14, Math.round((count / maxActivity) * 100)) : 14;
+                const pct = count > 0
+                  ? Math.max(18, Math.round((count / maxActivity) * 100))
+                  : 8;
                 return (
                   <div key={d.key} className="home-weekly__col" title={`${d.full}: ${faNum(count)} فعالیت`}>
                     <div className="home-weekly__track">
@@ -367,7 +372,10 @@ function AcademicIdentityCard({
           <span className="home-sub-strip__meta">
             {isSubActive
               ? `${faNum(daysLeft)} روز مانده${expireJalali ? ` · تا ${expireJalali}` : ''}`
-              : 'نیاز به تمدید اشتراک'}
+              : 'اشتراک غیرفعال'}
+            {(!isSubActive || daysLeft <= 3) && (
+              <DsBadge tone={isSubActive ? 'warning' : 'danger'}>تمدید</DsBadge>
+            )}
           </span>
         </Link>
       </div>
@@ -636,16 +644,28 @@ export function HomeScreen() {
 
   const loadData = useCallback(async () => {
     // cached data stays on screen while it refreshes; skeleton only on a cold cache
-    if (!peek('home')) setLoading(true);
+    const hasCached = Boolean(peek('home'));
+    if (!hasCached) setLoading(true);
     setError('');
     try {
-      const [dashRes, recentRes, subRes, tasksRes, weeklyRes] = await Promise.all([
-        dashboard.overview().catch(() => null),
-        reader.recent().catch(() => ({ items: [] })),
-        dashboard.subscriptionStatus().catch(() => null),
-        studyTasks.list().catch(() => ({ tasks: [] })),
-        dashboard.weekly().catch(() => ({ weekly: [] })),
+      const results = await Promise.allSettled([
+        dashboard.overview(),
+        reader.recent(),
+        dashboard.subscriptionStatus(),
+        studyTasks.list(),
+        dashboard.weekly(),
       ]);
+
+      if (results.every((r) => r.status === 'rejected')) {
+        const firstErr = (results[0] as PromiseRejectedResult).reason;
+        throw firstErr;
+      }
+
+      const dashRes = results[0].status === 'fulfilled' ? results[0].value : null;
+      const recentRes = results[1].status === 'fulfilled' ? results[1].value : { items: [] };
+      const subRes = results[2].status === 'fulfilled' ? results[2].value : null;
+      const tasksRes = results[3].status === 'fulfilled' ? results[3].value : { tasks: [] };
+      const weeklyRes = results[4].status === 'fulfilled' ? results[4].value : { weekly: [] };
 
       const next = put<HomeBundle>('home', {
         data: dashRes,
@@ -660,7 +680,9 @@ export function HomeScreen() {
       setTasks(next.tasks);
       setWeekly(next.weekly);
     } catch (err) {
-      setError(errorText(err, 'بارگذاری داشبورد انجام نشد.'));
+      if (!hasCached) {
+        setError(errorText(err, 'اتصال به سرور برقرار نشد؛ لطفاً اینترنت را بررسی کنید.'));
+      }
     } finally {
       setLoading(false);
     }

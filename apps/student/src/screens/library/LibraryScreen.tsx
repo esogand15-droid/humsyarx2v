@@ -107,7 +107,7 @@ export function LibraryScreen() {
                     : readerPath(r.scope, r.id);
 
                 return (
-                  <div key={`${r.scope}:${r.id}`}>
+                  <div key={`${r.scope}:${r.id}`} className="lib-recent-entry">
                     <ListRow
                       icon={
                         r.kind === 'audio'
@@ -121,7 +121,11 @@ export function LibraryScreen() {
                       to={href}
                       chevron
                     />
-                    {r.total > 0 && !isMedia && <ProgressBar value={r.percent} thin />}
+                    {r.total > 0 && !isMedia && (
+                      <div className="lib-recent-progress">
+                        <ProgressBar value={r.percent} thin />
+                      </div>
+                    )}
                   </div>
                 );
               })}

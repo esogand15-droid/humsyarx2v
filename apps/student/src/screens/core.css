@@ -315,6 +315,12 @@
   }
 }
 
+@media (min-width: 768px) and (max-width: 1023px) {
+  .home-analytics-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 .home-stat-card {
   height: 100%;
   display: flex;
@@ -483,7 +489,8 @@
   max-width: 18px;
   height: 50px;
   border-radius: var(--hym-radius-sm);
-  background: var(--hym-surface-sunken);
+  background: transparent;
+  border: 1px dashed var(--hym-hairline-strong);
   overflow: hidden;
 }
 
@@ -495,7 +502,7 @@
 }
 
 .home-weekly__bar {
-  fill: var(--hym-hairline-strong);
+  fill: var(--hym-hairline);
   stroke: none;
 }
 
@@ -622,6 +629,10 @@
   .home-modules-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .home-modules-grid > :last-child:nth-child(3n + 1) {
+    grid-column: 1 / -1;
+  }
 }
 
 .home-mod-link {
@@ -636,7 +647,6 @@
   flex-direction: column;
   justify-content: space-between;
   gap: var(--hym-space-2);
-  border-block-start: 3px solid var(--hym-accent);
 }
 
 @media (min-width: 560px) {
@@ -720,6 +730,11 @@
   padding: var(--hym-space-3) var(--hym-space-4);
   text-decoration: none;
   color: inherit;
+}
+
+.lib-recent-progress {
+  padding-inline: var(--hym-space-4);
+  padding-block: 0 var(--hym-space-3);
 }
 
 .lib-recent-row:hover {

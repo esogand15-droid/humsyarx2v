@@ -27,6 +27,7 @@ const MockExamHistory = lazy(() => import('./screens/exam/ExamSetup').then((m) =
 const MockRun = lazy(() => import('./screens/exam/MockRun').then((m) => ({ default: m.MockRun })));
 const ExamResult = lazy(() => import('./screens/exam/ExamResult').then((m) => ({ default: m.ExamResult })));
 const SearchScreen = lazy(() => import('./screens/SearchScreen').then((m) => ({ default: m.SearchScreen })));
+const WelcomeScreen = lazy(() => import('./screens/WelcomeScreen').then((m) => ({ default: m.WelcomeScreen })));
 const ScheduleScreen = lazy(() => import('./screens/ScheduleScreen').then((m) => ({ default: m.ScheduleScreen })));
 const AiChatScreen = lazy(() => import('./screens/ai/AiChatScreen').then((m) => ({ default: m.AiChatScreen })));
 const GradesScreen = lazy(() => import('./screens/GradesScreen').then((m) => ({ default: m.GradesScreen })));
@@ -75,6 +76,26 @@ function ScrollToTop() {
   return null;
 }
 
+/** ورودی روت: کاربر ناشناس صفحهٔ معرفی را می‌بیند، کاربر فعال مستقیم به خانه می‌رود. */
+function RootEntry() {
+  const { status } = useSession();
+  if (status === 'loading') return <SplashScreen />;
+  if (status === 'pending_approval') return <PendingScreen />;
+  if (status === 'suspended') return <BlockedScreen />;
+  if (status !== 'active') return <WelcomeScreen />;
+  return <HomeScreen />;
+}
+
+/** ورودی ورود: اگر کاربر از پیش وارد شده بود به داشبورد هدایت می‌شود. */
+function LoginEntry() {
+  const { status } = useSession();
+  if (status === 'loading') return <SplashScreen />;
+  if (status === 'pending_approval') return <PendingScreen />;
+  if (status === 'suspended') return <BlockedScreen />;
+  if (status === 'active') return <Navigate to="/" replace />;
+  return <LoginScreen />;
+}
+
 /** گارد — تنها جایی که «وضعیت حساب» به مسیر تبدیل میشود.
     سه وضعیت مستقل (نشست، تأیید، اشتراک) اینجا از هم جدا میمانند:
     این گارد فقط دو تای اول را میبیند؛ اشتراک در خود صفحهها تصمیم میگیرد. */
@@ -94,18 +115,20 @@ function LegacyTicketsRedirect() {
   return <Navigate to={t ? `/tickets/${encodeURIComponent(t)}` : '/tickets'} replace />;
 }
 
-/** صفحههای بدون گارد و بدون نوار ناوبری. */
-const PUBLIC_PATHS = import.meta.env.DEV ? ['/system', '/states', '/install'] : ['/install'];
+/** صفحه‌های بدون گارد و بدون نوار ناوبری. */
+const PUBLIC_PATHS = import.meta.env.DEV ? ['/system', '/states', '/install', '/welcome'] : ['/install', '/welcome'];
 
 /** پوسته بر اساس وضعیت واقعی نشست: تببار فقط وقتی معنا دارد که
-    کاربر وارد و تأییدشده باشد و در صفحههای مرجع نباشد. */
+    کاربر وارد و تأییدشده باشد و در صفحه‌های مرجع یا حالت تمام‌صفحه نباشد. */
 function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const { status } = useSession();
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
-  // ریدر فضای بیشتری میخواهد؛ تببار پایین در آن پنهان میشود
-  const immersive = pathname.startsWith('/read/');
-  const variant = immersive ? 'reader' : status === 'active' && !isPublic ? 'default' : 'bare';
+  // ریدر و اجرای آزمون زمان‌دار فضای بیشتری می‌خواهند؛ تب‌بار پایین پنهان می‌شود
+  const isReader = pathname.startsWith('/read/');
+  const isExamRun = pathname.startsWith('/exam/run/');
+  const immersive = isReader || isExamRun;
+  const variant = isReader ? 'reader' : status === 'active' && !isPublic ? 'default' : 'bare';
   return (
     <Shell tabs={status === 'active' && !isPublic && !immersive} variant={variant} section={sectionFor(pathname)}>
       {children}
@@ -143,14 +166,8 @@ export function App() {
       <SwUpdateBanner />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-        <Route
-          path="/login"
-          element={
-            <Gate>
-              <HomeScreen />
-            </Gate>
-          }
-        />
+        <Route path="/welcome" element={<WelcomeScreen />} />
+        <Route path="/login" element={<LoginEntry />} />
         {SystemScreen && (
           <Route path="/system" element={<Suspense fallback={null}><SystemScreen /></Suspense>} />
         )}
@@ -158,14 +175,7 @@ export function App() {
           <Route path="/states" element={<Suspense fallback={null}><StatesScreen /></Suspense>} />
         )}
         <Route path="/install" element={<InstallGuideScreen />} />
-        <Route
-          path="/"
-          element={
-            <Gate>
-              <HomeScreen />
-            </Gate>
-          }
-        />
+        <Route path="/" element={<RootEntry />} />
         <Route
           path="/library"
           element={

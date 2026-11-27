@@ -122,6 +122,9 @@
 .ds-chip:focus-visible { outline: 2px solid var(--hym-accent); outline-offset: 2px; }
 .ds-chip:disabled { color: var(--hym-text-disabled); cursor: not-allowed; border-style: dashed; }
 .ds-chip svg { width: 15px; height: 15px; }
+@media (pointer: coarse), (max-width: 767px) {
+  .ds-chip { min-height: var(--hym-control-h-md); padding-inline: var(--hym-space-4); }
+}
 
 /* ── Segmented control (role="tablist") ─────────────────────────────── */
 .ds-seg {

@@ -157,7 +157,7 @@ function isAuthProbePath(path: string): boolean {
 export const apiCall = call;
 
 export const api = {
-  session: () => call<SessionPayload>('/auth/session'),
+  session: (init?: RequestInit) => call<SessionPayload>('/auth/session', init),
 
   config: () => call<AuthConfig>('/auth/config'),
 

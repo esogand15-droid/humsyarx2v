@@ -973,3 +973,47 @@ html.dark {
   --hym-radius-lg: 10px;
   --hym-radius-xl: 14px;
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+   6. iOS 27 LIQUID GLASS CHROME TOKENS
+   Shared across navigation bars, sidebars/rails, floating toolbars,
+   mini-player, sheets, segmented controls, and pre-auth/landing chrome.
+   ────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --lg-tint:        rgba(255, 255, 255, 0.70);
+  --lg-tint-strong: rgba(255, 255, 255, 0.86);
+  --lg-tint-card:   rgba(255, 255, 255, 0.82);
+  --lg-blur:        blur(22px) saturate(180%);
+  --lg-blur-subtle: blur(14px) saturate(150%);
+  --lg-edge:        rgba(15, 23, 42, 0.10);
+  --lg-edge-strong: rgba(15, 23, 42, 0.16);
+  --lg-spec:        rgba(255, 255, 255, 0.96);
+  --lg-rim-dark:    rgba(15, 23, 42, 0.06);
+  --lg-shadow:      0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 32px -12px rgba(15, 23, 42, 0.22);
+  --lg-lens:        rgba(37, 99, 235, 0.10);
+  --lg-lens-rim:    rgba(255, 255, 255, 0.92);
+  --lg-btn:         rgba(255, 255, 255, 0.58);
+  --lg-btn-hover:   rgba(15, 23, 42, 0.06);
+  --lg-radius-bar:  30px;
+  --lg-spring:      cubic-bezier(.34, 1.32, .64, 1);
+}
+
+html[data-theme="dark"],
+html.dark {
+  --lg-tint:        rgba(22, 30, 48, 0.62);
+  --lg-tint-strong: rgba(15, 21, 35, 0.82);
+  --lg-tint-card:   rgba(19, 27, 45, 0.74);
+  --lg-blur:        blur(24px) saturate(165%);
+  --lg-blur-subtle: blur(16px) saturate(150%);
+  --lg-edge:        rgba(255, 255, 255, 0.12);
+  --lg-edge-strong: rgba(255, 255, 255, 0.20);
+  --lg-spec:        rgba(255, 255, 255, 0.18);
+  --lg-rim-dark:    rgba(0, 0, 0, 0.36);
+  --lg-shadow:      0 1px 1px rgba(0, 0, 0, 0.32), 0 14px 36px -14px rgba(0, 0, 0, 0.72);
+  --lg-lens:        rgba(255, 255, 255, 0.11);
+  --lg-lens-rim:    rgba(255, 255, 255, 0.18);
+  --lg-btn:         rgba(255, 255, 255, 0.07);
+  --lg-btn-hover:   rgba(255, 255, 255, 0.13);
+}
+

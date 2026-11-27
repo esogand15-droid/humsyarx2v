@@ -14,6 +14,7 @@ export interface ListRowProps {
   danger?: boolean;
   /** مسیر مقصد. اگر داده شود، ردیف خودش یک لینک است. */
   to?: string;
+  state?: unknown;
   onClick?: () => void;
 }
 
@@ -27,6 +28,7 @@ export function ListRow({
   chevron = false,
   danger = false,
   to,
+  state,
   onClick,
 }: ListRowProps) {
   const inner = (
@@ -56,7 +58,7 @@ export function ListRow({
 
   if (to) {
     return (
-      <Link className={cls} to={to}>
+      <Link className={cls} to={to} state={state}>
         {inner}
       </Link>
     );

@@ -3691,16 +3691,16 @@ html[data-theme="light"] .desktop-header {
 }
 .embedded-ai-typing-label {
   font-size: 11px;
-  color: #38bdf8;
-  margin-right: 6px;
+  color: var(--hym-info);
+  margin-inline-start: 6px;
 }
 .embedded-ai-chip--reset {
-  background: rgba(56, 189, 248, 0.1) !important;
-  border-color: rgba(56, 189, 248, 0.3) !important;
-  color: #38bdf8 !important;
+  background: color-mix(in srgb, var(--hym-info) 12%, transparent);
+  border-color: color-mix(in srgb, var(--hym-info) 32%, transparent);
+  color: var(--hym-info);
 }
 .embedded-ai-chip--reset:hover {
-  background: rgba(56, 189, 248, 0.2) !important;
+  background: color-mix(in srgb, var(--hym-info) 22%, transparent);
 }
 .embedded-ai-sender-tag {
   display: flex;
@@ -4243,9 +4243,9 @@ html[data-theme="light"] .desktop-header {
 }
 
 .pwa-step-visual--cyan {
-  color: #22D3EE !important;
-  border-color: rgba(34, 211, 238, 0.3) !important;
-  background: rgba(34, 211, 238, 0.1) !important;
+  color: var(--hym-info);
+  border-color: color-mix(in srgb, var(--hym-info) 30%, transparent);
+  background: color-mix(in srgb, var(--hym-info) 10%, transparent);
 }
 
 .pwa-direct-install-box {

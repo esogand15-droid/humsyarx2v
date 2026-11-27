@@ -109,7 +109,7 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
     if (navigator.share) {
       navigator
         .share({
-          title: 'هامزیار — دستیار دانشجوی پزشکی',
+          title: 'هامزیار: دستیار دانشجوی پزشکی',
           text: 'نسخهٔ وب تخصصی آموزش و یادگیری پزشکی هامزیار',
           url,
         })
@@ -163,7 +163,7 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
           </div>
           <h1 className="auth-title">نصب نسخهٔ وب هامزیار روی دستگاه</h1>
           <p className="auth-subtitle">
-            بدون نیاز به اپ‌استور یا فروشگاه برنامه، هامزیار را با سرعت بالا و آیکون مستقل روی گوشی یا کامپیوتر خود نصب کنید.
+            بدون نیاز به فروشگاه برنامه، هامزیار را با آیکون مستقل روی گوشی، آیپد یا کامپیوتر خود نصب کنید.
           </p>
         </div>
 
@@ -186,7 +186,7 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
               <div className="pwa-step-row">
                 <div className="pwa-step-num">۱</div>
                 <div className="pwa-step-desc">
-                  در نوار پایین مرورگر Safari روی دکمهٔ <strong>Share</strong> (اشتراک‌گذاری) بزنید
+                  در مرورگر Safari (نوار پایین در آیفون یا نوار بالا کنار نشانی در آیپد) روی دکمهٔ <strong>Share</strong> (اشتراک‌گذاری) بزنید
                 </div>
                 <div className="pwa-step-visual" title="دکمه Share">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -330,7 +330,7 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
               <div className="pwa-tip-box">
                 <Icon name="i-info" size={18} />
                 <span>
-                  در ویندوز و مک، نسخهٔ وب با پنجرهٔ مجزا و بدون شلوغی تب‌های مرورگر، سبک و سریع اجرا می‌شود.
+                  در ویندوز و مک، نسخهٔ وب با پنجرهٔ مجزا و بدون نوارهای اضافی مرورگر اجرا می‌شود.
                 </span>
               </div>
             </div>

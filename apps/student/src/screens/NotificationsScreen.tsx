@@ -94,6 +94,7 @@ export function NotificationsScreen() {
       <AppBar
         title="مرکز اعلان‌ها"
         sub="پیام‌ها و اطلاعیه‌های سامانه"
+        back
         actions={
           unreadCount > 0 ? (
             <DsButton

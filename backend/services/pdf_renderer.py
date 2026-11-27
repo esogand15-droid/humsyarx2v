@@ -5,13 +5,15 @@ Features:
 - PyMuPDF 2.0+ high-fidelity page rasterization at 150 DPI.
 - Pillow WebP converter (quality=80, method=4 for medical clarity).
 - Low-res (72 DPI) thumbnail generation (< 30 KB).
-- Dynamic diagonal pixel watermarking with RTL Persian text shaping.
-- Session-based transparent watermark overlay cache with SIMD alpha compositing (< 10ms).
+- Forensic micro watermark: one faint identity line burned into a fixed margin spot.
+- Per-session glyph mask cache, so stamping a page stays well under 50ms.
 - Singleflight coalescing lock for CPU-bounded render concurrency.
 """
 from __future__ import annotations
 
 import asyncio
+from collections import OrderedDict
+import hashlib
 import io
 import logging
 import os
@@ -19,7 +21,7 @@ import time
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
 
 import pymupdf  # PyMuPDF 2.0+
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageStat
 import arabic_reshaper
 from bidi.algorithm import get_display
 
@@ -167,9 +169,63 @@ class PdfRenderer:
 
 
 class WatermarkStamper:
-    """Pre-rendered session watermark overlay generator and SIMD alpha compositor."""
+    """Forensic micro watermark: one small, low-contrast identity line per page.
 
-    _CACHE: Dict[Tuple[int, str, int, int, int], Image.Image] = {}
+    The old diagonal grid covered every page with the student's name and made the
+    booklet hard to read. Now there is one line in a fixed spot. It is unreadable at
+    normal reading size and readable when you zoom into that spot:
+
+        bottom margin, left corner (LTR end side of an RTL page), inset ~3% from the
+        left edge and ~1.2% from the bottom edge.
+
+    The line is burned into the page pixels (not a DOM overlay), so screenshots and
+    saved images keep it. It carries the student's name, user id, client IP, the
+    issue time and a short check code tied to the file and page:
+
+        HY-<CODE> | <name> | <user id> | <ip> | <YYYY-MM-DD HH:MM>
+
+    <CODE> is the first 8 hex chars of sha256(uid|file|page|time|secret), so a leaked
+    page can be checked against the server secret and cannot be forged by editing text.
+    """
+
+    _CACHE: "OrderedDict[Tuple[Any, ...], Image.Image]" = OrderedDict()
+
+    # Fixed placement, as fractions of the page (documented above, keep in sync)
+    INSET_X = 0.03
+    INSET_Y = 0.012
+    # Font size as a fraction of page height, with a floor so the glyphs survive encoding
+    FONT_FRACTION = 0.0055
+    FONT_MIN_PX = 9
+    # Grey-level distance from the local paper tone: invisible at reading size, legible zoomed
+    INK_DELTA = 44
+
+    @staticmethod
+    def _secret() -> str:
+        return (
+            os.getenv("READER_SIGNING_SECRET")
+            or os.getenv("SESSION_SECRET")
+            or "humsyar-reader-secret-salt"
+        )
+
+    @classmethod
+    def mark_text(
+        cls,
+        user_name: str,
+        user_id: int,
+        client_ip: str,
+        timestamp: Optional[str] = None,
+        file_id: str = "",
+        page_number: int = 0,
+    ) -> str:
+        date_str = timestamp or time.strftime("%Y-%m-%d %H:%M", time.localtime())
+        raw = f"{user_id}|{file_id}|{page_number}|{date_str}|{cls._secret()}"
+        code = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:8].upper()
+        name = " ".join((user_name or "").replace("|", "-").split())[:72] or "Student"
+        return f"HY-{code} | {name} | {user_id} | {client_ip} | {date_str}"
+
+    @classmethod
+    def _font_px(cls, height: int) -> int:
+        return max(cls.FONT_MIN_PX, int(round(height * cls.FONT_FRACTION)))
 
     @classmethod
     def _get_overlay(
@@ -180,44 +236,48 @@ class WatermarkStamper:
         width: int,
         height: int,
         timestamp: Optional[str] = None,
+        file_id: str = "",
+        page_number: int = 0,
     ) -> Image.Image:
-        # Cache key rounded to hour to allow periodic timestamp updates
+        """Return the glyph mask ('L' image, 255 = ink) for one identity line."""
         hour_key = int(time.time() // 3600)
-        cache_key = (user_id, client_ip, width, height, hour_key)
+        cache_key = (user_id, client_ip, width, height, hour_key, file_id, page_number, user_name[:32])
         if timestamp is None and cache_key in cls._CACHE:
+            cls._CACHE.move_to_end(cache_key)
             return cls._CACHE[cache_key]
 
-        date_str = timestamp or time.strftime("%Y-%m-%d %H:%M", time.localtime())
-        raw_text = f"هامزیار | {user_name} ({user_id}) | {client_ip} | {date_str}"
-        reshaped = get_display(arabic_reshaper.reshape(raw_text))
-
+        text = cls.mark_text(user_name, user_id, client_ip, timestamp, file_id, page_number)
+        # Shape only the name: running bidi over the whole line reorders the LTR fields
+        # and printed the date as "03:30 27-11-2026".
+        head, _, tail = text.partition(" | ")
+        name, _, rest = tail.partition(" | ")
+        shaped = f"{head} | {get_display(arabic_reshaper.reshape(name))} | {rest}"
+        size = cls._font_px(height)
         try:
-            font = ImageFont.truetype(VAZIR_FONT_PATH, 20)
+            font = ImageFont.truetype(VAZIR_FONT_PATH, size)
         except Exception:
             font = ImageFont.load_default()
 
-        diag = int((width**2 + height**2)**0.5) + 200
-        overlay = Image.new("RGBA", (diag, diag), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(overlay)
+        probe = ImageDraw.Draw(Image.new("L", (1, 1)))
+        left, top, right, bottom = probe.textbbox((0, 0), shaped, font=font)
+        pad = 2
+        mask = Image.new("L", (max(1, right - left + pad * 2), max(1, bottom - top + pad * 2)), 0)
+        ImageDraw.Draw(mask).text((pad - left, pad - top), shaped, font=font, fill=255)
 
-        # Draw repeating diagonal grid at 45 degrees, opacity ~14% (alpha=36 / 255)
-        for y in range(0, diag, 180):
-            for x in range(0, diag, 550):
-                draw.text((x, y), reshaped, font=font, fill=(60, 60, 60, 36))
-
-        # Rotate 45 degrees and crop to target page dimensions
-        rotated = overlay.rotate(45, resample=Image.Resampling.NEAREST)
-        cx = (rotated.width - width) // 2
-        cy = (rotated.height - height) // 2
-        cropped = rotated.crop((cx, cy, cx + width, cy + height))
-
-        # Keep cache bounded to 200 active overlays
-        if len(cls._CACHE) > 200:
-            cls._CACHE.clear()
-
+        # Keep cache bounded to 200 active masks via LRU eviction (never wipe hot entries)
         if timestamp is None:
-            cls._CACHE[cache_key] = cropped
-        return cropped
+            while len(cls._CACHE) >= 200:
+                cls._CACHE.popitem(last=False)
+            cls._CACHE[cache_key] = mask
+        return mask
+
+    @classmethod
+    def mark_box(cls, width: int, height: int, mask_size: Tuple[int, int]) -> Tuple[int, int, int, int]:
+        """Pixel box (x0, y0, x1, y1) of the mark on a page of the given size."""
+        mw, mh = mask_size
+        x0 = int(round(width * cls.INSET_X))
+        y0 = max(0, height - int(round(height * cls.INSET_Y)) - mh)
+        return x0, y0, min(width, x0 + mw), min(height, y0 + mh)
 
     @classmethod
     def stamp_watermark(
@@ -227,21 +287,27 @@ class WatermarkStamper:
         user_id: int,
         client_ip: str,
         timestamp: Optional[str] = None,
+        file_id: str = "",
+        page_number: int = 0,
     ) -> bytes:
-        """Composite pre-rendered diagonal watermark on base page. Execution < 10ms."""
-        base_img = Image.open(io.BytesIO(base_webp_bytes)).convert("RGBA")
-        overlay = cls._get_overlay(
-            user_name,
-            user_id,
-            client_ip,
-            base_img.width,
-            base_img.height,
-            timestamp=timestamp,
+        """Burn the identity line into the page at its fixed spot and re-encode."""
+        base_img = Image.open(io.BytesIO(base_webp_bytes)).convert("RGB")
+        width, height = base_img.size
+        mask = cls._get_overlay(
+            user_name, user_id, client_ip, width, height,
+            timestamp=timestamp, file_id=file_id, page_number=page_number,
         )
-
-        composited = Image.alpha_composite(base_img, overlay)
-        rgb_img = composited.convert("RGB")
+        x0, y0, x1, y1 = cls.mark_box(width, height, mask.size)
+        if x1 > x0 and y1 > y0:
+            region = base_img.crop((x0, y0, x1, y1))
+            paper = int(ImageStat.Stat(region.convert("L")).mean[0])
+            tone = paper - cls.INK_DELTA if paper >= 128 else paper + cls.INK_DELTA
+            tone = max(0, min(255, tone))
+            ink = Image.new("RGB", region.size, (tone, tone, tone))
+            region.paste(ink, (0, 0), mask.crop((0, 0, x1 - x0, y1 - y0)))
+            base_img.paste(region, (x0, y0))
 
         bio = io.BytesIO()
-        rgb_img.save(bio, format="WEBP", quality=80, method=0)  # method=0 for fastest response delivery
+        # q90 keeps the faint glyph edges intact; method=0 stays fast
+        base_img.save(bio, format="WEBP", quality=90, method=0)
         return bio.getvalue()

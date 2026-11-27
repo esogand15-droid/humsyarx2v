@@ -43,7 +43,7 @@ export function SessionExpiredBanner() {
   return (
     <>
       <div className="session-banner" role="alert" aria-live="assertive">
-        <span className="session-banner__text">نشست شما منقضی شده — دوباره وارد شوید</span>
+        <span className="session-banner__text">نشست شما منقضی شده است؛ دوباره وارد شوید.</span>
         <div className="session-banner__actions">
           <button type="button" className="btn btn--sm session-banner__cta" onClick={() => setLoginOpen(true)}>
             ورود دوباره

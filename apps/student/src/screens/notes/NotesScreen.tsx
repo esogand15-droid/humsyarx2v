@@ -29,15 +29,18 @@ export function NotesScreen() {
   const navigate = useNavigate();
   const [items, setItems] = useState<NoteItem[]>(() => peek<NoteItem[]>('notes') ?? []);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>(() => (peek('notes') ? 'ready' : 'loading'));
+  const [loadErr, setLoadErr] = useState<unknown>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   const load = useCallback(async () => {
     if (!peek('notes')) setState('loading');
+    setLoadErr(null);
     try {
       const res = await ink.notes();
       setItems(put('notes', res.items ?? []));
       setState('ready');
-    } catch {
+    } catch (err) {
+      setLoadErr(err);
       setState('error');
     }
   }, []);
@@ -62,10 +65,10 @@ export function NotesScreen() {
 
   return (
     <>
-      <AppBar title="دفتر من" sub="هر چیزی که روی آن نوشته‌ای" back onBack={() => navigate(-1)} />
-      <div className="page page-enter acct-page">
-        {state === 'loading' && <LoadingBlock rows={3} />}
-        {state === 'error' && <ErrorBlock error={null} onRetry={() => void load()} />}
+      <AppBar title="دفتر من" sub="هر چیزی که روی آن نوشته‌ای" back />
+      <div className="page page-enter">
+        {state === 'loading' && <LoadingBlock rows={4} />}
+        {state === 'error' && <ErrorBlock error={loadErr} onRetry={() => void load()} />}
 
         {state === 'ready' && items.length === 0 && (
           <DsCard>
@@ -114,7 +117,7 @@ export function NotesScreen() {
                       <span className="ds-row__sub">
                         {n.available
                           ? `${faNum(n.pages)} صفحه · ${faNum(n.strokes)} خط · آخرین صفحه ${faNum(n.last_page)}`
-                          : 'این فایل دیگر در دسترس نیست — یادداشت‌ها محفوظ‌اند'}
+                          : 'این فایل دیگر در دسترس نیست، اما یادداشت‌ها محفوظ‌اند'}
                       </span>
                     </span>
                     {n.available ? (

@@ -6,8 +6,10 @@ import {
   type InkTool,
   type Point,
   type Scope,
+  type StickyNote,
   type Stroke,
 } from '../../lib/ink';
+import { getCachedInkPage, setCachedInkPage } from './readerPageCache';
 
 export interface InkApi {
   undo: () => void;
@@ -42,10 +44,13 @@ interface Props {
   shapeSnap?: boolean;
   stylusOnly?: boolean;
   onPinchZoom?: (factor: number) => void;
+  onNotesLoaded?: (page: number, notes: StickyNote[]) => void;
+  isGesturing?: boolean;
 }
 
 const SAVE_DELAY = 900;
 const MAX_HISTORY = 50;
+const MAX_INK_CANVAS_PIXELS = 5_242_880;
 const STYLUS_DECAY_MS = 750;
 // Fingertip contact on iPad/Android is commonly 30-50px, so the old 25px bound rejected
 // every finger stroke ("can't write with my finger"). A resting palm reports well above 70.
@@ -226,14 +231,19 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
     shapeSnap = false,
     stylusOnly = false,
     onPinchZoom,
+    onNotesLoaded,
+    isGesturing = false,
   },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const highlighterCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scratchRef = useRef<HTMLCanvasElement | null>(null);
-  const cbs = useRef({ onCount, onHistory, onStatus, onChanged });
-  cbs.current = { onCount, onHistory, onStatus, onChanged };
+  const cbs = useRef({ onCount, onHistory, onStatus, onChanged, onNotesLoaded });
+  cbs.current = { onCount, onHistory, onStatus, onChanged, onNotesLoaded };
+  const notesRef = useRef<StickyNote[]>([]);
+  const gesturingRef = useRef(isGesturing);
+  gesturingRef.current = isGesturing;
 
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const strokesRef = useRef<Stroke[]>([]);
@@ -279,25 +289,47 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
     [],
   );
 
-  // ── بارگذاری خطوط صفحه ───────────────────────────────────────
+  // ── بارگذاری خطوط صفحه (با کش RAM برای بازگشت فوری هنگام اسکرول) ──
   useEffect(() => {
     let cancelled = false;
-    setReady(false);
     past.current = [];
     future.current = [];
+
+    const cached = getCachedInkPage(scope, id, page);
+    if (cached) {
+      const list = cached.strokes.map(normalizeStroke);
+      strokesRef.current = list;
+      notesRef.current = cached.notes;
+      setStrokes(list);
+      cbs.current.onCount(list.length);
+      cbs.current.onHistory({ undo: 0, redo: 0 });
+      if (cached.notes.length > 0) cbs.current.onNotesLoaded?.(page, cached.notes);
+      setReady(true);
+      cbs.current.onStatus('idle');
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setReady(false);
     (async () => {
       let list: Stroke[] = [];
+      let loadedNotes: StickyNote[] = [];
       try {
         const res = await ink.page(scope, id, page);
         list = (res.strokes ?? []).map(normalizeStroke);
+        loadedNotes = res.notes ?? [];
       } catch {
         list = [];
       }
       if (cancelled) return;
+      notesRef.current = loadedNotes;
+      setCachedInkPage(scope, id, page, { strokes: list, notes: loadedNotes });
       strokesRef.current = list;
       setStrokes(list);
       cbs.current.onCount(list.length);
       cbs.current.onHistory({ undo: 0, redo: 0 });
+      if (loadedNotes.length > 0) cbs.current.onNotesLoaded?.(page, loadedNotes);
       setReady(true);
       cbs.current.onStatus('idle');
     })();
@@ -310,6 +342,10 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
   const flushSave = useCallback(async () => {
     if (!dirty.current) return;
     dirty.current = false;
+    setCachedInkPage(scope, id, page, {
+      strokes: strokesRef.current,
+      notes: notesRef.current,
+    });
     cbs.current.onStatus('saving');
     const res = await ink.save(scope, id, page, strokesRef.current);
     cbs.current.onStatus(res.ok ? 'saved' : 'pending');
@@ -326,8 +362,14 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
   useEffect(() => {
     return () => {
       window.clearTimeout(saveTimer.current);
+      window.clearTimeout(dwellTimer.current);
+      window.clearTimeout(stylusDecayTimer.current);
       if (dirty.current) {
         dirty.current = false;
+        setCachedInkPage(scope, id, page, {
+          strokes: strokesRef.current,
+          notes: notesRef.current,
+        });
         void ink.save(scope, id, page, strokesRef.current);
       }
     };
@@ -441,13 +483,22 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
   );
 
   const paint = useCallback(() => {
+    if (gesturingRef.current) return;
     const canvas = canvasRef.current;
     const hlCanvas = highlighterCanvasRef.current;
     if (!canvas || !width || !height) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(
+      window.devicePixelRatio || 1,
+      2,
+      Math.sqrt(MAX_INK_CANVAS_PIXELS / Math.max(1, width * height)),
+    );
+    const pxW = Math.max(1, Math.floor(width * dpr));
+    const pxH = Math.max(1, Math.floor(height * dpr));
 
-    canvas.width = Math.floor(width * dpr);
-    canvas.height = Math.floor(height * dpr);
+    if (canvas.width !== pxW || canvas.height !== pxH) {
+      canvas.width = pxW;
+      canvas.height = pxH;
+    }
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     const ctx = canvas.getContext('2d');
@@ -455,10 +506,15 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
+    const hasHighlighter =
+      drawing.current?.tool === 'highlighter' ||
+      strokesRef.current.some((s) => s.tool === 'highlighter');
     let hlCtx: CanvasRenderingContext2D | null = null;
-    if (hlCanvas) {
-      hlCanvas.width = Math.floor(width * dpr);
-      hlCanvas.height = Math.floor(height * dpr);
+    if (hlCanvas && hasHighlighter) {
+      if (hlCanvas.width !== pxW || hlCanvas.height !== pxH) {
+        hlCanvas.width = pxW;
+        hlCanvas.height = pxH;
+      }
       hlCanvas.style.width = `${width}px`;
       hlCanvas.style.height = `${height}px`;
       hlCtx = hlCanvas.getContext('2d');
@@ -466,18 +522,28 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
         hlCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         hlCtx.clearRect(0, 0, width, height);
       }
+    } else if (hlCanvas && hlCanvas.width > 0) {
+      const clearHl = hlCanvas.getContext('2d');
+      clearHl?.setTransform(1, 0, 0, 1, 0, 0);
+      clearHl?.clearRect(0, 0, hlCanvas.width, hlCanvas.height);
     }
 
     const scratch = scratchRef.current;
-    if (scratch) {
-      scratch.width = Math.floor(width * dpr);
-      scratch.height = Math.floor(height * dpr);
+    if (scratch && tool === 'eraser') {
+      if (scratch.width !== pxW || scratch.height !== pxH) {
+        scratch.width = pxW;
+        scratch.height = pxH;
+      }
       scratch.style.width = `${width}px`;
       scratch.style.height = `${height}px`;
       const sCtx = scratch.getContext('2d');
       if (sCtx) {
         sCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
+    } else if (scratch && scratch.width > 0) {
+      const sCtx = scratch.getContext('2d');
+      sCtx?.setTransform(1, 0, 0, 1, 0, 0);
+      sCtx?.clearRect(0, 0, scratch.width, scratch.height);
     }
 
     for (const s of strokesRef.current) {
@@ -526,11 +592,11 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
       ctx.strokeRect(bx, by, bw, bh);
       ctx.restore();
     }
-  }, [width, height, drawStrokeOnCtx]);
+  }, [width, height, tool, drawStrokeOnCtx]);
 
   useEffect(() => {
-    paint();
-  }, [paint, strokes, ready, width, height]);
+    if (!isGesturing) paint();
+  }, [paint, strokes, ready, width, height, isGesturing]);
 
   // ── Eraser Collision: فاصلهٔ نقطه تا پاره‌خط وکتور ──────────
   const hitStroke = useCallback(
@@ -640,20 +706,26 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
       if (e.pointerType === 'touch') {
         touchPointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-        // لمس چندانگشتی (>= 2): رهاسازی ترسیم و محاسبه پیوسته زوم دومعرفی (Touch Pinch-to-Zoom)
+        // لمس چندانگشتی (>= 2): رهاسازی ترسیم و واگذاری ژست به ریدر
         if (touchPointers.current.size >= 2) {
           if (drawing.current) {
             drawing.current = null;
             paint();
           }
-          // محاسبه پیوسته زوم دومعرفی (Direct Touchscreen Pinch-to-Zoom)
-          if (touchPointers.current.size === 2) {
+          try {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            }
+          } catch {
+            // ignore
+          }
+          if (onPinchZoom && touchPointers.current.size === 2) {
             const pts = Array.from(touchPointers.current.values());
             const curDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
             if (lastPinchDist.current !== null && lastPinchDist.current > 5) {
               const factor = curDist / lastPinchDist.current;
               if (Math.abs(factor - 1.0) > 0.003) {
-                onPinchZoom?.(factor);
+                onPinchZoom(factor);
               }
             }
             lastPinchDist.current = curDist;

@@ -11,6 +11,14 @@ import { NotebookPanel } from './NotebookPanel';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { ThumbnailDrawer } from './ThumbnailDrawer';
 import { TextLayer } from './components/TextLayer';
+import {
+  acquirePageUrl,
+  getCachedInkPage,
+  getCachedPageUrl,
+  invalidatePageCache,
+  prefetchPageUrl,
+  setCachedInkPage,
+} from './readerPageCache';
 
 import './components/TextLayer.css';
 import './reader.css';
@@ -65,9 +73,11 @@ export interface ProtectedReaderViewProps {
   id: string;
   url?: string;
   startPage?: number;
+  jumpRequest?: { page: number; seq: number } | null;
   onProgress: (page: number, total: number) => void;
   onExpired?: () => Promise<string | null>;
   onToggleSplitWorkspace?: () => void;
+  onInkChanged?: () => void;
   isAiOpen?: boolean;
 }
 
@@ -81,24 +91,16 @@ export async function fetchDocumentManifest(scope: Scope, id: string): Promise<D
 
 /**
  * نمایشگر پرچم‌دار جزوات و اسناد هامزیار (GoodNotes-Grade Protected Reader).
- *
- * قابلیت‌ها:
- * ۱) رندر سمت سرور صفحات WebP با واترمارک پویا و بدون نشت بایت‌های خام.
- * ۲) بدون محدودیت عرض مصنوعی (آنلاک تا ۱۴۰۰ پیکسل برای بوم عریض تبلت و دسکتاپ).
- * ۳) پالت غنی شامل قلم، مداد گرافیتی، هایلایترهای پاستلی/نئون و ابزار کمند (Lasso).
- * ۴) اسلایدر پیوسته ضخامت با دایره پیش‌نمایش پویا.
- * ۵) یادداشت‌های چسبان متصل به حاشیه با قابلیت سنجاق شدن و کشیدن.
- * ۶) حالت تمرکز و بدون حواس‌پرتی (Focus Fullscreen Mode) با کلید F.
- * ۷) کشوی پیش‌نمایش صفحات و نشان‌شده‌ها (Thumbnail & Bookmark Drawer) با کلید T.
- * ۸) وارون‌ساز هوشمند کنتراست شب (Obsidian Navy Night Contrast Inverter).
  */
 export function ProtectedReaderView({
   scope,
   id,
   startPage = 1,
+  jumpRequest = null,
   onProgress,
   onExpired,
   onToggleSplitWorkspace,
+  onInkChanged,
   isAiOpen = false,
 }: ProtectedReaderViewProps) {
   const [manifest, setManifest] = useState<DocumentManifest | null>(null);
@@ -106,7 +108,12 @@ export function ProtectedReaderView({
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(startPage || 1);
   const [zoom, setZoom] = useState(1.0); // ZOOM_MIN..ZOOM_MAX
+  const [gestureBadgeZoom, setGestureBadgeZoom] = useState<number | null>(null);
   const [baseWidth, setBaseWidth] = useState(720);
+  const [nearPages, setNearPages] = useState<Set<number>>(() => {
+    const p = Math.max(1, startPage || 1);
+    return new Set([Math.max(1, p - 1), p, p + 1, p + 2]);
+  });
 
   // لایه ابزارهای نوت‌برداری
   const [tool, setTool] = useState<ReaderTool>(null);
@@ -138,50 +145,159 @@ export function ProtectedReaderView({
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
   const inkApis = useRef<Map<number, InkApi>>(new Map());
   const progressRef = useRef(onProgress);
   progressRef.current = onProgress;
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const totalPagesRef = useRef(0);
+  totalPagesRef.current = manifest?.total_pages ?? 0;
 
-  // ── لنگرگاه هوشمند زوم (Zoom Anchor Preservation) ──
-  // جلوگیری از جهش صفحه به اول جزوه هنگام بزرگ‌نمایی
+  // ── لنگرگاه هوشمند زوم + ژست ۶۰ فریم بدون رندر مکرر (pdf.js pattern) ──
   const zoomAnchorRef = useRef<{ page: number; rx: number; ry: number; px: number; py: number } | null>(null);
   const isZoomingRef = useRef(false);
   const zoomResetTimerRef = useRef<number | null>(null);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
 
-  const captureZoomAnchor = useCallback((clientX?: number, clientY?: number) => {
-    const scroller = scrollRef.current;
-    if (!scroller) return;
-    const sr = scroller.getBoundingClientRect();
-    const px = (clientX ?? sr.left + sr.width / 2) - sr.left;
-    const py = (clientY ?? sr.top + sr.height / 2) - sr.top;
-    // anchor on the page under the pointer; in the gap between pages use the current one
-    const hit = Array.from(pageRefs.current.entries()).find(([, el]) => {
-      const r = el.getBoundingClientRect();
-      return r.top - sr.top <= py && r.bottom - sr.top >= py;
-    });
-    const page = hit ? hit[0] : currentPage;
-    const pageEl = pageRefs.current.get(page);
-    if (pageEl) {
-      const r = pageEl.getBoundingClientRect();
-      zoomAnchorRef.current = {
-        page,
-        rx: (px - (r.left - sr.left)) / Math.max(1, r.width),
-        ry: (py - (r.top - sr.top)) / Math.max(1, r.height),
-        px,
-        py,
-      };
+  const gestureRef = useRef<{
+    active: boolean;
+    baseZoom: number;
+    targetZoom: number;
+    originX: number;
+    originY: number;
+    rafId: number | null;
+    commitTimer: number | null;
+  }>({
+    active: false,
+    baseZoom: 1,
+    targetZoom: 1,
+    originX: 0,
+    originY: 0,
+    rafId: null,
+    commitTimer: null,
+  });
+
+  const captureZoomAnchor = useCallback(
+    (clientX?: number, clientY?: number) => {
+      const scroller = scrollRef.current;
+      if (!scroller) return;
+      const sr = scroller.getBoundingClientRect();
+      const px = (clientX ?? sr.left + sr.width / 2) - sr.left;
+      const py = (clientY ?? sr.top + sr.height / 2) - sr.top;
+      const hit = Array.from(pageRefs.current.entries()).find(([, el]) => {
+        const r = el.getBoundingClientRect();
+        return r.top - sr.top <= py && r.bottom - sr.top >= py;
+      });
+      const page = hit ? hit[0] : currentPage;
+      const pageEl = pageRefs.current.get(page);
+      if (pageEl) {
+        const r = pageEl.getBoundingClientRect();
+        zoomAnchorRef.current = {
+          page,
+          rx: (px - (r.left - sr.left)) / Math.max(1, r.width),
+          ry: (py - (r.top - sr.top)) / Math.max(1, r.height),
+          px,
+          py,
+        };
+      }
+      isZoomingRef.current = true;
+      if (zoomResetTimerRef.current) window.clearTimeout(zoomResetTimerRef.current);
+      zoomResetTimerRef.current = window.setTimeout(() => {
+        isZoomingRef.current = false;
+      }, 280);
+    },
+    [currentPage],
+  );
+
+  const applyGestureTransform = useCallback(
+    (nextTargetZoom: number, clientX?: number, clientY?: number) => {
+      const track = trackRef.current;
+      const scroller = scrollRef.current;
+      if (!track || !scroller) return;
+
+      const g = gestureRef.current;
+      const clamped = clampZoom(nextTargetZoom);
+
+      if (!g.active) {
+        const sr = scroller.getBoundingClientRect();
+        const cx = clientX ?? sr.left + sr.width / 2;
+        const cy = clientY ?? sr.top + sr.height / 2;
+        const tr = track.getBoundingClientRect();
+        g.active = true;
+        g.baseZoom = zoomRef.current;
+        g.originX = Math.max(0, Math.min(tr.width, cx - tr.left));
+        g.originY = Math.max(0, Math.min(tr.height, cy - tr.top));
+        track.classList.add('is-gesturing');
+        captureZoomAnchor(cx, cy);
+      }
+
+      g.targetZoom = clamped;
+      setGestureBadgeZoom(clamped);
+
+      if (g.rafId == null) {
+        g.rafId = window.requestAnimationFrame(() => {
+          g.rafId = null;
+          const t = trackRef.current;
+          if (!t || !gestureRef.current.active) return;
+          const rel = gestureRef.current.targetZoom / Math.max(0.1, gestureRef.current.baseZoom);
+          t.style.transformOrigin = `${gestureRef.current.originX}px ${gestureRef.current.originY}px`;
+          t.style.transform = `scale(${rel})`;
+        });
+      }
+    },
+    [captureZoomAnchor],
+  );
+
+  const commitGestureZoom = useCallback(() => {
+    const g = gestureRef.current;
+    if (g.commitTimer) {
+      window.clearTimeout(g.commitTimer);
+      g.commitTimer = null;
     }
-    isZoomingRef.current = true;
-    if (zoomResetTimerRef.current) window.clearTimeout(zoomResetTimerRef.current);
-    zoomResetTimerRef.current = window.setTimeout(() => {
-      isZoomingRef.current = false;
-    }, 350);
-  }, [currentPage]);
+    if (g.rafId != null) {
+      window.cancelAnimationFrame(g.rafId);
+      g.rafId = null;
+    }
+    if (!g.active) return;
+    g.active = false;
+    setGestureBadgeZoom(null);
 
-  // After the new sizes commit and before paint, scroll so the anchored point stays under the
-  // pointer on both axes. Deltas, not absolute scrollLeft, so RTL's negative scrollLeft is moot.
+    const next = clampZoom(g.targetZoom);
+    if (next !== zoomRef.current) {
+      setZoom(next);
+    } else {
+      const t = trackRef.current;
+      if (t) {
+        t.style.transform = '';
+        t.style.transformOrigin = '';
+        t.classList.remove('is-gesturing');
+      }
+      isZoomingRef.current = false;
+    }
+  }, []);
+
+  const scheduleCommitZoom = useCallback(
+    (delayMs = 150) => {
+      const g = gestureRef.current;
+      if (g.commitTimer) window.clearTimeout(g.commitTimer);
+      g.commitTimer = window.setTimeout(() => {
+        commitGestureZoom();
+      }, delayMs);
+    },
+    [commitGestureZoom],
+  );
+
+  // Clear CSS preview transform and apply exact scroll anchor in the same layout commit frame.
   useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (track) {
+      track.style.setProperty('--zoom-w', `${Math.floor(baseWidth * zoom)}px`);
+      track.style.transform = '';
+      track.style.transformOrigin = '';
+      track.classList.remove('is-gesturing');
+    }
+
     const a = zoomAnchorRef.current;
     zoomAnchorRef.current = null;
     const scroller = scrollRef.current;
@@ -191,109 +307,119 @@ export function ProtectedReaderView({
     const r = pageEl.getBoundingClientRect();
     scroller.scrollTop += r.top - sr.top + a.ry * r.height - a.py;
     scroller.scrollLeft += r.left - sr.left + a.rx * r.width - a.px;
-  }, [zoom]);
+  }, [zoom, baseWidth]);
 
-  // ── کنترل بزرگ‌نمایی چندلمسی طبیعی با دو انگشت (2-Finger Multi-Touch Pinch to Zoom) ──
+  useEffect(() => {
+    const g = gestureRef.current;
+    return () => {
+      if (g.rafId != null) window.cancelAnimationFrame(g.rafId);
+      if (g.commitTimer) window.clearTimeout(g.commitTimer);
+      if (zoomResetTimerRef.current) window.clearTimeout(zoomResetTimerRef.current);
+    };
+  }, []);
+
+  // ── کنترل بزرگ‌نمایی چندلمسی + ترک‌پد ویندوز + ژست Safari (بدون فریز رندر) ──
   const touchDistRef = useRef<number | null>(null);
   const touchStartZoomRef = useRef<number>(1.0);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const p1 = e.touches[0];
-      const p2 = e.touches[1];
-      touchDistRef.current = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
-      touchStartZoomRef.current = zoom;
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && touchDistRef.current !== null) {
-      const p1 = e.touches[0];
-      const p2 = e.touches[1];
-      const curDist = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
-      if (touchDistRef.current > 10) {
-        captureZoomAnchor((p1.clientX + p2.clientX) / 2, (p1.clientY + p2.clientY) / 2);
-        const factor = curDist / touchDistRef.current;
-        setZoom(clampZoom(touchStartZoomRef.current * factor));
-      }
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (e.touches.length < 2) {
-      touchDistRef.current = null;
-    }
-  };
-
-  // پشتیبانی از ترک‌پد Precision ویندوز و ماوس (Windows Touchpad Pinch-to-Zoom & Ctrl+Wheel)
   useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) {
-        e.preventDefault();
-        captureZoomAnchor(e.clientX, e.clientY);
-        // ضریب حساسیت نرم و بهینه برای تاچ‌پد ویندوز و موس با محدودسازی شیب
-        const delta = -e.deltaY * 0.006;
-        const clampedDelta = Math.max(-0.25, Math.min(0.25, delta));
-        setZoom((z) => clampZoom(z + clampedDelta));
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const current = gestureRef.current.active ? gestureRef.current.targetZoom : zoomRef.current;
+      const delta = -e.deltaY * 0.0055;
+      const clampedDelta = Math.max(-0.22, Math.min(0.22, delta));
+      applyGestureTransform(current + clampedDelta, e.clientX, e.clientY);
+      scheduleCommitZoom(140);
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const p1 = e.touches[0];
+        const p2 = e.touches[1];
+        touchDistRef.current = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
+        touchStartZoomRef.current = gestureRef.current.active
+          ? gestureRef.current.targetZoom
+          : zoomRef.current;
       }
     };
-    window.addEventListener('wheel', onWheel, { passive: false });
-    return () => window.removeEventListener('wheel', onWheel);
-  }, [captureZoomAnchor]);
 
-  // کنترل پیوسته بزرگ‌نمایی چندلمسی مستقیم روی بوم (2-Finger Multi-Touch Canvas Pinch)
-  const handlePinchZoom = useCallback((factor: number) => {
-    captureZoomAnchor();
-    setZoom((z) => clampZoom(z * factor));
-  }, [captureZoomAnchor]);
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && touchDistRef.current !== null && touchDistRef.current > 10) {
+        e.preventDefault();
+        const p1 = e.touches[0];
+        const p2 = e.touches[1];
+        const curDist = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
+        const factor = curDist / touchDistRef.current;
+        applyGestureTransform(
+          touchStartZoomRef.current * factor,
+          (p1.clientX + p2.clientX) / 2,
+          (p1.clientY + p2.clientY) / 2,
+        );
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2 && touchDistRef.current !== null) {
+        touchDistRef.current = null;
+        commitGestureZoom();
+      }
+    };
+
+    let safariStartZoom = 1.0;
+    const onGestureStart = (e: Event) => {
+      e.preventDefault();
+      safariStartZoom = gestureRef.current.active ? gestureRef.current.targetZoom : zoomRef.current;
+    };
+    const onGestureChange = (e: Event) => {
+      e.preventDefault();
+      const ge = e as Event & { scale?: number; clientX?: number; clientY?: number };
+      if (typeof ge.scale === 'number') {
+        applyGestureTransform(safariStartZoom * ge.scale, ge.clientX, ge.clientY);
+      }
+    };
+    const onGestureEnd = (e: Event) => {
+      e.preventDefault();
+      commitGestureZoom();
+    };
+
+    scroller.addEventListener('wheel', onWheel, { passive: false });
+    scroller.addEventListener('touchstart', onTouchStart, { passive: true });
+    scroller.addEventListener('touchmove', onTouchMove, { passive: false });
+    scroller.addEventListener('touchend', onTouchEnd, { passive: true });
+    scroller.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    scroller.addEventListener('gesturestart', onGestureStart, { passive: false });
+    scroller.addEventListener('gesturechange', onGestureChange, { passive: false });
+    scroller.addEventListener('gestureend', onGestureEnd, { passive: false });
+
+    return () => {
+      scroller.removeEventListener('wheel', onWheel);
+      scroller.removeEventListener('touchstart', onTouchStart);
+      scroller.removeEventListener('touchmove', onTouchMove);
+      scroller.removeEventListener('touchend', onTouchEnd);
+      scroller.removeEventListener('touchcancel', onTouchEnd);
+      scroller.removeEventListener('gesturestart', onGestureStart);
+      scroller.removeEventListener('gesturechange', onGestureChange);
+      scroller.removeEventListener('gestureend', onGestureEnd);
+    };
+  }, [manifest, applyGestureTransform, commitGestureZoom, scheduleCommitZoom]);
 
   // ── تازهسازی بیصدای آدرسهای امضاشده (T1) ──
-  // مانیفست جدید فقط آدرس صفحات را عوض میکند؛ صفحهٔ جاری، زوم و اسکرول
-  // دست نمیخورند و صفحاتی که قبلاً نمایش داده شدهاند دوباره دانلود نمیشوند.
   const refreshAtRef = useRef(0);
   const inflightRef = useRef<Promise<DocumentManifest | null> | null>(null);
-  const prefetchedUrlsRef = useRef<Set<string>>(new Set());
   const [prefetchTick, setPrefetchTick] = useState(0);
 
   const acceptManifest = useCallback((data: DocumentManifest) => {
     refreshAtRef.current = manifestRefreshAt(data);
-    prefetchedUrlsRef.current.clear();
     setManifest(data);
   }, []);
 
   const handlePageLoaded = useCallback(() => {
     setPrefetchTick((n) => n + 1);
   }, []);
-
-  useEffect(() => {
-    prefetchedUrlsRef.current.clear();
-  }, [scope, id]);
-
-  // پیش‌بارگذاری آرام صفحات همسایه (+1، +2، -1) با احترام به Save-Data
-  useEffect(() => {
-    if (!manifest || !manifest.page_dimensions?.length) return;
-    const conn =
-      typeof navigator !== 'undefined'
-        ? (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
-        : undefined;
-    if (conn?.saveData) return;
-
-    const timer = window.setTimeout(() => {
-      const targets = [currentPage + 1, currentPage + 2, currentPage - 1];
-      for (const p of targets) {
-        if (p < 1 || p > manifest.total_pages) continue;
-        const dim = manifest.page_dimensions.find((d) => d.page === p);
-        const pageUrl = dim?.url;
-        if (!pageUrl || prefetchedUrlsRef.current.has(pageUrl)) continue;
-        prefetchedUrlsRef.current.add(pageUrl);
-        const img = new Image();
-        img.decoding = 'async';
-        img.src = pageUrl;
-      }
-    }, 120);
-
-    return () => window.clearTimeout(timer);
-  }, [manifest, currentPage, prefetchTick]);
 
   const silentRefresh = useCallback((): Promise<DocumentManifest | null> => {
     if (inflightRef.current) return inflightRef.current;
@@ -303,7 +429,6 @@ export function ProtectedReaderView({
         acceptManifest(data);
         return data;
       } catch {
-        // شبکه/نشست: صفحات فعلی تا انقضای واقعی کار میکنند؛ تلاش بعدی یک دقیقه دیگر
         refreshAtRef.current = Date.now() + 60_000;
         return null;
       } finally {
@@ -323,8 +448,35 @@ export function ProtectedReaderView({
     [silentRefresh],
   );
 
-  // زمانبندی تازهسازی ~۲ دقیقه قبل از انقضا؛ تایمر در تب پسزمینه کند میشود،
-  // پس هنگام برگشت به تب و آنلاین شدن هم بررسی میکنیم.
+  // پیش‌بارگذاری آرام صفحات همسایه (+1، +2، +3، -1) داخل کش RAM
+  const prefetchedUrlsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    prefetchedUrlsRef.current.clear();
+  }, [scope, id]);
+
+  useEffect(() => {
+    if (!manifest || !manifest.page_dimensions?.length) return;
+    const conn =
+      typeof navigator !== 'undefined'
+        ? (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+        : undefined;
+    if (conn?.saveData) return;
+
+    const timer = window.setTimeout(() => {
+      const targets = [currentPage + 1, currentPage + 2, currentPage + 3, currentPage - 1];
+      for (const p of targets) {
+        if (p < 1 || p > manifest.total_pages) continue;
+        const dim = manifest.page_dimensions.find((d) => d.page === p);
+        if (!dim?.url || prefetchedUrlsRef.current.has(dim.url)) continue;
+        prefetchedUrlsRef.current.add(dim.url);
+        prefetchPageUrl(scope, id, p, dim.url, () => freshPageUrl(p));
+      }
+    }, 90);
+
+    return () => window.clearTimeout(timer);
+  }, [manifest, currentPage, prefetchTick, scope, id, freshPageUrl]);
+
+  // زمانبندی تازهسازی ~۲ دقیقه قبل از انقضا
   useEffect(() => {
     if (!manifest) return;
     const at = refreshAtRef.current;
@@ -347,9 +499,11 @@ export function ProtectedReaderView({
   }, [manifest, silentRefresh]);
 
   // دریافت مانیفست
+  const initialJumpedRef = useRef(false);
   const loadManifest = useCallback(async () => {
     setLoading(true);
     setError('');
+    initialJumpedRef.current = false;
     try {
       const data = await fetchDocumentManifest(scope, id);
       acceptManifest(data);
@@ -381,61 +535,182 @@ export function ProtectedReaderView({
     void loadManifest();
   }, [loadManifest]);
 
-  // دریافت یادداشت‌های چسبان برای صفحه فعال
+  // اندازه‌گیری پیوسته عرض محفظه با ResizeObserver (همگام با سایدبار و تقسیم پنل)
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await ink.page(scope, id, currentPage);
-        if (!cancelled && res.notes && res.notes.length > 0) {
-          setPageNotes((prev) => {
-            const m = new Map(prev);
-            m.set(currentPage, res.notes);
-            return m;
-          });
-        }
-      } catch {
-        // silent fallback
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [scope, id, currentPage]);
-
-  // اندازه‌گیری عرض محفظه بدون کلمپ مصنوعی (پشتیبانی تا ۱۴۰۰ پیکسل در نمایشگرهای عریض و آیپد)
-  useEffect(() => {
+    const el = scrollRef.current || containerRef.current;
+    if (!el) return;
+    let raf = 0;
     const updateWidth = () => {
-      const el = scrollRef.current || containerRef.current;
-      if (el) {
-        const available = Math.max(300, el.clientWidth - 32);
-        setBaseWidth(Math.min(available, 1400));
-      }
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const target = scrollRef.current || containerRef.current;
+        if (!target) return;
+        const available = Math.max(300, target.clientWidth - 32);
+        const clamped = Math.min(available, 1400);
+        setBaseWidth((prev) => (Math.abs(prev - clamped) >= 2 ? clamped : prev));
+      });
     };
     updateWidth();
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(updateWidth);
+      ro.observe(el);
+      return () => {
+        cancelAnimationFrame(raf);
+        ro.disconnect();
+      };
+    }
     window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, [notebookOpen]);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, [manifest, notebookOpen]);
+
+  // ناظر متمرکز پنجره‌بندی (۱ ناظر برای کل سند) + تشخیص دقیق صفحهٔ فعال بر مبنای مرکز دید
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller || !manifest) return;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        setNearPages((prev) => {
+          let changed = false;
+          const next = new Set(prev);
+          for (const entry of entries) {
+            const pageNum = Number((entry.target as HTMLElement).dataset.page || 0);
+            if (!pageNum) continue;
+            if (entry.isIntersecting) {
+              if (!next.has(pageNum)) {
+                next.add(pageNum);
+                changed = true;
+              }
+            } else if (next.has(pageNum)) {
+              next.delete(pageNum);
+              changed = true;
+            }
+          }
+          return changed ? next : prev;
+        });
+      },
+      { root: scroller, rootMargin: '1200px 0px 1200px 0px' },
+    );
+
+    for (const el of pageRefs.current.values()) {
+      obs.observe(el);
+    }
+
+    let scrollRaf = 0;
+    const pickActivePage = () => {
+      scrollRaf = 0;
+      if (isZoomingRef.current) return;
+      const sr = scroller.getBoundingClientRect();
+      const midY = sr.top + sr.height * 0.45;
+      let bestPage = currentPage;
+      let bestDist = Infinity;
+      for (const [p, el] of pageRefs.current.entries()) {
+        const r = el.getBoundingClientRect();
+        if (r.bottom < sr.top || r.top > sr.bottom) continue;
+        const pageCenter = (r.top + r.bottom) / 2;
+        const dist = Math.abs(pageCenter - midY);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestPage = p;
+        }
+      }
+      if (bestPage !== currentPage) {
+        setCurrentPage(bestPage);
+        progressRef.current(bestPage, totalPagesRef.current);
+      }
+    };
+
+    const onScroll = () => {
+      if (!scrollRaf) {
+        scrollRaf = window.requestAnimationFrame(pickActivePage);
+      }
+    };
+
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      obs.disconnect();
+      scroller.removeEventListener('scroll', onScroll);
+      if (scrollRaf) window.cancelAnimationFrame(scrollRaf);
+    };
+  }, [manifest, currentPage]);
 
   // پرش به صفحه با اسکرول نرم
-  const scrollToPage = useCallback((p: number) => {
-    const el = pageRefs.current.get(p);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const scrollToPage = useCallback(
+    (p: number, instant = false) => {
+      const clamped = Math.max(1, Math.min(manifest?.total_pages || p, p));
+      setNearPages((prev) => {
+        const next = new Set(prev);
+        next.add(clamped);
+        if (clamped > 1) next.add(clamped - 1);
+        if (clamped < (manifest?.total_pages || clamped)) next.add(clamped + 1);
+        return next;
+      });
+      const el = pageRefs.current.get(clamped);
+      if (el) {
+        el.scrollIntoView({ behavior: instant ? 'auto' : 'smooth', block: 'start' });
+      }
+      setCurrentPage(clamped);
+      if (manifest) {
+        progressRef.current(clamped, manifest.total_pages);
+      }
+    },
+    [manifest],
+  );
+
+  // پرش اولیه به startPage پس از رندر مانیفست
+  useEffect(() => {
+    if (!manifest || initialJumpedRef.current) return;
+    initialJumpedRef.current = true;
+    const p = Math.min(Math.max(1, startPage || 1), manifest.total_pages || 1);
+    if (p > 1) {
+      window.requestAnimationFrame(() => scrollToPage(p, true));
     }
-    setCurrentPage(p);
-    if (manifest) {
-      progressRef.current(p, manifest.total_pages);
-    }
-  }, [manifest]);
+  }, [manifest, startPage, scrollToPage]);
+
+  // پرش بدون رفرش صفحه از پنل دفترچه یا والد
+  useEffect(() => {
+    if (!jumpRequest || !manifest) return;
+    scrollToPage(jumpRequest.page);
+  }, [jumpRequest, manifest, scrollToPage]);
 
   // کلیدهای میانبر صفحه‌کلید
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea') return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return;
 
       const total = manifest?.total_pages || 1;
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        const api = inkApis.current.get(currentPage);
+        if (e.shiftKey) api?.redo();
+        else api?.undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        captureZoomAnchor();
+        setZoom((z) => clampZoom(z + 0.15));
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+        e.preventDefault();
+        captureZoomAnchor();
+        setZoom((z) => clampZoom(z - 0.15));
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        captureZoomAnchor();
+        setZoom(1.0);
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
       if (e.key === 'ArrowLeft' || e.key === 'PageDown') {
         scrollToPage(Math.min(total, currentPage + 1));
       }
@@ -472,16 +747,18 @@ export function ProtectedReaderView({
         else if (thumbnailDrawerOpen) setThumbnailDrawerOpen(false);
         else setTool(null);
       }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
-        e.preventDefault();
-        const api = inkApis.current.get(currentPage);
-        if (e.shiftKey) api?.redo();
-        else api?.undo();
-      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [currentPage, manifest, scrollToPage, focusMode, thumbnailDrawerOpen, onToggleSplitWorkspace]);
+  }, [currentPage, manifest, scrollToPage, focusMode, thumbnailDrawerOpen, onToggleSplitWorkspace, captureZoomAnchor]);
+
+  const handleNotesLoaded = useCallback((page: number, loadedNotes: StickyNote[]) => {
+    setPageNotes((prev) => {
+      const m = new Map(prev);
+      m.set(page, loadedNotes);
+      return m;
+    });
+  }, []);
 
   // افزودن یادداشت چسبان به صفحهٔ جاری
   const handleAddStickyNote = () => {
@@ -500,35 +777,45 @@ export function ProtectedReaderView({
     const nextMap = new Map(pageNotes);
     nextMap.set(currentPage, nextList);
     setPageNotes(nextMap);
+    const cachedInk = getCachedInkPage(scope, id, currentPage);
+    if (cachedInk) setCachedInkPage(scope, id, currentPage, { ...cachedInk, notes: nextList });
     void ink.save(scope, id, currentPage, undefined, nextList);
   };
 
-  const handleUpdatePageNotes = (page: number, updatedNotes: StickyNote[]) => {
-    const nextMap = new Map(pageNotes);
-    nextMap.set(page, updatedNotes);
-    setPageNotes(nextMap);
-    void ink.save(scope, id, page, undefined, updatedNotes);
-  };
+  const handleUpdatePageNotes = useCallback(
+    (page: number, updatedNotes: StickyNote[]) => {
+      setPageNotes((prev) => {
+        const nextMap = new Map(prev);
+        nextMap.set(page, updatedNotes);
+        return nextMap;
+      });
+      const cachedInk = getCachedInkPage(scope, id, page);
+      if (cachedInk) setCachedInkPage(scope, id, page, { ...cachedInk, notes: updatedNotes });
+      void ink.save(scope, id, page, undefined, updatedNotes);
+    },
+    [scope, id],
+  );
 
   const handleToggleBookmark = (p: number) => {
     bookmarks.toggle(scope, id, p);
     setBookmarkedPages(bookmarks.get(scope, id));
   };
 
-  // Text layer handlers
-  const handleTextSelection = useCallback((text: string, _rects: DOMRect[]) => {
-    if (text.trim()) {
-      // Could show floating toolbar for copy, highlight, etc.
-      console.log('Text selected:', text);
-    }
+  const handleInkChanged = useCallback(() => {
+    setNotebookKey((k) => k + 1);
+    onInkChanged?.();
+  }, [onInkChanged]);
+
+  const handleTextSelection = useCallback((_text: string, _rects: DOMRect[]) => {
+    // hook preserved for future selection toolbar
   }, []);
 
-  const handleAnchorAnnotation = useCallback((pageX: number, pageY: number, text: string) => {
-    // Called when user wants to anchor an annotation to specific text
-    console.log('Anchor annotation at:', pageX, pageY, text);
+  const handleAnchorAnnotation = useCallback((_pageX: number, _pageY: number, _text: string) => {
+    // hook preserved for anchored annotations
   }, []);
 
   const activeInkApi = inkApis.current.get(currentPage);
+  const shownZoomPct = Math.round((gestureBadgeZoom ?? zoom) * 100);
 
   return (
     <div
@@ -560,20 +847,23 @@ export function ProtectedReaderView({
 
       {!loading && !error && manifest && (
         <div className="reader__stage">
-          <div
-            className="reader__canvas"
-            ref={scrollRef}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchEnd}
-          >
-            <div
-              className="reader__scroll-track"
-              ref={(el) => {
-                el?.style.setProperty('--zoom-w', `${Math.floor(baseWidth * zoom)}px`);
+          {(gestureBadgeZoom !== null || Math.abs(zoom - 1) > 0.02) && (
+            <button
+              type="button"
+              className="reader-zoom-pill num"
+              onClick={() => {
+                captureZoomAnchor();
+                setZoom(1.0);
               }}
+              aria-label="بازگشت زوم به ۱۰۰ درصد"
+              title="بازنشانی بزرگ‌نمایی به ۱۰۰٪"
             >
+              <span>{fa(shownZoomPct)}٪</span>
+            </button>
+          )}
+
+          <div className="reader__canvas" ref={scrollRef}>
+            <div className="reader__scroll-track" ref={trackRef}>
               {manifest.page_dimensions.map((dim) => {
                 const targetW = Math.floor(baseWidth * zoom);
                 const targetH = Math.floor(targetW / (dim.aspect_ratio || 0.7071));
@@ -585,6 +875,7 @@ export function ProtectedReaderView({
                     width={targetW}
                     height={targetH}
                     url={dim.url}
+                    isNearViewport={nearPages.has(dim.page)}
                     onUrlRejected={freshPageUrl}
                     scope={scope}
                     id={id}
@@ -593,13 +884,9 @@ export function ProtectedReaderView({
                     strokeWidth={strokeWidth}
                     invertContrast={invertContrast}
                     notes={pageNotes.get(dim.page) || []}
-                    onUpdateNotes={(n) => handleUpdatePageNotes(dim.page, n)}
+                    onUpdateNotes={handleUpdatePageNotes}
+                    onNotesLoaded={handleNotesLoaded}
                     isCurrent={dim.page === currentPage}
-                    onVisible={(p) => {
-                      if (isZoomingRef.current) return;
-                      setCurrentPage(p);
-                      progressRef.current(p, manifest.total_pages);
-                    }}
                     onRegisterRef={(el) => {
                       if (el) pageRefs.current.set(dim.page, el);
                       else pageRefs.current.delete(dim.page);
@@ -611,15 +898,13 @@ export function ProtectedReaderView({
                     onInkStatus={setStatus}
                     onInkCount={setInkCount}
                     onInkHistory={setHistory}
-                    onInkChanged={() => setNotebookKey((k) => k + 1)}
+                    onInkChanged={handleInkChanged}
                     eraserMode={eraserMode}
                     eraseHighlighterOnly={eraseHighlighterOnly}
                     shapeSnap={shapeSnap}
                     stylusOnly={stylusOnly}
-                    onPinchZoom={handlePinchZoom}
-                    // Text layer props
                     textContent={textContents.get(dim.page) || null}
-                    viewport={manifest.page_dimensions.find(d => d.page === dim.page) || null}
+                    viewport={dim}
                     searchQuery={searchQuery}
                     searchMatches={searchMatches}
                     onTextSelection={handleTextSelection}
@@ -647,7 +932,6 @@ export function ProtectedReaderView({
         </div>
       )}
 
-      {/* نوار ابزار حاشیه‌نویسی شناور به سبک GoodNotes / آیپد */}
       {!loading && !error && manifest && !focusMode && (
         <InkToolbar
           tool={tool}
@@ -686,7 +970,6 @@ export function ProtectedReaderView({
         />
       )}
 
-      {/* المان‌های حالت تمرکز تمام‌صفحه */}
       {focusMode && manifest && (
         <>
           <div className="focus-counter-badge num">
@@ -704,13 +987,12 @@ export function ProtectedReaderView({
         </>
       )}
 
-      {/* کشوی پیش‌نمایش صفحات و نشان‌شده‌ها */}
       <ThumbnailDrawer
         open={thumbnailDrawerOpen}
         onClose={() => setThumbnailDrawerOpen(false)}
         manifest={manifest}
         currentPage={currentPage}
-        onJump={scrollToPage}
+        onJump={(p) => scrollToPage(p)}
         scope={scope}
         id={id}
         bookmarkedPages={bookmarkedPages}
@@ -725,7 +1007,7 @@ interface VirtualPageContainerProps {
   width: number;
   height: number;
   url: string;
-  /** آدرس صفحه رد شد (۴۰۱/۴۰۳ یا انقضا): آدرس تازهٔ همین صفحه */
+  isNearViewport: boolean;
   onUrlRejected?: (page: number) => Promise<string | null>;
   scope: Scope;
   id: string;
@@ -734,9 +1016,9 @@ interface VirtualPageContainerProps {
   strokeWidth: number;
   invertContrast: boolean;
   notes: StickyNote[];
-  onUpdateNotes: (notes: StickyNote[]) => void;
+  onUpdateNotes: (page: number, notes: StickyNote[]) => void;
+  onNotesLoaded: (page: number, notes: StickyNote[]) => void;
   isCurrent: boolean;
-  onVisible: (page: number) => void;
   onRegisterRef: (el: HTMLDivElement | null) => void;
   onRegisterInkApi: (api: InkApi | null) => void;
   onInkStatus: (status: InkStatus) => void;
@@ -747,8 +1029,6 @@ interface VirtualPageContainerProps {
   eraseHighlighterOnly?: boolean;
   shapeSnap?: boolean;
   stylusOnly?: boolean;
-  onPinchZoom?: (factor: number) => void;
-  // Text layer props
   textContent?: any;
   viewport?: any;
   searchQuery?: string;
@@ -765,6 +1045,7 @@ function VirtualPageContainer({
   width,
   height,
   url,
+  isNearViewport,
   onUrlRejected,
   scope,
   id,
@@ -774,8 +1055,8 @@ function VirtualPageContainer({
   invertContrast,
   notes,
   onUpdateNotes,
+  onNotesLoaded,
   isCurrent,
-  onVisible,
   onRegisterRef,
   onRegisterInkApi,
   onInkStatus,
@@ -786,8 +1067,6 @@ function VirtualPageContainer({
   eraseHighlighterOnly = false,
   shapeSnap = false,
   stylusOnly = false,
-  onPinchZoom,
-  // Text layer props
   textContent,
   viewport,
   searchQuery,
@@ -799,108 +1078,107 @@ function VirtualPageContainer({
   onPageLoaded,
 }: VirtualPageContainerProps) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [isNearViewport, setIsNearViewport] = useState(page <= 2);
-  const [imgLoaded, setImgLoaded] = useState(false);
   const textLayerRefInternal = useRef<any>(null);
 
-  // آدرس نمایشی جدا از آدرس مانیفست: تازهسازی مانیفست صفحهای را که
-  // نمایش داده شده دوباره دانلود نمیکند؛ فقط صفحهٔ بارگذارینشده یا ردشده
-  // آدرس تازه میگیرد. صفحهٔ ردشده یکبار بیصدا با آدرس نو تلاش میشود.
-  const [src, setSrc] = useState(url);
+  const initialCached = getCachedPageUrl(scope, id, page);
+  const [src, setSrc] = useState<string>(initialCached || '');
+  const [imgLoaded, setImgLoaded] = useState<boolean>(Boolean(initialCached));
   const [failed, setFailed] = useState(false);
-  const latestUrl = useRef(url);
-  latestUrl.current = url;
-  const loadedRef = useRef(false);
-  const retriedRef = useRef(false);
 
-  useEffect(() => {
-    if (!loadedRef.current) setSrc(url);
-  }, [url]);
+  const latestUrlRef = useRef(url);
+  latestUrlRef.current = url;
+  const onUrlRejectedRef = useRef(onUrlRejected);
+  onUrlRejectedRef.current = onUrlRejected;
+  const onPageLoadedRef = useRef(onPageLoaded);
+  onPageLoadedRef.current = onPageLoaded;
 
+  // هر بار صفحه نزدیک ویوپورت است، از کش RAM می‌خوانیم؛ در صورت نبود، فقط یکبار دانلود می‌شود
   useEffect(() => {
-    if (!isNearViewport) {
-      // img برداشته شد؛ دفعهٔ بعد با تازهترین آدرس ساخته شود
-      loadedRef.current = false;
-      retriedRef.current = false;
-      setImgLoaded(false);
+    if (!isNearViewport) return;
+
+    const cached = getCachedPageUrl(scope, id, page);
+    if (cached) {
+      setSrc(cached);
+      setImgLoaded(true);
       setFailed(false);
-      setSrc(latestUrl.current);
-    }
-  }, [isNearViewport]);
-
-  const recover = useCallback(async () => {
-    if (!onUrlRejected) {
-      setFailed(true);
       return;
     }
-    const fresh = await onUrlRejected(page);
-    const next = fresh || latestUrl.current;
+
+    let cancelled = false;
     setFailed(false);
-    loadedRef.current = false;
-    setImgLoaded(false);
-    // همان آدرس هم باشد (مثلاً خطای گذرای شبکه)، با پارامتر کوچک دوباره میخوانیم
-    setSrc(next === src ? `${next}${next.includes('?') ? '&' : '?'}r=${Date.now()}` : next);
-  }, [onUrlRejected, page, src]);
 
-  const handleImgError = useCallback(() => {
-    if (retriedRef.current) {
-      setFailed(true);
-      return;
-    }
-    retriedRef.current = true;
-    void recover();
-  }, [recover]);
+    void acquirePageUrl(
+      scope,
+      id,
+      page,
+      latestUrlRef.current,
+      onUrlRejectedRef.current ? () => onUrlRejectedRef.current!(page) : undefined,
+    )
+      .then((objUrl) => {
+        if (cancelled) return;
+        setSrc(objUrl);
+        setImgLoaded(true);
+        setFailed(false);
+        onPageLoadedRef.current?.();
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isNearViewport, scope, id, page]);
+
+  const retryLoad = useCallback(() => {
+    invalidatePageCache(scope, id, page);
+    setFailed(false);
+    setImgLoaded(false);
+    void acquirePageUrl(
+      scope,
+      id,
+      page,
+      latestUrlRef.current,
+      onUrlRejectedRef.current ? () => onUrlRejectedRef.current!(page) : undefined,
+    )
+      .then((objUrl) => {
+        setSrc(objUrl);
+        setImgLoaded(true);
+        onPageLoadedRef.current?.();
+      })
+      .catch(() => {
+        setFailed(true);
+      });
+  }, [scope, id, page]);
 
   // اینترنت برگشت ⇒ صفحهٔ ناموفق خودکار دوباره
   useEffect(() => {
     if (!failed) return;
-    const on = () => {
-      retriedRef.current = false;
-      void recover();
-    };
+    const on = () => retryLoad();
     window.addEventListener('online', on);
     return () => window.removeEventListener('online', on);
-  }, [failed, recover]);
+  }, [failed, retryLoad]);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     onRegisterRef(el);
-
-    // ناظر پنجره‌بندی (Windowing): بارگذاری با فاصله ۶۰۰ پیکسل قبل از دید
-    const windowingObs = new IntersectionObserver(
-      ([entry]) => {
-        setIsNearViewport(entry.isIntersecting);
-      },
-      { rootMargin: '600px 0px 600px 0px' },
-    );
-
-    // ناظر صفحه فعال: כאשר که صفحه از خط دید مرکزی عبور می‌کند
-    const activeObs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          onVisible(page);
-        }
-      },
-      { threshold: 0.15 },
-    );
-
-    windowingObs.observe(el);
-    activeObs.observe(el);
-
     return () => {
-      windowingObs.disconnect();
-      activeObs.disconnect();
       onRegisterRef(null);
     };
-  }, [page, onVisible, onRegisterRef]);
+  }, [onRegisterRef]);
 
-  // Expose text layer ref methods
   useEffect(() => {
     if (textLayerRef && textLayerRefInternal.current) {
       (textLayerRef as any).current = textLayerRefInternal.current;
     }
   }, [textLayerRef]);
+
+  const handleNotesChange = useCallback(
+    (updated: StickyNote[]) => onUpdateNotes(page, updated),
+    [onUpdateNotes, page],
+  );
 
   return (
     <div
@@ -911,6 +1189,7 @@ function VirtualPageContainer({
           el.style.setProperty('--page-h', `${height}px`);
         }
       }}
+      data-page={page}
       className={`pdf-page${isCurrent ? ' is-active' : ''}${invertContrast ? ' is-inverted' : ''}`}
     >
       {isNearViewport ? (
@@ -918,36 +1197,30 @@ function VirtualPageContainer({
           {failed ? (
             <div className="page-placeholder">
               <span>صفحهٔ {fa(page)} بارگذاری نشد</span>
-              <DsButton
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  retriedRef.current = false;
-                  void recover();
-                }}
-              >
+              <DsButton variant="secondary" size="sm" onClick={retryLoad}>
                 تلاش دوباره
               </DsButton>
             </div>
-          ) : (
+          ) : src ? (
             <img
               src={src}
               alt={`صفحهٔ ${fa(page)}`}
               className={`pdf-page__img reader__page${imgLoaded ? ' is-loaded' : ''}${invertContrast ? ' reader__page--inverted' : ''}`}
-              loading="lazy"
               decoding="async"
               draggable={false}
               onLoad={() => {
-                loadedRef.current = true;
-                retriedRef.current = false;
                 setImgLoaded(true);
-                onPageLoaded?.();
+                onPageLoadedRef.current?.();
               }}
-              onError={handleImgError}
+              onError={retryLoad}
             />
+          ) : (
+            <div className="page-placeholder" aria-busy="true">
+              <DsSkeleton className="page-placeholder__skel" />
+              <span className="num">صفحهٔ {fa(page)}</span>
+            </div>
           )}
 
-          {/* Text Layer - Semantic text overlay for selection, search, copy */}
           {textContent && viewport && (
             <TextLayer
               ref={textLayerRefInternal}
@@ -964,16 +1237,14 @@ function VirtualPageContainer({
             />
           )}
 
-          {/* لایه یادداشت‌های چسبان */}
           <StickyNoteOverlay
             page={page}
             width={width}
             height={height}
             notes={notes}
-            onUpdateNotes={onUpdateNotes}
+            onUpdateNotes={handleNotesChange}
           />
 
-          {/* لایه حاشیه‌نویسی دیجیتال */}
           <InkLayer
             ref={onRegisterInkApi}
             scope={scope}
@@ -988,11 +1259,11 @@ function VirtualPageContainer({
             onHistory={onInkHistory}
             onStatus={onInkStatus}
             onChanged={onInkChanged}
+            onNotesLoaded={onNotesLoaded}
             eraserMode={eraserMode}
             eraseHighlighterOnly={eraseHighlighterOnly}
             shapeSnap={shapeSnap}
             stylusOnly={stylusOnly}
-            onPinchZoom={onPinchZoom}
           />
         </>
       ) : (

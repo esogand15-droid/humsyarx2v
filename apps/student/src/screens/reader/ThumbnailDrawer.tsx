@@ -1,9 +1,74 @@
 import { useEffect, useState } from 'react';
-import { DsEmpty } from '../../design/components';
+import { DsButton, DsEmpty } from '../../design/components';
 import { Icon } from '../../icons';
 import { fa } from '../../lib/library';
 import { ink, type InkSummaryPage, type Scope } from '../../lib/ink';
 import type { DocumentManifest } from './ProtectedReaderView';
+import { acquireThumbUrl, getCachedThumbUrl } from './readerPageCache';
+
+function CachedThumbImg({
+  scope,
+  id,
+  page,
+  remoteUrl,
+  fallbackUrl,
+  alt,
+}: {
+  scope: Scope;
+  id: string;
+  page: number;
+  remoteUrl: string;
+  fallbackUrl: string;
+  alt: string;
+}) {
+  const [src, setSrc] = useState<string>(() => {
+    const cached = getCachedThumbUrl(scope, id, page);
+    if (cached) return cached;
+    return remoteUrl.startsWith('data:') ? remoteUrl : '';
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const cached = getCachedThumbUrl(scope, id, page);
+    if (cached) {
+      setSrc(cached);
+      return;
+    }
+    if (remoteUrl.startsWith('data:')) {
+      setSrc(remoteUrl);
+      return;
+    }
+    void acquireThumbUrl(scope, id, page, remoteUrl)
+      .then((objUrl) => {
+        if (!cancelled) setSrc(objUrl);
+      })
+      .catch(() => {
+        if (!cancelled && fallbackUrl && fallbackUrl !== remoteUrl) {
+          void acquireThumbUrl(scope, id, page, fallbackUrl)
+            .then((objUrl) => {
+              if (!cancelled) setSrc(objUrl);
+            })
+            .catch(() => {
+              if (!cancelled) setSrc(fallbackUrl);
+            });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scope, id, page, remoteUrl, fallbackUrl]);
+
+  return (
+    <img
+      src={src || undefined}
+      alt={alt}
+      className="thumb-card__img"
+      loading="lazy"
+      decoding="async"
+      draggable={false}
+    />
+  );
+}
 
 interface ThumbnailDrawerProps {
   open: boolean;
@@ -33,6 +98,11 @@ export function ThumbnailDrawer({
   const [activeTab, setActiveTab] = useState<DrawerTab>('thumbnails');
   const [annotatedPages, setAnnotatedPages] = useState<InkSummaryPage[]>([]);
   const [totalInk, setTotalInk] = useState(0);
+  const [showAllThumbs, setShowAllThumbs] = useState(false);
+
+  useEffect(() => {
+    if (!open) setShowAllThumbs(false);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -57,6 +127,17 @@ export function ThumbnailDrawer({
 
   const totalPages = manifest?.total_pages || 0;
   const pageDimensions = manifest?.page_dimensions || [];
+  const thumbLimit = showAllThumbs ? pageDimensions.length : Math.max(36, currentPage + 16);
+  const visibleDimensions = pageDimensions.slice(0, thumbLimit);
+  const hasMoreThumbs = pageDimensions.length > visibleDimensions.length;
+
+  const activateOnKey = (e: React.KeyboardEvent, page: number) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onJump(page);
+      onClose();
+    }
+  };
 
   return (
     <div className="thumb-drawer-backdrop" onClick={onClose}>
@@ -106,7 +187,7 @@ export function ThumbnailDrawer({
 
         {activeTab === 'thumbnails' && (
           <div className="thumb-drawer__grid">
-            {pageDimensions.map((dim) => {
+            {visibleDimensions.map((dim) => {
               const isCurrent = dim.page === currentPage;
               const isBm = bookmarkedPages.includes(dim.page);
               const hasInk = annotatedPages.some((a) => a.page === dim.page);
@@ -119,15 +200,18 @@ export function ThumbnailDrawer({
                     onJump(dim.page);
                     onClose();
                   }}
+                  onKeyDown={(e) => activateOnKey(e, dim.page)}
                   role="button"
                   tabIndex={0}
                   aria-label={`پرش به صفحه ${dim.page}`}
                 >
-                  <img
-                    src={dim.url}
+                  <CachedThumbImg
+                    scope={scope}
+                    id={id}
+                    page={dim.page}
+                    remoteUrl={dim.thumbnail_url || dim.url}
+                    fallbackUrl={dim.url}
                     alt={`صفحه ${dim.page}`}
-                    className="thumb-card__img"
-                    loading="lazy"
                   />
                   <div className="thumb-card__footer">
                     <span className="thumb-card__num num">صفحه {fa(dim.page)}</span>
@@ -154,6 +238,13 @@ export function ThumbnailDrawer({
                 </div>
               );
             })}
+            {hasMoreThumbs && (
+              <div className="thumb-drawer__more">
+                <DsButton variant="secondary" size="sm" block onClick={() => setShowAllThumbs(true)}>
+                  نمایش همهٔ صفحات ({fa(pageDimensions.length)})
+                </DsButton>
+              </div>
+            )}
           </div>
         )}
 
@@ -180,14 +271,18 @@ export function ThumbnailDrawer({
                         onJump(dim.page);
                         onClose();
                       }}
+                      onKeyDown={(e) => activateOnKey(e, dim.page)}
                       role="button"
                       tabIndex={0}
+                      aria-label={`پرش به صفحه ${dim.page}`}
                     >
-                      <img
-                        src={dim.url}
+                      <CachedThumbImg
+                        scope={scope}
+                        id={id}
+                        page={dim.page}
+                        remoteUrl={dim.thumbnail_url || dim.url}
+                        fallbackUrl={dim.url}
                         alt={`صفحه ${dim.page}`}
-                        className="thumb-card__img"
-                        loading="lazy"
                       />
                       <div className="thumb-card__footer">
                         <span className="thumb-card__num num">صفحه {fa(dim.page)}</span>

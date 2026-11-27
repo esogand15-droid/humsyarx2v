@@ -13,6 +13,7 @@ interface Props {
   onJump: (page: number) => void;
   /** هر بار که خطی ذخیره می‌شود، پنل تازه شود */
   refreshKey: number;
+  hideHeader?: boolean;
 }
 
 /** دفتر این فایل — جای دیگری برای «کجا نوشته‌ام؟»
@@ -20,7 +21,7 @@ interface Props {
  *  روی دسکتاپ/تبلت کنار صفحه می‌نشیند و روی گوشی از پایین باز می‌شود؛
  *  در هر دو حالت یک کامپوننت است، چیدمان را CSS تعیین می‌کند.
  */
-export function NotebookPanel({ scope, id, page, open, onClose, onJump, refreshKey }: Props) {
+export function NotebookPanel({ scope, id, page, open, onClose, onJump, refreshKey, hideHeader = false }: Props) {
   const [pages, setPages] = useState<InkSummaryPage[]>([]);
   const [total, setTotal] = useState(0);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -49,12 +50,14 @@ export function NotebookPanel({ scope, id, page, open, onClose, onJump, refreshK
 
   return (
     <aside className="notebook" aria-label="دفتر این فایل">
-      <div className="notebook__head">
-        <span className="h3">دفتر</span>
-        <button type="button" className="iconbtn" onClick={onClose} aria-label="بستن دفتر">
-          <Icon name="i-x" size={16} />
-        </button>
-      </div>
+      {!hideHeader && (
+        <div className="notebook__head">
+          <span className="h3">دفتر</span>
+          <button type="button" className="iconbtn" onClick={onClose} aria-label="بستن دفتر">
+            <Icon name="i-x" size={16} />
+          </button>
+        </div>
+      )}
 
       {state === 'loading' && <p className="small">در حال خواندن دفتر…</p>}
 

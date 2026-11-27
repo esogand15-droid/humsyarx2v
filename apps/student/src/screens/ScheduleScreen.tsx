@@ -546,7 +546,7 @@ export function ScheduleScreen() {
         title="برنامه و تسک‌های مطالعه"
         sub="برنامه هفتگی و تقویم جلالی"
       />
-      <div className="page sched-page" data-section="schedule">
+      <div className="page page-enter sched-page" data-section="schedule">
         <div className="sched-tabs">
           <DsSegmented
             block

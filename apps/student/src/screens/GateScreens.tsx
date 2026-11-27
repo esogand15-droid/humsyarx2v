@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import './auth.css';
 import { Brand } from '../components';
 import { DsBadge, DsButton, DsCard } from '../design/components';
@@ -27,15 +29,26 @@ function StopPage({
 }) {
   const { refresh, signOut, config } = useSession();
   const { resolved, setMode } = useTheme();
+  const [checking, setChecking] = useState(false);
   const support = config?.support_url?.trim() || '';
+
+  const handleRecheck = async () => {
+    if (checking) return;
+    setChecking(true);
+    try {
+      await refresh();
+    } finally {
+      setChecking(false);
+    }
+  };
 
   return (
     <div className="auth-screen">
       <div className="auth-topbar">
-        <a href="/" className="auth-topbar-btn">
+        <Link to="/welcome" className="auth-topbar-btn">
           <Icon name="i-chevron-r" size={16} />
           <span>صفحهٔ اصلی</span>
-        </a>
+        </Link>
         <button
           type="button"
           className="auth-topbar-btn auth-theme-btn"
@@ -82,7 +95,7 @@ function StopPage({
         )}
 
         <div className="gate-actions">
-          <DsButton block size="lg" onClick={() => void refresh()}>
+          <DsButton block size="lg" loading={checking} onClick={() => void handleRecheck()}>
             <Icon name="i-refresh" size={18} />
             <span>بررسی دوبارهٔ وضعیت</span>
           </DsButton>
@@ -114,7 +127,7 @@ export function PendingScreen() {
       icon="i-clock"
       eyebrow="در انتظار تأیید"
       title="حساب شما هنوز تأیید نشده است"
-      body="ثبت‌نام انجام شده، ولی دسترسی به محتوا پس از تأیید باز می‌شود. این کار در ربات هامزیار انجام می‌شود و معمولا چند ساعت طول می‌کشد."
+      body="ثبت‌نام انجام شده، ولی دسترسی به محتوا پس از تأیید باز می‌شود. وضعیت حساب از ربات تلگرام هم‌یار بررسی و فعال می‌گردد."
       steps={[
         'در ربات هامزیار، مشخصات خود را کامل کنید.',
         'اگر شمارهٔ دانشجویی خواسته شده، آن را وارد کنید.',

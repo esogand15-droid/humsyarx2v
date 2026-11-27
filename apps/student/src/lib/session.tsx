@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { api, ApiError, onSessionExpired } from './api';
 import { clearCache } from './swr';
 import { bgAudio } from './bgAudio';
+import { clearAllReaderCaches } from '../screens/reader/readerPageCache';
 import type { AccountState, AuthConfig, PublicUser } from './api-types';
 
 /** وضعیت نشست در کل اپ — تنها منبع حقیقت برای گارد مسیرها. */
@@ -32,8 +33,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [expired, setExpired] = useState(false);
 
   const refresh = useCallback(async () => {
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => ctrl.abort(), 10_000);
     try {
-      const res = await api.session();
+      const res = await api.session({ signal: ctrl.signal });
       setOffline(false);
       setUser(res.user);
       setStatus(res.authenticated ? res.state : 'anonymous');
@@ -41,9 +44,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       // سرور در دسترس نیست → کاربر را پشت صفحهی خطای بنبست حبس نمیکنیم؛
       // فرم ورود میماند و هشدار «اتصال برقرار نشد» کنارش میآید.
-      setOffline(err instanceof ApiError ? err.offline : false);
+      setOffline(ctrl.signal.aborted || (err instanceof ApiError ? err.offline : false));
       setUser(null);
       setStatus('anonymous');
+    } finally {
+      window.clearTimeout(timer);
     }
   }, []);
 
@@ -81,6 +86,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // حتی اگر شبکه خطا داد، سمت کلاینت خارج میشویم؛ کوکی منقضی میماند
     }
     clearCache(); // next account must never paint the previous one's data
+    clearAllReaderCaches(); // release in-memory WebP & ink caches on sign-out
     bgAudio.stop();
     setExpired(false);
     setUser(null);

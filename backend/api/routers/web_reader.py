@@ -29,6 +29,8 @@
 from __future__ import annotations
 
 import asyncio
+from collections import OrderedDict
+import copy
 import hashlib
 import hmac
 import logging
@@ -343,6 +345,74 @@ async def _fetch_and_cache_master_pdf(scope: str, item: dict) -> bytes:
     raise HTTPException(status_code=404, detail="master_pdf_not_found")
 
 
+_MANIFEST_DIM_CACHE: "OrderedDict[str, Tuple[int, List[Dict[str, Any]]]]" = OrderedDict()
+
+
+def _demo_pdf_bytes() -> bytes:
+    import pymupdf
+    doc = pymupdf.open()
+    for p_num in range(1, 4):
+        page = doc.new_page(width=595, height=842)
+        page.insert_text((50, 80), f"HumsYarX Sample Medical Pamphlet - Page {p_num}", fontsize=18)
+        page.insert_text((50, 130), "Medical Physiology & Pharmacology Notes (Demo Booklet)", fontsize=14)
+        page.insert_text((50, 180), "This is a secure protected PDF page rendered via WebP 150 DPI.", fontsize=11)
+        page.insert_text((50, 210), "Digital Ink (Pen, Highlighter, Eraser) can be tested on top of this canvas.", fontsize=11)
+        page.insert_text((50, 260), "Notice the forensic micro watermark in the page margin.", fontsize=11)
+    return doc.tobytes()
+
+
+def _format_student_label(user: Optional[dict], resolved_uid: int) -> str:
+    if not user:
+        return f"Student-{resolved_uid}"
+    base_name = str(user.get("name") or user.get("full_name") or "").strip() or f"Student-{resolved_uid}"
+    parts = [base_name]
+    student_id = str(user.get("student_id") or "").strip()
+    username = str(user.get("username") or "").strip().lstrip("@")
+    if student_id:
+        parts.append(f"#{student_id}")
+    if username:
+        parts.append(f"@{username}")
+    return " ".join(parts)
+
+
+async def _resolve_student_identity(
+    request: Request,
+    uid: Optional[int],
+    *,
+    allow_uid_only: bool,
+) -> Tuple[int, str, str]:
+    """Resolve authenticated student uid, full identity label, and client IP."""
+    resolved_uid: Optional[int] = None
+    user: Optional[dict] = None
+
+    app = request.app
+    if hasattr(app, "dependency_overrides") and current_student in app.dependency_overrides:
+        override = app.dependency_overrides[current_student]
+        user = override() if callable(override) else override
+        if user:
+            resolved_uid = int(user.get("user_id") or user.get("id") or 0)
+    else:
+        try:
+            user = await current_student(request)
+            if user:
+                resolved_uid = int(user.get("user_id") or user.get("id") or 0)
+        except HTTPException:
+            user = None
+
+    if resolved_uid is None:
+        if uid is not None and allow_uid_only:
+            resolved_uid = int(uid)
+        else:
+            raise HTTPException(status_code=401, detail="login_required")
+
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "127.0.0.1")
+        or "127.0.0.1"
+    )
+    return resolved_uid, _format_student_label(user, resolved_uid), client_ip
+
+
 async def get_or_render_page(file_id: str, page_num: int) -> bytes:
     """Retrieve base WebP page from LocalStorageDriver cache or rasterize on miss with singleflight lock."""
     storage = get_storage_driver()
@@ -365,21 +435,12 @@ async def get_or_render_page(file_id: str, page_num: int) -> bytes:
         pdf_bytes = await storage.get_original(file_id)
         if not pdf_bytes:
             if file_id in ("demo", "sample", "test"):
-                import pymupdf
-                doc = pymupdf.open()
-                for p_num in range(1, 4):
-                    page = doc.new_page(width=595, height=842)
-                    page.insert_text((50, 80), f"HumsYarX Sample Medical Pamphlet - Page {p_num}", fontsize=18)
-                    page.insert_text((50, 130), "Medical Physiology & Pharmacology Notes (Demo Booklet)", fontsize=14)
-                    page.insert_text((50, 180), "This is a secure protected PDF page rendered via WebP 150 DPI.", fontsize=11)
-                    page.insert_text((50, 210), "Digital Ink (Pen, Highlighter, Eraser) can be tested on top of this canvas.", fontsize=11)
-                    page.insert_text((50, 260), "Notice the dynamic semi-transparent Persian watermark across the page.", fontsize=11)
-                pdf_bytes = doc.tobytes()
+                pdf_bytes = await asyncio.to_thread(_demo_pdf_bytes)
                 await storage.save_original(file_id, pdf_bytes)
             else:
                 raise FileNotFoundError(f"Original PDF {file_id} not found in storage")
 
-        webp_bytes = PdfRenderer.rasterize_page_to_webp(pdf_bytes, page_num, dpi=150)
+        webp_bytes = await asyncio.to_thread(PdfRenderer.rasterize_page_to_webp, pdf_bytes, page_num, 150)
         await storage.save_cached_page(file_id, page_num, webp_bytes)
 
         # 3. Check high watermark threshold
@@ -394,7 +455,7 @@ async def get_or_render_page(file_id: str, page_num: int) -> bytes:
 
 
 async def get_or_render_thumbnail(file_id: str, page_num: int) -> bytes:
-    """Retrieve base WebP thumbnail (72 DPI) from LocalStorageDriver cache or rasterize on miss with singleflight lock."""
+    """Retrieve base WebP thumbnail (72 DPI) via singleflight lock off the event loop."""
     storage = get_storage_driver()
 
     key = f"{file_id}:p{page_num}:dpi72:thumb"
@@ -404,21 +465,12 @@ async def get_or_render_thumbnail(file_id: str, page_num: int) -> bytes:
         pdf_bytes = await storage.get_original(file_id)
         if not pdf_bytes:
             if file_id in ("demo", "sample", "test"):
-                import pymupdf
-                doc = pymupdf.open()
-                for p_num in range(1, 4):
-                    page = doc.new_page(width=595, height=842)
-                    page.insert_text((50, 80), f"HumsYarX Sample Medical Pamphlet - Page {p_num}", fontsize=18)
-                    page.insert_text((50, 130), "Medical Physiology & Pharmacology Notes (Demo Booklet)", fontsize=14)
-                    page.insert_text((50, 180), "This is a secure protected PDF page rendered via WebP 150 DPI.", fontsize=11)
-                    page.insert_text((50, 210), "Digital Ink (Pen, Highlighter, Eraser) can be tested on top of this canvas.", fontsize=11)
-                    page.insert_text((50, 260), "Notice the dynamic semi-transparent Persian watermark across the page.", fontsize=11)
-                pdf_bytes = doc.tobytes()
+                pdf_bytes = await asyncio.to_thread(_demo_pdf_bytes)
                 await storage.save_original(file_id, pdf_bytes)
             else:
                 raise FileNotFoundError(f"Original PDF {file_id} not found in storage")
 
-        return PdfRenderer.render_thumbnail(pdf_bytes, page_num=page_num)
+        return await asyncio.to_thread(PdfRenderer.render_thumbnail, pdf_bytes, page_num)
 
     return await coalescer.execute(key, _render_job)
 
@@ -444,33 +496,46 @@ async def get_reader_manifest(
         else:
             raise HTTPException(status_code=404, detail="file_not_found")
 
-    storage = get_storage_driver()
-    pdf_bytes = await storage.get_original(file_id)
-    if not pdf_bytes:
-        if file_id in ("demo", "sample", "test"):
-            import pymupdf
-            doc = pymupdf.open()
-            for p_num in range(1, 4):
-                page = doc.new_page(width=595, height=842)
-                page.insert_text((50, 80), f"HumsYarX Sample Medical Pamphlet - Page {p_num}", fontsize=18)
-                page.insert_text((50, 130), "Medical Physiology & Pharmacology Notes (Demo Booklet)", fontsize=14)
-                page.insert_text((50, 180), "This is a secure protected PDF page rendered via WebP 150 DPI.", fontsize=11)
-                page.insert_text((50, 210), "Digital Ink (Pen, Highlighter, Eraser) can be tested on top of this canvas.", fontsize=11)
-                page.insert_text((50, 260), "Notice the dynamic semi-transparent Persian watermark across the page.", fontsize=11)
-            pdf_bytes = doc.tobytes()
-            await storage.save_original(file_id, pdf_bytes)
-        else:
-            pdf_bytes = await _fetch_and_cache_master_pdf(scope, item)
-
     uid = int(user.get("user_id") or user.get("id") or 0)
     title = _public(item)["name"]
-    manifest = PdfRenderer.get_document_manifest(
-        pdf_bytes=pdf_bytes,
-        file_id=file_id,
-        scope=scope,
-        title=title,
-        user_id=uid,
-    )
+
+    cached_dims = _MANIFEST_DIM_CACHE.get(file_id)
+    if cached_dims is not None:
+        _MANIFEST_DIM_CACHE.move_to_end(file_id)
+        total_pages, dims_template = cached_dims
+        manifest = {
+            "file_id": file_id,
+            "scope": scope,
+            "title": title,
+            "total_pages": total_pages,
+            "page_dimensions": copy.deepcopy(dims_template),
+            "encryption_mode": "server_webp_watermarked",
+            "watermark_user_id": uid,
+        }
+    else:
+        storage = get_storage_driver()
+        pdf_bytes = await storage.get_original(file_id)
+        if not pdf_bytes:
+            if file_id in ("demo", "sample", "test"):
+                pdf_bytes = await asyncio.to_thread(_demo_pdf_bytes)
+                await storage.save_original(file_id, pdf_bytes)
+            else:
+                pdf_bytes = await _fetch_and_cache_master_pdf(scope, item)
+
+        manifest = await asyncio.to_thread(
+            PdfRenderer.get_document_manifest,
+            pdf_bytes,
+            file_id,
+            scope,
+            title,
+            uid,
+        )
+        while len(_MANIFEST_DIM_CACHE) >= 256:
+            _MANIFEST_DIM_CACHE.popitem(last=False)
+        _MANIFEST_DIM_CACHE[file_id] = (
+            int(manifest["total_pages"]),
+            copy.deepcopy(manifest["page_dimensions"]),
+        )
 
     # ⏳ توکنهای امضاشدهٔ صفحه با READER_URL_TTL_SEC (پیشفرض ۳ ساعت).
     # expires_at/expires_in افزودهاند تا کلاینت پیش از انقضا مانیفست را تازه کند.
@@ -497,32 +562,9 @@ async def get_reader_page(
     uid: Optional[int] = Query(None),
 ):
     """Deliver watermarked WebP page with zero-storage Cache-Control headers."""
-    # Resolve user: via app.dependency_overrides, active session, or signed uid
-    resolved_uid: Optional[int] = None
-    student_name: str = "Student"
-
-    app = request.app
-    if hasattr(app, "dependency_overrides") and current_student in app.dependency_overrides:
-        override = app.dependency_overrides[current_student]
-        user = override() if callable(override) else override
-        if user:
-            resolved_uid = int(user.get("user_id") or user.get("id") or 0)
-            student_name = user.get("name") or user.get("full_name") or f"Student-{resolved_uid}"
-    else:
-        try:
-            user = await current_student(request)
-            if user:
-                resolved_uid = int(user.get("user_id") or user.get("id") or 0)
-                student_name = user.get("name") or user.get("full_name") or f"Student-{resolved_uid}"
-        except HTTPException:
-            user = None
-
-    if resolved_uid is None:
-        if uid is not None:
-            resolved_uid = int(uid)
-            student_name = f"Student-{resolved_uid}"
-        else:
-            raise HTTPException(status_code=401, detail="login_required")
+    resolved_uid, student_label, client_ip = await _resolve_student_identity(
+        request, uid, allow_uid_only=True
+    )
 
     # Expiry verification
     if int(time.time()) > int(expires):
@@ -532,12 +574,6 @@ async def get_reader_page(
     if not verify_page_token(token, resolved_uid, file_id, page_number, expires):
         raise HTTPException(status_code=403, detail="INVALID_SIGNATURE")
 
-    client_ip = (
-        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        or (request.client.host if request.client else "127.0.0.1")
-        or "127.0.0.1"
-    )
-
     try:
         base_webp = await get_or_render_page(file_id, page_number)
     except (ValueError, FileNotFoundError):
@@ -546,12 +582,16 @@ async def get_reader_page(
         logger.error("Failed to render page %s of %s: %s", page_number, file_id, exc)
         raise HTTPException(status_code=404, detail="PAGE_RENDER_FAILED")
 
-    # Dynamic diagonal watermark with RTL Persian shaping
-    watermarked_webp = WatermarkStamper.stamp_watermark(
+    # Forensic micro watermark: one faint identity line in the page's bottom-left margin.
+    # Off the event loop: decode + encode of a 150 DPI page is CPU work.
+    watermarked_webp = await asyncio.to_thread(
+        WatermarkStamper.stamp_watermark,
         base_webp,
-        student_name,
+        student_label,
         resolved_uid,
         client_ip,
+        file_id=file_id,
+        page_number=page_number,
     )
 
     headers = {
@@ -573,28 +613,12 @@ async def get_reader_thumbnail(
     expires: Optional[int] = Query(None),
     uid: Optional[int] = Query(None),
 ):
-    """Deliver low-resolution 72 DPI WebP thumbnail with zero-storage Cache-Control headers."""
-    resolved_uid: Optional[int] = None
-
-    app = request.app
-    if hasattr(app, "dependency_overrides") and current_student in app.dependency_overrides:
-        override = app.dependency_overrides[current_student]
-        user = override() if callable(override) else override
-        if user:
-            resolved_uid = int(user.get("user_id") or user.get("id") or 0)
-    else:
-        try:
-            user = await current_student(request)
-            if user:
-                resolved_uid = int(user.get("user_id") or user.get("id") or 0)
-        except HTTPException:
-            user = None
-
-    if resolved_uid is None:
-        if uid is not None and token is not None and expires is not None:
-            resolved_uid = int(uid)
-        else:
-            raise HTTPException(status_code=401, detail="login_required")
+    """Deliver watermarked 72 DPI WebP thumbnail with zero-storage Cache-Control headers."""
+    resolved_uid, student_label, client_ip = await _resolve_student_identity(
+        request,
+        uid,
+        allow_uid_only=(token is not None and expires is not None),
+    )
 
     # If signed token parameters provided, verify expiry and signature
     if token is not None and expires is not None:
@@ -604,7 +628,16 @@ async def get_reader_thumbnail(
             raise HTTPException(status_code=403, detail="INVALID_SIGNATURE")
 
     try:
-        thumb_webp = await get_or_render_thumbnail(file_id, page_number)
+        base_thumb = await get_or_render_thumbnail(file_id, page_number)
+        thumb_webp = await asyncio.to_thread(
+            WatermarkStamper.stamp_watermark,
+            base_thumb,
+            student_label,
+            resolved_uid,
+            client_ip,
+            file_id=file_id,
+            page_number=page_number,
+        )
     except (ValueError, FileNotFoundError):
         raise HTTPException(status_code=404, detail="page_not_found")
     except Exception as exc:

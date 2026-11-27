@@ -14,8 +14,18 @@ import { useTheme } from '../lib/theme';
    import.meta.env.DEV). Not one byte of it reaches the production build. */
 
 const FA_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+const AR_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
 function toFaDigits(value: number | string): string {
   return String(value).replace(/\d/g, (d) => FA_DIGITS[Number(d)]);
+}
+
+function normalizeLatinDigits(raw: string): string {
+  let s = raw;
+  for (let i = 0; i < 10; i++) {
+    s = s.split(FA_DIGITS[i]).join(String(i)).split(AR_DIGITS[i]).join(String(i));
+  }
+  return s;
 }
 
 /**
@@ -24,13 +34,7 @@ function toFaDigits(value: number | string): string {
  * خروجی: HY-XXXX-XXXX
  */
 function formatCrockfordCode(raw: string): string {
-  const faDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-  const arDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-  let s = raw.trim();
-  for (let i = 0; i < 10; i++) {
-    s = s.split(faDigits[i]).join(String(i)).split(arDigits[i]).join(String(i));
-  }
-  s = s.toUpperCase().replace(/\s+/g, '');
+  let s = normalizeLatinDigits(raw.trim()).toUpperCase().replace(/\s+/g, '');
 
   let clean: string;
   if (s.startsWith('HY-')) {
@@ -64,6 +68,7 @@ export function LoginScreen() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [challengeTerminal, setChallengeTerminal] = useState(false);
 
   // حالت کد اضطراری (Fallback OTP Modal)
   const [showFallback, setShowFallback] = useState(false);
@@ -89,20 +94,32 @@ export function LoginScreen() {
   // نظرسنجی (Polling) هر ۱.۵ ثانیه برای وضعیت تأیید چالش در تلگرام
   // جداسازی کامل از شمارش معکوس secondsLeft برای جلوگیری از starvation
   useEffect(() => {
-    if (step !== 'waiting' || !challenge) return;
+    if (step !== 'waiting' || !challenge || challengeTerminal) return;
 
     let cancelled = false;
+    let intervalId: number | undefined;
+    const stopPolling = () => {
+      cancelled = true;
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+    };
+
     const poll = async () => {
       try {
         const res = await api.pollChallenge(challenge.challenge_id);
         if (cancelled) return;
 
         if (res.status === 'approved') {
+          stopPolling();
           setBusy(true);
           await refresh();
         } else if (res.status === 'rejected') {
+          stopPolling();
+          setChallengeTerminal(true);
           setError('درخواست ورود توسط شما در ربات تلگرام رد شد.');
         } else if (res.status === 'expired') {
+          stopPolling();
+          setChallengeTerminal(true);
+          setSecondsLeft(0);
           setError('مهلت تأیید به پایان رسید. لطفا کد جدید دریافت کنید.');
         }
       } catch (err) {
@@ -113,13 +130,12 @@ export function LoginScreen() {
     };
 
     void poll();
-    const interval = window.setInterval(poll, 1500);
+    intervalId = window.setInterval(() => {
+      void poll();
+    }, 1500);
 
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [step, challenge, refresh]);
+    return stopPolling;
+  }, [step, challenge, challengeTerminal, refresh]);
 
   const cleanCode = userCode.replace(/[^0-9A-Z]/g, '').replace(/^HY/, '');
   const canRequest = cleanCode.length === 8;
@@ -127,6 +143,7 @@ export function LoginScreen() {
   async function handleCreateChallenge() {
     if (!canRequest || busy) return;
     setError('');
+    setChallengeTerminal(false);
     setBusy(true);
 
     if (import.meta.env.DEV) {
@@ -153,7 +170,7 @@ export function LoginScreen() {
   }
 
   async function handleVerifyFallback() {
-    const cleanOtp = fallbackOtp.replace(/\D/g, '');
+    const cleanOtp = normalizeLatinDigits(fallbackOtp).replace(/\D/g, '');
     if (cleanOtp.length < 4 || fallbackBusy) return;
     setFallbackError('');
     setFallbackBusy(true);
@@ -180,10 +197,10 @@ export function LoginScreen() {
 
   const topbar = (
     <div className="auth-topbar">
-      <a href="/" className="auth-topbar-btn">
+      <Link to="/welcome" className="auth-topbar-btn">
         <Icon name="i-chevron-r" size={16} />
         <span>صفحهٔ اصلی</span>
-      </a>
+      </Link>
       <button
         type="button"
         className="auth-topbar-btn auth-theme-btn"
@@ -248,12 +265,24 @@ export function LoginScreen() {
             </p>
 
             <div className="auth-waiting-actions">
+              {(challengeTerminal || secondsLeft <= 0) && (
+                <DsButton
+                  type="button"
+                  block
+                  loading={busy}
+                  onClick={() => void handleCreateChallenge()}
+                >
+                  دریافت کد تازه
+                </DsButton>
+              )}
+
               <DsButton
                 type="button"
                 variant="ghost"
                 block
                 onClick={() => {
                   setStep('entry');
+                  setChallengeTerminal(false);
                   setError('');
                 }}
               >
@@ -296,9 +325,9 @@ export function LoginScreen() {
                   name="fallback-otp"
                   ltr
                   value={fallbackOtp}
-                  onChange={(e) => setFallbackOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onChange={(e) => setFallbackOtp(normalizeLatinDigits(e.target.value).replace(/\D/g, '').slice(0, 6))}
                   inputMode="numeric"
-                  placeholder="۱۲۳۴۵۶"
+                  placeholder="123456"
                   error={fallbackError || undefined}
                   disabled={fallbackBusy}
                 />
@@ -307,7 +336,7 @@ export function LoginScreen() {
                   type="submit"
                   block
                   loading={fallbackBusy}
-                  disabled={fallbackOtp.replace(/\D/g, '').length < 4}
+                  disabled={normalizeLatinDigits(fallbackOtp).replace(/\D/g, '').length < 4}
                 >
                   تأیید و ورود به سامانه
                 </DsButton>
@@ -417,7 +446,7 @@ export function LoginScreen() {
               <Icon name={canRequest ? 'i-check' : 'i-info'} size={15} />
               <span>
                 {canRequest
-                  ? 'کد کامل است — برای تأیید ورود دکمه زیر را بزنید.'
+                    ? 'کد کامل است. برای تأیید ورود دکمه زیر را بزنید.'
                   : rawClean.length > 0
                   ? `برای فعال شدن دکمه ورود، هر ۸ کاراکتر را کامل وارد کنید (${toFaDigits(rawClean.length)} از ۸).`
                   : 'کد در بخش «پروفایل» ربات تلگرام یا کارت دانشجویی شما درج شده است.'}

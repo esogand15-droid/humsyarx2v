@@ -1,8 +1,9 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { AppBar, Button, EmptyState } from '../../components';
+import { AppBar } from '../../components';
 import { ErrorBlock, LoadingBlock } from '../../components/AccessStates';
+import { DsButton, DsEmpty } from '../../design/components';
 import { Icon } from '../../icons';
 import { faNum } from '../../lib/fa';
 import { ink } from '../../lib/ink';
@@ -47,7 +48,10 @@ export function ReaderScreen() {
   const [sidePanel, setSidePanel] = useState<StudySidePanel>('none');
   const [sideWidth, setSideWidth] = useState(380);
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
-  const [notebookKey] = useState(0);
+  const [notebookKey, setNotebookKey] = useState(0);
+  const [activePage, setActivePage] = useState(1);
+  const [jumpRequest, setJumpRequest] = useState<{ page: number; seq: number } | null>(null);
+  const dividerCleanupRef = useRef<(() => void) | null>(null);
 
   const scopeTyped = (scope === 'ref' ? 'ref' : 'res') as Scope;
   const saveTimer = useRef<number | null>(null);
@@ -93,12 +97,14 @@ export function ReaderScreen() {
       if (prog) {
         latest.current = { page: prog.page || 1, total: prog.total || 0, position: prog.position || 0 };
         setStartPage(prog.page > 0 ? prog.page : 1);
+        setActivePage(prog.page > 0 ? prog.page : 1);
         setStartAt(prog.position > 0 ? prog.position : 0);
       }
       // ?p=۴ از دفتر یادداشت‌ها → همان صفحه، حتی اگر پیشرفت جای دیگری باشد
       const jump = Number(new URLSearchParams(window.location.search).get('p'));
       if (jump > 0) {
         setStartPage(jump);
+        setActivePage(jump);
         latest.current = { ...latest.current, page: jump };
       }
     } catch (err) {
@@ -149,9 +155,16 @@ export function ReaderScreen() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [sidePanel]);
 
+  useEffect(() => {
+    return () => {
+      dividerCleanupRef.current?.();
+    };
+  }, []);
+
   // جابه‌جایی مقیاس جداکننده پنل‌ها در دسکتاپ
   const handleDividerPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
+    dividerCleanupRef.current?.();
     setIsDraggingDivider(true);
     const startX = e.clientX;
     const initialWidth = sideWidth;
@@ -166,10 +179,14 @@ export function ReaderScreen() {
       setIsDraggingDivider(false);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      dividerCleanupRef.current = null;
     };
 
+    dividerCleanupRef.current = onPointerUp;
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
   };
 
   /** لینک ۱۰ دقیقه‌ای تمام شده: آدرس تازه بگیر، همان‌جا بمان. */
@@ -233,7 +250,7 @@ export function ReaderScreen() {
                 title="دفترچه یادداشت"
                 aria-label="دفترچه یادداشت"
               >
-                <Icon name="i-layers" size={18} />
+                <Icon name="i-pen" size={18} />
               </button>
             </div>
           ) : undefined
@@ -241,31 +258,31 @@ export function ReaderScreen() {
       />
 
       {loading && (
-        <div className="page">
+        <div className="page page-enter">
           <LoadingBlock rows={2} />
         </div>
       )}
 
       {!loading && error != null && (
-        <div className="page">
+        <div className="page page-enter">
           <ErrorBlock error={error} onRetry={() => void load()} />
         </div>
       )}
 
       {!loading && !error && info && !info.available && (
-        <div className="page">
-          <EmptyState
-            icon="i-lock"
+        <div className="page page-enter">
+          <DsEmpty
+            icon={<Icon name="i-lock" size={28} />}
             title="این فایل داخل برنامه خوانده نمی‌شود"
-            text={
+            body={
               info.reason === 'not_previewable'
                 ? 'فرمت این فایل برای نمایش درون‌برنامه‌ای مناسب نیست (مثلاً پاورپوینت یا فایل فشرده). برای دیدنش باید از مسیر دریافت فایل استفاده کنی.'
                 : 'این فایل در حال حاضر قابل نمایش نیست.'
             }
             action={
-              <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+              <DsButton variant="ghost" size="sm" onClick={() => navigate(-1)}>
                 بازگشت به فهرست
-              </Button>
+              </DsButton>
             }
           />
         </div>
@@ -288,11 +305,17 @@ export function ReaderScreen() {
                     id={id}
                     url={url}
                     startPage={startPage}
-                    onProgress={(page, total) => persist('pdf', { page, total })}
+                    jumpRequest={jumpRequest}
+                    onProgress={(page, total) => {
+                      latest.current = { ...latest.current, page, total };
+                      setActivePage(page);
+                      persist('pdf', { page, total });
+                    }}
                     onExpired={refreshUrl}
                     onToggleSplitWorkspace={() =>
                       setSidePanel((p) => (p === 'ai_chat' ? 'none' : 'ai_chat'))
                     }
+                    onInkChanged={() => setNotebookKey((k) => k + 1)}
                     isAiOpen={sidePanel === 'ai_chat'}
                   />
                 ) : kind === 'video' || kind === 'audio' || kind === 'image' ? (
@@ -308,11 +331,11 @@ export function ReaderScreen() {
                     bg={kind === 'audio' ? { scope: scopeTyped, id } : undefined}
                   />
                 ) : (
-                  <div className="page">
-                    <EmptyState
-                      icon="i-doc"
+                  <div className="page page-enter">
+                    <DsEmpty
+                      icon={<Icon name="i-doc" size={28} />}
                       title="نمایش این نوع فایل پشتیبانی نمی‌شود"
-                      text="فقط PDF، ویدیو، صدا و تصویر داخل برنامه باز می‌شوند."
+                      body="فقط PDF، ویدیو، صدا و تصویر داخل برنامه باز می‌شوند."
                     />
                   </div>
                 )}
@@ -358,11 +381,14 @@ export function ReaderScreen() {
                   <NotebookPanel
                     scope={scopeTyped}
                     id={id}
-                    page={latest.current.page}
+                    page={activePage}
                     open={true}
+                    hideHeader
                     onClose={() => setSidePanel('none')}
                     onJump={(p) => {
-                      window.location.search = `?p=${p}`;
+                      setJumpRequest((prev) => ({ page: p, seq: (prev?.seq ?? 0) + 1 }));
+                      navigate(`?p=${p}`, { replace: true });
+                      if (window.innerWidth < 768) setSidePanel('none');
                     }}
                     refreshKey={notebookKey}
                   />
@@ -400,7 +426,7 @@ export function ReaderScreen() {
                         <span className="ai-top-flow-badge">دستیار هوشمند مطالعه</span>
                       </div>
                       <div className="ai-top-flow-subtitle">
-                        {info?.name ? `جزوهٔ «${info.name}»` : 'مطالعهٔ جزوه'} · صفحهٔ {faNum(latest.current.page || 1)}
+                        {info?.name ? `جزوهٔ «${info.name}»` : 'مطالعهٔ جزوه'} · صفحهٔ {faNum(activePage || 1)}
                       </div>
                     </div>
                   </div>

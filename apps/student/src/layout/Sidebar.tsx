@@ -1,29 +1,11 @@
 import { NavLink } from 'react-router-dom';
 import { Icon } from '../icons/Icon';
-import type { IconName } from '../icons/sprite';
 import { Brand } from '../components/Brand';
 import { faDigits } from '../lib/fa';
 import { useSession } from '../lib/session';
 import { useTheme } from '../lib/theme';
-import { sectionFor } from './section';
+import { SIDEBAR_ITEMS } from './nav';
 import { useSidebar } from './SidebarContext';
-
-interface NavItem {
-  to: string;
-  label: string;
-  icon: IconName;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'خانه', icon: 'i-home' },
-  { to: '/library', label: 'کتابخانه', icon: 'i-book' },
-  { to: '/exam', label: 'بانک سؤال', icon: 'i-flask' },
-  { to: '/ai', label: 'هوش‌یار', icon: 'i-chat' },
-  { to: '/grades', label: 'کارنامه و معدل', icon: 'i-award' },
-  { to: '/schedule', label: 'برنامه مطالعه', icon: 'i-calendar' },
-  { to: '/me/notes', label: 'دفترچه من', icon: 'i-pen' },
-  { to: '/me', label: 'پروفایل و حساب', icon: 'i-user' },
-];
 
 export function Sidebar() {
   const { user } = useSession();
@@ -82,19 +64,20 @@ export function Sidebar() {
       </div>
 
       <nav className="sidebar__nav">
-        {NAV_ITEMS.map((item) => (
+        {SIDEBAR_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             // '/me' must not match '/me/notes', or «دفترچه من» and «پروفایل» light up together
             end={item.to === '/' || item.to === '/me'}
-            data-section={sectionFor(item.to)}
+            data-section={item.section}
             className={({ isActive }) => `sidebar__link ${isActive ? 'active' : ''}`}
             title={item.label}
             aria-label={item.label}
           >
             <Icon name={item.icon} size={20} />
             <span className="sidebar__label">{item.label}</span>
+            <span className="sidebar__rail-label" aria-hidden="true">{item.shortLabel}</span>
           </NavLink>
         ))}
       </nav>

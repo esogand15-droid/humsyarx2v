@@ -155,7 +155,7 @@ export function TicketsScreen() {
       <AppBar
         title={selectedId != null ? `تیکت ${faNum(selectedId)}` : 'پشتیبانی و تیکت‌ها'}
         sub="پشتیبانی فنی و آموزشی"
-        back={idParam != null || showNewTicket}
+        back
         onBack={
           idParam != null
             ? () => setSelectedId(null)

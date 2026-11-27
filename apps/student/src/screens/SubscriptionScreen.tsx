@@ -162,7 +162,7 @@ export function SubscriptionScreen() {
 
   return (
     <>
-      <AppBar title="طرح‌های اشتراک" sub="دسترسی جامع به منابع و هوش پزشکی" />
+      <AppBar title="طرح‌های اشتراک" sub="دسترسی جامع به منابع و هوش پزشکی" back />
 
       <div className="page page-enter acct-page acct-sub-page">
         {loadError && (
@@ -344,7 +344,7 @@ export function SubscriptionScreen() {
 
                   {discount && (
                     <p className="acct-discount-ok" role="status">
-                      {faNum(discount.percent)}٪ تخفیف اعمال شد — مبلغ نهایی{' '}
+                      {faNum(discount.percent)}٪ تخفیف اعمال شد؛ مبلغ نهایی{' '}
                       {faNum(discount.final_price)} تومان
                     </p>
                   )}

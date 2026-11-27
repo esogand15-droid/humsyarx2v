@@ -1,5 +1,5 @@
 import { useCallback, type ReactNode } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 
 import '../core.css';
 import { AppBar, ListRow } from '../../components';
@@ -72,6 +72,7 @@ export function TermScreen() {
                   sub={l.teacher || 'منبع درسی'}
                   meta={`${faNum(l.session_count)} جلسه`}
                   to={`/library/lesson/${l._id}`}
+                  state={{ title: l.name }}
                   chevron
                 />
               ))}
@@ -86,11 +87,13 @@ export function TermScreen() {
 /* ─────────────── ۲) جلسه‌های یک درس ─────────────── */
 export function LessonScreen() {
   const { id = '' } = useParams();
+  const locState = useLocation().state as { title?: string } | null;
+  const lessonTitle = locState?.title || 'جلسه‌ها';
   const run = useCallback(() => library.sessions(id), [id]);
   const { data, error, loading, reload } = useAsync(run, [id]);
 
   return (
-    <LibraryShell title="جلسه‌ها" sub="ویدیو، جزوه و صوت هر جلسه">
+    <LibraryShell title={lessonTitle} sub="ویدیو، جزوه و صوت هر جلسه">
       {loading && <LoadingBlock />}
       {!loading && error != null && <ErrorBlock error={error} onRetry={reload} />}
       {!loading && !error && data && data.sessions.length === 0 && (
@@ -114,10 +117,11 @@ export function LessonScreen() {
                 <ListRow
                   key={s._id}
                   icon="i-play"
-                  title={`جلسهٔ ${faNum(s.number)} — ${s.topic}`}
+                  title={`جلسهٔ ${faNum(s.number)}: ${s.topic}`}
                   sub={s.teacher || 'جلسهٔ آموزشی'}
                   meta={`${faNum(s.file_count)} فایل`}
                   to={`/library/session/${s._id}`}
+                  state={{ title: `جلسهٔ ${faNum(s.number)}`, lessonTitle: s.topic || lessonTitle }}
                   chevron
                 />
               ))}
@@ -132,6 +136,7 @@ export function LessonScreen() {
 /* ─────────────── ۳) فایل‌های یک جلسه ─────────────── */
 export function SessionScreen() {
   const { id = '' } = useParams();
+  const locState = useLocation().state as { title?: string; lessonTitle?: string } | null;
   const run = useCallback(() => library.files(id), [id]);
   const { data, error, loading, reload } = useAsync(run, [id]);
 
@@ -144,7 +149,10 @@ export function SessionScreen() {
   };
 
   return (
-    <LibraryShell title="فایل‌های جلسه" sub="جزوه، ویدیو و فایل‌های ضمیمه">
+    <LibraryShell
+      title={locState?.title || 'فایل‌های جلسه'}
+      sub={locState?.lessonTitle || 'جزوه، ویدیو و فایل‌های ضمیمه'}
+    >
       {loading && <LoadingBlock />}
       {!loading && error != null && <ErrorBlock error={error} onRetry={reload} />}
       {!loading && !error && data && data.files.length === 0 && (
@@ -168,7 +176,7 @@ export function SessionScreen() {
                   sub={[fileLabel(f.type), humanSize(f.size)]
                     .filter(Boolean)
                     .join(' · ')}
-                  trailing={!f.preview ? <DsBadge tone="neutral">دریافت از ربات</DsBadge> : undefined}
+                  trailing={!f.preview ? <DsBadge tone="neutral">فقط از ربات تلگرام</DsBadge> : undefined}
                   to={f.preview ? readerPath('res', f.id) : undefined}
                   chevron={f.preview}
                 />
@@ -176,8 +184,8 @@ export function SessionScreen() {
             </div>
           </DsCard>
           <DsCard level="sunken" className="lib-note-card">
-            فایل‌های PDF، ویدیو و صوت مستقیماً داخل هامزیار باز می‌شوند. برای فایل‌های اسلاید،
-            می‌توانید آن‌ها را از ربات تلگرام دریافت کنید.
+            فایل‌های PDF، ویدیو و صوت مستقیماً داخل هم‌یار باز می‌شوند. فایل‌های اسلاید و ضمایمی که
+            برچسب «فقط از ربات تلگرام» دارند را در ربات رسمی تلگرام دریافت کنید.
           </DsCard>
         </div>
       )}

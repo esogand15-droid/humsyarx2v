@@ -5,16 +5,11 @@ import { useHeader } from './HeaderContext';
 import { useSidebar } from './SidebarContext';
 import { Brand } from '../components/Brand';
 import { IconButton } from '../components/IconButton';
+import { fallbackTitleFor } from './nav';
 
-const ROUTE_TITLES: Record<string, string> = {
+const PRIMARY_ROUTE_TITLES: Record<string, string> = {
   '/': 'داشبورد دانشجو',
   '/library': 'کتابخانه آموزشی',
-  '/exam': 'بانک سؤال و آزمون',
-  '/me/notes': 'دفترچه یادداشت من',
-  '/schedule': 'برنامه مطالعه',
-  '/me': 'پروفایل و حساب کاربری',
-  '/search': 'جستجوی سراسری',
-  '/notifications': 'مرکز اعلان‌ها',
 };
 
 export function DesktopHeader() {
@@ -27,12 +22,13 @@ export function DesktopHeader() {
   const isHomeScreen = location.pathname === '/' || location.pathname === '/login';
 
   const defaultTitle =
-    ROUTE_TITLES[location.pathname] ||
+    PRIMARY_ROUTE_TITLES[location.pathname] ||
+    fallbackTitleFor(location.pathname) ||
     (location.pathname.startsWith('/library/')
       ? 'کتابخانه آموزشی'
       : location.pathname.startsWith('/read/')
-      ? 'مطالعه جزوه'
-      : 'هامزیار');
+        ? 'مطالعه جزوه'
+        : 'هامزیار');
 
   const title = header.title || defaultTitle;
   const sub = header.sub;
@@ -68,9 +64,9 @@ export function DesktopHeader() {
         )}
         <Brand size="sm" />
         <div className="desktop-header__titles">
-          <div className="desktop-header__title">
+          <h1 className="desktop-header__title">
             <bdi dir="auto">{title}</bdi>
-          </div>
+          </h1>
           {sub && (
             <div className="desktop-header__sub">
               <bdi dir="auto">{sub}</bdi>

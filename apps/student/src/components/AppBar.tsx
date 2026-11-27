@@ -38,7 +38,7 @@ export function AppBar({ title, sub, back = false, actions, onBack }: AppBarProp
         />
       )}
       <div className="grow">
-        <div className="appbar__title">{title}</div>
+        <h1 className="appbar__title">{title}</h1>
         {sub && <div className="appbar__sub">{sub}</div>}
       </div>
       {actions}
