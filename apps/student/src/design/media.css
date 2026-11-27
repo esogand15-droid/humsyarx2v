@@ -667,8 +667,8 @@
   background: color-mix(in srgb, var(--hym-slate-900) 92%, transparent);
   border-color: color-mix(in srgb, var(--hym-amber-400) 45%, transparent);
   color: var(--hym-slate-0);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: var(--blur-sm);
+  backdrop-filter: var(--blur-sm);
 }
 
 [dir="rtl"] .mfail--overlay {

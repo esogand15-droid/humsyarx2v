@@ -1475,8 +1475,8 @@ html[data-theme="light"] .desktop-header {
   padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));
   border-top:1px solid var(--line);
   background:var(--glass-bg);
-  backdrop-filter:blur(20px) saturate(160%);
-  -webkit-backdrop-filter:blur(20px) saturate(160%);
+  backdrop-filter:var(--blur-md);
+  -webkit-backdrop-filter:var(--blur-md);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
 }
 .reader__counter{
@@ -1857,8 +1857,8 @@ html[data-theme="light"] .desktop-header {
   padding: 6px 14px;
   border-radius: 20px;
   background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -1987,8 +1987,8 @@ html[data-theme="light"] .desktop-header {
   border-radius: 9999px !important;
   background: rgba(13, 19, 33, 0.94) !important;
   border: 1px solid rgba(255, 255, 255, 0.16) !important;
-  backdrop-filter: blur(28px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  backdrop-filter: var(--blur-lg) !important;
+  -webkit-backdrop-filter: var(--blur-lg) !important;
   box-shadow: 0 16px 45px -8px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
   display: flex !important;
   flex-direction: row !important;
@@ -2374,8 +2374,8 @@ html[data-theme="light"] .desktop-header {
   background: rgba(13, 19, 33, 0.96) !important;
   border: 1px solid rgba(255, 255, 255, 0.16) !important;
   border-radius: 9999px !important;
-  backdrop-filter: blur(28px) !important;
-  -webkit-backdrop-filter: blur(28px) !important;
+  backdrop-filter: var(--blur-lg) !important;
+  -webkit-backdrop-filter: var(--blur-lg) !important;
   padding: 0 14px !important;
   display: flex !important;
   flex-direction: row !important;
@@ -2649,7 +2649,7 @@ html[data-theme="light"] .desktop-header {
   transform: translateX(-50%);
   background: rgba(15, 23, 42, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(24px);
+  backdrop-filter: var(--blur-lg);
   border-radius: 14px;
   padding: 6px;
   display: flex;
@@ -2831,8 +2831,8 @@ html[data-theme="light"] .desktop-header {
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.75),
               0 0 35px rgba(6, 182, 212, 0.1),
               inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  backdrop-filter: var(--blur-lg);
+  -webkit-backdrop-filter: var(--blur-lg);
   animation: loginCardPop 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes loginCardPop {
@@ -3242,8 +3242,8 @@ html[data-theme="light"] .desktop-header {
   inset: 0;
   z-index: 1200;
   background: rgba(3, 7, 18, 0.48);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1);
@@ -3265,8 +3265,8 @@ html[data-theme="light"] .desktop-header {
   display: flex;
   flex-direction: column;
   background: linear-gradient(170deg, rgba(15, 23, 42, 0.94) 0%, rgba(8, 14, 28, 0.98) 100%);
-  backdrop-filter: blur(32px) saturate(180%);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: var(--blur-lg);
+  -webkit-backdrop-filter: var(--blur-lg);
   border: 1px solid rgba(56, 189, 248, 0.28);
   border-radius: 24px;
   box-shadow: 
@@ -3341,7 +3341,7 @@ html[data-theme="light"] .desktop-header {
   inset: 0;
   z-index: 9999;
   background: rgba(6, 11, 22, 0.85);
-  backdrop-filter: blur(12px);
+  backdrop-filter: var(--blur-sm);
   overflow-y: auto;
 }
 

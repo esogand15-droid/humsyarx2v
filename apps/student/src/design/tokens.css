@@ -974,6 +974,26 @@ html.dark {
   --hym-radius-xl: 14px;
 }
 
+/* Backdrop blur scale: every backdrop-filter uses one of these three steps
+   (sm = scrims and small chips, md = popovers and sheets, lg = bars and rails). */
+:root {
+  --blur-sm: blur(8px);
+  --blur-md: blur(16px) saturate(160%);
+  --blur-lg: blur(24px) saturate(180%);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  html[data-theme="dark"],
+  html.dark {
+    --blur-sm: none;
+    --blur-md: none;
+    --blur-lg: none;
+    --lg-blur: none;
+    --lg-blur-subtle: none;
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────────────
    6. iOS 27 LIQUID GLASS CHROME TOKENS
    Shared across navigation bars, sidebars/rails, floating toolbars,

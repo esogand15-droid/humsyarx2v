@@ -246,8 +246,8 @@
   position: fixed;
   inset: 0;
   background: rgba(11, 15, 25, 0.65);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
   z-index: 1000;
   display: flex;
   justify-content: flex-end;
@@ -315,8 +315,8 @@
   box-sizing: border-box !important;
   overflow: hidden !important;
   background: radial-gradient(circle at 35% 30%, rgba(20, 36, 64, 0.96), rgba(7, 14, 26, 0.98)) !important;
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  backdrop-filter: var(--blur-lg);
+  -webkit-backdrop-filter: var(--blur-lg);
   border: 2px solid rgba(0, 242, 254, 0.6) !important;
   display: flex !important;
   align-items: center !important;
