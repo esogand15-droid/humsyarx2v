@@ -102,7 +102,7 @@ export function MeScreen() {
   const [devicesFromSecurity, setDevicesFromSecurity] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // فیلدهای فرم ویرایش پروفایل
+  // فیلد‌های فرم ویرایش پروفایل
   const [nameInput, setNameInput] = useState(cached?.profile?.name || '');
   const [nicknameInput, setNicknameInput] = useState(cached?.profile?.nickname || '');
   const [studentIdInput, setStudentIdInput] = useState(cached?.profile?.student_id || '');
@@ -354,7 +354,7 @@ export function MeScreen() {
               <div className="acct-identity__badges">
                 <DsBadge tone="success">
                   <Icon name="i-check" size={12} />
-                  <span>حساب تأییدشده</span>
+                  <span>حساب تأیید‌شده</span>
                 </DsBadge>
                 {group && <DsBadge tone="accent">{group}</DsBadge>}
                 {intake && <DsBadge tone="neutral">{intake}</DsBadge>}
@@ -522,25 +522,25 @@ export function MeScreen() {
               <div className="ds-list">
                 <MeNavRow
                   icon="i-trophy"
-                  title="رقابت و دستاوردها"
-                  sub="نشانها، پرستیژ، جدول رقابت و تازهها"
+                  title="رقابت و دستاورد‌ها"
+                  sub="نشانها، پرستیژ، جدول رقابت و تازه‌ها"
                   to="/me/badges"
                 />
                 <MeNavRow
                   icon="i-graduation"
                   title="کارنامه تحصیلی"
-                  sub="نمرهها و معدل وزنی"
+                  sub="نمره‌ها و معدل وزنی"
                   to="/grades"
                 />
                 <MeNavRow
                   icon="i-notebook"
                   title="دفتر من"
-                  sub="یادداشتها و خطکشیدههای جزوهها"
+                  sub="یادداشت‌ها و خط‌کشیده‌های جزوه‌ها"
                   to="/me/notes"
                 />
                 <MeNavRow
                   icon="i-pencil-ruler"
-                  title="سؤالهای طراحیشده"
+                  title="سؤال‌های طراحی‌شده"
                   sub="سؤالسازی، پیگیری تأیید و چالش پرستیژ"
                   to="/exam/my-designs"
                 />
@@ -552,38 +552,38 @@ export function MeScreen() {
               <div className="ds-list">
                 <MeNavRow
                   icon="i-wallet"
-                  title="اشتراک و کیفپول"
+                  title="اشتراک و کیف‌پول"
                   sub="وضعیت اشتراک، خانواده، هدیه و پرداخت"
                   to="/subscription"
                 />
                 <MeNavRow
                   icon="i-smartphone"
-                  title="دستگاههای من"
-                  sub="نشستها و دستگاههای متصل"
+                  title="دستگاه‌های من"
+                  sub="نشست‌ها و دستگاه‌های متصل"
                   onClick={() => openSheet('devices', false)}
                 />
                 <MeNavRow
                   icon="i-shield"
                   title="امنیت حساب"
-                  sub="محافظت از کد ورود و بررسی نشستها"
+                  sub="محافظت از کد ورود و بررسی نشست‌ها"
                   onClick={() => openSheet('security', false)}
                 />
               </div>
             </DsCard>
 
-            <h3 className="acct-group__title">اعلانها</h3>
+            <h3 className="acct-group__title">اعلان‌ها</h3>
             <DsCard flush>
               <div className="ds-list">
                 <MeNavRow
                   icon="i-inbox"
-                  title="صندوق اعلانها"
-                  sub="پیامها، سنجاقشدهها و بایگانی"
+                  title="صندوق اعلان‌ها"
+                  sub="پیامها، سنجاق‌شده‌ها و بایگانی"
                   to="/notifications"
                 />
                 <MeNavRow
                   icon="i-sliders"
-                  title="تنظیمات اطلاعرسانی"
-                  sub="انتخاب دستههای اعلان (آزمون، برنامه، منابع، هوشیار…)"
+                  title="تنظیمات اطلاع‌رسانی"
+                  sub="انتخاب دسته‌های اعلان (آزمون، برنامه، منابع، هوشیار…)"
                   to="/notifications?tab=settings"
                 />
               </div>
@@ -594,20 +594,20 @@ export function MeScreen() {
               <div className="ds-list">
                 <MeNavRow
                   icon="i-help-circle"
-                  title="راهنما و پرسشهای متداول"
-                  sub="جستوجو در پرسشهای پرتکرار و راهنمای نصب"
+                  title="راهنما و پرسش‌های متداول"
+                  sub="جست‌وجو در پرسش‌های پرتکرار و راهنمای نصب"
                   onClick={() => openSheet('faq', false)}
                 />
                 <MeNavRow
                   icon="i-lifebuoy"
-                  title="پشتیبانی و تیکتها"
+                  title="پشتیبانی و تیکت‌ها"
                   sub="ارسال درخواست و گفتگو با تیم پشتیبانی"
                   to="/tickets"
                 />
                 <MeNavRow
                   icon="i-flag"
-                  title="گزارشهای ایراد محتوا"
-                  sub="ثبت و پیگیری ایراد سؤالها و فایلها"
+                  title="گزارش‌های ایراد محتوا"
+                  sub="ثبت و پیگیری ایراد سؤال‌ها و فایل‌ها"
                   to="/me/reports"
                 />
               </div>

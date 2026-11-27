@@ -33,7 +33,7 @@ const REACTIONS: Array<{ kind: 'clap' | 'fire' | 'crown'; label: string }> = [
   { kind: 'crown', label: '👑 طلایی' },
 ];
 
-export function LeaderboardScreen() {
+export function LeaderboardScreen({ embedded = false }: { embedded?: boolean } = {}) {
   const [range, setRange] = useState('week');
   const [scope, setScope] = useState('all');
   const [tab, setTab] = useState('xp');
@@ -98,7 +98,7 @@ export function LeaderboardScreen() {
 
   return (
     <>
-      <AppBar
+      {!embedded && (<AppBar
         title="میدان رقابت"
         sub="رتبه‌بندی هوشمند، پیشرفت هفتگی و تازه‌های دانشجویان"
         back
@@ -108,9 +108,9 @@ export function LeaderboardScreen() {
             <span>نشان‌ها</span>
           </Link>
         }
-      />
+      />)}
 
-      <div className="page page-enter" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className={embedded ? 'lb-embedded' : 'page page-enter'} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <DsCard style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {RANGES.map(([k, lbl]) => (

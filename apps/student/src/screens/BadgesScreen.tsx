@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { AppBar, SkeletonStack, Switch, Toast } from '../components';
-import { DsBadge, DsButton, DsCard, DsEmpty, DsSegmented } from '../design/components';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+
+import './badges.css';
+import { AppBar, ProgressBar, Switch, Toast } from '../components';
+import { DsBadge, DsButton, DsCard, DsEmpty, DsSegmented, DsSkeleton } from '../design/components';
 import { Icon } from '../icons';
 import { errorText } from '../lib/api';
 import { faNum } from '../lib/fa';
@@ -11,6 +13,8 @@ import {
   type PrestigeHistoryItem,
   type PrestigeState,
 } from '../lib/profile';
+import { peek, put } from '../lib/swr';
+import { LeaderboardScreen } from './LeaderboardScreen';
 
 const KIND_TITLES: Record<string, string> = {
   lifetime: 'لحظه‌ای‌ها',
@@ -24,12 +28,26 @@ const KIND_TITLES: Record<string, string> = {
 
 const KIND_ORDER = ['lifetime', 'accuracy', 'community', 'secret', 'ancient', 'competition', 'founder'];
 
+type Tab = 'badges' | 'journey' | 'compete';
+const TABS: Tab[] = ['badges', 'journey', 'compete'];
+
+interface HubData {
+  prestige: PrestigeState | null;
+  badges: BadgesPayload | null;
+  history: PrestigeHistoryItem[];
+}
+
+const CACHE_KEY = 'me:prestige-hub';
+
+/** «رقابت و دستاورد‌ها» — نشانها، سفر پیشرفت و میدان رقابت در یک بخش. */
 export function BadgesScreen() {
-  const [tab, setTab] = useState<'badges' | 'journey'>('badges');
-  const [prestige, setPrestige] = useState<PrestigeState | null>(null);
-  const [badges, setBadges] = useState<BadgesPayload | null>(null);
-  const [history, setHistory] = useState<PrestigeHistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [params, setParams] = useSearchParams();
+  const tabParam = params.get('tab') as Tab | null;
+  const tab: Tab = tabParam && TABS.includes(tabParam) ? tabParam : 'badges';
+  const setTab = (t: Tab) => setParams(t === 'badges' ? {} : { tab: t }, { replace: true });
+
+  // Cached data paints the whole screen at once; the fetch only refreshes it.
+  const [data, setData] = useState<HubData | null>(() => peek<HubData>(CACHE_KEY) ?? null);
   const [err, setErr] = useState('');
   const [toast, setToast] = useState<string | null>(null);
 
@@ -39,8 +57,11 @@ export function BadgesScreen() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  const update = useCallback((fn: (d: HubData) => HubData) => {
+    setData((prev) => (prev ? put(CACHE_KEY, fn(prev)) : prev));
+  }, []);
+
   const loadAll = useCallback(async () => {
-    setLoading(true);
     setErr('');
     try {
       const [pRes, bRes, hRes] = await Promise.all([
@@ -48,13 +69,15 @@ export function BadgesScreen() {
         profileApi.prestigeBadges(),
         profileApi.prestigeHistory(40),
       ]);
-      setPrestige(pRes.prestige || null);
-      setBadges(bRes.badges || null);
-      setHistory(hRes.items || []);
+      setData(
+        put(CACHE_KEY, {
+          prestige: pRes.prestige || null,
+          badges: bRes.badges || null,
+          history: hRes.items || [],
+        }),
+      );
     } catch (e) {
       setErr(errorText(e, 'دریافت اطلاعات پرستیژ و نشان‌ها ناموفق بود.'));
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -62,136 +85,160 @@ export function BadgesScreen() {
     void loadAll();
   }, [loadAll]);
 
+  const prestige = data?.prestige ?? null;
+  const badges = data?.badges ?? null;
+  const history = data?.history ?? [];
+  const showcase = badges?.showcase || [];
+  const progressive = badges?.progressive || [];
+  const singles = useMemo(() => badges?.singles || [], [badges]);
+  const globals = badges?.global || [];
+  const earnedCount = singles.filter((s) => s.earned).length;
+  const byKey = useMemo(() => new Map(singles.map((s) => [s.key, s])), [singles]);
+
   async function togglePin(key: string, earned: boolean) {
     if (!earned || !badges) return;
-    const current = badges.showcase || [];
-    if (!current.includes(key) && current.length >= 3) {
+    if (!showcase.includes(key) && showcase.length >= 3) {
       setToast('حداکثر ۳ نشان می‌توانید در ویترین سنجاق کنید.');
       return;
     }
-    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key].slice(0, 3);
+    const next = showcase.includes(key) ? showcase.filter((k) => k !== key) : [...showcase, key].slice(0, 3);
     try {
       const res = await profileApi.setShowcase(next);
       const updated = res.showcase?.map((x) => x.key).filter(Boolean) || next;
-      setBadges((prev) => (prev ? { ...prev, showcase: updated } : prev));
-      setToast('ویترین نشان‌ها بروزرسانی شد.');
+      update((d) => (d.badges ? { ...d, badges: { ...d.badges, showcase: updated } } : d));
+      setToast('ویترین نشان‌ها به‌روز شد.');
     } catch (e) {
-      setToast(errorText(e, 'بروزرسانی ویترین ناموفق بود.'));
+      setToast(errorText(e, 'به‌روزرسانی ویترین ناموفق بود.'));
     }
   }
 
   async function togglePrivacy(nextVal: boolean) {
     try {
       const res = await profileApi.setPrestigePrivacy(nextVal);
-      setPrestige((prev) => (prev ? { ...prev, privacy_public: res.privacy_public } : prev));
+      update((d) => (d.prestige ? { ...d, prestige: { ...d.prestige, privacy_public: res.privacy_public } } : d));
       setToast(res.privacy_public ? 'نمایش پروفایل در رقابت عمومی روشن شد.' : 'حالت ناشناس در رقابت فعال شد.');
     } catch (e) {
       setToast(errorText(e, 'تغییر حریم عمومی ناموفق بود.'));
     }
   }
 
-  const showcase = badges?.showcase || [];
-  const progressive = badges?.progressive || [];
-  const singles = badges?.singles || [];
-  const globals = badges?.global || [];
+  const xp = prestige?.xp ?? 0;
+  const nextXp = prestige?.next_tier_xp ?? null;
+  const tierPct = nextXp && nextXp > 0 ? Math.min(100, (xp / nextXp) * 100) : 100;
 
   return (
     <>
-      <AppBar
-        title="نشان‌ها و پرستیژ من"
-        sub="رتبه علمی، ویترین افتخارات و تایم‌لاین پیشرفت"
-        back
-        actions={
-          <Link className="ds-btn ds-btn--ghost ds-btn--sm" to="/leaderboard">
-            <Icon name="i-trend" size={16} />
-            <span>میدان رقابت</span>
-          </Link>
-        }
-      />
+      <AppBar title="رقابت و دستاورد‌ها" sub="نشانها، سفر پیشرفت و میدان رقابت" back />
 
-      <div className="page page-enter" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {loading ? (
-          <SkeletonStack rows={4} />
-        ) : err ? (
+      <div className="page page-enter bdg">
+        {!data && !err ? (
+          <HubSkeleton />
+        ) : !data ? (
           <DsCard>
-            <p style={{ color: 'var(--danger)', margin: 0 }}>{err}</p>
-            <div style={{ marginTop: 8 }}>
-              <DsButton variant="secondary" size="sm" onClick={() => void loadAll()}>
-                تلاش دوباره
-              </DsButton>
-            </div>
+            <p className="bdg-error">{err}</p>
+            <DsButton variant="secondary" size="sm" onClick={() => void loadAll()}>
+              تلاش دوباره
+            </DsButton>
           </DsCard>
         ) : (
           <>
-            {prestige && (
-              <DsCard level="accent" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>
-                      {prestige.tier_icon || '🏅'} {prestige.tier_name || 'سطح فعلی'}
-                    </div>
-                    <div style={{ fontSize: '0.84rem', color: 'var(--ink-2)', marginTop: 4 }}>
-                      امتیاز XP کل: {faNum(prestige.xp ?? 0)}
-                      {typeof prestige.effective_xp === 'number' && ` · مؤثر: ${faNum(prestige.effective_xp)}`}
-                    </div>
-                  </div>
-                  <DsBadge tone="success">پله {faNum(prestige.tier ?? 1)}</DsBadge>
+            <section className="bdg-hero" aria-label="سطح پرستیژ">
+              <div className="bdg-hero__top">
+                <span className="bdg-hero__emblem" aria-hidden="true">
+                  {prestige?.tier_icon || '🏅'}
+                </span>
+                <div className="bdg-hero__id">
+                  <span className="bdg-hero__eyebrow">پلهٔ {faNum(prestige?.tier ?? 1)}</span>
+                  <h2 className="bdg-hero__tier">{prestige?.tier_name || 'سطح فعلی'}</h2>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                  <span style={{ fontSize: '0.85rem' }}>نمایش عمومی نام من در جدول رقابت و فید</span>
-                  <Switch
-                    label="نمایش عمومی در رقابت"
-                    checked={prestige.privacy_public !== false}
-                    onChange={(v) => void togglePrivacy(v)}
-                  />
+                <div className="bdg-hero__xp">
+                  <bdi>{faNum(xp)}</bdi>
+                  <span>XP</span>
                 </div>
-              </DsCard>
-            )}
+              </div>
+              <ProgressBar value={tierPct} thin />
+              <p className="bdg-hero__hint">
+                {nextXp && nextXp > xp ? `${faNum(nextXp - xp)} XP تا پلهٔ بعد` : 'بالاترین پلهٔ فعلی را فتح کرده‌اید'}
+                {typeof prestige?.effective_xp === 'number' && ` · امتیاز مؤثر ${faNum(prestige.effective_xp)}`}
+              </p>
+              <div className="bdg-stats">
+                <Stat label="نشان باز‌شده" value={`${faNum(earnedCount)} / ${faNum(singles.length)}`} />
+                <Stat label="ویترین" value={`${faNum(showcase.length)} / ۳`} />
+                <Stat label="رویداد سفر" value={faNum(history.length)} />
+              </div>
+            </section>
 
             <DsSegmented
               block
-              label="بخش‌های پرستیژ"
+              label="بخش‌های رقابت و دستاورد‌ها"
               value={tab}
               onChange={setTab}
               options={[
-                { value: 'badges', label: `کلکسیون نشان‌ها (${faNum(singles.filter((s) => s.earned).length)})` },
-                { value: 'journey', label: 'سفر پیشرفت من' },
+                { value: 'badges', label: 'نشان‌ها' },
+                { value: 'journey', label: 'سفر من' },
+                { value: 'compete', label: 'میدان رقابت' },
               ]}
             />
 
-            {tab === 'badges' ? (
+            {tab === 'badges' && (
               <>
-                <DsCard level="sunken">
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                    <Icon name="i-pin" size={14} /> ویترین افتخارات ({faNum(showcase.length)} از ۳)
+                <DsCard className="bdg-card">
+                  <header className="bdg-card__head">
+                    <h3>ویترین افتخارات</h3>
+                    <span className="bdg-card__meta">روی نشان باز‌شده بزنید تا سنجاق شود</span>
+                  </header>
+                  <div className="bdg-showcase">
+                    {[0, 1, 2].map((i) => {
+                      const item = showcase[i] ? byKey.get(showcase[i]) : undefined;
+                      return item ? (
+                        <button
+                          key={i}
+                          type="button"
+                          className="bdg-slot bdg-slot--filled"
+                          onClick={() => void togglePin(item.key, true)}
+                          aria-label={`برداشتن ${item.title} از ویترین`}
+                        >
+                          <span className="bdg-slot__icon">{item.icon}</span>
+                          <span className="bdg-slot__title">{item.title}</span>
+                        </button>
+                      ) : (
+                        <div key={i} className="bdg-slot" aria-hidden="true">
+                          <Icon name="i-pin" size={16} />
+                        </div>
+                      );
+                    })}
                   </div>
-                  <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ink-2)' }}>
-                    {showcase.length > 0
-                      ? 'روی هر نشان بازشده بزنید تا در کارت پروفایل عمومی شما سنجاق یا حذف شود.'
-                      : 'هنوز نشانی پین نکرده‌اید؛ روی یکی از نشان‌های بازشده ضربه بزنید.'}
-                  </p>
                 </DsCard>
 
                 {progressive.length > 0 && (
-                  <DsCard style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>نشان‌های تکاملی</h2>
-                    {progressive.map((b) => (
-                      <DsCard key={b.key} level="sunken">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                          <strong>
-                            {b.icon} {b.title}
-                          </strong>
-                          <DsBadge tone="accent">
-                            پله {faNum(b.tier)} / {faNum(b.tiers_count)}
-                          </DsBadge>
-                        </div>
-                        <div style={{ fontSize: '0.82rem', color: 'var(--ink-2)', marginTop: 6 }}>
-                          {b.next_target
-                            ? `${faNum(b.value)} از ${faNum(b.next_target)} · پله بعدی: +${faNum(b.next_xp ?? 0)} XP`
-                            : 'بالاترین سطح این نشان فتح شده است!'}
-                        </div>
-                      </DsCard>
-                    ))}
+                  <DsCard className="bdg-card">
+                    <header className="bdg-card__head">
+                      <h3>نشان‌های تکاملی</h3>
+                    </header>
+                    <div className="bdg-prog">
+                      {progressive.map((b) => {
+                        const pct = b.next_target ? Math.min(100, (b.value / b.next_target) * 100) : 100;
+                        return (
+                          <div key={b.key} className="bdg-prog__row">
+                            <span className="bdg-prog__icon" aria-hidden="true">{b.icon}</span>
+                            <div className="bdg-prog__body">
+                              <div className="bdg-prog__line">
+                                <strong>{b.title}</strong>
+                                <span className="bdg-card__meta">
+                                  پلهٔ {faNum(b.tier)} از {faNum(b.tiers_count)}
+                                </span>
+                              </div>
+                              <ProgressBar value={pct} thin tone={b.next_target ? 'accent' : 'good'} />
+                              <span className="bdg-card__meta">
+                                {b.next_target
+                                  ? `${faNum(b.value)} از ${faNum(b.next_target)} · پاداش پلهٔ بعد ${faNum(b.next_xp ?? 0)} XP`
+                                  : 'بالاترین سطح این نشان فتح شده است'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </DsCard>
                 )}
 
@@ -199,43 +246,36 @@ export function BadgesScreen() {
                   const group = singles.filter((s) => s.kind === kind);
                   if (!group.length) return null;
                   return (
-                    <DsCard key={kind} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700 }}>
-                          {KIND_TITLES[kind] || kind}
-                        </h3>
+                    <DsCard key={kind} className="bdg-card">
+                      <header className="bdg-card__head">
+                        <h3>{KIND_TITLES[kind] || kind}</h3>
                         <DsBadge>
                           {faNum(group.filter((g) => g.earned).length)} / {faNum(group.length)}
                         </DsBadge>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: 8 }}>
+                      </header>
+                      <div className="bdg-grid">
                         {group.map((item) => {
-                          const isPinned = showcase.includes(item.key);
+                          const pinned = showcase.includes(item.key);
+                          const hidden = Boolean(item.secret) && !item.earned;
                           return (
                             <button
                               key={item.key}
                               type="button"
-                              className="ds-card"
+                              className={`bdg-tile${item.earned ? ' is-earned' : ' is-locked'}${pinned ? ' is-pinned' : ''}`}
                               onClick={() => void togglePin(item.key, item.earned)}
-                              style={{
-                                textAlign: 'right',
-                                opacity: item.earned || item.secret ? 1 : 0.55,
-                                borderColor: isPinned ? 'var(--brand)' : undefined,
-                                cursor: item.earned ? 'pointer' : 'default',
-                              }}
+                              disabled={!item.earned}
+                              aria-pressed={item.earned ? pinned : undefined}
                             >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-                                <strong>
-                                  {item.icon} {item.title}
-                                </strong>
-                                {isPinned && <DsBadge tone="accent">سنجاق</DsBadge>}
-                              </div>
-                              <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--ink-2)', lineHeight: 1.6 }}>
-                                {item.desc}
-                              </p>
-                              {item.count && item.count > 1 && (
-                                <DsBadge tone="neutral">×{faNum(item.count)} بار</DsBadge>
-                              )}
+                              <span className="bdg-tile__icon" aria-hidden="true">
+                                {hidden ? '؟' : item.icon}
+                              </span>
+                              <span className="bdg-tile__title">{hidden ? 'نشان پنهان' : item.title}</span>
+                              <span className="bdg-tile__desc">{hidden ? 'با کشف آن غافلگیر می‌شوید' : item.desc}</span>
+                              <span className="bdg-tile__foot">
+                                {pinned && <DsBadge tone="accent">سنجاق</DsBadge>}
+                                {!item.earned && <DsBadge tone="neutral">قفل</DsBadge>}
+                                {item.count && item.count > 1 ? <DsBadge>×{faNum(item.count)}</DsBadge> : null}
+                              </span>
                             </button>
                           );
                         })}
@@ -245,58 +285,118 @@ export function BadgesScreen() {
                 })}
 
                 {globals.length > 0 && (
-                  <DsCard style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>نشان‌های جهانی (تک‌مالکی)</h2>
-                    {globals.map((g) => (
-                      <DsCard key={g.key} level="sunken">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                          <strong>
-                            {g.icon} {g.title}
-                          </strong>
+                  <DsCard className="bdg-card">
+                    <header className="bdg-card__head">
+                      <h3>نشان‌های جهانی</h3>
+                      <span className="bdg-card__meta">هر کدام فقط یک دارنده دارد</span>
+                    </header>
+                    <div className="bdg-globals">
+                      {globals.map((g) => (
+                        <div key={g.key} className="bdg-global">
+                          <span className="bdg-prog__icon" aria-hidden="true">{g.icon}</span>
+                          <strong>{g.title}</strong>
                           <DsBadge tone={g.owned_by_me ? 'success' : g.claimed ? 'neutral' : 'warning'}>
                             {g.claimed ? (g.owned_by_me ? 'متعلق به شما' : `دارنده: ${g.owner_name || 'دانشجو'}`) : 'آزاد'}
                           </DsBadge>
                         </div>
-                      </DsCard>
-                    ))}
+                      ))}
+                    </div>
+                  </DsCard>
+                )}
+
+                {prestige && (
+                  <DsCard className="bdg-card bdg-privacy">
+                    <div>
+                      <h3>نمایش عمومی در رقابت</h3>
+                      <span className="bdg-card__meta">نام شما در جدول رقابت و تازه‌ها دیده شود</span>
+                    </div>
+                    <Switch
+                      label="نمایش عمومی در رقابت"
+                      checked={prestige.privacy_public !== false}
+                      onChange={(v) => void togglePrivacy(v)}
+                    />
                   </DsCard>
                 )}
               </>
-            ) : history.length === 0 ? (
-              <DsCard>
-                <DsEmpty
-                  icon={<Icon name="i-award" size={28} />}
-                  title="هنوز رویدادی در سفر شما ثبت نشده"
-                  body="با شرکت در آزمون‌ها، دانلود جزوه و گفت‌وگو با هوشیار سفر خود را شروع کنید."
-                />
-              </DsCard>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {history.map((item, i) => (
-                  <DsCard key={i}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                      <strong>
-                        {item.icon ? `${item.icon} ` : ''}
-                        {item.title}
-                      </strong>
-                      {typeof item.delta === 'number' && item.delta !== 0 && (
-                        <DsBadge tone={item.delta > 0 ? 'success' : 'neutral'}>
-                          +{faNum(item.delta)} XP
-                        </DsBadge>
-                      )}
-                    </div>
-                    {item.at_jalali && (
-                      <div style={{ fontSize: '0.78rem', color: 'var(--ink-2)', marginTop: 4 }}>{item.at_jalali}</div>
-                    )}
-                  </DsCard>
-                ))}
-              </div>
             )}
+
+            {tab === 'journey' &&
+              (history.length === 0 ? (
+                <DsCard>
+                  <DsEmpty
+                    icon={<Icon name="i-trophy" size={28} />}
+                    title="سفر شما از همین‌جا شروع می‌شود"
+                    body="با شرکت در آزمونها، مطالعهٔ جزوه و گفت‌وگو با هوشیار، اولین قدم‌ها اینجا ثبت می‌شوند."
+                  />
+                </DsCard>
+              ) : (
+                <DsCard className="bdg-card">
+                  <ol className="bdg-timeline">
+                    {history.map((item, i) => (
+                      <li key={i} className="bdg-timeline__item">
+                        <span className="bdg-timeline__dot" aria-hidden="true">
+                          {item.icon || '•'}
+                        </span>
+                        <div className="bdg-timeline__body">
+                          <strong>{item.title}</strong>
+                          {item.at_jalali && <span className="bdg-card__meta">{item.at_jalali}</span>}
+                        </div>
+                        {typeof item.delta === 'number' && item.delta !== 0 && (
+                          <DsBadge tone={item.delta > 0 ? 'success' : 'neutral'}>
+                            {item.delta > 0 ? '+' : '−'}
+                            {faNum(Math.abs(item.delta))} XP
+                          </DsBadge>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </DsCard>
+              ))}
+
+            {tab === 'compete' && <LeaderboardScreen embedded />}
           </>
         )}
       </div>
 
       <Toast message={toast} />
     </>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bdg-stat">
+      <bdi className="bdg-stat__value">{value}</bdi>
+      <span className="bdg-stat__label">{label}</span>
+    </div>
+  );
+}
+
+/** Same shape as the loaded screen, so nothing jumps when the data lands. */
+function HubSkeleton() {
+  return (
+    <div className="bdg-skel" aria-hidden="true">
+      <div className="bdg-hero">
+        <div className="bdg-hero__top">
+          <DsSkeleton shape="circle" />
+          <div className="bdg-skel__id">
+            <DsSkeleton shape="text" />
+            <DsSkeleton shape="title" />
+          </div>
+        </div>
+        <DsSkeleton shape="text" />
+        <div className="bdg-stats">
+          <DsSkeleton shape="row" />
+          <DsSkeleton shape="row" />
+          <DsSkeleton shape="row" />
+        </div>
+      </div>
+      <DsSkeleton shape="row" />
+      <div className="bdg-grid">
+        {Array.from({ length: 6 }, (_, i) => (
+          <DsSkeleton key={i} shape="card" />
+        ))}
+      </div>
+    </div>
   );
 }

@@ -39,7 +39,6 @@ const AiLiveScreen = lazy(() => import('./screens/ai/AiLiveScreen').then((m) => 
 const GradesScreen = lazy(() => import('./screens/GradesScreen').then((m) => ({ default: m.GradesScreen })));
 const SubscriptionScreen = lazy(() => import('./screens/SubscriptionScreen').then((m) => ({ default: m.SubscriptionScreen })));
 const PaymentVerifyScreen = lazy(() => import('./screens/PaymentVerifyScreen').then((m) => ({ default: m.PaymentVerifyScreen })));
-const LeaderboardScreen = lazy(() => import('./screens/LeaderboardScreen').then((m) => ({ default: m.LeaderboardScreen })));
 const BadgesScreen = lazy(() => import('./screens/BadgesScreen').then((m) => ({ default: m.BadgesScreen })));
 const MyReportsScreen = lazy(() => import('./screens/MyReportsScreen').then((m) => ({ default: m.MyReportsScreen })));
 const NotificationsScreen = lazy(() => import('./screens/NotificationsScreen').then((m) => ({ default: m.NotificationsScreen })));
@@ -248,7 +247,7 @@ export function App() {
         <Route path="/grades" element={<Gate><GradesScreen /></Gate>} />
         <Route path="/subscription" element={<Gate><SubscriptionScreen /></Gate>} />
         <Route path="/payment/verify" element={<Gate><PaymentVerifyScreen /></Gate>} />
-        <Route path="/leaderboard" element={<Gate><LeaderboardScreen /></Gate>} />
+        <Route path="/leaderboard" element={<Navigate to="/me/badges?tab=compete" replace />} />
         <Route path="/notifications" element={<Gate><NotificationsScreen /></Gate>} />
         <Route path="/tickets" element={<Gate><TicketsScreen /></Gate>} />
         <Route path="/tickets/:id" element={<Gate><TicketsScreen /></Gate>} />
