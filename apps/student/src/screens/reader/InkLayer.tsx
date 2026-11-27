@@ -11,6 +11,8 @@ import {
   type Stroke,
 } from '../../lib/ink';
 import { getCachedInkPage, setCachedInkPage } from './readerPageCache';
+import { Icon } from '../../icons';
+import './ink-select.css';
 
 export interface InkApi {
   undo: () => void;
@@ -68,6 +70,50 @@ const MAX_FLING_PX_MS = 6;
  * canvas as a whole, so a stroke that crosses itself or a neighbour keeps one even tint.
  */
 const HIGHLIGHTER_ALPHA = 0.38;
+
+/** Lasso-copied strokes, relative to their selection box; shared by every page so paste works anywhere. */
+let inkClipboard: { strokes: Stroke[]; w: number; h: number } | null = null;
+
+const SELECTION_COLORS = ['#111827', '#2563EB', '#DC2626', '#16A34A', '#F59E0B', '#9333EA'];
+
+type Box = { minX: number; minY: number; maxX: number; maxY: number };
+type SelMenu =
+  | { mode: 'strokes' | 'region'; box: Box; count: number }
+  | { mode: 'paste'; x: number; y: number };
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+function CameraGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.4-2h5l1.4 2h1.6A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" />
+      <circle cx="12" cy="12.5" r="3.4" />
+    </svg>
+  );
+}
+
+function SaveGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 4v11" />
+      <path d="m7.5 10.5 4.5 4.5 4.5-4.5" />
+      <path d="M5 19h14" />
+    </svg>
+  );
+}
+
+function PasteGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="6" y="5" width="12" height="15" rx="2.4" />
+      <path d="M9.5 5V3.8h5V5" />
+      <path d="M9.5 11h5M9.5 14.5h3.5" />
+    </svg>
+  );
+}
 
 function findScrollParent(el: HTMLElement | null): HTMLElement | null {
   for (let node = el?.parentElement ?? null; node; node = node.parentElement) {
@@ -315,6 +361,12 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
     scroller: HTMLElement | null;
   } | null>(null);
   const momentumRaf = useRef<number | null>(null);
+  /** Lasso area when it caught no strokes: still screenshot-able (the PDF under it). */
+  const regionBox = useRef<Box | null>(null);
+  const [selMenu, setSelMenu] = useState<SelMenu | null>(null);
+  const [selColors, setSelColors] = useState(false);
+  const [selNote, setSelNote] = useState<{ text: string; error?: boolean } | null>(null);
+  const selNoteTimer = useRef<number | undefined>(undefined);
   const paintRaf = useRef<number | null>(null);
   /** Bitmap of committed strokes, kept only while a stroke is live so per-frame cost stays flat. */
   const committedCache = useRef<{
@@ -702,6 +754,9 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
       for (let i = 1; i < lassoPoints.current.length; i++) {
         ctx.lineTo(lassoPoints.current[i].x * width, lassoPoints.current[i].y * height);
       }
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(37, 99, 235, 0.06)';
+      ctx.fill();
       ctx.stroke();
       ctx.restore();
     }
@@ -719,6 +774,20 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
       const bh = (selectionBBox.current.maxY - selectionBBox.current.minY + 0.02) * height;
       ctx.fillRect(bx, by, bw, bh);
       ctx.strokeRect(bx, by, bw, bh);
+      ctx.restore();
+    } else if (regionBox.current) {
+      const r = regionBox.current;
+      ctx.save();
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = '#0EA5E9';
+      ctx.lineWidth = 2;
+      ctx.fillStyle = 'rgba(14, 165, 233, 0.07)';
+      const rx = r.minX * width;
+      const ry = r.minY * height;
+      const rw = (r.maxX - r.minX) * width;
+      const rh = (r.maxY - r.minY) * height;
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.strokeRect(rx, ry, rw, rh);
       ctx.restore();
     }
   }, [width, height, tool, drawStrokeOnCtx]);
@@ -951,6 +1020,9 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
     if (tool !== 'lasso') {
       selectedIds.current.clear();
       selectionBBox.current = null;
+      regionBox.current = null;
+      setSelMenu(null);
+      setSelColors(false);
       lassoPoints.current = [];
       paint();
     }
@@ -1065,6 +1137,8 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
         // شروع جابه‌جایی استروک‌های انتخاب‌شده
         isDraggingSelection.current = true;
         dragStartPt.current = { x: pt.x, y: pt.y };
+        setSelMenu(null);
+        setSelColors(false);
         return;
       }
       // شروع منحنی جدید کمند
@@ -1072,6 +1146,9 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
       selectionBBox.current = null;
       isDraggingSelection.current = false;
       dragStartPt.current = null;
+      regionBox.current = null;
+      setSelMenu(null);
+      setSelColors(false);
       lassoPoints.current = [pt];
       paint();
       return;
@@ -1235,10 +1312,14 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
         dragStartPt.current = null;
         commit([...strokesRef.current]);
         paint();
+        showSelectionMenu();
         return;
       }
       const poly = lassoPoints.current;
       lassoPoints.current = [];
+      selectedIds.current.clear();
+      selectionBBox.current = null;
+      regionBox.current = null;
       if (poly.length > 2) {
         const matched = new Set<string>();
         let bMinX = 1.0, bMaxX = 0.0, bMinY = 1.0, bMaxY = 0.0;
@@ -1262,12 +1343,23 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
           selectedIds.current = matched;
           selectionBBox.current = { minX: bMinX, minY: bMinY, maxX: bMaxX, maxY: bMaxY };
         } else {
-          selectedIds.current.clear();
-          selectionBBox.current = null;
+          let rMinX = 1, rMaxX = 0, rMinY = 1, rMaxY = 0;
+          for (const p of poly) {
+            rMinX = Math.min(rMinX, p.x);
+            rMaxX = Math.max(rMaxX, p.x);
+            rMinY = Math.min(rMinY, p.y);
+            rMaxY = Math.max(rMaxY, p.y);
+          }
+          if (rMaxX - rMinX > 0.02 && rMaxY - rMinY > 0.01) {
+            regionBox.current = { minX: rMinX, minY: rMinY, maxX: rMaxX, maxY: rMaxY };
+          }
         }
+        showSelectionMenu();
+      } else if (poly.length > 0 && inkClipboard && inkClipboard.strokes.length > 0) {
+        // A tap with something on the clipboard offers to paste it here.
+        setSelMenu({ mode: 'paste', x: poly[0].x, y: poly[0].y });
       } else {
-        selectedIds.current.clear();
-        selectionBBox.current = null;
+        setSelMenu(null);
       }
       paint();
       return;
@@ -1308,6 +1400,247 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
     }
     if (e.pointerId === activePointer.current) abandonActive();
   };
+
+  // ── Lasso selection actions ────────────────────────────────
+  const flashNote = (text: string, error = false) => {
+    setSelNote({ text, error });
+    if (selNoteTimer.current) window.clearTimeout(selNoteTimer.current);
+    selNoteTimer.current = window.setTimeout(() => setSelNote(null), 1800);
+  };
+
+  useEffect(() => () => window.clearTimeout(selNoteTimer.current), []);
+
+  function showSelectionMenu() {
+    if (selectedIds.current.size > 0 && selectionBBox.current) {
+      setSelMenu({ mode: 'strokes', box: { ...selectionBBox.current }, count: selectedIds.current.size });
+    } else if (regionBox.current) {
+      setSelMenu({ mode: 'region', box: { ...regionBox.current }, count: 0 });
+    } else {
+      setSelMenu(null);
+    }
+  }
+
+  const clearSelection = () => {
+    selectedIds.current.clear();
+    selectionBBox.current = null;
+    regionBox.current = null;
+    setSelMenu(null);
+    setSelColors(false);
+    paint();
+  };
+
+  const copySelection = () => {
+    const box = selectionBBox.current;
+    const picked = strokesRef.current.filter((s) => selectedIds.current.has(s.stroke_id));
+    if (!box || picked.length === 0) return false;
+    inkClipboard = {
+      strokes: picked.map((s) => ({
+        ...s,
+        points: s.points.map((p) => ({ ...p, x: p.x - box.minX, y: p.y - box.minY })),
+      })),
+      w: box.maxX - box.minX,
+      h: box.maxY - box.minY,
+    };
+    return true;
+  };
+
+  const deleteSelection = () => {
+    if (selectedIds.current.size === 0) return;
+    commit(strokesRef.current.filter((s) => !selectedIds.current.has(s.stroke_id)));
+    clearSelection();
+  };
+
+  const recolorSelection = (c: string) => {
+    const now = new Date().toISOString();
+    commit(
+      strokesRef.current.map((s) =>
+        selectedIds.current.has(s.stroke_id) ? { ...s, color: c, updated_at: now } : s,
+      ),
+    );
+    setSelColors(false);
+    paint();
+  };
+
+  const pasteAt = (x: number, y: number) => {
+    const clip = inkClipboard;
+    if (!clip || clip.strokes.length === 0) return;
+    const ox = Math.min(Math.max(0, x), Math.max(0, 1 - clip.w));
+    const oy = Math.min(Math.max(0, y), Math.max(0, 1 - clip.h));
+    const now = new Date().toISOString();
+    const pasted = clip.strokes.map((s) => ({
+      ...s,
+      stroke_id: generateUUID(),
+      created_at: now,
+      updated_at: now,
+      points: s.points.map((p) => ({ ...p, x: clamp01(p.x + ox), y: clamp01(p.y + oy) })),
+    }));
+    commit([...strokesRef.current, ...pasted]);
+    selectedIds.current = new Set(pasted.map((s) => s.stroke_id));
+    selectionBBox.current = { minX: ox, minY: oy, maxX: ox + clip.w, maxY: oy + clip.h };
+    regionBox.current = null;
+    showSelectionMenu();
+    paint();
+  };
+
+  /** Renders the selected area (PDF page + ink, re-drawn as vectors) into a fresh canvas. */
+  const captureRegion = (withPage: boolean): HTMLCanvasElement | null => {
+    const sel = selectedIds.current.size > 0 ? selectionBBox.current : null;
+    const box = sel
+      ? { minX: sel.minX - 0.01, minY: sel.minY - 0.01, maxX: sel.maxX + 0.01, maxY: sel.maxY + 0.01 }
+      : regionBox.current;
+    if (!box || !width || !height) return null;
+    const host = canvasRef.current?.parentElement ?? null;
+    const img = withPage ? host?.querySelector<HTMLImageElement>('img.pdf-page__img') ?? null : null;
+    const imgReady = !!img && img.complete && img.naturalWidth > 0;
+    const scale = Math.min(3, Math.max(1.5, imgReady ? img!.naturalWidth / width : 2));
+    const rx = clamp01(box.minX) * width;
+    const ry = clamp01(box.minY) * height;
+    const rw = Math.max(1, (clamp01(box.maxX) - clamp01(box.minX)) * width);
+    const rh = Math.max(1, (clamp01(box.maxY) - clamp01(box.minY)) * height);
+    const out = document.createElement('canvas');
+    out.width = Math.round(rw * scale);
+    out.height = Math.round(rh * scale);
+    const o = out.getContext('2d');
+    if (!o) return null;
+    o.fillStyle = '#ffffff';
+    o.fillRect(0, 0, out.width, out.height);
+    if (imgReady && img) {
+      const kx = img.naturalWidth / width;
+      const ky = img.naturalHeight / height;
+      o.drawImage(img, rx * kx, ry * ky, rw * kx, rh * ky, 0, 0, out.width, out.height);
+    }
+    const place = (c: CanvasRenderingContext2D) => c.setTransform(scale, 0, 0, scale, -rx * scale, -ry * scale);
+    const hl = strokesRef.current.filter((s) => s.tool === 'highlighter');
+    if (hl.length > 0) {
+      const h = document.createElement('canvas');
+      h.width = out.width;
+      h.height = out.height;
+      const hc = h.getContext('2d');
+      if (hc) {
+        place(hc);
+        for (const s of hl) drawStrokeOnCtx(hc, s);
+        o.save();
+        o.globalAlpha = HIGHLIGHTER_ALPHA;
+        o.globalCompositeOperation = 'multiply';
+        o.drawImage(h, 0, 0);
+        o.restore();
+      }
+      h.width = 0;
+    }
+    o.save();
+    place(o);
+    for (const s of strokesRef.current) if (s.tool !== 'highlighter') drawStrokeOnCtx(o, s);
+    o.restore();
+    return out;
+  };
+
+  const selectionImage = (): Promise<Blob> => {
+    const toBlob = (c: HTMLCanvasElement | null) =>
+      new Promise<Blob>((resolve, reject) => {
+        if (!c) return reject(new Error('no_region'));
+        try {
+          c.toBlob((b) => (b ? resolve(b) : reject(new Error('no_blob'))), 'image/png');
+        } catch (err) {
+          reject(err);
+        }
+      });
+    // A cross-origin page image taints the canvas; fall back to the ink alone.
+    return toBlob(captureRegion(true)).catch(() => toBlob(captureRegion(false)));
+  };
+
+  const saveBlob = async (blob: Blob) => {
+    const name = `hamyar-page-${page}.png`;
+    const file = typeof File !== 'undefined' ? new File([blob], name, { type: 'image/png' }) : null;
+    const nav = navigator as Navigator & { canShare?: (d: unknown) => boolean };
+    if (file && nav.canShare?.({ files: [file] }) && typeof nav.share === 'function') {
+      // iPad/phone: the share sheet offers "Save Image" to Photos.
+      await nav.share({ files: [file] });
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
+
+  const screenshotSelection = () => {
+    // The blob promise goes straight into ClipboardItem inside the tap, as Safari requires.
+    const blob = selectionImage();
+    const CI = (window as unknown as { ClipboardItem?: new (items: Record<string, Promise<Blob>>) => ClipboardItem })
+      .ClipboardItem;
+    if (CI && navigator.clipboard?.write) {
+      navigator.clipboard.write([new CI({ 'image/png': blob })]).then(
+        () => flashNote('تصویر کپی شد'),
+        () =>
+          blob
+            .then(saveBlob)
+            .then(() => flashNote('تصویر ذخیره شد'))
+            .catch(() => flashNote('ثبت تصویر انجام نشد', true)),
+      );
+      return;
+    }
+    blob
+      .then(saveBlob)
+      .then(() => flashNote('تصویر ذخیره شد'))
+      .catch(() => flashNote('ثبت تصویر انجام نشد', true));
+  };
+
+  const saveSelectionImage = () => {
+    selectionImage()
+      .then(saveBlob)
+      .then(() => flashNote('تصویر ذخیره شد'))
+      .catch((err: unknown) => {
+        if ((err as { name?: string })?.name === 'AbortError') return;
+        flashNote('ذخیرهٔ تصویر انجام نشد', true);
+      });
+  };
+
+  const selActions = useRef({ copySelection, deleteSelection, clearSelection, flashNote });
+  selActions.current = { copySelection, deleteSelection, clearSelection, flashNote };
+
+  // Keyboard on a selection: Delete/Backspace removes it, Ctrl/Cmd+C/X copy or cut it.
+  const hasStrokeSelection = selMenu?.mode === 'strokes';
+  useEffect(() => {
+    if (!hasStrokeSelection) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const a = selActions.current;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        a.deleteSelection();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+        e.preventDefault();
+        if (a.copySelection()) a.flashNote('کپی شد');
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'x' || e.key === 'X')) {
+        e.preventDefault();
+        if (a.copySelection()) a.deleteSelection();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [hasStrokeSelection]);
+
+  let menuStyle: React.CSSProperties | undefined;
+  if (selMenu) {
+    const half = Math.min(150, width / 2);
+    if (selMenu.mode === 'paste') {
+      const left = Math.min(Math.max(selMenu.x * width, half), width - half);
+      const top = Math.max(6, selMenu.y * height - 52);
+      menuStyle = { left, top };
+    } else {
+      const b = selMenu.box;
+      const cx = ((b.minX + b.maxX) / 2) * width;
+      const left = Math.min(Math.max(cx, half), width - half);
+      let top = (b.minY - 0.01) * height - 54;
+      if (top < 6) top = Math.min(height - 52, (b.maxY + 0.01) * height + 10);
+      menuStyle = { left, top };
+    }
+  }
 
   useImperativeHandle(ref, () => ({
     undo: () => {
@@ -1385,6 +1718,125 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
         style={{ width, height, position: 'absolute', inset: 0, zIndex: 4, pointerEvents: 'none' }}
         aria-hidden="true"
       />
+      {selMenu && tool === 'lasso' && (
+        <div
+          className="ink-sel-menu"
+          style={menuStyle}
+          onPointerDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {selNote && (
+            <span className={`ink-sel-menu__note${selNote.error ? ' is-error' : ''}`} role="status">
+              {selNote.text}
+            </span>
+          )}
+          <div className="ink-sel-menu__bar" role="toolbar" aria-label="کارهای ناحیهٔ انتخابشده">
+            {selMenu.mode === 'paste' ? (
+              <button
+                type="button"
+                className="ink-sel-menu__btn"
+                onClick={() => pasteAt(selMenu.x, selMenu.y)}
+              >
+                <PasteGlyph />
+                چسباندن
+              </button>
+            ) : (
+              <>
+                {selMenu.mode === 'strokes' && (
+                  <>
+                    <span className="ink-sel-menu__count num">{selMenu.count.toLocaleString('fa-IR')} خط</span>
+                    <button
+                      type="button"
+                      className="ink-sel-menu__btn"
+                      onClick={() => {
+                        if (copySelection()) flashNote('کپی شد · برای چسباندن با کمند روی صفحه بزن');
+                      }}
+                    >
+                      <Icon name="i-copy" size={15} />
+                      کپی
+                    </button>
+                    <button
+                      type="button"
+                      className="ink-sel-menu__btn"
+                      onClick={() => {
+                        if (copySelection()) deleteSelection();
+                      }}
+                    >
+                      <Icon name="i-scissors" size={15} />
+                      برش
+                    </button>
+                    <button
+                      type="button"
+                      className={`ink-sel-menu__btn${selColors ? ' is-on' : ''}`}
+                      aria-pressed={selColors}
+                      onClick={() => setSelColors((v) => !v)}
+                    >
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: '50%',
+                          background: 'conic-gradient(#2563EB, #16A34A, #F59E0B, #DC2626, #9333EA, #2563EB)',
+                        }}
+                      />
+                      رنگ
+                    </button>
+                    <span className="ink-sel-menu__sep" aria-hidden="true" />
+                  </>
+                )}
+                <button type="button" className="ink-sel-menu__btn" onClick={screenshotSelection}>
+                  <CameraGlyph />
+                  اسکرینشات
+                </button>
+                <button
+                  type="button"
+                  className="ink-sel-menu__btn"
+                  onClick={saveSelectionImage}
+                  aria-label="ذخیرهٔ تصویر"
+                  title="ذخیرهٔ تصویر"
+                >
+                  <SaveGlyph />
+                </button>
+                {selMenu.mode === 'strokes' && (
+                  <button
+                    type="button"
+                    className="ink-sel-menu__btn ink-sel-menu__btn--danger"
+                    onClick={deleteSelection}
+                    aria-label="حذف"
+                    title="حذف (Delete)"
+                  >
+                    <Icon name="i-trash" size={15} />
+                  </button>
+                )}
+              </>
+            )}
+            <button
+              type="button"
+              className="ink-sel-menu__btn"
+              onClick={clearSelection}
+              aria-label="لغو انتخاب"
+              title="لغو انتخاب"
+            >
+              <Icon name="i-x" size={14} />
+            </button>
+          </div>
+          {selColors && selMenu.mode === 'strokes' && (
+            <div className="ink-sel-menu__swatches" role="group" aria-label="رنگ خطوط انتخابشده">
+              {SELECTION_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="ink-sel-menu__swatch"
+                  style={{ background: c }}
+                  aria-label={`رنگ ${c}`}
+                  onClick={() => recolorSelection(c)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </>
   );
 });
