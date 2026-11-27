@@ -259,6 +259,43 @@
   color: var(--hym-text-muted);
 }
 
+/* Credit line at the very bottom of the profile: quiet, centred, one accent. */
+.acct-credit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--hym-space-4) 0 var(--hym-space-2);
+}
+.acct-credit__made {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--hym-fs-small);
+  color: var(--hym-text-secondary);
+}
+.acct-credit__name {
+  font-weight: var(--hym-fw-bold);
+  letter-spacing: 0.02em;
+  color: var(--hym-text-primary);
+}
+.acct-credit__heart {
+  display: inline-block;
+  font-size: 1.05em;
+  line-height: 1;
+  animation: acct-heartbeat 2.4s ease-in-out infinite;
+}
+@keyframes acct-heartbeat {
+  0%, 60%, 100% { transform: scale(1); }
+  12% { transform: scale(1.18); }
+  24% { transform: scale(1); }
+  36% { transform: scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .acct-credit__heart { animation: none; }
+}
+
 /* شیت و مودال اختصاصی حساب کاربری */
 .acct-sheet-scrim {
   position: fixed;

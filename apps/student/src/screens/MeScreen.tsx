@@ -311,7 +311,17 @@ export function MeScreen() {
               </div>
             </DsCard>
 
-            <p className="acct-version-foot">هامزیار · نسخهٔ ۲٫۰ · دستیار هوشمند دانشجویان پزشکی</p>
+            <footer className="acct-credit">
+              <p className="acct-credit__made">
+                <span>ساخته شده با</span>
+                <span className="acct-credit__heart" role="img" aria-label="عشق">
+                  ❤️
+                </span>
+                <span>توسط</span>
+                <bdi dir="ltr" className="acct-credit__name">pwker</bdi>
+              </p>
+              <p className="acct-version-foot">هامزیار · نسخهٔ ۲٫۰</p>
+            </footer>
           </section>
         </div>
       </div>
