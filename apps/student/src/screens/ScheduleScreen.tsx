@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { AppBar, Sheet, Toast } from '../components';
 import {
@@ -7,7 +7,6 @@ import {
   DsCard,
   DsChip,
   DsEmpty,
-  DsInput,
   DsSegmented,
   DsSkeleton,
 } from '../design/components';
@@ -18,12 +17,12 @@ import {
   enDigits,
   faDigits,
   faNum,
-  formatJalaliDate,
   formatTerm,
 } from '../lib/fa';
 import { downloadScheduleBlob, schedule, studyTasks } from '../lib/schedule';
 import type { CourseSelectionsPayload, ScheduleConflict, ScheduleItem, StudyTask } from '../lib/schedule';
 import { peek, put } from '../lib/swr';
+import { TasksBoard } from './TasksBoard';
 
 interface ScheduleMeta {
   cohortTitle: string;
@@ -70,50 +69,6 @@ function readGroup(): GroupFilter {
     // فقط همین نشست
   }
   return 'all';
-}
-
-function getTodayJalali(): string {
-  try {
-    const formatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      timeZone: 'Asia/Tehran',
-    });
-    const parts = formatter.formatToParts(new Date());
-    const y = parts.find((p) => p.type === 'year')?.value;
-    const m = parts.find((p) => p.type === 'month')?.value;
-    const d = parts.find((p) => p.type === 'day')?.value;
-    if (y && m && d) return faDigits(`${y}-${m}-${d}`);
-  } catch {
-    // fallback
-  }
-  return '۱۴۰۵-۰۹-۰۵';
-}
-
-function normalizeJalaliInput(raw: string): string | null {
-  const ascii = enDigits(raw).trim().replace(/\//g, '-');
-  const m = ascii.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (!m) return null;
-  const year = Number(m[1]);
-  const month = Number(m[2]);
-  const day = Number(m[3]);
-  if (year < 1300 || year > 1500 || month < 1 || month > 12 || day < 1 || day > 31) {
-    return null;
-  }
-  if (month > 6 && day > 30) return null;
-  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
-
-function normalizeTimeInput(raw: string): string | null | 'invalid' {
-  const ascii = enDigits(raw).trim();
-  if (!ascii) return null;
-  const m = ascii.match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return 'invalid';
-  const hh = Number(m[1]);
-  const mm = Number(m[2]);
-  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return 'invalid';
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
 /* group از بکاند «1» یا «گروه 1» یا «گروه الف» است و educational_group
@@ -353,16 +308,7 @@ export function ScheduleScreen() {
   const [tasks, setTasks] = useState<StudyTask[]>(() => peek<StudyTask[]>('schedule-tasks') ?? []);
   const [tasksLoading, setTasksLoading] = useState(() => !peek('schedule-tasks'));
   const [tasksError, setTasksError] = useState('');
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDate, setTaskDate] = useState(getTodayJalali);
-  const [taskTime, setTaskTime] = useState('');
-  const [creatingTask, setCreatingTask] = useState(false);
-  const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
-  const taskFormRef = useRef<HTMLFormElement>(null);
 
-  const focusTaskTitle = () => {
-    taskFormRef.current?.querySelector<HTMLInputElement>('#sched-task-title')?.focus();
-  };
 
   const loadTimetable = useCallback(async () => {
     if (!peek('schedule')) setLoading(true);
@@ -559,57 +505,7 @@ export function ScheduleScreen() {
     [tasks],
   );
 
-  const handleCreateTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const title = taskTitle.trim();
-    if (!title || creatingTask) return;
-    const normDate = normalizeJalaliInput(taskDate);
-    if (!normDate) {
-      setTasksError('تاریخ جلالی معتبر نیست. نمونه صحیح: ۱۴۰۵-۰۹-۰۵');
-      return;
-    }
-    const normTime = normalizeTimeInput(taskTime);
-    if (normTime === 'invalid') {
-      setTasksError('فرمت ساعت یادآوری باید به‌صورت ۱۸:۰۰ باشد.');
-      return;
-    }
-    setCreatingTask(true);
-    setTasksError('');
-    try {
-      await studyTasks.create({
-        title,
-        jalali_date: normDate,
-        reminder_time: normTime,
-      });
-      setTaskTitle('');
-      setTaskTime('');
-      await loadTasks();
-    } catch (err) {
-      setTasksError(errorText(err, 'ثبت تسک مطالعه با خطا مواجه شد.'));
-    } finally {
-      setCreatingTask(false);
-    }
-  };
 
-  const handleToggleTask = async (taskId: string) => {
-    if (togglingTaskId) return;
-    setTogglingTaskId(taskId);
-    setTasksError('');
-    try {
-      const res = await studyTasks.toggle(taskId);
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.task_id === taskId
-            ? { ...t, completed: res.completed, completed_at: res.completed_at }
-            : t,
-        ),
-      );
-    } catch (err) {
-      setTasksError(errorText(err, 'تغییر وضعیت تسک انجام نشد.'));
-    } finally {
-      setTogglingTaskId(null);
-    }
-  };
 
   const termBadgeText = meta.term
     ? meta.term.startsWith('ترم')
@@ -1049,161 +945,7 @@ export function ScheduleScreen() {
 
         {/* ═══════════ تب تسک‌های مطالعه جلالی ═══════════ */}
         {activeTab === 'tasks' && (
-          <div className="sched-tasks-layout">
-            <DsCard className="sched-task-form-card">
-              <h2 className="ds-card__title">افزودن تسک مطالعه</h2>
-              <p className="ds-card__sub">
-                مباحث مطالعه و مرور خود را با تاریخ جلالی و ساعت یادآوری ثبت کنید.
-              </p>
-              <form ref={taskFormRef} className="sched-task-form" onSubmit={handleCreateTask}>
-                <DsInput
-                  id="sched-task-title"
-                  label="عنوان مبحث یا تسک"
-                  placeholder="مثلاً: مرور فیزیولوژی قلب یا ۵۰ تست آناتومی"
-                  value={taskTitle}
-                  onChange={(e) => setTaskTitle(e.target.value)}
-                  required
-                />
-
-                <div className="sched-task-form__row">
-                  <DsInput
-                    id="sched-task-date"
-                    className="sched-input-ltr"
-                    label="تاریخ جلالی"
-                    placeholder="۱۴۰۵-۰۹-۰۵"
-                    hint="الگو: ۱۴۰۵-۰۹-۰۵"
-                    value={taskDate}
-                    onChange={(e) => setTaskDate(e.target.value)}
-                    required
-                    ltr
-                  />
-                  <DsInput
-                    id="sched-task-time"
-                    className="sched-input-ltr"
-                    label="ساعت یادآوری (اختیاری)"
-                    placeholder="۱۸:۰۰"
-                    hint="مثلاً ۱۸:۰۰"
-                    value={taskTime}
-                    onChange={(e) => setTaskTime(e.target.value)}
-                    ltr
-                  />
-                </div>
-
-                <div className="sched-task-form__actions">
-                  <DsButton
-                    type="submit"
-                    variant="primary"
-                    size="md"
-                    block
-                    loading={creatingTask}
-                    disabled={!taskTitle.trim() || !taskDate.trim()}
-                  >
-                    <Icon name="i-plus" size={18} />
-                    <span>افزودن به برنامه</span>
-                  </DsButton>
-                </div>
-              </form>
-            </DsCard>
-
-            <div className="sched-tasks-col">
-              {tasksError && (
-                <div data-section="danger">
-                  <DsCard level="accent" role="alert">
-                    <div className="sched-alert">
-                      <Icon name="i-alert-circle" size={18} className="sched-alert__icon" />
-                      <div className="sched-alert__body">
-                        <span>{tasksError}</span>
-                      </div>
-                    </div>
-                  </DsCard>
-                </div>
-              )}
-
-              {tasksLoading ? (
-                <div className="sched-skel">
-                  <DsSkeleton shape="row" />
-                  <DsSkeleton shape="row" />
-                  <DsSkeleton shape="row" />
-                </div>
-              ) : tasks.length === 0 ? (
-                <DsCard>
-                  <DsEmpty
-                    icon={<Icon name="i-calendar" size={28} />}
-                    title="تسک مطالعه‌ای ثبت نشده"
-                    body="با افزودن اولین مبحث درسی، برنامه‌ریزی شخصی خود را بر اساس تقویم جلالی آغاز کنید."
-                    action={
-                      <DsButton
-                        variant="secondary"
-                        onClick={focusTaskTitle}
-                      >
-                        <Icon name="i-plus" size={18} />
-                        <span>ثبت اولین تسک</span>
-                      </DsButton>
-                    }
-                  />
-                </DsCard>
-              ) : (
-                <>
-                  <div className="sched-tasks-head">
-                    <h2 className="sched-tasks-head__title">تسک‌های مطالعه</h2>
-                    <DsBadge tone={pendingTaskCount > 0 ? 'accent' : 'success'}>
-                      {faNum(pendingTaskCount)} مانده از {faNum(tasks.length)} تسک
-                    </DsBadge>
-                  </div>
-                  <DsCard flush>
-                    <ul className="ds-list">
-                      {tasks.map((task) => {
-                        const isToggling = togglingTaskId === task.task_id;
-                        const dateLabel = formatJalaliDate(task.jalali_date);
-                        return (
-                          <li
-                            key={task.task_id}
-                            className={`sched-task${task.completed ? ' is-done' : ''}`}
-                          >
-                            <button
-                              type="button"
-                              className="sched-task__check-btn"
-                              onClick={() => void handleToggleTask(task.task_id)}
-                              disabled={isToggling}
-                              aria-pressed={task.completed}
-                              aria-label={
-                                task.completed
-                                  ? `بازگرداندن «${task.title}» به حالت انجام‌نشده`
-                                  : `تکمیل تسک «${task.title}»`
-                              }
-                            >
-                              <span className="sched-task__box" aria-hidden="true">
-                                <Icon name="i-check" size={15} />
-                              </span>
-                            </button>
-
-                            <div className="sched-task__body">
-                              <span className="sched-task__title">{faDigits(task.title)}</span>
-                              <div className="sched-task__meta">
-                                {dateLabel && (
-                                  <span className="sched-task__meta-item">
-                                    <Icon name="i-calendar" size={14} />
-                                    <span>{dateLabel}</span>
-                                  </span>
-                                )}
-                                {task.reminder_time && (
-                                  <span className="sched-task__meta-item">
-                                    <Icon name="i-clock" size={14} />
-                                    <span>{faDigits(task.reminder_time)}</span>
-                                  </span>
-                                )}
-                                {task.completed && <DsBadge tone="success">انجام شد</DsBadge>}
-                              </div>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </DsCard>
-                </>
-              )}
-            </div>
-          </div>
+          <TasksBoard tasks={tasks} setTasks={setTasks} loading={tasksLoading} error={tasksError} />
         )}
       </div>
 

@@ -638,11 +638,13 @@ async def mock_finish(session_id: str, user: dict = Depends(current_student)):
 # ══════════════════════════════════════════════════════════════
 #  🌐 هم‌پیوندی مسیرهای وب (Web Contract Aliases)
 # ══════════════════════════════════════════════════════════════
-from backend.api.routers.schedule import list_study_tasks, create_study_task, toggle_study_task
+from backend.api.routers.schedule import list_study_tasks, create_study_task, toggle_study_task, update_study_task, delete_study_task
 from backend.api.routers.grades import grades_summary
 
 router.add_api_route("/schedule/items", list_study_tasks, methods=["GET"], tags=["web-schedule"])
 router.add_api_route("/schedule/items", create_study_task, methods=["POST"], status_code=201, tags=["web-schedule"])
 router.add_api_route("/schedule/items/{task_id}/toggle", toggle_study_task, methods=["PATCH"], tags=["web-schedule"])
+router.add_api_route("/schedule/items/{task_id}", update_study_task, methods=["PATCH"], tags=["web-schedule"])
+router.add_api_route("/schedule/items/{task_id}", delete_study_task, methods=["DELETE"], tags=["web-schedule"])
 router.add_api_route("/grades/summary", grades_summary, methods=["GET"], tags=["web-grades"])
 

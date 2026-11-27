@@ -437,6 +437,23 @@ class StudyTaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=150)
     jalali_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     reminder_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
+    priority: str = Field(default="medium", pattern=r"^(high|medium|low)$")
+    urgent: bool = False
+    status: str = Field(default="todo", pattern=r"^(todo|doing|done)$")
+
+
+class StudyTaskUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=150)
+    status: str | None = Field(default=None, pattern=r"^(todo|doing|done)$")
+    priority: str | None = Field(default=None, pattern=r"^(high|medium|low)$")
+    urgent: bool | None = None
+
+
+def _task_status(d: dict) -> str:
+    s = d.get("status")
+    if s in ("todo", "doing", "done"):
+        return s
+    return "done" if d.get("completed") else "todo"
 
 
 def _tasks_col():
@@ -500,6 +517,9 @@ async def list_study_tasks(
                 "reminder_time": d.get("reminder_time"),
                 "completed": bool(d.get("completed")),
                 "completed_at": d.get("completed_at"),
+                "status": _task_status(d),
+                "priority": d.get("priority") or "medium",
+                "urgent": bool(d.get("urgent")),
             }
             for d in docs
         ]
@@ -520,8 +540,11 @@ async def create_study_task(
         "title": body.title.strip(),
         "jalali_date": body.jalali_date,
         "reminder_time": body.reminder_time,
-        "completed": False,
-        "completed_at": None,
+        "priority": body.priority,
+        "urgent": body.urgent,
+        "status": body.status,
+        "completed": body.status == "done",
+        "completed_at": utc_now_iso() if body.status == "done" else None,
         "created_at": utc_now_iso(),
     }
     col = _tasks_col()
@@ -546,7 +569,66 @@ async def toggle_study_task(
     completed_at = utc_now_iso() if new_state else None
     await col.update_one(
         {"_id": task["_id"]},
-        {"$set": {"completed": new_state, "completed_at": completed_at}},
+        {"$set": {"completed": new_state, "completed_at": completed_at, "status": "done" if new_state else "todo"}},
     )
     return {"task_id": task_id, "completed": new_state, "completed_at": completed_at}
+
+
+async def _owned_task(task_id: str, uid: int):
+    if not ObjectId.is_valid(task_id):
+        raise HTTPException(status_code=404, detail="تسک یافت نشد")
+    col = _tasks_col()
+    task = await col.find_one({"_id": ObjectId(task_id), "user_id": uid})
+    if not task:
+        raise HTTPException(status_code=404, detail="تسک یافت نشد")
+    return col, task
+
+
+@router.patch("/items/{task_id}")
+async def update_study_task(
+    task_id: str,
+    body: StudyTaskUpdate,
+    user=Depends(get_current_user),
+):
+    """ویرایش ستون بورد (todo/doing/done)، اولویت، فوریت یا عنوان تسک."""
+    uid = int(user.get("id") or user.get("user_id") or 0)
+    col, task = await _owned_task(task_id, uid)
+    updates: dict[str, Any] = {}
+    if body.title is not None:
+        updates["title"] = body.title.strip()
+    if body.priority is not None:
+        updates["priority"] = body.priority
+    if body.urgent is not None:
+        updates["urgent"] = body.urgent
+    if body.status is not None:
+        updates["status"] = body.status
+        done = body.status == "done"
+        updates["completed"] = done
+        if done and _task_status(task) != "done":
+            updates["completed_at"] = utc_now_iso()
+        elif not done:
+            updates["completed_at"] = None
+    if updates:
+        await col.update_one({"_id": task["_id"]}, {"$set": updates})
+    merged = {**task, **updates}
+    return {
+        "task_id": task_id,
+        "status": _task_status(merged),
+        "priority": merged.get("priority") or "medium",
+        "urgent": bool(merged.get("urgent")),
+        "completed": bool(merged.get("completed")),
+        "completed_at": merged.get("completed_at"),
+    }
+
+
+@router.delete("/items/{task_id}")
+async def delete_study_task(
+    task_id: str,
+    user=Depends(get_current_user),
+):
+    """حذف تسک مطالعه (فقط مالک)."""
+    uid = int(user.get("id") or user.get("user_id") or 0)
+    col, task = await _owned_task(task_id, uid)
+    await col.delete_one({"_id": task["_id"]})
+    return {"task_id": task_id, "deleted": True}
 

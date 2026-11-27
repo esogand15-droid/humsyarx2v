@@ -166,7 +166,14 @@ export interface StudyTask {
   reminder_time: string | null;
   completed: boolean;
   completed_at: string | null;
+  /** ستون بورد؛ تسک‌های قدیمی بدون این فیلد از روی completed خوانده می‌شوند. */
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  urgent?: boolean;
 }
+
+export type TaskStatus = 'todo' | 'doing' | 'done';
+export type TaskPriority = 'high' | 'medium' | 'low';
 
 export interface StudyTasksPayload {
   tasks: StudyTask[];
@@ -181,7 +188,14 @@ export const studyTasks = {
     return apiCall<StudyTasksPayload>(`/schedule/items${qs}`);
   },
 
-  create: (data: { title: string; jalali_date: string; reminder_time?: string | null }) =>
+  create: (data: {
+    title: string;
+    jalali_date: string;
+    reminder_time?: string | null;
+    priority?: TaskPriority;
+    urgent?: boolean;
+    status?: TaskStatus;
+  }) =>
     apiCall<{ task_id: string; created: boolean }>('/schedule/items', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -192,4 +206,15 @@ export const studyTasks = {
       `/schedule/items/${encodeURIComponent(task_id)}/toggle`,
       { method: 'PATCH' },
     ),
+
+  update: (task_id: string, data: { title?: string; status?: TaskStatus; priority?: TaskPriority; urgent?: boolean }) =>
+    apiCall<{ task_id: string; status: TaskStatus; priority: TaskPriority; urgent: boolean }>(
+      `/schedule/items/${encodeURIComponent(task_id)}`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+    ),
+
+  remove: (task_id: string) =>
+    apiCall<{ task_id: string; deleted: boolean }>(`/schedule/items/${encodeURIComponent(task_id)}`, {
+      method: 'DELETE',
+    }),
 };
