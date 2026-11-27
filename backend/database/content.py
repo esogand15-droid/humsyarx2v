@@ -2127,6 +2127,21 @@ class DBContent:
             return hh * 60 + mm
         return None
 
+    _FEMALE_TITLE_TOKENS = ('دختران', 'خواهران', 'بانوان')
+    _MALE_TITLE_TOKENS = ('پسران', 'برادران', 'آقایان')
+
+    @classmethod
+    def _gender_from_lesson_title(cls, title) -> str | None:
+        """'female_only' / 'male_only' when the lesson title names exactly one section."""
+        text = str(title or '')
+        female = any(t in text for t in cls._FEMALE_TITLE_TOKENS)
+        male = any(t in text for t in cls._MALE_TITLE_TOKENS)
+        if female and not male:
+            return 'female_only'
+        if male and not female:
+            return 'male_only'
+        return None
+
     @classmethod
     def detect_schedule_conflicts(cls, items: list, active_term: str = None,
                                   user_educational_group: str = None) -> list:
@@ -2151,6 +2166,12 @@ class DBContent:
             if active_term and it_term and it_term != str(active_term).strip():
                 continue
             edu_grp = cls.normalize_class_educational_group(it.get('educational_group'), default='mixed')
+            if edu_grp in ('mixed', 'unknown'):
+                # Many imported rows leave educational_group empty and carry the
+                # section only in the title ("آیین زندگی دختران"). Without this,
+                # a girls' section and a boys' section at the same hour were
+                # reported as a clash for every student.
+                edu_grp = cls._gender_from_lesson_title(it.get('lesson') or it.get('course_name')) or edu_grp
             if user_educational_group and user_educational_group != 'unknown':
                 if not cls.class_matches_user_educational_group(edu_grp, user_educational_group):
                     continue
