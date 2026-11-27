@@ -9,13 +9,17 @@ import { faNum } from '../../lib/fa';
 import { ink } from '../../lib/ink';
 import { reader } from '../../lib/reader';
 import type { Kind, Scope, ViewInfo } from '../../lib/reader';
-import { EmbeddedAiStudyPanel } from './EmbeddedAiStudyPanel';
-import { NotebookPanel } from './NotebookPanel';
 import './reader.css';
 
-// pdf.js حجم دارد؛ فقط وقتی وارد ریدر PDF می‌شویم بارگذاری می‌شود
+// pdf.js و پنل‌های جانبی ریدر سنگین‌اند؛ فقط در زمان باز شدن بارگذاری می‌شوند
 const PdfView = lazy(() => import('./PdfView').then((m) => ({ default: m.PdfView })));
 const MediaView = lazy(() => import('./MediaView').then((m) => ({ default: m.MediaView })));
+const EmbeddedAiStudyPanel = lazy(() =>
+  import('./EmbeddedAiStudyPanel').then((m) => ({ default: m.EmbeddedAiStudyPanel })),
+);
+const NotebookPanel = lazy(() =>
+  import('./NotebookPanel').then((m) => ({ default: m.NotebookPanel })),
+);
 
 type StudySidePanel = 'none' | 'ai_chat' | 'notes';
 
@@ -378,20 +382,22 @@ export function ReaderScreen() {
                   </button>
                 </div>
                 <div className="study-workspace__secondary-body">
-                  <NotebookPanel
-                    scope={scopeTyped}
-                    id={id}
-                    page={activePage}
-                    open={true}
-                    hideHeader
-                    onClose={() => setSidePanel('none')}
-                    onJump={(p) => {
-                      setJumpRequest((prev) => ({ page: p, seq: (prev?.seq ?? 0) + 1 }));
-                      navigate(`?p=${p}`, { replace: true });
-                      if (window.innerWidth < 768) setSidePanel('none');
-                    }}
-                    refreshKey={notebookKey}
-                  />
+                  <Suspense fallback={<LoadingBlock rows={3} />}>
+                    <NotebookPanel
+                      scope={scopeTyped}
+                      id={id}
+                      page={activePage}
+                      open={true}
+                      hideHeader
+                      onClose={() => setSidePanel('none')}
+                      onJump={(p) => {
+                        setJumpRequest((prev) => ({ page: p, seq: (prev?.seq ?? 0) + 1 }));
+                        navigate(`?p=${p}`, { replace: true });
+                        if (window.innerWidth < 768) setSidePanel('none');
+                      }}
+                      refreshKey={notebookKey}
+                    />
+                  </Suspense>
                 </div>
               </aside>
             </>
@@ -444,12 +450,16 @@ export function ReaderScreen() {
                 </div>
 
                 <div className="ai-top-flow-body">
-                  <EmbeddedAiStudyPanel
-                    fileId={id}
-                    bookletName={info?.name}
-                    page={latest.current.page}
-                    onClose={() => setSidePanel('none')}
-                  />
+                  {sidePanel === 'ai_chat' && (
+                    <Suspense fallback={<LoadingBlock rows={3} />}>
+                      <EmbeddedAiStudyPanel
+                        fileId={id}
+                        bookletName={info?.name}
+                        page={activePage}
+                        onClose={() => setSidePanel('none')}
+                      />
+                    </Suspense>
+                  )}
                 </div>
               </div>
             </div>

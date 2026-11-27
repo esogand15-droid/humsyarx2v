@@ -30,7 +30,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 backend_path = os.path.join(ROOT, "backend")
 if backend_path not in sys.path:
-    sys.path.insert(0, backend_path)
+    sys.path.append(backend_path)
 
 os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017/medicalbot")
 os.environ.setdefault("ADMIN_ID", "1")

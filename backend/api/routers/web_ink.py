@@ -353,10 +353,14 @@ async def sync_batch(body: SyncBatchRequest, user: dict = Depends(current_studen
             continue
 
         page_key = _key(uid, mut.scope, mut.file_id, mut.page)
+        sync_log_key = f"{uid}:{mut.mutation_id}"
 
-        # 1. Idempotency check via web_ink_sync_log
+        # 1. Idempotency check via web_ink_sync_log (scoped per user so mutation_ids never collide)
         try:
-            already = await _coll("web_ink_sync_log").find_one({"_id": mut.mutation_id, "uid": uid})
+            sync_log_coll = _coll("web_ink_sync_log")
+            already = await sync_log_coll.find_one({"_id": sync_log_key})
+            if not already:
+                already = await sync_log_coll.find_one({"_id": mut.mutation_id, "uid": uid})
             if already:
                 successful_ids.append(mut.mutation_id)
                 continue
@@ -416,6 +420,7 @@ async def sync_batch(body: SyncBatchRequest, user: dict = Depends(current_studen
 
         elif mut.action == "clear_page":
             strokes_map.clear()
+            notes_map.clear()
 
         elif mut.action == "upsert_note":
             if not mut.note:
@@ -456,10 +461,10 @@ async def sync_batch(body: SyncBatchRequest, user: dict = Depends(current_studen
 
             # 5. Record mutation in web_ink_sync_log
             await _coll("web_ink_sync_log").update_one(
-                {"_id": mut.mutation_id},
+                {"_id": sync_log_key},
                 {
                     "$set": {
-                        "_id": mut.mutation_id,
+                        "_id": sync_log_key,
                         "mutation_id": mut.mutation_id,
                         "uid": uid,
                         "client_id": body.client_id,

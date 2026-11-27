@@ -1,5 +1,6 @@
 """User subscription, discounts and payment receipt endpoints."""
 
+import asyncio
 import os
 
 from datetime import datetime
@@ -278,67 +279,32 @@ async def get_status(
             "enforced": True,
         }
 
-    subscription = (
-        await db.sub_get(
-            user_id
-        )
+    from subscription import has_access
+
+    (
+        subscription,
+        active,
+        raw_days_left,
+        plans,
+        history,
+        card_number,
+        card_owner,
+        resource_access,
+        enforced_raw,
+    ) = await asyncio.gather(
+        db.sub_get(user_id),
+        db.sub_is_active(user_id),
+        db.sub_days_left(user_id),
+        db.sub_plan_list(only_active=True),
+        db.sub_payment_history(user_id),
+        db.get_setting("subscription_card_number", "—"),
+        db.get_setting("subscription_card_owner", "—"),
+        has_access(user_id),
+        db.get_setting("subscription_enforced", False),
     )
 
-    active = (
-        await db.sub_is_active(
-            user_id
-        )
-    )
-
-    days_left = (
-        await db.sub_days_left(
-            user_id
-        )
-        if active
-        else 0
-    )
-
-    plans = (
-        await db.sub_plan_list(
-            only_active=True
-        )
-    )
-
-    history = (
-        await db.sub_payment_history(
-            user_id
-        )
-    )
-
-    card_number = (
-        await db.get_setting(
-            "subscription_card_number",
-            "—",
-        )
-    )
-
-    card_owner = (
-        await db.get_setting(
-            "subscription_card_owner",
-            "—",
-        )
-    )
-
-    # گیت از ماژول ربات — تک‌منبعِ قانون؛ فرانت فقط می‌خواند
-    from subscription import (
-        has_access,
-    )
-
-    resource_access = (
-        await has_access(user_id)
-    )
-
-    enforced = bool(
-        await db.get_setting(
-            "subscription_enforced",
-            False,
-        )
-    )
+    days_left = raw_days_left if active else 0
+    enforced = bool(enforced_raw)
 
     has_pending = any(
         item.get("status")
@@ -647,8 +613,14 @@ async def family_overview_ep(
     seats = await db.family_plan_seats(uid)
     members = []
     if seats["total"] > 1:
-        for m in await db.family_members(uid):
-            u = await db.get_user(int(m["_id"])) or {}
+        raw_members = await db.family_members(uid)
+        users = (
+            await asyncio.gather(*(db.get_user(int(m["_id"])) for m in raw_members))
+            if raw_members
+            else []
+        )
+        for m, u_raw in zip(raw_members, users):
+            u = u_raw or {}
             members.append({
                 "user_id": int(m["_id"]),
                 "name": u.get("name", ""),

@@ -88,23 +88,41 @@ export function SearchScreen() {
     try {
       const res = await searchApi.global(q.trim());
       const all: SearchResultItem[] = [];
-      const map = res.results || {};
-      Object.entries(map).forEach(([type, items]) => {
-        if (Array.isArray(items)) {
-          items.forEach((it: any, idx: number) => {
-            all.push({
-              id: it.id || it._id || `${type}-${idx}`,
-              title: it.title || it.name || it.question || it.lesson || '—',
-              type: type.replace(/s$/, '') as SearchResultItem['type'],
-              subtitle:
-                it.subtitle ||
-                it.topic ||
-                it.teacher ||
-                (it.answer ? String(it.answer).slice(0, 80) : undefined),
-            });
+      const raw = res.results as unknown;
+      if (Array.isArray(raw)) {
+        raw.forEach((it: any, idx: number) => {
+          const rawType = String(it.type || 'resource');
+          const normType = (rawType === 'reference' ? 'book' : rawType) as SearchResultItem['type'];
+          all.push({
+            id: it.id || it._id || `${normType}-${idx}`,
+            title: it.title || it.name || it.question || it.lesson || '—',
+            type: normType,
+            subtitle:
+              it.subtitle ||
+              it.topic ||
+              it.teacher ||
+              (it.answer ? String(it.answer).slice(0, 80) : undefined),
           });
-        }
-      });
+        });
+      } else if (raw && typeof raw === 'object') {
+        Object.entries(raw as Record<string, unknown>).forEach(([type, items]) => {
+          if (Array.isArray(items)) {
+            items.forEach((it: any, idx: number) => {
+              const normType = (type === 'references' ? 'book' : type.replace(/s$/, '')) as SearchResultItem['type'];
+              all.push({
+                id: it.id || it._id || `${normType}-${idx}`,
+                title: it.title || it.name || it.question || it.lesson || '—',
+                type: normType,
+                subtitle:
+                  it.subtitle ||
+                  it.topic ||
+                  it.teacher ||
+                  (it.answer ? String(it.answer).slice(0, 80) : undefined),
+              });
+            });
+          }
+        });
+      }
       setResults(all);
     } catch (err) {
       setError(errorText(err, 'جستجو با خطا مواجه شد.'));

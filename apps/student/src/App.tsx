@@ -137,9 +137,12 @@ function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export function App() {
-  // Warm the main screen chunks once idle: tab switches then never wait on a download,
-  // so RouteFallback shows only on a cold first paint. Same specifiers = same chunks as lazy().
+  const { status } = useSession();
+
+  // Warm the main screen chunks once idle ONLY for signed-in active sessions so
+  // unauthenticated /welcome or /login visitors do not download protected screen bundles.
   useEffect(() => {
+    if (status !== 'active') return;
     const warm = () => {
       void import('./screens/HomeScreen');
       void import('./screens/library/LibraryScreen');
@@ -156,7 +159,7 @@ export function App() {
     return () => {
       if (!ric) window.clearTimeout(id);
     };
-  }, []);
+  }, [status]);
 
   return (
     <Layout>

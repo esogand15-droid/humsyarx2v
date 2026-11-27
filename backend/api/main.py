@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 
 import mimetypes
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -56,6 +56,7 @@ from api.routers import (
     web_login,
     web_student,
 )
+from api.auth import get_current_user
 from database import db
 from request_context import current_request_id
 from time_utils import now_utc
@@ -613,6 +614,47 @@ app.include_router(
     tags=["web-tickets"],
 )
 
+_WEB_SEARCH_GROUP_MAP = {
+    "resource": "resources",
+    "resources": "resources",
+    "question": "questions",
+    "questions": "questions",
+    "faq": "faqs",
+    "faqs": "faqs",
+    "schedule": "schedules",
+    "schedules": "schedules",
+    "subject": "subjects",
+    "subjects": "subjects",
+    "reference": "books",
+    "book": "books",
+    "books": "books",
+}
+
+
+@app.get("/api/web/search", tags=["web-search"])
+async def web_search(
+    q: str = Query(..., min_length=2, max_length=100),
+    user=Depends(get_current_user),
+):
+    """Unified search adapter for the web student client under /api/web."""
+    payload = await global_search.search(q=q, user=user)
+    grouped: dict[str, list] = {
+        "resources": [],
+        "questions": [],
+        "faqs": [],
+        "schedules": [],
+        "subjects": [],
+        "books": [],
+    }
+    for item in payload.get("results") or []:
+        bucket = _WEB_SEARCH_GROUP_MAP.get(str(item.get("type") or "").lower(), "resources")
+        grouped[bucket].append(item)
+    return {
+        "query": payload.get("query", q),
+        "total": payload.get("total", 0),
+        "results": grouped,
+    }
+
 
 
 @app.get("/api/health")
@@ -747,6 +789,7 @@ def _is_m1_web_alias(path: str) -> bool:
         "/api/web/schedule/ical",
         "/api/web/schedule/conflicts",
         "/api/web/grades",
+        "/api/web/search",
     ):
         return True
     return False

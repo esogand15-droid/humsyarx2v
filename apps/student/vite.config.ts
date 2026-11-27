@@ -123,6 +123,12 @@ export default defineConfig({
           ) {
             return 'react-vendor';
           }
+          if (
+            norm.includes('/node_modules/react-router/') ||
+            norm.includes('/node_modules/react-router-dom/')
+          ) {
+            return 'router-vendor';
+          }
           return undefined;
         },
       },

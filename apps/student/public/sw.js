@@ -14,7 +14,7 @@ const LEGACY_CACHE_PREFIX = 'static-humsyar-student-v4';
  * ZERO CACHE PERMITTED — Under no circumstances may requests matching
  * these patterns enter Cache Storage or IndexedDB.
  */
-const DRM_AND_SECURE_REGEX = /^\/api\/(web\/reader\/|web-auth\/|web\/sessions|web\/ink\/sync|ai\/|web\/exam\/|web\/wallet\/|subscription\/)/;
+const DRM_AND_SECURE_REGEX = /^\/api\/(web\/reader\/|web\/library\/view-url\/|web-auth\/|web\/sessions|web\/ink\/|ai\/|web\/exam\/|web\/wallet\/|subscription\/)/;
 
 /**
  * Offline DRM fallback response payload
@@ -111,6 +111,15 @@ self.addEventListener('fetch', (event) => {
   const pathname = url.pathname;
   const path = pathname;
 
+  // Never intercept or cache SW script, asset manifest, or byte-range media requests
+  if (
+    pathname.endsWith('/sw.js') ||
+    pathname.endsWith('/sw-assets.json') ||
+    req.headers.has('range')
+  ) {
+    return;
+  }
+
   // 1️⃣ STRICT DRM ZERO-STORAGE RULE (Network-Only)
   if (DRM_AND_SECURE_REGEX.test(pathname)) {
     event.respondWith(
@@ -136,15 +145,6 @@ self.addEventListener('fetch', (event) => {
   // 2️⃣ Non-sensitive API requests: network-first with TTL & strict no-store check
   if (path.startsWith('/api/')) {
     event.respondWith(networkFirstWithTTL(req, 30000));
-    return;
-  }
-
-  // Never intercept or cache SW script, asset manifest, or Range requests
-  if (
-    pathname.endsWith('/sw.js') ||
-    pathname.endsWith('/sw-assets.json') ||
-    req.headers.has('range')
-  ) {
     return;
   }
 

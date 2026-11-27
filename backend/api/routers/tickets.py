@@ -2,6 +2,7 @@ import logging
 """🎫 Tickets"""
 import os
 from datetime import datetime
+from html import escape
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from api.auth import get_current_user
@@ -97,7 +98,7 @@ async def create_ticket(body: NewTicket, user=Depends(get_current_user)):
     try:
         notif = db.client["medicalbot"]["bot_notifications"]
         await notif.insert_one({"type":"new_ticket","chat_id":int(os.getenv("ADMIN_ID","0")),
-            "text":f"🔔 <b>تیکت #{tid}</b>\n👤 {db_user.get('name','')}\n📋 {body.subject}\n\n{body.message.strip()[:200]}",
+            "text":f"🔔 <b>تیکت #{tid}</b>\n👤 {escape(str(db_user.get('name','')))}\n📋 {escape(str(body.subject))}\n\n{escape(body.message.strip()[:200])}",
             "sent":False,"created_at":utc_now_iso()})
     except Exception as _ne:
         # 🛡 AUDIT-R6 — اگر درجِ صف اعلان شکست بخورد، ادمین هرگز از این تیکت
@@ -140,7 +141,7 @@ async def reply(tid: int, body: ReplyBody, user=Depends(get_current_user)):
     try:
         notif = db.client["medicalbot"]["bot_notifications"]
         await notif.insert_one({"type":"ticket_reply","chat_id":int(os.getenv("ADMIN_ID","0")),
-            "text":f"💬 <b>پاسخ دانشجو #{tid}</b>\n{msg[:200]}",
+            "text":f"💬 <b>پاسخ دانشجو #{tid}</b>\n{escape(msg[:200])}",
             "sent":False,"created_at":utc_now_iso()})
     except Exception as _ne:
         # 🛡 AUDIT-R6 — اگر درجِ صف اعلان شکست بخورد، ادمین هرگز از این تیکت

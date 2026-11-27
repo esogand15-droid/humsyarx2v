@@ -614,18 +614,35 @@ async def get_reader_thumbnail(
     uid: Optional[int] = Query(None),
 ):
     """Deliver watermarked 72 DPI WebP thumbnail with zero-storage Cache-Control headers."""
+    if page_number < 1:
+        raise HTTPException(status_code=422, detail="invalid_page_number")
+
     resolved_uid, student_label, client_ip = await _resolve_student_identity(
         request,
         uid,
         allow_uid_only=(token is not None and expires is not None),
     )
 
-    # If signed token parameters provided, verify expiry and signature
-    if token is not None and expires is not None:
+    if token and expires is not None:
         if int(time.time()) > int(expires):
             raise HTTPException(status_code=403, detail="SIGNATURE_EXPIRED")
         if not verify_page_token(token, resolved_uid, file_id, page_number, expires):
             raise HTTPException(status_code=403, detail="INVALID_SIGNATURE")
+    elif file_id not in ("demo", "sample", "test"):
+        # Unsigned thumbnail requests require an active signed-in session that passes subscription/intake access.
+        student = await current_student(request)
+        web = _web_user(student)
+        item_res = await _item("res", file_id)
+        item_ref = None if item_res else await _item("ref", file_id)
+        if not item_res and not item_ref:
+            raise HTTPException(status_code=404, detail="file_not_found")
+        scope = "res" if item_res else "ref"
+        await _gate("references" if scope == "ref" else "resources", web)
+        item = item_res or item_ref
+        item_intake = str((item or {}).get("intake") or "").strip()
+        user_intake = str(web.get("intake") or "").strip()
+        if item_intake and user_intake and item_intake not in ("all", "همه", user_intake):
+            raise HTTPException(status_code=403, detail="not_in_scope")
 
     try:
         base_thumb = await get_or_render_thumbnail(file_id, page_number)

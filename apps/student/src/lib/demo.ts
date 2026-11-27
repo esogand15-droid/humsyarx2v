@@ -29,6 +29,8 @@ export function setDemoMode(active: boolean): void {
 }
 
 /** داده‌های mock برای حالت دمو */
+import { addDays, tehranNow, weekStart } from './weekPlan';
+
 const MOCK_USER: PublicUser = {
   id: 123456789,
   name: 'دکتر علی رضایی',
@@ -38,35 +40,196 @@ const MOCK_USER: PublicUser = {
   intake: '1401',
   role: 'student',
   registered_at: '۱۴۰۱/۰۱/۰۱',
+  web_login_code: '7K9M2P4X',
 };
 
-const MOCK_DASHBOARD = {
-  streak_days: 15,
-  total_study_minutes: 1250,
-  this_week_minutes: 320,
-  continue_reading: [],
-  announcements: [],
-};
+function currentWeekDates(): string[] {
+  const ws = weekStart(tehranNow().iso);
+  return Array.from({ length: 7 }, (_, i) => addDays(ws, i));
+}
 
-const MOCK_WEEKLY = [
-  { day: 'شنبه', minutes: 60 },
-  { day: 'یکشنبه', minutes: 45 },
-  { day: 'دوشنبه', minutes: 90 },
-  { day: 'سه‌شنبه', minutes: 30 },
-  { day: 'چهارشنبه', minutes: 75 },
-  { day: 'پنج‌شنبه', minutes: 20 },
-  { day: 'جمعه', minutes: 0 },
-];
+const WEEK_DAY_LABELS = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
+const WEEK_COUNTS = [8, 5, 11, 4, 9, 6, 2];
+
+function buildMockDashboard() {
+  return {
+    user: {
+      name: MOCK_USER.name,
+      nickname: 'دکتر علی',
+      display_name: MOCK_USER.name,
+      intake: '1401',
+      group: 'گروه الف (فیزیوپاتولوژی)',
+      role: 'student',
+      student_id: '98123456',
+    },
+    stats: {
+      total_answers: 248,
+      correct_answers: 216,
+      accuracy: 87,
+      streak_days: 15,
+      weak_topics: ['الکتروفیزیولوژی دهلیزی', 'فارماکولوژی ضدآریتمی'],
+    },
+    upcoming_exams: [
+      {
+        id: 'ex_demo_1',
+        lesson: 'فیزیوپاتولوژی قلب',
+        date: currentWeekDates()[5],
+        time: '۱۰:۰۰',
+        days_left: 5,
+        course_code: 'MED-301',
+        teacher: 'دکتر صادقی',
+        location: 'تالار ابن‌سینا',
+      },
+    ],
+    open_tickets: 1,
+    prestige: {
+      xp: 1840,
+      level: 7,
+      level_title: 'انترن پیشتاز',
+      rank: 'رتبه ۴ در ورودی ۱۴۰۱',
+      streak: { current: 15, best: 21 },
+      exams_completed: 9,
+      downloads_count: 14,
+    },
+  };
+}
+
+function buildMockWeekly() {
+  const dates = currentWeekDates();
+  return {
+    weekly: dates.map((date, idx) => ({
+      date,
+      day: WEEK_DAY_LABELS[idx],
+      count: WEEK_COUNTS[idx] ?? 0,
+    })),
+  };
+}
 
 const MOCK_SUBSCRIPTION = {
   active: true,
+  days_left: 30,
   plan_name: 'ماهانه VIP',
-  plan_id: 'vip_monthly',
-  days_remaining: 30,
-  ai_daily_limit: 200,
-  trial_available: false,
-  auto_renew: true,
+  expires: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+  expires_fa: '۱۴۰۵/۱۰/۰۶',
+  resource_access: true,
+  enforced: true,
+  stacked: false,
+  has_pending_payment: false,
+  card_number: '۶۰۳۷-۹۹۷۱-۱۲۳۴-۵۶۷۸',
+  card_owner: 'مؤسسه آموزشی هامزیار',
+  plans: [
+    { id: 'plan_1m', name: 'اشتراک یک‌ماهه VIP', days: 30, price: 290000 },
+    { id: 'plan_3m', name: 'اشتراک سه‌ماهه VIP', days: 90, price: 750000 },
+    { id: 'plan_family', name: 'اشتراک گروهی (۳ نفره)', days: 90, price: 1850000, max_members: 3 },
+  ],
+  history: [
+    {
+      id: 'pay_demo_1',
+      plan_name: 'ماهانه VIP',
+      amount: 290000,
+      final_price: 290000,
+      status: 'approved',
+      status_label: 'تأیید شده',
+      created_at: new Date(Date.now() - 86_400_000).toISOString(),
+    },
+  ],
 };
+
+let demoSessions = [
+  {
+    session_id: 'sess_demo_1',
+    device_name: 'مرورگر وب دسکتاپ (دمو لوکال)',
+    device_type: 'desktop',
+    ip_address: '127.0.0.1',
+    is_current: true,
+    created_at: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    last_active: new Date().toISOString(),
+  },
+  {
+    session_id: 'sess_demo_2',
+    device_name: 'آیفون ۱۵ (Safari)',
+    device_type: 'mobile',
+    ip_address: '127.0.0.1',
+    is_current: false,
+    created_at: new Date(Date.now() - 48 * 3_600_000).toISOString(),
+    last_active: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+  },
+];
+
+let demoNotifications = [
+  {
+    id: 'notif_demo_1',
+    title: 'جزوه جدید فیزیوپاتولوژی قلب منتشر شد',
+    body: 'فصل آریتمی‌های دهلیزی با نمودارهای ECG در کتابخانهٔ ترم ۱۴۰۱ قرار گرفت.',
+    category: 'content',
+    read: false,
+    pinned: true,
+    created_at: new Date(Date.now() - 45 * 60_000).toISOString(),
+  },
+  {
+    id: 'notif_demo_2',
+    title: 'یادآور کلاس فارماکولوژی بالینی',
+    body: 'جلسهٔ هفتهٔ جاری ساعت ۱۰:۰۰ در تالار ابن‌سینا برگزار می‌شود.',
+    category: 'schedule',
+    read: false,
+    pinned: false,
+    created_at: new Date(Date.now() - 5 * 3_600_000).toISOString(),
+  },
+  {
+    id: 'notif_demo_3',
+    title: 'اشتراک ماهانه VIP فعال است',
+    body: 'دسترسی کامل به جزوه‌ها، آزمون‌ها و هوش‌یار تا ۳۰ روز آینده برقرار است.',
+    category: 'general',
+    read: true,
+    pinned: false,
+    created_at: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+  },
+];
+
+let demoTasks: {
+  task_id: string;
+  title: string;
+  jalali_date: string;
+  reminder_time: string | null;
+  completed: boolean;
+  completed_at: string | null;
+}[] = [
+  {
+    task_id: 'task_demo_1',
+    title: 'مرور الکتروفیزیولوژی دهلیزی و موج P',
+    jalali_date: '۱۴۰۵/۰۹/۰۷',
+    reminder_time: '۱۶:۰۰',
+    completed: false,
+    completed_at: null as string | null,
+  },
+  {
+    task_id: 'task_demo_2',
+    title: 'حل ۲۰ تست فارماکولوژی ضدآریتمی',
+    jalali_date: '۱۴۰۵/۰۹/۰۷',
+    reminder_time: '۱۹:۳۰',
+    completed: true,
+    completed_at: new Date(Date.now() - 3_600_000).toISOString(),
+  },
+];
+
+let demoTickets = [
+  {
+    id: 1042,
+    subject: 'دسترسی به اسلایدهای جلسه ۵ قلب',
+    status: 'waiting_user',
+    created_at: new Date(Date.now() - 18 * 3_600_000).toISOString(),
+    reply_count: 1,
+    priority: 'normal',
+    message: 'سلام، فایل اسلاید جلسه ۵ فیزیوپاتولوژی قلب را در بخش کتابخانه پیدا نکردم.',
+    replies: [
+      {
+        text: 'سلام دکتر رضایی؛ فایل جلسه ۵ در ترم ۱۴۰۱ اضافه شد و از بخش کتابخانه قابل مطالعه است.',
+        sender: 'support',
+        at: new Date(Date.now() - 12 * 3_600_000).toISOString(),
+      },
+    ],
+  },
+];
 
 const MOCK_CONTINUE_ITEMS = [
   { scope: 'res', id: 'pdf_cardio_01', name: 'جزوه فیزیوپاتولوژی قلب', kind: 'pdf', page: 12, total: 48, percent: 25, updated_at: '۱۴۰۳/۰۸/۱۵' },
@@ -74,6 +237,7 @@ const MOCK_CONTINUE_ITEMS = [
 
 export function getMockResponse<T>(path: string, init?: RequestInit): T | undefined {
   const p = path.toLowerCase();
+  const method = (init?.method || 'GET').toUpperCase();
 
   // 1. Auth & Session
   if (p.includes('/auth/session')) {
@@ -109,26 +273,51 @@ export function getMockResponse<T>(path: string, init?: RequestInit): T | undefi
     } as unknown as T;
   }
   if (p.includes('/sessions')) {
-    return {
-      sessions: [
-        {
-          session_id: 'sess_demo_1',
-          device_name: 'مرورگر وب (دمو لوکال)',
-          ip_address: '127.0.0.1',
-          is_current: true,
-          created_at: '۱۴۰۳/۰۸/۲۱ ۱۰:۰۰',
-          last_active: 'اکنون',
-        },
-      ],
-    } as unknown as T;
+    if (method === 'DELETE') {
+      const seg = path.split('/').filter(Boolean).pop() || '';
+      demoSessions = demoSessions.filter((s) => s.session_id !== seg);
+      return { ok: true, revoked: true } as unknown as T;
+    }
+    return { sessions: demoSessions } as unknown as T;
   }
   if (p.includes('/logout')) {
     return { ok: true } as unknown as T;
   }
 
-  // 2. Dashboard
+  // 2. Dashboard & Notifications & Subscription
+  if (p.includes('/notifications/inbox/unread-count')) {
+    const unread = demoNotifications.reduce((acc, n) => acc + (n.read ? 0 : 1), 0);
+    return { unread } as unknown as T;
+  }
+  if (p.includes('/notifications/inbox/read') && method === 'POST') {
+    let ids: string[] | null = null;
+    try {
+      const parsed = init?.body ? JSON.parse(String(init.body)) : {};
+      if (Array.isArray(parsed?.ids)) ids = parsed.ids as string[];
+    } catch {
+      /* ignore parse error */
+    }
+    demoNotifications = demoNotifications.map((n) =>
+      ids === null || ids.includes(n.id) ? { ...n, read: true } : n,
+    );
+    const unread = demoNotifications.reduce((acc, n) => acc + (n.read ? 0 : 1), 0);
+    return { ok: true, unread } as unknown as T;
+  }
+  if (p.includes('/notifications/inbox')) {
+    const unread = demoNotifications.reduce((acc, n) => acc + (n.read ? 0 : 1), 0);
+    return { items: demoNotifications, unread } as unknown as T;
+  }
+  if (p.includes('/notifications/settings')) {
+    return {
+      settings: [
+        { key: 'exam_reminder', label: 'یادآور آزمون‌ها', enabled: true },
+        { key: 'content_update', label: 'جزوه‌ها و منابع تازه', enabled: true },
+        { key: 'schedule_change', label: 'تغییر برنامه کلاسی', enabled: true },
+      ],
+    } as unknown as T;
+  }
   if (p.includes('/dashboard/weekly')) {
-    return MOCK_WEEKLY as unknown as T;
+    return buildMockWeekly() as unknown as T;
   }
   if (p.includes('/dashboard/leaderboard')) {
     return {
@@ -142,7 +331,10 @@ export function getMockResponse<T>(path: string, init?: RequestInit): T | undefi
     } as unknown as T;
   }
   if (p.includes('/dashboard')) {
-    return MOCK_DASHBOARD as unknown as T;
+    return buildMockDashboard() as unknown as T;
+  }
+  if (p.includes('/subscription/gateway')) {
+    return { online_pay_enabled: true, bot_username: 'HumsyarBot' } as unknown as T;
   }
   if (p.includes('/subscription/status') || p.includes('/subscription')) {
     return MOCK_SUBSCRIPTION as unknown as T;
@@ -170,12 +362,35 @@ export function getMockResponse<T>(path: string, init?: RequestInit): T | undefi
   }
   if (p.includes('/schedule/items')) {
     if (p.includes('/toggle')) {
-      return { task_id: 'task_toggle', completed: true, completed_at: '۱۴۰۳/۰۸/۲۱' } as unknown as T;
+      const segs = path.split('/').filter(Boolean);
+      const taskId = decodeURIComponent(segs[segs.length - 2] || '');
+      let nextCompleted = true;
+      let completedAt: string | null = new Date().toISOString();
+      demoTasks = demoTasks.map((t) => {
+        if (t.task_id !== taskId) return t;
+        nextCompleted = !t.completed;
+        completedAt = nextCompleted ? new Date().toISOString() : null;
+        return { ...t, completed: nextCompleted, completed_at: completedAt };
+      });
+      return { task_id: taskId, completed: nextCompleted, completed_at: completedAt } as unknown as T;
     }
-    if (init?.method === 'POST') {
-      return { task_id: 'task_' + Date.now(), created: true } as unknown as T;
+    if (method === 'POST') {
+      let title = 'مرور درس';
+      let jalali_date = '۱۴۰۵/۰۹/۰۷';
+      let reminder_time: string | null = null;
+      try {
+        const body = init?.body ? JSON.parse(String(init.body)) : {};
+        if (body.title) title = String(body.title);
+        if (body.jalali_date) jalali_date = String(body.jalali_date);
+        if (body.reminder_time) reminder_time = String(body.reminder_time);
+      } catch {
+        /* fallback */
+      }
+      const id = 'task_' + Date.now();
+      demoTasks = [{ task_id: id, title, jalali_date, reminder_time, completed: false, completed_at: null }, ...demoTasks];
+      return { task_id: id, created: true } as unknown as T;
     }
-    return { tasks: [] } as unknown as T;
+    return { tasks: demoTasks } as unknown as T;
   }
 
   // 4. Library & Search
@@ -188,16 +403,44 @@ export function getMockResponse<T>(path: string, init?: RequestInit): T | undefi
     } as unknown as T;
   }
   if (p.includes('/library/terms')) {
-    return { terms: [{ id: '1401', name: 'ترم ۱۴۰۱', lesson_count: 8 }, { id: '1400', name: 'ترم ۱۴۰۰', lesson_count: 7 }] } as unknown as T;
+    return {
+      terms: [
+        { name: 'ترم ۱۴۰۱', lesson_count: 8 },
+        { name: 'ترم ۱۴۰۰', lesson_count: 7 },
+      ],
+    } as unknown as T;
   }
   if (p.includes('/library/lessons/')) {
-    return { lessons: [{ id: 'lesson_1', name: 'فیزیوپاتولوژی قلب', teacher: 'دکتر صادقی', session_count: 12 }, { id: 'lesson_2', name: 'فارماکولوژی', teacher: 'دکتر حسینی', session_count: 10 }] } as unknown as T;
+    return {
+      lessons: [
+        { _id: 'lesson_cardio', name: 'فیزیوپاتولوژی قلب', teacher: 'دکتر صادقی', term: 'ترم ۱۴۰۱', session_count: 12 },
+        { _id: 'lesson_pharma', name: 'فارماکولوژی بالینی', teacher: 'دکتر حسینی', term: 'ترم ۱۴۰۱', session_count: 10 },
+      ],
+    } as unknown as T;
   }
   if (p.includes('/library/sessions/')) {
-    return { sessions: [{ id: 'sess_1', name: 'جلسه ۱', file_count: 3 }, { id: 'sess_2', name: 'جلسه ۲', file_count: 2 }] } as unknown as T;
+    return {
+      sessions: [
+        { _id: 'sess_1', number: 1, topic: 'الکتروفیزیولوژی و آریتمی‌ها', teacher: 'دکتر صادقی', file_count: 3, logical_id: 'cardio_s1' },
+        { _id: 'sess_2', number: 2, topic: 'نارسایی احتقانی قلب', teacher: 'دکتر صادقی', file_count: 2, logical_id: 'cardio_s2' },
+      ],
+    } as unknown as T;
   }
   if (p.includes('/library/files/')) {
-    return { files: [{ id: 'pdf_1', name: 'جزوه جلسه ۱', type: 'pdf', size: 12582912, mime: 'application/pdf' }] } as unknown as T;
+    return {
+      files: [
+        {
+          id: 'pdf_cardio_01',
+          name: 'جزوه جلسه ۱ — آریتمی‌های دهلیزی',
+          description: 'نسخه کامل با نمودارهای ECG',
+          type: 'pdf',
+          downloads: 142,
+          size: 12582912,
+          mime: 'application/pdf',
+          preview: true,
+        },
+      ],
+    } as unknown as T;
   }
   if (p.includes('/library/search') || p.includes('/search?') || p.startsWith('/search') || p.includes('/api/search')) {
     return {
@@ -214,7 +457,7 @@ export function getMockResponse<T>(path: string, init?: RequestInit): T | undefi
     return { subjects: [{ id: 'subj_1', name: 'کتاب‌های مرجع قلب', book_count: 5 }] } as unknown as T;
   }
   if (p.includes('/library/books/')) {
-    return { subject: { id: 'subj_1', name: 'کتاب‌های مرجع قلب' }, books: [{ id: 'book_1', name: 'براون‌والد', volume_count: 2 }] } as unknown as T;
+    return { subject: { id: 'subj_1', name: 'کتاب‌های مرجع قلب' }, books: [{ id: 'book_1', name: 'براون‌والد', fa_count: 1, en_count: 1 }] } as unknown as T;
   }
   if (p.includes('/library/book-files/')) {
     return { book: { id: 'book_1', name: 'براون‌والد' }, fa_files: [], en_files: [] } as unknown as T;
@@ -228,6 +471,101 @@ export function getMockResponse<T>(path: string, init?: RequestInit): T | undefi
   }
 
   // 5. Exam Bank & Mock Exams
+  if (p.includes('/exam/catalog')) {
+    return {
+      total_questions: 350,
+      active_lessons_count: 2,
+      groups: [
+        {
+          key: 'basic_structural',
+          title: 'دروس پایه و ساختاری',
+          description: 'آناتومی، بافت‌شناسی، جنین‌شناسی، فیزیولوژی و بیوشیمی',
+          lesson_count: 1,
+          question_count: 150,
+          lessons: [
+            {
+              id: 'ex_cardio',
+              name: 'فیزیولوژی',
+              term: '',
+              group: 'basic_structural',
+              count: 150,
+              solved_count: 42,
+              accuracy: 87,
+              topics_count: 2,
+              periods_count: 1,
+            },
+          ],
+        },
+        {
+          key: 'clinical_extended',
+          title: 'علوم تکمیلی و بالینی',
+          description: 'پاتولوژی، ژنتیک، تغذیه، فیزیک پزشکی، فارماکولوژی و بالین',
+          lesson_count: 1,
+          question_count: 200,
+          lessons: [
+            {
+              id: 'ex_pharma',
+              name: 'فارماکولوژی',
+              term: '',
+              group: 'clinical_extended',
+              count: 200,
+              solved_count: 0,
+              accuracy: null,
+              topics_count: 1,
+              periods_count: 0,
+            },
+          ],
+        },
+      ],
+      empty_lessons: [],
+      periods: [
+        {
+          key: '1404:shahrivar',
+          exam_year: '1404',
+          exam_session: 'shahrivar',
+          label: 'شهریور ۱۴۰۴',
+          count: 85,
+          lessons: [
+            { lesson_id: 'ex_cardio', lesson: 'فیزیولوژی', count: 45 },
+            { lesson_id: 'ex_pharma', lesson: 'فارماکولوژی', count: 40 },
+          ],
+        },
+      ],
+      filters: {
+        sources: [
+          { code: 'konkoor_sarasari', label: 'کنکور سراسری علوم پایه', count: 250 },
+          { code: 'hamsyar', label: 'هوشیار (طراحی با AI هامزیار)', count: 100 },
+        ],
+        years: ['1404', '1403'],
+        year_min: '1403',
+        year_max: '1404',
+        sessions: [{ code: 'shahrivar', label: 'شهریور', count: 85 }],
+        difficulties: [
+          { code: 'easy', label: 'آسان 🟢', count: 100 },
+          { code: 'medium', label: 'متوسط 🟡', count: 180 },
+          { code: 'hard', label: 'سخت 🔴', count: 70 },
+        ],
+      },
+      smart_queues: { flagged_count: 1, wrong_count: 12, hard_count: 70 },
+    } as unknown as T;
+  }
+  if (p.includes('/exam/filters')) {
+    return {
+      sources: [
+        { code: 'konkoor_sarasari', label: 'کنکور سراسری علوم پایه', count: 250 },
+        { code: 'hamsyar', label: 'هوشیار (طراحی با AI هامزیار)', count: 100 },
+      ],
+      years: ['1404', '1403'],
+      year_min: '1403',
+      year_max: '1404',
+      sessions: [{ code: 'shahrivar', label: 'شهریور', count: 85 }],
+      difficulties: [
+        { code: 'easy', label: 'آسان 🟢', count: 100 },
+        { code: 'medium', label: 'متوسط 🟡', count: 180 },
+        { code: 'hard', label: 'سخت 🔴', count: 70 },
+      ],
+    } as unknown as T;
+  }
   if (p.includes('/exam/lessons')) {
     return { lessons: [{ id: 'ex_cardio', name: 'فیزیوپاتولوژی قلب', count: 150 }, { id: 'ex_pharma', name: 'فارماکولوژی', count: 200 }] } as unknown as T;
   }
@@ -294,17 +632,224 @@ export function getMockResponse<T>(path: string, init?: RequestInit): T | undefi
     return { processed: 0, successful_ids: [], conflicts: [], server_timestamp: new Date().toISOString() } as unknown as T;
   }
 
-  // 7. Schedule & Grades
+  // 7. Schedule, Grades & Tickets
   if (p.includes('/schedule')) {
-    return { items: [] } as unknown as T;
+    const dates = currentWeekDates();
+    return {
+      items: [
+        {
+          id: 'sch_demo_1',
+          type: 'class',
+          lesson: 'فیزیوپاتولوژی قلب',
+          teacher: 'دکتر صادقی',
+          date: dates[0],
+          time: '۰۸:۰۰',
+          end_time: '۱۰:۰۰',
+          location: 'تالار ابن‌سینا',
+          note: 'مرور نوار قلب پیش از کلاس',
+          group: 'گروه الف',
+          educational_group: 'گروه الف',
+          course_code: 'MED-301',
+          term: '14041',
+          days_left: 0,
+        },
+        {
+          id: 'sch_demo_2',
+          type: 'class',
+          lesson: 'فارماکولوژی بالینی',
+          teacher: 'دکتر حسینی',
+          date: dates[1],
+          time: '۱۰:۳۰',
+          end_time: '۱۲:۳۰',
+          location: 'تالار رازی',
+          note: '',
+          group: 'گروه الف',
+          educational_group: 'گروه الف',
+          course_code: 'MED-304',
+          term: '14041',
+          days_left: 1,
+        },
+        {
+          id: 'sch_demo_3',
+          type: 'makeup',
+          lesson: 'آسیب‌شناسی عملی',
+          teacher: 'دکتر کاظمی',
+          date: dates[3],
+          time: '۱۴:۰۰',
+          end_time: '۱۶:۰۰',
+          location: 'آزمایشگاه مرکزی',
+          note: 'روپوش سفید الزامی است',
+          group: 'گروه الف',
+          educational_group: 'گروه الف',
+          course_code: 'MED-309',
+          term: '14041',
+          days_left: 3,
+        },
+        {
+          id: 'sch_demo_4',
+          type: 'exam',
+          lesson: 'آزمون میان‌ترم قلب',
+          teacher: 'دکتر صادقی',
+          date: dates[5],
+          time: '۱۰:۰۰',
+          end_time: '۱۱:۳۰',
+          location: 'سالن امتحانات',
+          note: 'مبحث آریتمی‌ها',
+          group: 'گروه الف',
+          educational_group: 'گروه الف',
+          course_code: 'MED-301',
+          term: '14041',
+          days_left: 5,
+        },
+      ],
+      has_custom_selection: false,
+      selected_count: 4,
+      total_offered_count: 6,
+      computed_group: 'گروه الف',
+      educational_group: 'گروه الف',
+      conflicts: [],
+      term: '14041',
+    } as unknown as T;
   }
   if (p.includes('/grades/summary') || p.includes('/grades')) {
-    return { semesters: [], gpa: 0, total_credits: 0 } as unknown as T;
+    return {
+      cumulative_gpa: 17.85,
+      total_credits: 42,
+      passed_credits: 42,
+      failed_credits: 0,
+      semesters: [
+        {
+          term_label: 'نیم‌سال اول ۱۴۰۳–۱۴۰۴',
+          term_gpa: 18.12,
+          credits: 21,
+          courses: [
+            { course_id: 'c_1', name: 'فیزیوپاتولوژی قلب', credits: 4, score: 18.5, normalized_score: 18.5, passed: true },
+            { course_id: 'c_2', name: 'فارماکولوژی بالینی', credits: 3, score: 17.75, normalized_score: 17.75, passed: true },
+          ],
+        },
+        {
+          term_label: 'نیم‌سال دوم ۱۴۰۲–۱۴۰۳',
+          term_gpa: 17.58,
+          credits: 21,
+          courses: [
+            { course_id: 'c_3', name: 'آسیب‌شناسی عمومی', credits: 4, score: 17.5, normalized_score: 17.5, passed: true },
+            { course_id: 'c_4', name: 'میکروب‌شناسی پزشکی', credits: 3, score: 17.7, normalized_score: 17.7, passed: true },
+          ],
+        },
+      ],
+    } as unknown as T;
+  }
+  if (p.includes('/tickets')) {
+    const cleanPath = path.split('?')[0];
+    if (p.endsWith('/reply') && method === 'POST') {
+      const idNum = Number(cleanPath.split('/').slice(-2, -1)[0]);
+      let msg = '';
+      try {
+        msg = String((init?.body ? JSON.parse(String(init.body)) : {}).message || '').trim();
+      } catch {
+        /* ignore */
+      }
+      demoTickets = demoTickets.map((t) =>
+        t.id === idNum
+          ? {
+              ...t,
+              status: 'open',
+              reply_count: t.reply_count + 1,
+              replies: [...t.replies, { text: msg || 'پیام جدید', sender: 'user', at: new Date().toISOString() }],
+            }
+          : t,
+      );
+      return { ok: true } as unknown as T;
+    }
+    const idMatch = cleanPath.match(/\/tickets\/(\d+)$/);
+    if (idMatch && method === 'GET') {
+      const idNum = Number(idMatch[1]);
+      const found = demoTickets.find((t) => t.id === idNum) || demoTickets[0];
+      return { ticket: found } as unknown as T;
+    }
+    if (method === 'POST') {
+      let subject = 'پشتیبانی';
+      let message = '';
+      try {
+        const parsed = init?.body ? JSON.parse(String(init.body)) : {};
+        if (parsed.subject) subject = String(parsed.subject);
+        if (parsed.message) message = String(parsed.message);
+      } catch {
+        /* ignore */
+      }
+      const nextId = Math.max(1042, ...demoTickets.map((t) => t.id)) + 1;
+      demoTickets = [
+        {
+          id: nextId,
+          subject,
+          status: 'open',
+          created_at: new Date().toISOString(),
+          reply_count: 0,
+          priority: 'normal',
+          message,
+          replies: [],
+        },
+        ...demoTickets,
+      ];
+      return { ok: true, ticket_id: nextId } as unknown as T;
+    }
+    return {
+      tickets: demoTickets.map(({ message: _m, replies: _r, ...summary }) => summary),
+      subjects: ['محتوای درسی و جزوه', 'اشتراک و پرداخت', 'آزمون و کارنامه', 'مشکل فنی'],
+    } as unknown as T;
   }
 
   // 8. AI
+  if (p.includes('/ai/status')) {
+    return {
+      enabled: true,
+      banned: false,
+      daily_limit: 50,
+      used_today: 8,
+      remaining: 42,
+      unlimited: false,
+      disabled_message: '',
+      max_input_chars: 2000,
+      capabilities: { text: true, image: true, pdf: true, audio: false },
+    } as unknown as T;
+  }
+  if (p.includes('/ai/conversations/') && p.includes('/messages')) {
+    return {
+      messages: [
+        { role: 'user', text: 'تفاوت فیبریلاسیون دهلیزی و فلوتر دهلیزی در نوار قلب چیست؟', at: new Date(Date.now() - 3_600_000).toISOString(), index: 0 },
+        { role: 'assistant', text: 'در **فیبریلاسیون دهلیزی (AF)** موج P مشخص حذف می‌شود و ریتم به‌صورت نامنظم (irregularly irregular) است؛ در **فلوتر دهلیزی** امواج دندانه‌دار مشخص با بسامد حدود ۳۰۰ در دقیقه دیده می‌شود.', at: new Date(Date.now() - 3_590_000).toISOString(), index: 1 },
+      ],
+      total: 2,
+      has_more: false,
+    } as unknown as T;
+  }
   if (p.includes('/ai/conversations')) {
-    return { conversations: [] } as unknown as T;
+    if (method === 'POST') return { id: 'conv_demo_' + Date.now() } as unknown as T;
+    if (method === 'PATCH' || method === 'DELETE') return { ok: true } as unknown as T;
+    return {
+      conversations: [
+        {
+          id: 'conv_demo_1',
+          title: 'مقایسه AF و فلوتر دهلیزی',
+          pinned: true,
+          preview: 'در فیبریلاسیون دهلیزی موج P مشخص حذف می‌شود...',
+          count: 2,
+          created_at: new Date(Date.now() - 3_600_000).toISOString(),
+          updated_at: new Date(Date.now() - 3_590_000).toISOString(),
+        },
+        {
+          id: 'conv_demo_2',
+          title: 'الگوریتم درمان هیپوناترمی',
+          pinned: false,
+          preview: 'ابتدا اسمولالیته پلاسما و وضعیت حجمی بیمار ارزیابی می‌شود.',
+          count: 4,
+          created_at: new Date(Date.now() - 86_400_000).toISOString(),
+          updated_at: new Date(Date.now() - 86_000_000).toISOString(),
+        },
+      ],
+      total: 2,
+      has_more: false,
+    } as unknown as T;
   }
   if (p.includes('/ai/ask')) {
     // SSE stream - handled separately
@@ -323,9 +868,6 @@ export function getMockResponse<T>(path: string, init?: RequestInit): T | undefi
   }
   if (p.includes('/web-auth/fallback/verify')) {
     return { status: 'approved', authenticated: true, user: MOCK_USER } as unknown as T;
-  }
-  if (p.includes('/web-auth/sessions')) {
-    return { sessions: [{ session_id: 'sess_1', device_name: 'Demo Browser', ip_address: '127.0.0.1', is_current: true, created_at: 'now', last_active: 'now' }] } as unknown as T;
   }
 
   return undefined;
