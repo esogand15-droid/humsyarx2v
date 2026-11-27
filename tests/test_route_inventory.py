@@ -32,7 +32,7 @@ EXPECTED_ROUTE_OBJECTS = 771
 
 def _load_app():
     try:
-        import api.main as m
+        import backend.api.main as m
     except Exception as exc:                       # noqa: BLE001
         return None, exc
     return m, None

@@ -11,7 +11,7 @@ import difflib
 from datetime import timedelta
 from bson import ObjectId
 import motor.motor_asyncio
-from time_utils import now_utc, parse_machine_datetime, utc_now_iso
+from backend.core.time_utils import now_utc, parse_machine_datetime, utc_now_iso
 
 # نام logger عمداً «database» نگه داشته شد تا کانال لاگ تغییر نکند
 logger = logging.getLogger('database')

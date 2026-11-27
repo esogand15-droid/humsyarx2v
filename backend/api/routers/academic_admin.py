@@ -15,11 +15,11 @@ from fastapi import (
 )
 from pydantic import BaseModel, Field
 
-from api.auth import get_current_user
-from api.routers.admin_panel import _audit
-from database import db
-from grade_utils import normalize_grade
-from time_utils import TimeContractError, parse_clock_time, parse_gregorian_date, utc_now_iso
+from backend.api.auth import get_current_user
+from backend.api.routers.admin_panel import _audit
+from backend.database.database import db
+from backend.services.grade_utils import normalize_grade
+from backend.core.time_utils import TimeContractError, parse_clock_time, parse_gregorian_date, utc_now_iso
 
 
 router = APIRouter()
@@ -156,7 +156,7 @@ def _valid_time(
     # but canonical store is single HH:MM; range handled separately via end_time
     # if value contains range separator, extract start
     import re as _re
-    from time_utils import en_digits as _en
+    from backend.core.time_utils import en_digits as _en
     v = _en(str(value)).strip()
     # if range present, keep first HH:MM
     m = _re.search(r'(\d{1,2}:\d{2})', v)
@@ -189,7 +189,7 @@ def _valid_time_range(start: str, end: str) -> tuple[str, str]:
     e = _valid_time(end)
     if s and e:
         try:
-            from time_utils import en_digits as _en2
+            from backend.core.time_utils import en_digits as _en2
             # need to compare times
             st = parse_clock_time(s)
             et = parse_clock_time(e)
@@ -210,7 +210,7 @@ def _normalize_range_input(value: str) -> tuple[str, str]:
     if not value:
         return "", ""
     import re as _re2
-    from time_utils import en_digits as _en3
+    from backend.core.time_utils import en_digits as _en3
     raw = _en3(str(value)).strip().replace('—', '-').replace('–', '-').replace('تا', '-')
     # handle interval like 8-10 or 13-15 without colon
     m_range = _re2.findall(r'(\d{1,2})(?::(\d{2}))?', raw)
@@ -702,7 +702,7 @@ async def admin_scan_course_selection_images(
     """استخراج اطلاعات انتخاب واحد از یک یا چند اسکرین‌شات (مثلاً تصویر آقایان + تصویر بانوان)
     و ذخیره در فضای Staging بدون نوشتن مستقیم روی دیتابیس اصلی."""
     import base64
-    from ai_solver import scan_course_selection_images, AIError, AIConfigError
+    from backend.services.ai_solver import scan_course_selection_images, AIError, AIConfigError
 
     raw_images = body.get("images") if isinstance(body, dict) else []
     if not isinstance(raw_images, list) or not raw_images:
@@ -1011,7 +1011,7 @@ def _parse_cohort(cohort: str | None) -> tuple[str | None, str | None]:
 
 def _parse_schedule_free_text(text: str, default_group: str = "1", default_edu: str = "mixed") -> list[dict]:
     import re
-    from time_utils import en_digits
+    from backend.core.time_utils import en_digits
     DAY_LIST = [
         ("چهارشنبه", 4),
         ("پنج‌شنبه", 5), ("پنج شنبه", 5),
@@ -1312,10 +1312,10 @@ async def schedule_templates_scan(
 ):
     image_bytes, mime = await _read_scan_upload(file)
     try:
-        from ai_solver import scan_weekly_schedule_image
+        from backend.services.ai_solver import scan_weekly_schedule_image
         parsed = await scan_weekly_schedule_image(image_bytes, mime, group_hint=(group or None))
     except Exception as e:
-        from ai_solver import AIConfigError, AIError
+        from backend.services.ai_solver import AIConfigError, AIError
         if isinstance(e, (AIConfigError, AIError)):
             raise HTTPException(status_code=422, detail=str(e))
         raise HTTPException(status_code=500, detail=f"اسکن ناموفق: {e}")
@@ -1359,10 +1359,10 @@ async def schedule_exams_scan(
 ):
     image_bytes, mime = await _read_scan_upload(file)
     try:
-        from ai_solver import scan_exam_schedule_image
+        from backend.services.ai_solver import scan_exam_schedule_image
         parsed = await scan_exam_schedule_image(image_bytes, mime)
     except Exception as e:
-        from ai_solver import AIConfigError, AIError
+        from backend.services.ai_solver import AIConfigError, AIError
         if isinstance(e, (AIConfigError, AIError)):
             raise HTTPException(status_code=422, detail=str(e))
         raise HTTPException(status_code=500, detail=f"اسکن ناموفق: {e}")
@@ -1377,7 +1377,7 @@ async def schedule_exams_scan_confirm(
     body: ExamBulkConfirm,
     admin=Depends(get_schedule_admin_user),
 ):
-    from time_utils import parse_gregorian_date, parse_jalali_date, TimeContractError, en_digits
+    from backend.core.time_utils import parse_gregorian_date, parse_jalali_date, TimeContractError, en_digits
     created = 0
     skipped = 0
     for raw in body.exams:
@@ -1683,11 +1683,11 @@ async def grades_term_options(
     می‌شوند و با همان `_term_rank` مرتب می‌شوند تا «ترم ۱۰» بعد از «ترم ۲»
     بیاید، نه بینِ ۱ و ۲.
     """
-    from grade_utils import _term_rank, TERM_ORDER
+    from backend.services.grade_utils import _term_rank, TERM_ORDER
 
     known: list[str] = []
     try:
-        from api.routers.content_admin import TERMS as _TERMS
+        from backend.api.routers.content_admin import TERMS as _TERMS
         known = [str(t).strip() for t in (_TERMS or []) if str(t).strip()]
     except Exception:
         known = []

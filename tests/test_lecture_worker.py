@@ -187,8 +187,8 @@ def test_atomic_error_recovery_on_job_failure():
         mock_bot = MagicMock()
         mock_bot.edit_message_text = AsyncMock()
 
-        with patch("ai_solver.refund_lecture_quota", new_callable=AsyncMock) as mock_refund, \
-             patch("ai_solver.ai_release_inflight", new_callable=AsyncMock) as mock_release:
+        with patch("backend.services.ai_solver.refund_lecture_quota", new_callable=AsyncMock) as mock_refund, \
+             patch("backend.services.ai_solver.ai_release_inflight", new_callable=AsyncMock) as mock_release:
 
             await queue.enqueue_job(
                 chat_id=9999,
@@ -220,8 +220,8 @@ def test_worker_queue_shutdown_drains_unstarted_jobs():
         mock_bot = MagicMock()
         mock_bot.edit_message_text = AsyncMock()
 
-        with patch("ai_solver.refund_lecture_quota", new_callable=AsyncMock) as mock_refund, \
-             patch("ai_solver.ai_release_inflight", new_callable=AsyncMock) as mock_release:
+        with patch("backend.services.ai_solver.refund_lecture_quota", new_callable=AsyncMock) as mock_refund, \
+             patch("backend.services.ai_solver.ai_release_inflight", new_callable=AsyncMock) as mock_release:
 
             await queue.enqueue_job(1, 101, "sess_drain_1", {}, 201, mock_bot, quota_consumed=True, auto_start=False)
             await queue.enqueue_job(2, 102, "sess_drain_2", {}, 202, mock_bot, quota_consumed=True, auto_start=False)

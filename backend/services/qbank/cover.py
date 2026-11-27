@@ -8,8 +8,8 @@
 from reportlab.lib.units import mm
 from reportlab.lib.colors import HexColor
 
-from qbank.fonts_rtl import rtl, fa_digits, text_width, REGULAR, MEDIUM, BOLD
-from qbank.styles import (
+from backend.services.qbank.fonts_rtl import rtl, fa_digits, text_width, REGULAR, MEDIUM, BOLD
+from backend.services.qbank.styles import (
     PAGE_W, PAGE_H, MARGIN, NAVY, NAVY_LIGHT, BRAND_GREEN,
     GRAY, TEXT_DARK, WHITE, CARD_BG, CARD_BORDER,
 )
@@ -58,13 +58,13 @@ def _draw_logo(c, cx, cy, r):
 
 
 def _today_jalali() -> str:
-    from time_utils import format_date_fa, now_utc
+    from backend.core.time_utils import format_date_fa, now_utc
     return format_date_fa(now_utc(), long=True)
 
 
 def _now_tehran_pretty() -> str:
     try:
-        from time_utils import format_datetime_fa, now_utc
+        from backend.core.time_utils import format_datetime_fa, now_utc
         return format_datetime_fa(now_utc(), long=True)
     except Exception:
         return _today_jalali()

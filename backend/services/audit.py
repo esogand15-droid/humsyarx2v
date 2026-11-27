@@ -33,7 +33,7 @@ from typing import Any, Optional
 
 # ─────────── Time ───────────
 try:
-    from time_utils import now_utc, utc_now_iso, TEHRAN, format_datetime_fa
+    from backend.core.time_utils import now_utc, utc_now_iso, TEHRAN, format_datetime_fa
 except Exception:  # pragma: no cover
     from zoneinfo import ZoneInfo
     TEHRAN = ZoneInfo("Asia/Tehran")
@@ -48,7 +48,7 @@ except Exception:  # pragma: no cover
             return str(v)
 
 try:
-    from request_context import current_request_id
+    from backend.core.request_context import current_request_id
 except Exception:
     from contextvars import ContextVar
     current_request_id = ContextVar("humsyar_request_id", default=None)
@@ -513,7 +513,7 @@ def build_telegram_audit_text(event: dict) -> str:
     mod = event.get("module", "")
     # ترجمه ماژول
     try:
-        from database import db as _db
+        from backend.database.database import db as _db
         mod_fa = _db.MODULE_LABELS_FA.get(mod, mod)
     except Exception:
         mod_fa = mod
@@ -650,7 +650,7 @@ async def persist_audit_event(event: dict) -> str:
     returns: inserted_id / event_id
     """
     try:
-        from database import db
+        from backend.database.database import db
         doc = dict(event)
         # Mongo _id جداگانه؛ event_id ایندکس یکتا
         r = await db.audit_logs.insert_one(doc)
@@ -672,7 +672,7 @@ async def enqueue_telegram_delivery(event: dict, chat_id: int | str) -> None:
     از کالکشن audit_outbox استفاده می‌کنیم؛ اگر نبود از bot_notifications reuse می‌کنیم (§14 می‌گوید reuse اگر وجود دارد).
     """
     try:
-        from database import db
+        from backend.database.database import db
         # سعی کن audit_outbox را به‌کار ببر؛ اگر کالکشن نیست، fallback به bot_notifications
         has_outbox = hasattr(db, "audit_outbox") and db.audit_outbox is not None
         payload_text = build_telegram_audit_text(event)
@@ -757,7 +757,7 @@ async def process_audit_outbox_once(bot, limit: int = 20) -> dict:
     Race (§44): find_one_and_update برای claim اتمیک.
     """
     try:
-        from database import db
+        from backend.database.database import db
         if not hasattr(db, "audit_outbox"):
             # fallback: bot_notifications path — توسط mini_app_outbox_job موجود پردازش می‌شود
             return {"processed": 0, "note": "no audit_outbox, using bot_notifications"}
@@ -925,7 +925,7 @@ async def audit_event(
             # تعیین chat_id گروه لاگ بر اساس دسته
             if telegram_chat_id is None:
                 try:
-                    from database import db as _db
+                    from backend.database.database import db as _db
                     group_key, _, _ = get_category_meta(category)
                     chat_id = await _db.get_setting(group_key, None)
                     # اگر گروه مربوطه نبود، admin را fallback کن
@@ -945,7 +945,7 @@ async def audit_event(
                         delivery = DELIVERY_DELIVERED
                         # mark delivered immediately to avoid duplicate later
                         try:
-                            from database import db as _db2
+                            from backend.database.database import db as _db2
                             if hasattr(_db2, "audit_outbox"):
                                 await _db2.audit_outbox.update_many(
                                     {"event_id": event["event_id"], "status": {"$in": [DELIVERY_PENDING, "CLAIMED"]}},
@@ -1039,7 +1039,7 @@ async def legacy_send_audit_log(bot, category: str, actor_name: str, actor_id: i
 # ══════════════════════════════════════════════════
 async def get_audit_health() -> dict:
     try:
-        from database import db
+        from backend.database.database import db
         pending = await db.audit_outbox.count_documents({"status": {"$in": [DELIVERY_PENDING, DELIVERY_RETRY]}}) if hasattr(db, "audit_outbox") else 0
         failed = await db.audit_outbox.count_documents({"status": DELIVERY_FAILED}) if hasattr(db, "audit_outbox") else 0
         perm_failed = await db.audit_outbox.count_documents({"status": DELIVERY_PERMANENT_FAILED}) if hasattr(db, "audit_outbox") else 0
@@ -1064,7 +1064,7 @@ DEFAULT_RETENTION_DAYS = 365  # پیش‌فرض یک سال؛ قابل override 
 async def apply_retention(days: int | None = None) -> int:
     """حذف لاگ‌های قدیمی‌تر از retention — فقط اگر تنظیمات اجازه دهد."""
     try:
-        from database import db
+        from backend.database.database import db
         if days is None:
             days = int(await db.get_setting("audit_retention_days", DEFAULT_RETENTION_DAYS))
         if days <= 0:

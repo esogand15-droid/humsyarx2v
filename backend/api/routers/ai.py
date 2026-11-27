@@ -23,7 +23,7 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ai_solver import (
+from backend.services.ai_solver import (
     MAX_INPUT_CHARS,
     MAX_MEDIA_BYTES,
     AIError,
@@ -63,13 +63,13 @@ from ai_solver import (
     get_ai_config,
     record_token_usage,
 )
-from api.auth import (
+from backend.api.auth import (
     ADMIN_ID, WA_SESSION_COOKIE, get_current_user,
     require_feature, resolve_web_session, verify_telegram_init_data,
 )
-from api.rate_limit import rate_limit_dependency, rate_limit_user
-from database import db
-from time_utils import now_utc, parse_machine_datetime, today_tehran, utc_now_iso
+from backend.api.rate_limit import rate_limit_dependency, rate_limit_user
+from backend.database.database import db
+from backend.core.time_utils import now_utc, parse_machine_datetime, today_tehran, utc_now_iso
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -2178,7 +2178,7 @@ async def _authenticate_live_ws(websocket: WebSocket) -> dict | None:
     ).strip()
     if app_tok:
         try:
-            from api.auth import resolve_web_user_session
+            from backend.api.auth import resolve_web_user_session
             sess = await resolve_web_user_session(app_tok)
             if sess:
                 uid = int(sess.get("uid") or 0)

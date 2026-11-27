@@ -14,10 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
 
-import core.access as acc
-from core.errors import Code
-from core.features import FEATURE_CATALOG, default_policy
-from db.core import DBCore
+import backend.core.access as acc
+from backend.core.errors import Code
+from backend.core.features import FEATURE_CATALOG, default_policy
+from backend.database.core import DBCore
 
 ADMIN = 999
 USER = 111
@@ -381,7 +381,7 @@ class W7PolicyStoreTest(unittest.TestCase):
 
 class W7MigrationTest(unittest.TestCase):
     def test_v4_seed_and_enforced_and_idempotent(self):
-        from db import migrations
+        from backend.database import migrations
         db = FakeColl()
         fake = FakeColl()  # setting جدا
         settings = {"subscription_enforced": True}

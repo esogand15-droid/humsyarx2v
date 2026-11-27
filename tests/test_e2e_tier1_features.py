@@ -94,7 +94,7 @@ from backend.services.ai_solver import (
     api_key_problem,
     AIConfigError,
 )
-from database import db
+from backend.database.database import db
 
 
 # ============================================================================
@@ -934,7 +934,7 @@ class Tier1Feature17SubscriptionViewLiveWiringTests(Tier1BaseTest):
 
     def test_04_jalali_expiration_calculation(self):
         """Verify Jalali expiration date formatting logic."""
-        from time_utils import utc_now_iso
+        from backend.core.time_utils import utc_now_iso
         now = utc_now_iso()
         self.assertIsInstance(now, str)
         self.assertIn("T", now)

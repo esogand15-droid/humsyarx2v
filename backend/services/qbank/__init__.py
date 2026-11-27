@@ -14,6 +14,6 @@
 نقطه‌ی ورود عمومی همینه:
     from qbank import generate_exam_pdf
 """
-from qbank.builder import generate_exam_pdf
+from backend.services.qbank.builder import generate_exam_pdf
 
 __all__ = ['generate_exam_pdf']

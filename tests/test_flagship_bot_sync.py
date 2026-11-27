@@ -50,9 +50,9 @@ from fastapi.testclient import TestClient
 from backend.api.main import app, _count_api_operations, _walk_included_routes
 from backend.api.auth import get_current_user
 from backend.api.routers.web_student import current_student
-from core.access import check_feature
-from database import db
-from time_utils import utc_now_iso
+from backend.core.access import check_feature
+from backend.database.database import db
+from backend.core.time_utils import utc_now_iso
 
 
 class MockAsyncCursor:
@@ -318,7 +318,7 @@ class TestFlagshipBotSync(unittest.TestCase):
              patch.object(db, "sub_plan_list", new_callable=AsyncMock) as m_plans, \
              patch.object(db, "sub_payment_history", new_callable=AsyncMock) as m_hist, \
              patch.object(db, "get_setting", new_callable=AsyncMock) as m_setting, \
-             patch("subscription.has_access", new_callable=AsyncMock) as m_access:
+             patch("backend.bot.subscription.has_access", new_callable=AsyncMock) as m_access:
 
             m_plans.return_value = []
             m_hist.return_value = []

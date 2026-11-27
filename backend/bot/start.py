@@ -5,9 +5,9 @@ import os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
-from bot_modern_ui import ButtonGridBuilder
-from database import db
-from utils import (
+from backend.bot.bot_modern_ui import ButtonGridBuilder
+from backend.database.database import db
+from backend.bot.utils import (
     main_keyboard, admin_keyboard, content_admin_keyboard, get_keyboard_for_user,
     esc as _esc,   # 🛡 P0-FIX: نامِ کاربر داخل parse_mode='HTML' باید escape شود
 )
@@ -50,7 +50,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             _sargs = getattr(context, 'args', None) or []
             if _sargs:
-                import growth_rules as _gr
+                import backend.services.growth_rules as _gr
                 _rcode = _gr.parse_ref_start_arg(_sargs[0])
                 if _rcode:
                     context.user_data['pending_ref'] = _rcode
@@ -113,7 +113,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🎙 م9 — دیپ‌لینک شروع تماس صوتی زنده از گروه (?start=ai_live)
     _sargs = getattr(context, 'args', None) or []
     if _sargs and str(_sargs[0]).strip().lower() in ('ai_live', 'live', 'voicechat'):
-        from ai_solver import show_ai_live_card
+        from backend.services.ai_solver import show_ai_live_card
         await show_ai_live_card(update, context)
         return ConversationHandler.END
     await _show_dashboard(update, context)
@@ -397,7 +397,7 @@ async def _after_intake_step(update, context, uid, name, group, intake, username
     try:
         _pr = context.user_data.pop('pending_ref', None)
         if _pr:
-            from referral import attribute as _ref_attribute
+            from backend.bot.referral import attribute as _ref_attribute
             await _ref_attribute(uid, _pr, 'bot')
     except Exception:
         pass
@@ -456,7 +456,7 @@ async def step_student_id_handler(update: Update, context: ContextTypes.DEFAULT_
     try:
         _pr = context.user_data.pop('pending_ref', None)
         if _pr:
-            from referral import attribute as _ref_attribute
+            from backend.bot.referral import attribute as _ref_attribute
             await _ref_attribute(uid, _pr, 'bot')
     except Exception:
         pass
@@ -551,7 +551,7 @@ async def _finish_registration(update, context, uid, name, group, intake, userna
 
         # FIX جدید: ثبت در Audit Log گروه ادمین هم (severity پایین —
         # رویداد روزمره است، اما باید در تاریخچه باشد)
-        from utils import send_audit_log
+        from backend.bot.utils import send_audit_log
         await send_audit_log(
             context.bot, 'admin', name, uid,
             "ثبت‌نام کاربر جدید", module='Users', severity='INFO',
@@ -584,7 +584,7 @@ async def _finish_registration(update, context, uid, name, group, intake, userna
 # ══════════════════════════════════════════════════
 
 async def _show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from dashboard import build_dashboard_text
+    from backend.bot.dashboard import build_dashboard_text
     uid = update.effective_user.id
     try:
         text, kb = await build_dashboard_text(uid)
@@ -594,7 +594,7 @@ async def _show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def _send_dashboard_by_id(context: ContextTypes.DEFAULT_TYPE, uid: int):
-    from dashboard import build_dashboard_text
+    from backend.bot.dashboard import build_dashboard_text
     try:
         text, kb = await build_dashboard_text(uid)
         await context.bot.send_message(uid, text, parse_mode='HTML', reply_markup=kb)

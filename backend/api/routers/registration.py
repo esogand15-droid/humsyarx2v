@@ -10,15 +10,15 @@
 import logging
 import os
 from datetime import datetime
-from time_utils import utc_now_iso
-from api.rate_limit import rate_limit_user  # 🛡 W3/SEC-03
+from backend.core.time_utils import utc_now_iso
+from backend.api.rate_limit import rate_limit_user  # 🛡 W3/SEC-03
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
-from api.auth import verify_telegram_init_data
-from database import db
+from backend.api.auth import verify_telegram_init_data
+from backend.database.database import db
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -208,7 +208,7 @@ async def register_via_miniapp(
     # 🌱 W13 — attribution دعوت (exception-safe؛ ثبت‌نام را نمی‌شکند)
     try:
         if (body.ref or "").strip():
-            from referral import attribute as _ref_attribute
+            from backend.bot.referral import attribute as _ref_attribute
             await _ref_attribute(uid, body.ref, 'miniapp')
     except Exception:
         pass
@@ -253,7 +253,7 @@ async def register_via_miniapp(
     # می‌رسد؛ ثبت‌نام از مینی‌اپ هم باید همان‌طور به گروه برسد تا گروه
     # تصویر کامل هر دو کانال را داشته باشد (با همان قالب مشترک) ──
     try:
-        from utils import build_audit_log_text
+        from backend.bot.utils import build_audit_log_text
         chat_id = await db.get_setting("log_group_admin", None)
         if chat_id:
             text = build_audit_log_text(

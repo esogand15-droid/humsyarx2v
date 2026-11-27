@@ -50,9 +50,9 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from starlette.staticfiles import StaticFiles
 
-from api.rate_limit import rate_limit
-from database import db
-from time_utils import TimeContractError, now_utc, parse_machine_datetime
+from backend.api.rate_limit import rate_limit
+from backend.database.database import db
+from backend.core.time_utils import TimeContractError, now_utc, parse_machine_datetime
 
 logger = logging.getLogger("web_student")
 

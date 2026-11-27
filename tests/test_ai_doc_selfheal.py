@@ -21,8 +21,8 @@ import _rtloop
 _HAS_MONGO_URI = bool(os.environ.get("MONGODB_URI"))
 
 if _HAS_MONGO_URI:
-    import ai_solver
-    from ai_solver import AIConfigError
+    import backend.services.ai_solver as ai_solver
+    from backend.services.ai_solver import AIConfigError
 
 
 def _mongo_available() -> bool:
@@ -132,7 +132,7 @@ class SelfHealStreamTests(unittest.TestCase):
 
     def setUp(self):
         _rtloop.adopt()
-        import database
+        import backend.database.database as database
         self.db = database.db
         self.uid = 881001
         _rtloop.run(self._cleanup())

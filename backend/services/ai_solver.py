@@ -20,10 +20,10 @@ import asyncio
 import logging
 import unicodedata
 from typing import Optional, Dict, Any, List
-from utils import esc as _esc   # 🛡 AUDIT-A6 —escape مرکزی (پارامتر quote حفظ است)
+from backend.bot.utils import esc as _esc   # 🛡 AUDIT-A6 —escape مرکزی (پارامتر quote حفظ است)
 from collections import deque, OrderedDict
 from datetime import datetime
-from time_utils import (
+from backend.core.time_utils import (
     format_date_fa, format_datetime_fa, format_time_fa,
     now_utc, parse_machine_datetime, today_tehran, utc_now_iso,
 )
@@ -32,9 +32,9 @@ import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from database import db
+from backend.database.database import db
 try:
-    from utils_crypto import decrypt_value, encrypt_value, is_encryption_enabled
+    from backend.core.utils_crypto import decrypt_value, encrypt_value, is_encryption_enabled
 except Exception:
     decrypt_value = lambda x: x if isinstance(x,str) else (x.get("c","") if isinstance(x,dict) else str(x or ""))
     encrypt_value = lambda x: x
@@ -2118,7 +2118,7 @@ async def _execute_ai_function(name: str, args: dict, uid: int) -> str:
                 return "\n".join(lines)
 
             if name == 'admin_list_pending_approvals':
-                from question_bank.contracts import status_query
+                from backend.services.question_bank.contracts import status_query
                 pending_u = await db.pending_users()
                 pending_q_count = await db.questions.count_documents(status_query('pending'))
                 pending_p = await db.sub_payment_list_pending()
@@ -3470,7 +3470,7 @@ def auto_repair_generation_config(gen_cfg: dict) -> dict:
 async def show_ai_intro(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     # 🌊 W7 — گیت فیچر (پیش‌فرض FREE ⇒ بدون تغییر رفتار امروز)
-    from subscription import feature_allowed, show_paywall
+    from backend.bot.subscription import feature_allowed, show_paywall
     if not await feature_allowed(uid, "ai_chat"):
         await show_paywall(update.message, uid, feature="ai_chat")
         return
@@ -3493,7 +3493,7 @@ async def show_ai_intro(update: Update, context: ContextTypes.DEFAULT_TYPE):
         used  = user.get('ai_usage_count', 0) if user.get('ai_usage_date') == today else 0
         quota_line = f"📊 تا الان {used} از {limit} سوالِ امروزتو استفاده کردی"
 
-    from utils import webapp_url as _wa_url
+    from backend.bot.utils import webapp_url as _wa_url
     _live_url = _wa_url('/ai/live')
     _kb_rows = [
         [
@@ -3552,7 +3552,7 @@ async def show_ai_live_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("🎙 تماس صوتی زنده‌ی هوشیار فعلاً توسط مدیریت غیرفعال است.")
         return
 
-    from utils import webapp_url as _wa_url
+    from backend.bot.utils import webapp_url as _wa_url
     live_url = _wa_url('/ai/live')
     chat_type = getattr(update.effective_chat, 'type', 'private')
     model_name = cfg.get('live_model') or DEFAULT_LIVE_MODEL
@@ -3621,7 +3621,7 @@ async def join_live_vc_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     wait_msg = await msg.reply_text("⏳ در حال اتصال دستیار هوشیار به ویس‌چت گروه و Gemini Live…")
     try:
-        from tg_group_voice_call import join_group_voice_chat
+        from backend.bot.tg_group_voice_call import join_group_voice_chat
         info = await join_group_voice_chat(
             chat_id=chat.id,
             bot=context.bot,
@@ -3652,7 +3652,7 @@ async def leave_live_vc_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not chat:
         return
     try:
-        from tg_group_voice_call import leave_group_voice_chat
+        from backend.bot.tg_group_voice_call import leave_group_voice_chat
         await leave_group_voice_chat(chat.id)
         await msg.reply_text("📴 هوشیار از ویس‌چت گروه خارج شد.")
     except Exception as e:
@@ -4054,7 +4054,7 @@ async def ai_claim_inflight(uid: int) -> bool:
     if uid in _busy_users:
         return False
     try:
-        from database import db
+        from backend.database.database import db
         if not await db.op_claim('ai_inflight', str(uid), ttl_seconds=AI_INFLIGHT_TTL):
             return False
     except Exception:
@@ -4074,7 +4074,7 @@ async def ai_is_inflight(uid: int) -> bool:
     if uid in _busy_users:
         return True
     try:
-        from database import db
+        from backend.database.database import db
         doc = await db.admin_op_locks.find_one({'_id': f"ai_inflight:{uid}"})
         if not doc:
             return False
@@ -4090,7 +4090,7 @@ async def ai_release_inflight(uid: int) -> None:
     uid = int(uid)
     _busy_users.discard(uid)
     try:
-        from database import db
+        from backend.database.database import db
         await db.op_release('ai_inflight', str(uid))
     except Exception:
         logger.exception("ai_release_inflight failed for %s", uid)
@@ -4105,7 +4105,7 @@ async def handle_ai_image_prompt(update: Update, context: ContextTypes.DEFAULT_T
     """
     uid  = update.effective_user.id
     # 🌊 W7 — گیت فیچر (پیش‌فرض FREE ⇒ بدون تغییر رفتار امروز)
-    from subscription import feature_allowed, show_paywall
+    from backend.bot.subscription import feature_allowed, show_paywall
     if not await feature_allowed(uid, "ai_image"):
         context.user_data.pop('mode', None)
         await show_paywall(update.message, uid, feature="ai_image")
@@ -4208,7 +4208,7 @@ async def handle_ai_image_prompt(update: Update, context: ContextTypes.DEFAULT_T
 async def handle_ai_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid  = update.effective_user.id
     # 🌊 W7 — گیت فیچر (پیش‌فرض FREE ⇒ بدون تغییر رفتار امروز)
-    from subscription import feature_allowed, show_paywall
+    from backend.bot.subscription import feature_allowed, show_paywall
     if not await feature_allowed(uid, "ai_chat"):
         context.user_data.pop('mode', None)
         await show_paywall(update.message, uid, feature="ai_chat")
@@ -5706,7 +5706,7 @@ async def handle_ai_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     uid = update.effective_user.id
     # 🌊 W7 — گیت فیچر (پیش‌فرض FREE ⇒ بدون تغییر رفتار امروز)
-    from subscription import feature_allowed, show_paywall
+    from backend.bot.subscription import feature_allowed, show_paywall
     if not await feature_allowed(uid, "ai_chat"):
         context.user_data.pop('mode', None)
         await show_paywall(update.message, uid, feature="ai_chat")
@@ -5980,7 +5980,7 @@ async def ai_user_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         await query.answer("⏳ در حال ورود هوشیار به ویس‌چت گروه…", show_alert=False)
         try:
-            from tg_group_voice_call import join_group_voice_chat
+            from backend.bot.tg_group_voice_call import join_group_voice_chat
             info = await join_group_voice_chat(
                 chat_id=chat.id,
                 bot=context.bot,
@@ -6011,7 +6011,7 @@ async def ai_user_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer()
             return
         try:
-            from tg_group_voice_call import leave_group_voice_chat
+            from backend.bot.tg_group_voice_call import leave_group_voice_chat
             await leave_group_voice_chat(chat.id)
             await query.answer("📴 هوشیار از ویس‌چت گروه خارج شد.", show_alert=False)
             await query.message.reply_text("📴 هوشیار از ویس‌چت گروه خارج شد.")
@@ -6324,7 +6324,7 @@ async def scan_weekly_schedule_image(image_bytes: bytes, image_mime: str = 'imag
             et = str(s.get('end_time') or s.get('time_end') or '').strip()
             # legacy: time may contain range "08:00-10:00" or "08:00 تا 10:00"
             if t and ("-" in t or "تا" in t) and not et:
-                from time_utils import en_digits as _en
+                from backend.core.time_utils import en_digits as _en
                 tmp = _en(t).replace('—','-').replace('–','-').replace('تا','-')
                 times = re.findall(r'(\d{1,2}:\d{2})', tmp)
                 if len(times) >=2:
@@ -6351,7 +6351,7 @@ async def scan_weekly_schedule_image(image_bytes: bytes, image_mime: str = 'imag
             if et:
                 et = _fix_pm(et)
             # validate times
-            from time_utils import parse_clock_time as _pct
+            from backend.core.time_utils import parse_clock_time as _pct
             try:
                 _pct(t)
                 if et:
@@ -6366,7 +6366,7 @@ async def scan_weekly_schedule_image(image_bytes: bytes, image_mime: str = 'imag
             if not lesson:
                 continue
             g = str(s.get('group') or group_hint or 'هر دو').strip() or 'هر دو'
-            from database import db as _db
+            from backend.database.database import db as _db
             g = _db.normalize_group(g) or 'هر دو'
             if g not in ('1','2','3','4','هر دو'):
                 g = 'هر دو'
@@ -6411,7 +6411,7 @@ async def scan_exam_schedule_image(image_bytes: bytes, image_mime: str = 'image/
             if not raw_date:
                 continue
             # normalize digits and slashes
-            from time_utils import en_digits
+            from backend.core.time_utils import en_digits
             raw_date = en_digits(raw_date).replace('-', '/').strip()
             # ensure YYYY/MM/DD
             parts = re.split(r'[/\s]+', raw_date)
@@ -6430,7 +6430,7 @@ async def scan_exam_schedule_image(image_bytes: bytes, image_mime: str = 'image/
             else:
                 t = '08:00'
             g = str(e.get('group') or 'هر دو').strip() or 'هر دو'
-            from database import db as _db
+            from backend.database.database import db as _db
             g = _db.normalize_group(g) or 'هر دو'
             norm.append({
                 'date': raw_date,
@@ -6513,7 +6513,7 @@ async def scan_course_selection_image(
     if not key:
         raise AIConfigError("کلید API vision تنظیم نشده — از پنل هوشیار یک کلید Gemini/OpenRouter وارد کن.")
 
-    from database import db as _db
+    from backend.database.database import db as _db
     edu_grp = _db.normalize_class_educational_group(educational_group, default='unknown')
     user_prompt = (
         "از این تصویر انتخاب واحد دانشگاهی، فهرست دروس، کد درس، گروه درس و تعداد واحد را استخراج کن.\n"
@@ -6588,7 +6588,7 @@ async def scan_course_selection_images(
       - `educational_group`: 'male_only' | 'female_only' | 'mixed' | 'unknown'
       - `source_image`: نام یا شناسه تصویر (مثلاً 'boys_portal.png')
     """
-    from database import db as _db
+    from backend.database.database import db as _db
     if not images:
         raise AIError("هیچ تصویری برای استخراج ارسال نشده است.")
 

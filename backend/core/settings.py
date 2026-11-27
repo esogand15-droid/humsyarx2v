@@ -5,7 +5,7 @@
 هر کلید یک property تایپ‌دار است؛ مقدار پیش‌فرض و ولیدیشن یک‌جا است.
 Bot و API و WebAdmin از همین کلاس می‌خوانند — typo غیرممکن.
 """
-from database import db
+from backend.database.database import db
 
 class Settings:
     # کیف پول — ضداسپم

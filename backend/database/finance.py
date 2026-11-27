@@ -13,7 +13,7 @@ from datetime import timedelta
 from pymongo.errors import DuplicateKeyError
 from bson import ObjectId
 import motor.motor_asyncio
-from time_utils import (
+from backend.core.time_utils import (
     UTC, TimeContractError, canonical_utc, end_of_day_tehran, now_utc,
     parse_gregorian_date, parse_machine_datetime, remaining_days,
     start_of_month_tehran, utc_now_iso,
@@ -40,7 +40,7 @@ def _referral_first_buy_trigger(fn):
             if isinstance(res, dict) and not res.get('already'):
                 payer = int((payment or {}).get('user_id') or 0)
                 if payer:
-                    from referral import on_first_payment
+                    from backend.bot.referral import on_first_payment
                     await on_first_payment(payer)
         except Exception:
             logger.exception('referral first-buy hook failed')
@@ -1051,7 +1051,7 @@ class DBFinance:
             'method': 'zarinpal', 'status': 'zarinpal_pending',
             'zarinpal_authority': authority,
             'zarinpal_ref_id': None,
-            'submitted_at': __import__('time_utils').utc_now_iso(),
+            'submitted_at': __import__('backend.core.time_utils').utc_now_iso(),
             'idem_key': idem_key or None,
         }
         r = await self.sub_payments.insert_one(doc)

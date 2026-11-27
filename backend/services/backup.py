@@ -6,12 +6,12 @@
 """
 import os, json, logging, io, gzip
 from datetime import datetime
-from utils import fmt_jalali_dt, now_tehran, now_tehran_str
-from time_utils import utc_now_iso
+from backend.bot.utils import fmt_jalali_dt, now_tehran, now_tehran_str
+from backend.core.time_utils import utc_now_iso
 from bson import ObjectId
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from database import db
+from backend.database.database import db
 
 logger   = logging.getLogger(__name__)
 ADMIN_ID = int(os.getenv('ADMIN_ID', '0'))
@@ -765,7 +765,7 @@ async def _export_all(query, context):
         # FIX لاگ: دانلود کل دیتابیس حساس‌ترین عملیات است و قبلاً
         # هیچ‌جا ثبت نمی‌شد — حالا مثل خروجی اکسل، در audit_logs و
         # گروه لاگ ثبت می‌شود که کی و چه زمانی بکاپ گرفته است.
-        from utils import send_audit_log
+        from backend.bot.utils import send_audit_log
         uid = query.from_user.id
         admin_user = await db.get_user(uid)
         actor_name = admin_user.get('name', 'مدیر ارشد') if admin_user else 'مدیر ارشد'
@@ -1024,7 +1024,7 @@ async def _export_section(query, context, section: str):
         data = await build_section_backup_data(section)
         await _send_json_file(query, data, filename=f'backup_{section}')
         # FIX لاگ: دریافت پشتیبان بخشی هم مثل بکاپ کامل ثبت شود
-        from utils import send_audit_log
+        from backend.bot.utils import send_audit_log
         uid = query.from_user.id
         admin_user = await db.get_user(uid)
         actor_name = admin_user.get('name', 'مدیر ارشد') if admin_user else 'مدیر ارشد'
@@ -1156,7 +1156,7 @@ async def backup_file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         file_bytes = bytes(await tg_file.download_as_bytearray())
         # 🌊 W5/REL-04 — رمزگشایی بکاپ خودکارِ رمزنگاری‌شده
         if _fname.endswith('.enc'):
-            from utils_crypto import decrypt_bytes
+            from backend.core.utils_crypto import decrypt_bytes
             _dec = decrypt_bytes(file_bytes)
             if _dec is None:
                 await update.message.reply_text("❌ فایل رمزنگاری‌شده است ولی کلید (FERNET_KEY) در دسترس/معتبر نیست.")
@@ -1321,7 +1321,7 @@ async def backup_confirm_restore(update: Update, context: ContextTypes.DEFAULT_T
 
         # FIX جدید طبق سند: بازیابی بکاپ = CRITICAL — این عمل می‌تواند
         # کل دیتابیس را بازنویسی کند، باید بسیار برجسته و قابل ردیابی باشد.
-        from utils import send_audit_log
+        from backend.bot.utils import send_audit_log
         admin_user_doc = await db.get_user(uid)
         actor_name = admin_user_doc.get('name', 'ادمین') if admin_user_doc else 'ادمین'
         actor_role = await db.get_actor_role_label(uid)
@@ -1346,7 +1346,7 @@ async def backup_confirm_restore(update: Update, context: ContextTypes.DEFAULT_T
     except Exception as e:
         logger.error(f"Restore error: {e}")
         try:
-            from utils import send_audit_log
+            from backend.bot.utils import send_audit_log
             await send_audit_log(
                 context.bot, 'admin', 'ادمین', uid,
                 "خطا در بازیابی بکاپ", module='Backup', severity='CRITICAL',

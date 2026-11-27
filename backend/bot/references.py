@@ -8,7 +8,7 @@ import logging
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from database import db
+from backend.database.database import db
 
 logger = logging.getLogger(__name__)
 BRAND_NAME = os.getenv("BRAND_NAME", "هامزیار")
@@ -22,11 +22,11 @@ async def references_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # هدایت فوری به ریفرال در صورت برخورد ref:menu (جلوگیری از قفل اشتراک برای دعوت دوستان)
     if action == 'menu':
-        from referral import referral_callback
+        from backend.bot.referral import referral_callback
         return await referral_callback(update, context)
 
     # FIX جدید: دفاع لایه‌دوم اشتراک
-    from subscription import feature_allowed
+    from backend.bot.subscription import feature_allowed
     if not await feature_allowed(update.effective_user.id, "references"):
         await query.answer("🔒 اول باید اشتراک فعال کنی — از «📚 منابع» شروع کن.", show_alert=True)
         return

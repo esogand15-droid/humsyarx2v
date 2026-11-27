@@ -44,7 +44,7 @@ class FakeUpload:
 
 
 def _router():
-    from api.routers import content_admin
+    from backend.api.routers import content_admin
     return content_admin
 
 

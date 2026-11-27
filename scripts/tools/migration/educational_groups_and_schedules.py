@@ -216,7 +216,7 @@ async def _amain():
     ap.add_argument("--backup", default="", help="Backup file path for --rollback")
     args = ap.parse_args()
 
-    from database import db
+    from backend.database.database import db
     if args.rollback:
         if not args.backup:
             raise SystemExit("--rollback requires --backup <path>")

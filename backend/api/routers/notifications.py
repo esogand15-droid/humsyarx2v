@@ -2,9 +2,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Dict, List, Optional
-from api.auth import get_current_user
-from database import db
-from request_context import current_request_id
+from backend.api.auth import get_current_user
+from backend.database.database import db
+from backend.core.request_context import current_request_id
 
 async def _notif_audit(actor: dict, action: str, *, before=None, after=None):
     try:

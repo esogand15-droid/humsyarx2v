@@ -4,8 +4,8 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from database import db
-from utils import progress_bar, get_level
+from backend.database.database import db
+from backend.bot.utils import progress_bar, get_level
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ async def _main_stats(query, uid: int):
             elif ch.get('mode') == 'locked':
                 ps_line += "🔒 چالش Apex هنوز قفل است (پیش‌شرط‌های اجتماعی).\n"
             elif nxt.get('span'):
-                from utils import progress_bar as _pbar
+                from backend.bot.utils import progress_bar as _pbar
                 have = int(nxt.get('have') or 0)
                 span = max(1, int(nxt.get('span') or 1))
                 ps_line += (f"<code>[{_pbar(min(100, round(have / span * 100)), 12)}]"

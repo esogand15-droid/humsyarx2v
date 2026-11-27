@@ -17,7 +17,7 @@ from typing import Any, Mapping
 
 from bson import ObjectId
 
-from time_utils import utc_now_iso
+from backend.core.time_utils import utc_now_iso
 from .contracts import QuestionDomainError, clean_text
 
 ALLOWED_IMAGE_MIMES = {"image/jpeg", "image/png", "image/webp", "image/gif"}

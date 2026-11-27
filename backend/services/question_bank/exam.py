@@ -10,7 +10,7 @@ from typing import Mapping
 
 from bson import ObjectId
 
-from time_utils import now_utc, parse_machine_datetime, utc_now_iso
+from backend.core.time_utils import now_utc, parse_machine_datetime, utc_now_iso
 from .contracts import QuestionDomainError, public_question
 from .service import QuestionBankService
 
@@ -237,7 +237,7 @@ class ExamService:
     @staticmethod
     async def _pdf_question_images(image_service, questions: list) -> dict:
         try:
-            from api.telegram_send import download_telegram_file
+            from backend.api.telegram_send import download_telegram_file
         except ImportError:
             return {}
         from io import BytesIO
@@ -281,8 +281,8 @@ class ExamService:
                 continue
         if not questions:
             raise QuestionDomainError("no_questions", "سؤالی برای تولید PDF باقی نمانده است", 404)
-        from qbank import generate_exam_pdf
-        from qbank.query import ExamMeta
+        from backend.services.qbank import generate_exam_pdf
+        from backend.services.qbank.query import ExamMeta
         db_user = user.get("_db") or user
         meta = ExamMeta(lesson=session.get("lesson", ""), topic=session.get("topic", ""),
                         difficulty=session.get("difficulty") or None,
@@ -301,7 +301,7 @@ class ExamService:
         # ناموفق = چاپ بدون تصویر (سؤال حذف نمی‌شود). کلید کش بالای این
         # تابع updated_at را دارد و attach آن را می‌شکند، پس کش خودبه‌خود
         # بعد از اتصال تصویر باطل می‌شود.
-        from question_bank.images import QuestionImageService
+        from backend.services.question_bank.images import QuestionImageService
         from reportlab.lib.utils import ImageReader
         question_images = await self._pdf_question_images(
             QuestionImageService(self.db), questions)

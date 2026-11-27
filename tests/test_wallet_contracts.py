@@ -170,9 +170,9 @@ class WalletRuntimeTests(unittest.TestCase):
         os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
         import httpx
         cls.httpx = httpx
-        import api.main as main_mod
+        import backend.api.main as main_mod
         cls.app = main_mod.app
-        from database import db
+        from backend.database.database import db
         cls.db = db
         cls.admin_h = {"X-Init-Data": _signed_init_data(ADMIN_UID)}
         cls.a_h = {"X-Init-Data": _signed_init_data(STUDENT_A)}
@@ -284,7 +284,7 @@ class WalletRuntimeTests(unittest.TestCase):
                                        "unit", "k2", STUDENT_B, "تست")
             assert t2["balance_before"] == 50000 and t2["balance_after"] == 30000
             # موجودی ناکافی → خطا با کد + موجودی دست‌نخورده
-            from db.wallet import WalletError
+            from backend.database.wallet import WalletError
             try:
                 await db.wallet_debit(STUDENT_B, 999999, "subscription_purchase",
                                       "unit", "k3", STUDENT_B, "تست")
@@ -416,7 +416,7 @@ class WalletRuntimeTests(unittest.TestCase):
             await db.wallet_credit(STUDENT_B, 10000, "admin_credit",
                                    "unit", "bad-credit", ADMIN_UID, "تست")
             before = int((await db.wallet_get_for_user_id(STUDENT_B))["balance"])
-            from db.wallet import WalletError
+            from backend.database.wallet import WalletError
             try:
                 await db.wallet_purchase(STUDENT_B, str(PLAN_BAD_W6),
                                          "w6-bad-plan")
@@ -542,7 +542,7 @@ class WalletRuntimeTests(unittest.TestCase):
             await db.discount_add("W6TEST20", 20, max_uses=5)
             await db.wallet_credit(STUDENT_A, 200000, "admin_credit",
                                    "unit", "disc-seed", ADMIN_UID, "تست")
-            from db.wallet import WalletError
+            from backend.database.wallet import WalletError
             # کد نامعتبر → خطای شفاف، بدون اثر مالی
             try:
                 await db.wallet_purchase(STUDENT_A, str(PLAN_W6),
@@ -622,7 +622,7 @@ class WalletRuntimeTests(unittest.TestCase):
                               simulate_applied=False):
         """تراکنش pending دستی = شبیه‌سازی کرش بین مراحل؛ اگر
         simulate_applied=True اثر مالی هم (بدون نشان‌گذاری) روی موجودی است."""
-        from time_utils import utc_now_iso
+        from backend.core.time_utils import utc_now_iso
         r = await self.db.wallet_transactions.insert_one({
             "user_id": uid,
             "type": "refund_credit" if direction == "credit"

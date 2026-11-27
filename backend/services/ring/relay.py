@@ -25,12 +25,12 @@ from __future__ import annotations
 import logging
 from collections import deque
 
-from ring import models as M
-from ring import notify
-from ring import settings as S
-from ring import state
-from ring import texts
-from time_utils import utc_now_iso
+from backend.services.ring import models as M
+from backend.services.ring import notify
+from backend.services.ring import settings as S
+from backend.services.ring import state
+from backend.services.ring import texts
+from backend.core.time_utils import utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ async def relay(update, context, *, entry: dict | None = None) -> dict:
     ent = entry or state.get(uid)
     if not ent:
         return {"handled": False, "why": "idle"}
-    from database import db
+    from backend.database.database import db
     sid = ent["sid"]
     sess = await db.ring_session(sid)
     if not sess or sess.get("status") != "active":
@@ -167,7 +167,7 @@ async def relay(update, context, *, entry: dict | None = None) -> dict:
     # §۲۰/§۲۱/§۵۸ — «نفر بعدی/پایان/گزارش/بلاک» کنشِ کاربر→بات است، نه حرفِ
     # کاربر→پارتنر. اگر کسی برچسبشان را تایپ کرد، رله نمی‌شود و یک راهنمای
     # محلی (فقط برای خودش) می‌گیرد — برای پارتنر هیچ چیزی ساخته نمی‌شود.
-    from ring import keyboards as K
+    from backend.services.ring import keyboards as K
     if kind == "text" and K.is_control_label(msg.text) and not K.is_main_menu_label(msg.text):
         await notify.send_text(uid, texts.control_not_message(), bot=context.bot)
         return {"handled": True, "why": "control_label"}
@@ -221,7 +221,7 @@ async def relay(update, context, *, entry: dict | None = None) -> dict:
             # 🛡 AUDIT-A6 — `leak` تکه‌ای از پیامِ خودِ کاربر است که داخل
             # Markdown خام می‌رفت: هر `_`/`*`/`[` در شماره‌ی تلفنِ تایپ‌شده
             # (مثلاً «0912_34_56») پارس را می‌شکست و **هشدار ایمنی ارسال نمی‌شد**.
-            from utils import esc as _esc
+            from backend.bot.utils import esc as _esc
             await notify.send_text(
                 uid, f"🛡 هشدار: به‌نظر داری <b>{_esc(leak)}</b> می‌فرستی. با غریبه‌ها "
                      "شماره/آیدی/لینک نفرست؛ مسئولیتش با خودته.", parse_mode="HTML")
@@ -232,7 +232,7 @@ async def relay(update, context, *, entry: dict | None = None) -> dict:
 
 def _expiry(cfg):
     from datetime import timedelta
-    from time_utils import now_utc
+    from backend.core.time_utils import now_utc
     return now_utc() + timedelta(days=int(cfg.get("evidence_ttl_days", 7)))
 
 
@@ -280,7 +280,7 @@ async def _relay_by_file_id(context, peer: int, msg, kind: str) -> bool:
 
 async def persist_buffer_as_evidence(sid: str, report_id: int) -> int:
     """§۳۵ — فقط وقتی گزارش ثبت شد، محتوای بافر روی دیسک می‌نشیند (TTL‌دار)."""
-    from database import db
+    from backend.database.database import db
     cfg = await S.get_cfg()
     rows = buffer_snapshot(sid)
     n = 0

@@ -38,10 +38,10 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from api.auth import BOT_TOKEN, get_current_user  # noqa: F401  (BOT_TOKEN برای هم‌ترازی)
-from database import db
+from backend.api.auth import BOT_TOKEN, get_current_user  # noqa: F401  (BOT_TOKEN برای هم‌ترازی)
+from backend.database.database import db
 
-from api import web_login_core as core
+from backend.api import web_login_core as core
 
 logger = logging.getLogger(__name__)
 

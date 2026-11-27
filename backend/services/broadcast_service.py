@@ -11,9 +11,9 @@ from typing import Any
 import httpx
 from bson import ObjectId
 
-from database import db
-from api.telegram_send import API_BASE, BOT_TOKEN
-from time_utils import now_utc, parse_machine_datetime, utc_now_iso
+from backend.database.database import db
+from backend.api.telegram_send import API_BASE, BOT_TOKEN
+from backend.core.time_utils import now_utc, parse_machine_datetime, utc_now_iso
 
 MESSAGE_TYPES = {"text", "photo", "video", "document", "voice", "audio"}
 MEDIA_METHOD = {
@@ -190,7 +190,7 @@ async def send_payload_http(chat_id: int, payload: dict) -> dict:
         method, field = MEDIA_METHOD[p["type"]]
         body = {"chat_id": chat_id, field: p["file_id"]}
         if p.get("caption"): body.update({"caption": p["caption"], "parse_mode": "HTML"})
-    from http_client import telegram_post, _timeout
+    from backend.services.http_client import telegram_post, _timeout
     import httpx
     # reuse shared client; per-call timeout 30s
     resp = await telegram_post(f"{API_BASE}/{method}", json=body, timeout=_timeout(httpx.Timeout(15, read=30)))
@@ -204,7 +204,7 @@ async def upload_media(chat_id: int, kind: str, filename: str, raw: bytes, mime:
     if kind not in MEDIA_METHOD or not BOT_TOKEN:
         raise ValueError("unsupported_media_type")
     method, field = MEDIA_METHOD[kind]
-    from http_client import telegram_post, _timeout
+    from backend.services.http_client import telegram_post, _timeout
     import httpx
     resp = await telegram_post(f"{API_BASE}/{method}",
         data={"chat_id": chat_id, "disable_notification": True},

@@ -6,17 +6,17 @@ from typing import Any, Mapping, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from api.auth import ADMIN_ID, get_current_user
-from api.user_metrics import (
+from backend.api.auth import ADMIN_ID, get_current_user
+from backend.api.user_metrics import (
     non_negative_int,
     normalize_stats,
     normalize_weekly,
     same_user_id,
 )
-from api.rate_limit import rate_limit_user  # 🛡 W10/RATE-01
-from database import db
-from time_utils import parse_gregorian_date
-from utils import now_tehran
+from backend.api.rate_limit import rate_limit_user  # 🛡 W10/RATE-01
+from backend.database.database import db
+from backend.core.time_utils import parse_gregorian_date
+from backend.bot.utils import now_tehran
 
 router = APIRouter()
 
@@ -46,7 +46,7 @@ def _demo_enabled() -> bool:
 
     شناسهٔ 99999999 میتواند شناسهٔ واقعی یک کاربر تلگرام باشد؛ بدون
     این شرط، آن کاربر بهجای دادهٔ خودش آمار ساختگی میدید."""
-    from api.auth import demo_sessions_enabled
+    from backend.api.auth import demo_sessions_enabled
     return demo_sessions_enabled()
 
 

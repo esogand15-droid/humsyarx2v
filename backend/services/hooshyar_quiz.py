@@ -29,9 +29,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest, RetryAfter, Forbidden
 from telegram.ext import ContextTypes
 
-from database import db
-from utils import ADMIN_ID, esc as _esc
-from time_utils import utc_now_iso
+from backend.database.database import db
+from backend.bot.utils import ADMIN_ID, esc as _esc
+from backend.core.time_utils import utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -317,7 +317,7 @@ async def build_topic_structure(pages: list, user_id: int) -> list:
             '• بازه‌ها پیوسته و مرتب از صفحه‌ی ۱ تا آخر، بدون همپوشانی و بدون شکاف.\n'
             '• فقط از محتوای همین جزوه؛ مبحث از خودت نساز.\n\n'
             + '\n'.join(page_map[:400]))
-        from ai_solver import generate_structured_json, get_ai_config, AIError
+        from backend.services.ai_solver import generate_structured_json, get_ai_config, AIError
         cfg = await get_ai_config()
         t0 = time.monotonic()
         async with _AI_SEMAPHORE:
@@ -552,7 +552,7 @@ async def generate_questions_for_topic(doc, topic: dict, want: int,
     if cur:
         chunks.append(cur)
 
-    from ai_solver import generate_structured_json, get_ai_config
+    from backend.services.ai_solver import generate_structured_json, get_ai_config
     cfg = await get_ai_config()
     if not cfg.get('enabled'):
         logger.warning('quiz gen skipped: AI disabled (uid=%s)', user_id)
@@ -704,7 +704,7 @@ async def verify_questions(candidates: list, source: str, user_id: int,
     prompt = VERIFY_PROMPT.format(
         topic=topic_title or '',
         qlist='\n\n'.join(qlist), source=source[:12000])
-    from ai_solver import generate_structured_json, get_ai_config
+    from backend.services.ai_solver import generate_structured_json, get_ai_config
     cfg = await get_ai_config()
     t0 = time.monotonic()
     try:
@@ -1254,7 +1254,7 @@ async def _build_and_start(chat_id: int, message_id: int, sid: str, uid: int):
             try:
                 diag = await _generation_diagnostics(uid)
                 if diag:
-                    from utils import ADMIN_ID as _AID
+                    from backend.bot.utils import ADMIN_ID as _AID
                     bot = _get_bot()
                     if bot and _AID:
                         await bot.send_message(
@@ -1333,7 +1333,7 @@ async def _activate(session, chat_id, message_id, total_now=None,
 async def _generation_diagnostics(uid: int, minutes: int = 15) -> str:
     """خلاصه‌ی تله‌متری تولید برای ادمین — فقط اعداد/خطا، بدون محتوا."""
     from datetime import timedelta
-    from time_utils import now_utc
+    from backend.core.time_utils import now_utc
     cutoff = (now_utc() - timedelta(minutes=minutes)).isoformat()
     rows = await db.ai_generation_logs.find(
         {'user_id': int(uid), 'at': {'$gte': cutoff}}
@@ -1722,11 +1722,11 @@ async def quiz_upload_hook(update: Update,
     if not await _setting('quiz_pdf_enabled'):
         await msg.reply_text('📚 آزمون‌ساز فعلاً غیرفعال است.')
         return True
-    from subscription import feature_allowed, show_paywall
+    from backend.bot.subscription import feature_allowed, show_paywall
     if not await feature_allowed(uid, 'ai_chat'):
         await show_paywall(msg, uid, feature='ai_chat')
         return True
-    from ai_solver import get_ai_config
+    from backend.services.ai_solver import get_ai_config
     if not (await get_ai_config()).get('enabled'):
         await msg.reply_text('🤖 هوش مصنوعی فعلاً توسط مدیریت غیرفعال است.')
         return True

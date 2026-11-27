@@ -25,14 +25,14 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 from bson import json_util
-from time_utils import utc_now_iso
+from backend.core.time_utils import utc_now_iso
 
 SOURCE = "qbank_files"
 ARCHIVE = "qbank_files_archive_v1"
 
 
 def collections():
-    from database import db
+    from backend.database.database import db
     mongo = db.client["medicalbot"]
     return mongo[SOURCE], mongo[ARCHIVE]
 

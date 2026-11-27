@@ -27,7 +27,7 @@ class FlagshipBotPremiumTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_referral_isolated_from_references_paywall(self):
         """ref:menu must never be blocked by references subscription gate."""
-        from references import references_callback
+        from backend.bot.references import references_callback
 
         update = MagicMock()
         update.effective_user.id = 999999
@@ -38,13 +38,13 @@ class FlagshipBotPremiumTests(unittest.IsolatedAsyncioTestCase):
         context.user_data = {}
 
         # Mock referral_callback to check delegation
-        with patch('referral.referral_callback', new_callable=AsyncMock) as mock_ref_cb:
+        with patch('backend.bot.referral.referral_callback', new_callable=AsyncMock) as mock_ref_cb:
             await references_callback(update, context)
             mock_ref_cb.assert_called_once_with(update, context)
 
     async def test_ticket_file_handler_handles_photos(self):
         """Ticket file handler must process photo attachments and set awaiting_confirm."""
-        from ticket import ticket_file_handler, TICKET_WAITING
+        from backend.bot.ticket import ticket_file_handler, TICKET_WAITING
 
         update = MagicMock()
         update.effective_user.id = 12345
@@ -80,7 +80,7 @@ class FlagshipBotPremiumTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_db_ticket_create_and_reply_with_attachment(self):
         """Database ticket creation and replies must preserve attachment objects."""
-        from database import db
+        from backend.database.database import db
 
         uid = 555001
         name = "دانشجو تستی"
@@ -112,7 +112,7 @@ class FlagshipBotPremiumTests(unittest.IsolatedAsyncioTestCase):
 
     def test_main_keyboard_includes_grades(self):
         """Main reply keyboard must contain the grades button."""
-        from utils import main_keyboard
+        from backend.bot.utils import main_keyboard
 
         kb = main_keyboard()
         button_texts = [btn.text for row in kb.keyboard for btn in row]
@@ -121,7 +121,7 @@ class FlagshipBotPremiumTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_message_router_handles_grades(self):
         """Routing '📊 کارنامه و معدل' must call show_my_grades_msg."""
-        import message_router
+        import backend.bot.message_router as message_router
 
         update = MagicMock()
         update.effective_user.id = 12345
@@ -131,15 +131,15 @@ class FlagshipBotPremiumTests(unittest.IsolatedAsyncioTestCase):
         context = MagicMock()
         context.user_data = {}
 
-        with patch('grades.show_my_grades_msg', new_callable=AsyncMock) as mock_show_grades, \
-             patch('database.db.get_user', new_callable=AsyncMock, return_value={'approved': True}):
+        with patch('backend.bot.grades.show_my_grades_msg', new_callable=AsyncMock) as mock_show_grades, \
+             patch('backend.database.database.db.get_user', new_callable=AsyncMock, return_value={'approved': True}):
             await message_router.route_message(update, context)
             mock_show_grades.assert_called_once_with(update)
 
     async def test_ambassador_club_on_donation_disabled(self):
         """When donation is disabled, show Ambassador Club card with referral options."""
-        import message_router
-        from database import db
+        import backend.bot.message_router as message_router
+        from backend.database.database import db
 
         update = MagicMock()
         update.effective_user.id = 12345
@@ -160,8 +160,8 @@ class FlagshipBotPremiumTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_smart_clinical_concierge_fallback(self):
         """Unhandled text messages must display the smart clinical concierge card."""
-        import message_router
-        from database import db
+        import backend.bot.message_router as message_router
+        from backend.database.database import db
 
         update = MagicMock()
         update.effective_user.id = 12345
@@ -181,7 +181,7 @@ class FlagshipBotPremiumTests(unittest.IsolatedAsyncioTestCase):
 
     def test_exam_finish_card_mastery_tier(self):
         """Exam finish card should classify performance with clinical badges and buttons."""
-        from questions import _build_exam_finish_card
+        from backend.bot.questions import _build_exam_finish_card
 
         text, kb = _build_exam_finish_card(correct=9, answered=10, percentage=90.0, exam_code='EXAM-2026')
         self.assertIn("ارزیابی آزمون پزشکی", text)

@@ -30,9 +30,9 @@ import telegram
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from database import db
-from time_utils import today_tehran, now_utc, format_date_fa
-from bot_modern_ui import ButtonGridBuilder, CompactTableBuilder
+from backend.database.database import db
+from backend.core.time_utils import today_tehran, now_utc, format_date_fa
+from backend.bot.bot_modern_ui import ButtonGridBuilder, CompactTableBuilder
 
 
 def expandable_quote(text: str) -> str:
@@ -416,12 +416,12 @@ def _cleanup_expired_sessions():
 async def show_lecture_scribe_intro(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پیام خوش‌آمدگویی و فعال‌سازی حالت جزوه‌نویس چندرسانه‌ای"""
     uid = update.effective_user.id
-    from subscription import feature_allowed, show_paywall
+    from backend.bot.subscription import feature_allowed, show_paywall
     if not await feature_allowed(uid, "ai_chat"):
         await show_paywall(update.message or update.callback_query.message, uid, feature="ai_chat")
         return
 
-    from ai_solver import get_ai_config
+    from backend.services.ai_solver import get_ai_config
     cfg = await get_ai_config()
     if not cfg.get('enabled') or not cfg.get('lecture_scribe_enabled', True):
         msg = update.effective_message
@@ -659,7 +659,7 @@ async def handle_lecture_callback(update: Update, context: ContextTypes.DEFAULT_
     if data == 'ls:back_ai':
         await query.answer()
         context.user_data['mode'] = 'ai_query'
-        from ai_solver import show_ai_intro
+        from backend.services.ai_solver import show_ai_intro
         return await show_ai_intro(update, context)
 
     # دکمه‌های تشخیص هوشمند خودکار صوت
@@ -687,9 +687,9 @@ async def handle_lecture_callback(update: Update, context: ContextTypes.DEFAULT_
             pass
         if pending_msg:
             update.message = pending_msg
-            from ai_solver import handle_ai_media
+            from backend.services.ai_solver import handle_ai_media
             return await handle_ai_media(update, context)
-        from ai_solver import show_ai_intro
+        from backend.services.ai_solver import show_ai_intro
         return await show_ai_intro(update, context)
 
     if data == 'ls:smart_cancel':
@@ -1299,7 +1299,7 @@ async def run_lecture_processing_worker(
             force=True
         )
 
-        from lecture_notes_pdf import generate_lecture_pdf
+        from backend.services.lecture_notes_pdf import generate_lecture_pdf
         await _lj_stage('pdf')
         pdf_buffer = await asyncio.to_thread(generate_lecture_pdf, digest)
         await _lj_stage('deliver')
@@ -1449,7 +1449,7 @@ async def run_lecture_processing(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     # ۱. گارد هم‌زمانی: ابتدا قفل اجرای همزمان بررسی می‌شود تا هیچ سهمیه‌ای برای درخواست موازی کسر نشود
-    from ai_solver import ai_claim_inflight, ai_release_inflight, check_and_consume_lecture_quota, refund_lecture_quota
+    from backend.services.ai_solver import ai_claim_inflight, ai_release_inflight, check_and_consume_lecture_quota, refund_lecture_quota
     if not await ai_claim_inflight(uid):
         await msg.reply_text(
             "⏳ <b>شما در حال حاضر یک درخواست در حال پردازش دارید.</b>\n"

@@ -26,8 +26,8 @@ if os.path.dirname(__file__) not in sys.path:
 os.environ.setdefault('MONGODB_URI', 'mongodb://localhost:27017/test_fallback')
 
 import _rtloop
-import ai_solver
-from ai_solver import (
+import backend.services.ai_solver as ai_solver
+from backend.services.ai_solver import (
     AIQuotaError, AIConfigError, AIError, AiImageError,
     _load_vault, ordered_keys, classify_key_error,
     mark_key_failed, mark_key_ok, key_cooldown_remaining,
@@ -405,7 +405,7 @@ class EnvKeyResolutionTests(unittest.TestCase):
 
     def test_env_key_loading_multi_delimiters(self):
         """تست تفکیک کلیدها با جداکننده‌های کاما، سمیکولون، خط جدید، و اسپیس/تب"""
-        from ai_solver import resolve_gemini_api_keys
+        from backend.services.ai_solver import resolve_gemini_api_keys
         os.environ["GEMINI_API_KEYS"] = "AIza_k1, AIza_k2;  AIza_k3\nAIza_k4\t AIza_k5"
         keys = resolve_gemini_api_keys({})
         self.assertIn("AIza_k1", keys)
@@ -417,7 +417,7 @@ class EnvKeyResolutionTests(unittest.TestCase):
 
     def test_precedence_order_db_then_env(self):
         """تست تقدم ترتیبی: DB Vault > GEMINI_API_KEYS > GEMINI_API_KEY > GOOGLE_API_KEY"""
-        from ai_solver import resolve_gemini_api_keys
+        from backend.services.ai_solver import resolve_gemini_api_keys
         os.environ["GEMINI_API_KEYS"] = "AIza_env_multi_1, AIza_env_multi_2"
         os.environ["GEMINI_API_KEY"] = "AIza_env_single"
         os.environ["GOOGLE_API_KEY"] = "AIza_env_google"
@@ -436,7 +436,7 @@ class EnvKeyResolutionTests(unittest.TestCase):
 
     def test_deduplication_across_db_and_env(self):
         """تست حذف کلیدهای تکراری بدون تغییر تقدم اولین کلید مشاهده‌شده"""
-        from ai_solver import resolve_gemini_api_keys
+        from backend.services.ai_solver import resolve_gemini_api_keys
         os.environ["GEMINI_API_KEYS"] = "AIza_common, AIza_env_only"
         os.environ["GEMINI_API_KEY"] = "AIza_common"
         os.environ["GOOGLE_API_KEY"] = "AIza_google"
@@ -451,7 +451,7 @@ class EnvKeyResolutionTests(unittest.TestCase):
 
     def test_dirty_unicode_sanitization_in_env_keys(self):
         """تست پاکسازی کاراکترهای مخفی و یونیکد نامرئی در کلیدهای محیطی"""
-        from ai_solver import resolve_gemini_api_keys
+        from backend.services.ai_solver import resolve_gemini_api_keys
         os.environ["GEMINI_API_KEYS"] = " \u200eAIza_dirty_1\u200f , \u200bAIza_dirty_2 "
         keys = resolve_gemini_api_keys({})
         self.assertIn("AIza_dirty_1", keys)
@@ -466,7 +466,7 @@ class FileUploadFailoverTests(unittest.TestCase):
     def test_upload_429_triggers_key_rotation(self):
         """تست سوییچ به کلید دوم در صورت بروز خطای 429 در فرایند آپلود اولیه"""
         import asyncio
-        from ai_solver import run_with_key_failover, AIQuotaError
+        from backend.services.ai_solver import run_with_key_failover, AIQuotaError
 
         keys = ["AIza_upload_k1", "AIza_upload_k2"]
         attempts = []
@@ -485,7 +485,7 @@ class FileUploadFailoverTests(unittest.TestCase):
     def test_content_generation_429_reupload_scoping(self):
         """تست سناریوی تفکیک آپلود: در صورت شکست محتوا با کلید ۱، فایل تحت کلید ۲ آپلود می‌شود"""
         import asyncio
-        from ai_solver import run_with_key_failover, AIQuotaError
+        from backend.services.ai_solver import run_with_key_failover, AIQuotaError
 
         keys = ["AIza_key_A", "AIza_key_B"]
         uploads = []
@@ -528,7 +528,7 @@ class GeminiAQKeyFormatAndVaultMultiTests(unittest.TestCase):
 
     def test_aq_key_sanitization_and_validation(self):
         """AQ. format keys must be sanitized and validated as legitimate Gemini API keys."""
-        from ai_solver import sanitize_api_key, api_key_problem
+        from backend.services.ai_solver import sanitize_api_key, api_key_problem
 
         raw_key = "  AQ.AbCd_1234-xyz.999\u200b  "
         cleaned = sanitize_api_key(raw_key)
@@ -543,7 +543,7 @@ class GeminiAQKeyFormatAndVaultMultiTests(unittest.TestCase):
 
     def test_aq_key_redaction_in_provider_error_text(self):
         """_sanitize_provider_text must mask AQ. format keys to prevent leaks in logs and UI."""
-        from ai_solver import _sanitize_provider_text
+        from backend.services.ai_solver import _sanitize_provider_text
 
         err_msg = "Google API call failed with key AQ.AbCd_1234-xyz.999 on https://example.com"
         sanitized = _sanitize_provider_text(err_msg)

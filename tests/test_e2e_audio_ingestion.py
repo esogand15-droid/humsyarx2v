@@ -90,8 +90,8 @@ class TestE2EAudioIngestion(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp(prefix="humsyar_test_audio_")
         _LECTURE_SESSIONS.clear()
-        self._patch_refund = patch("ai_solver.refund_lecture_quota", AsyncMock(return_value=True))
-        self._patch_inflight = patch("ai_solver.ai_release_inflight", AsyncMock(return_value=True))
+        self._patch_refund = patch("backend.services.ai_solver.refund_lecture_quota", AsyncMock(return_value=True))
+        self._patch_inflight = patch("backend.services.ai_solver.ai_release_inflight", AsyncMock(return_value=True))
         self._patch_refund.start()
         self._patch_inflight.start()
 

@@ -12,8 +12,8 @@ import re
 from datetime import datetime, timedelta
 from bson import ObjectId
 import motor.motor_asyncio
-from request_context import current_request_id
-from time_utils import (
+from backend.core.request_context import current_request_id
+from backend.core.time_utils import (
     TEHRAN, day_bounds_utc, format_date_fa, now_utc, parse_gregorian_date,
     parse_machine_datetime, start_of_month_tehran, today_tehran, utc_now_iso,
 )
@@ -569,7 +569,7 @@ class DBCore:
             }
             # 🌊 W3 — versioned migrations (exam_sessions expires_at backfill etc)
             try:
-                from db.migrations import run_migrations
+                from backend.database.migrations import run_migrations
                 await run_migrations(self)
             except Exception as _mig_e:
                 logger.warning(f"migration warning: {_mig_e}")
@@ -1743,7 +1743,7 @@ class DBCore:
     @staticmethod
     def ticket_sla_info(t: dict) -> dict:
         """وضعیت SLA تیکت (first-response): {sla_hours, due_at, responded, breached}."""
-        from time_utils import parse_machine_datetime, now_utc
+        from backend.core.time_utils import parse_machine_datetime, now_utc
         from datetime import timedelta
         sla = 0
         try:
@@ -2061,7 +2061,7 @@ class DBCore:
     async def tickets_needing_nudge(self, stale_hours: int,
                                     limit: int = 30) -> list:
         """تیکت‌های باز بدون پاسخ پشتیبانی که از stale_hours گذشته‌اند."""
-        from time_utils import now_utc
+        from backend.core.time_utils import now_utc
         from datetime import timedelta
         cutoff = (now_utc() - timedelta(hours=max(1, stale_hours))).isoformat()
         return await self.tickets.find({
@@ -2115,7 +2115,7 @@ class DBCore:
 
 
     async def global_stats(self) -> dict:
-        from question_bank.contracts import approved_query, status_query
+        from backend.services.question_bank.contracts import approved_query, status_query
         week_ago  = (now_utc() - timedelta(days=7)).isoformat()
         new_users = await self.users.count_documents({'registered_at': {'$gt': week_ago}})
         # FIX جدید: online_30m و total_downloads هم اینجا اضافه شد تا
@@ -2162,7 +2162,7 @@ class DBCore:
         🌊 C1.5 — effective=True (فقط وقتی intake کد مشخصی است): آمار
         «مؤثر» = آنچه دانشجوی آن ورودی واقعاً می‌بیند = اختصاصی ورودی +
         سراسری. زیرساخت نمایش آمار مؤثر در UI (موج آینده)."""
-        from question_bank.contracts import (and_query, approved_query,
+        from backend.services.question_bank.contracts import (and_query, approved_query,
                                               status_query)
         if intake is not None:
             base = await self._content_admin_stats_scoped(intake)
@@ -2278,7 +2278,7 @@ class DBCore:
 
     async def stats_dashboard_users(self) -> dict:
         """آمار جزئی کاربران: رشد، فعالیت، گروه/ورودی، نقش‌های فرعی"""
-        from utils import today_start_utc_str
+        from backend.bot.utils import today_start_utc_str
         now          = now_utc()
         today_start  = today_start_utc_str()
         week_ago     = (now - timedelta(days=7)).isoformat()
@@ -2388,7 +2388,7 @@ class DBCore:
 
     async def stats_dashboard_content(self) -> dict:
         """Content and structured Question Bank analytics (legacy file bank retired)."""
-        from question_bank.contracts import approved_query
+        from backend.services.question_bank.contracts import approved_query
         week_ago = (now_utc() - timedelta(days=7)).isoformat()
         (bs_lessons, bs_sessions, bs_by_type, ref_subjects, ref_books,
          ref_by_lang, faq_count, qbank_questions, top_qbank_lessons,
@@ -2447,7 +2447,7 @@ class DBCore:
 
     async def stats_dashboard_questions(self) -> dict:
         """آمار جزئی بانک سوال: دقت پاسخ‌دهی، پرسوال‌ترین درس‌ها، سخت‌ترین سوالات"""
-        from question_bank.contracts import and_query, approved_query, status_query
+        from backend.services.question_bank.contracts import and_query, approved_query, status_query
         approved = approved_query()
         (q_approved, q_pending, q_by_bot, q_by_users, by_diff, by_lesson, totals, hardest) = await asyncio.gather(
             self.questions.count_documents(approved),
@@ -3109,7 +3109,7 @@ class DBCore:
         # 🚀 استفاده از audit.py مرکزی برای Sanitization + Schema یکسان
         # وارد کردن تنبل برای جلوگیری از Circular Import
         try:
-            from audit import build_audit_event, sanitize_audit_data
+            from backend.services.audit import build_audit_event, sanitize_audit_data
             # اگر event_id از قبل داده شده، ترجیح می‌دهیم همان بماند (idempotency §43)
             # وگرنه audit.py یکی می‌سازد
             ev = build_audit_event(
@@ -3142,10 +3142,10 @@ class DBCore:
             # ── Unified Delivery: هر لاگ مدیریتی/محتوایی به تلگرام هم می‌رود (یک الگوی واحد) ──
             # این enqueue ثانویه است و هرگز persistence را نمی‌شکند (fail-open).
             try:
-                from audit import enqueue_telegram_delivery
+                from backend.services.audit import enqueue_telegram_delivery
                 # group_key را از audit.get_category_meta می‌گیریم تا الگو یکسان بماند
                 try:
-                    from audit import get_category_meta
+                    from backend.services.audit import get_category_meta
                     gkey, _, _ = get_category_meta(doc.get("category", "system"))
                 except Exception:
                     gkey = "log_group_admin" if doc.get("category") == "admin" else "log_group_content" if doc.get("category") == "content" else "log_group_admin"
@@ -3182,7 +3182,7 @@ class DBCore:
                 })
         # Sanitize fallback
         try:
-            from audit import sanitize_audit_data as _san
+            from backend.services.audit import sanitize_audit_data as _san
             before = _san(before) if before else before
             after = _san(after) if after else after
             details = _san(details) if details else details
@@ -3191,7 +3191,7 @@ class DBCore:
         import uuid as _uuid
         # fallback Tehran time — یکپارچه شمسی حتی در مسیر قدیمی
         try:
-            from time_utils import format_datetime_fa
+            from backend.core.time_utils import format_datetime_fa
             _now = now_utc()
             _ts_tehran = _now.astimezone(TEHRAN).isoformat()
             _ts_str = format_datetime_fa(_now, long=True)
@@ -3476,7 +3476,7 @@ class DBCore:
     async def get_audit_health_metrics(self) -> dict:
         """§52 — Audit Health برای Admin/Monitoring"""
         try:
-            import audit as _audit_mod
+            import backend.services.audit as _audit_mod
             health = await _audit_mod.get_audit_health()
             # enrich with DB counts
             health["total_logs"] = await self.audit_logs.count_documents({})
@@ -3489,7 +3489,7 @@ class DBCore:
     async def audit_retention_cleanup(self, days: int = None) -> int:
         """§39 — Retention قابل تنظیم"""
         try:
-            import audit as _audit_mod
+            import backend.services.audit as _audit_mod
             return await _audit_mod.apply_retention(days)
         except Exception:
             return 0
@@ -4366,7 +4366,7 @@ class DBCore:
 
     async def count_active_users_today(self) -> int:
         """تعداد کاربرانی که امروز (به وقت تهران) حداقل یک‌بار فعالیت داشته‌اند"""
-        from utils import today_start_utc_str
+        from backend.bot.utils import today_start_utc_str
         today_start = today_start_utc_str()
         return await self.users.count_documents({'last_active': {'$gte': today_start}})
 
@@ -4459,7 +4459,7 @@ class DBCore:
 
     async def grade_terms(self) -> list:
         """همه‌ی ترم‌های دارای نمره (برای فهرستِ فیلترِ پنل/ربات)."""
-        from grade_utils import _term_rank
+        from backend.services.grade_utils import _term_rank
         raw = await self.grades.distinct('term')
         return sorted([str(t) for t in raw if t], key=_term_rank)
 
@@ -4472,7 +4472,7 @@ class DBCore:
         «۰» از «۲» کوچک‌تر است. همان کلیدی که `grade_terms` استفاده
         می‌کند تا ترتیبِ تب‌های مینی‌اپ و فیلترِ پنل یکی باشد.
         """
-        from grade_utils import _term_rank
+        from backend.services.grade_utils import _term_rank
         raw = await self.grades.distinct('term', {'student_id': int(uid)})
         return sorted([str(t) for t in raw if t], key=_term_rank)
 
@@ -5298,7 +5298,7 @@ class DBCore:
 async def lecture_consume_quota(uid: int, daily_limit: int, today: str) -> tuple:
     """Module-level wrapper for lecture quota consumption."""
     try:
-        from database import db
+        from backend.database.database import db
         return await db.lecture_consume_quota(uid, daily_limit, today)
     except Exception:
         uid = int(uid)
@@ -5312,7 +5312,7 @@ async def lecture_consume_quota(uid: int, daily_limit: int, today: str) -> tuple
 async def lecture_refund_quota(uid: int, today: str) -> None:
     """Module-level wrapper for lecture quota refund."""
     try:
-        from database import db
+        from backend.database.database import db
         await db.lecture_refund_quota(uid, today)
     except Exception:
         pass

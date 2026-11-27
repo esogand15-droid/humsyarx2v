@@ -8,7 +8,7 @@ import re
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
-from time_utils import format_datetime_fa, now_utc, utc_now_iso
+from backend.core.time_utils import format_datetime_fa, now_utc, utc_now_iso
 
 from fastapi import (
     APIRouter,
@@ -23,21 +23,21 @@ from pydantic import (
     Field,
 )
 
-from api.auth import (
+from backend.api.auth import (
     require_perm,
 )
 
-from api.telegram_send import (
+from backend.api.telegram_send import (
     _send,
     API_BASE,
     BOT_TOKEN,
 )
 
-from api.routers.admin_panel import (
+from backend.api.routers.admin_panel import (
     _audit,
 )
 
-from database import db
+from backend.database.database import db
 
 
 router = APIRouter()
@@ -443,7 +443,7 @@ async def update_subscription_settings(
             # 🌊 W7 — سوییچ legacy حالا ماکرو است: روی هر ۳ پالیسی محتوا می‌نویسد
             # (تک‌منبع حقیقت = feature_policies؛ کلید قدیمی فقط برای rollback نگه داشته می‌شود)
             if key == "subscription_enforced":
-                from core.access import invalidate_policy_cache
+                from backend.core.access import invalidate_policy_cache
                 _mode = "subscription" if value else "free"
                 for _f in ("question_bank", "resources", "references"):
                     await db.set_feature_policy(
@@ -472,7 +472,7 @@ async def update_plan(
     if not old:
         raise HTTPException(status_code=404, detail="پلن پیدا نشد")
     # 🌊 W7 — سفیدسازی entitlements با کاتالوگ (کلید ناشناخته دور ریخته می‌شود)
-    from core.features import FEATURE_CATALOG as _FCAT
+    from backend.core.features import FEATURE_CATALOG as _FCAT
     _ent = {k: bool(v) for k, v in (body.entitlements or {}).items()
             if k in _FCAT}
     patch = {"name": body.name.strip(), "days": body.days, "price": body.price,
@@ -496,7 +496,7 @@ async def add_plan(
 
     admin=Depends(require_perm("subscription.manage")),
 ):
-    from core.features import FEATURE_CATALOG as _FCAT2
+    from backend.core.features import FEATURE_CATALOG as _FCAT2
     _ent2 = {k: bool(v) for k, v in (body.entitlements or {}).items()
              if k in _FCAT2}
     plan_id = (
@@ -1894,7 +1894,7 @@ async def delete_discount(
 # ══════════════════════════════════════════════════
 
 async def _campaign_msg(discount: dict, title=None, description=None):
-    from discount_campaign import build_campaign_message
+    from backend.services.discount_campaign import build_campaign_message
     overrides = {}
     if title:
         overrides['title'] = title
@@ -1914,7 +1914,7 @@ async def preview_discount_campaign(
     if not discount:
         raise HTTPException(status_code=404, detail="کد پیدا نشد")
     text = await _campaign_msg(discount)
-    from discount_campaign import resolve_target_plans, campaign_cta_link
+    from backend.services.discount_campaign import resolve_target_plans, campaign_cta_link
     plans = await resolve_target_plans(db, discount)
     return {
         "ok": True,
@@ -1933,7 +1933,7 @@ async def start_discount_broadcast(
 
     admin=Depends(require_perm("subscription.manage")),
 ):
-    from api.telegram_send import _send as _tg_send
+    from backend.api.telegram_send import _send as _tg_send
     import asyncio as _asyncio
 
     discount = await db.discount_get(code)
@@ -1963,8 +1963,8 @@ async def start_discount_broadcast(
         raise HTTPException(status_code=422,
             detail="هیچ مخاطبی در این بخش نیست (پس از اعمال ترجیحات اعلان کاربران).")
 
-    from discount_campaign import campaign_cta_link
-    from utils import webapp_url
+    from backend.services.discount_campaign import campaign_cta_link
+    from backend.bot.utils import webapp_url
     cta_url = webapp_url(campaign_cta_link(discount))
     kb_rows = []
     if cta_url:
@@ -2073,7 +2073,7 @@ async def start_discount_broadcast(
 
     # 🛡 AUDIT-M1 — مرجع نگه‌داشتن + ثبت خطا (قبلاً شکست broadcast فقط یک
     # «Task exception was never retrieved» در stdout بود)
-    from utils import spawn_bg
+    from backend.bot.utils import spawn_bg
     spawn_bg(_run(), 'discount_broadcast_web')
     return {"ok": True, "broadcast_id": bid, "total": len(users)}
 

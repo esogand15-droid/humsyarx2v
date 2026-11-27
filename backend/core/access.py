@@ -12,7 +12,7 @@ from typing import Optional
 import logging
 import os
 import time as _time
-from database import db
+from backend.database.database import db
 from .errors import Code, DEFAULT_MESSAGE
 from .features import FEATURE_CATALOG, default_policy
 

@@ -22,9 +22,9 @@ from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel, Field
 
-from database import db
+from backend.database.database import db
 from backend.core import student_code as sc
-from api import web_login_core as core
+from backend.api import web_login_core as core
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +199,7 @@ def _demo_enabled() -> bool:
     قبلاً همیشه روشن بود: هر کسی با کوکی `demo_...` بدون ورود واقعی
     به‌عنوان «دانشجوی آزمایشی» احراز می‌شد.
     """
-    from api.auth import demo_sessions_enabled
+    from backend.api.auth import demo_sessions_enabled
     return demo_sessions_enabled()
 
 
@@ -727,7 +727,7 @@ async def miniapp_exchange(body: MiniappExchangeRequest, request: Request):
     درخواستها ۴۰۱ میگرفتند. توکن خام فقط در پاسخ برمیگردد و در
     دیتابیس فقط hash آن ذخیره میشود (همان کالکشن web_user_sessions).
     """
-    from api.auth import (APP_SESSION_HEADER, init_data_exchange_max_age,
+    from backend.api.auth import (APP_SESSION_HEADER, init_data_exchange_max_age,
                           verify_telegram_init_data)
 
     init_data = (body.init_data or request.headers.get("X-Init-Data") or "").strip()

@@ -136,7 +136,7 @@ def _coerce(raw: dict) -> dict:
 
 async def get_flag() -> bool:
     """آیا کل فیچر روشن است؟ (§۵۶ — تنها منبع حقیقت)"""
-    from database import db
+    from backend.database.database import db
     try:
         val = await db.get_setting(FLAG_KEY, False)
     except Exception as e:
@@ -152,7 +152,7 @@ async def get_flag() -> bool:
 
 
 async def get_cfg(force: bool = False) -> dict:
-    from database import db
+    from backend.database.database import db
     now = time.monotonic()
     if not force and _cfg_cache["data"] is not None and now - _cfg_cache["at"] < CACHE_TTL:
         return _cfg_cache["data"]
@@ -182,7 +182,7 @@ async def mode_enabled(mode: str) -> bool:
 
 async def disable_mode() -> str:
     """soft (جلسات موجود تمام می‌شوند) یا hard (§۲۹/§۷۴)"""
-    from database import db
+    from backend.database.database import db
     try:
         return (await db.get_setting("ring_disable_mode", "soft")) or "soft"
     except Exception:
@@ -190,7 +190,7 @@ async def disable_mode() -> str:
 
 
 async def set_enabled(admin_id: int, enabled: bool, disable_mode_: str = "soft") -> None:
-    from database import db
+    from backend.database.database import db
     await db.set_setting(FLAG_KEY, bool(enabled))
     await db.set_setting("ring_disable_mode", "hard" if disable_mode_ == "hard" else "soft")
     await db.ring_audit(admin_id, "ENABLE_RING" if enabled else "DISABLE_RING",
@@ -201,7 +201,7 @@ async def set_enabled(admin_id: int, enabled: bool, disable_mode_: str = "soft")
 async def set_cfg(admin_id: int, updates: dict) -> dict:
     """مقادیر را اعتبارسنجی/ذخیره و کش را باطل می‌کند. §۷۴: هیچ کلید
     ناشناخته‌ای نوشته نمی‌شود (جلوی آلوده‌شدن settings با payload دلخواه)."""
-    from database import db
+    from backend.database.database import db
     cur = (await db.get_setting(CFG_KEY, {})) or {}
     merged = _coerce(cur)
     changed = {}
@@ -217,7 +217,7 @@ async def set_cfg(admin_id: int, updates: dict) -> dict:
 
 async def maintenance() -> bool:
     """حالت زرد (§۴۵): صف و match جدید بسته، چت‌های جاری باز."""
-    from database import db
+    from backend.database.database import db
     try:
         return bool(await db.get_setting(MAINT_KEY, False))
     except Exception as e:
@@ -230,7 +230,7 @@ def maintenance_sync() -> bool:
 
 
 async def set_maintenance(admin_id: int, on: bool) -> None:
-    from database import db
+    from backend.database.database import db
     await db.set_setting(MAINT_KEY, bool(on))
     await db.ring_audit(admin_id, "RING_MAINTENANCE_ON" if on else "RING_MAINTENANCE_OFF",
                         "global", "", {"maintenance": bool(on)})

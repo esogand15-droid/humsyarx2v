@@ -6,13 +6,13 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List
-from api.auth import require_perm
-from api.rate_limit import rate_limit_user  # 🛡 W10/RATE-01
-from database import db
-from question_bank.contracts import approved_query, status_query
-from request_context import current_request_id
-import broadcast_service
-from time_utils import day_bounds_utc, fa_digits, now_utc, parse_gregorian_date, utc_now_iso
+from backend.api.auth import require_perm
+from backend.api.rate_limit import rate_limit_user  # 🛡 W10/RATE-01
+from backend.database.database import db
+from backend.services.question_bank.contracts import approved_query, status_query
+from backend.core.request_context import current_request_id
+import backend.services.broadcast_service as broadcast_service
+from backend.core.time_utils import day_bounds_utc, fa_digits, now_utc, parse_gregorian_date, utc_now_iso
 
 router = APIRouter()
 ADMIN_ID = int(os.getenv("ADMIN_ID","0"))
@@ -70,7 +70,7 @@ async def _audit(admin, action: str, module: str, *, severity: str = "INFO",
         )
         # سینک با گروه لاگ تلگرام — همان متنی که send_audit_log می‌سازد
         try:
-            from utils import build_audit_log_text
+            from backend.bot.utils import build_audit_log_text
             chat_id = await db.get_setting("log_group_admin", None)
             if chat_id:
                 sync_tags = list(dict.fromkeys((tags or []) + ["پنل_وب"]))
@@ -115,7 +115,7 @@ async def stats(admin=Depends(require_perm("stats.view"))):
     نیز برای مصرف‌کننده‌های قدیمی باقی می‌مانند. هیچ مقدار placeholder یا
     عدد ساختگی در پاسخ وجود ندارد.
     """
-    from utils import today_start_utc_str
+    from backend.bot.utils import today_start_utc_str
 
     today_start = today_start_utc_str()
     week_ago = (now_utc() - timedelta(days=7)).isoformat()
@@ -900,7 +900,7 @@ async def poll_create(body: PollCreate, admin=Depends(require_perm("settings.man
     if len(body.options) < 2: raise HTTPException(422, "حداقل ۲ گزینه لازم است")
     channel_id = await db.get_setting("poll_channel_id", None)
     if not channel_id: raise HTTPException(400, "کانال نظرسنجی تنظیم نشده — اول از بخش تنظیمات کانال رو وارد کن")
-    from api.telegram_send import BOT_TOKEN, API_BASE
+    from backend.api.telegram_send import BOT_TOKEN, API_BASE
     import httpx
     async with httpx.AsyncClient(timeout=20) as client:
         resp = await client.post(f"{API_BASE}/sendPoll", json={
@@ -1265,7 +1265,7 @@ async def log_groups_test(admin=Depends(require_perm("settings.manage"))):
     """تست واقعی هر دو گروه از مسیر Bot API، بدون افشای token به مرورگر."""
     import time
     import httpx
-    from api.telegram_send import API_BASE, BOT_TOKEN
+    from backend.api.telegram_send import API_BASE, BOT_TOKEN
 
     specs = [
         ("admin", "log_group_admin", "🛡 لاگ مدیریت"),
@@ -1446,7 +1446,7 @@ async def audit_health(admin=Depends(require_perm("audit.view"))):
         db_health = {"error": str(e)[:200]}
     # delivery health از audit.py (in-memory)
     try:
-        from audit import get_delivery_health as _adh
+        from backend.services.audit import get_delivery_health as _adh
         delivery = _adh()
     except Exception:
         delivery = {}

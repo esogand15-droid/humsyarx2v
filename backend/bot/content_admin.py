@@ -10,7 +10,7 @@
 import asyncio, hashlib, os, logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
-from database import db
+from backend.database.database import db
 
 logger   = logging.getLogger(__name__)
 ADMIN_ID = int(os.getenv('ADMIN_ID', '0'))
@@ -241,7 +241,7 @@ async def _cow_ref_file_target(context, uid, fid):
     if twin:
         return str(twin['_id']), note
     # کپی افزودنی تک‌فایل (همان فیلدهای ref_ensure_override)
-    from time_utils import utc_now_iso as _uni
+    from backend.core.time_utils import utc_now_iso as _uni
     r = await db.ref_files.insert_one({
         'book_id': tgt, 'lang': f.get('lang', 'fa'), 'volume': f.get('volume', 1),
         'description': f.get('description', ''), 'file_id': f.get('file_id', ''),
@@ -439,7 +439,7 @@ async def _audit(context, uid, action, *, severity='INFO', details='',
        • اقدام اصلی هرگز به خاطر audit نمی‌شکند (fail-open) اما ناظر می‌بیند.
     """
     try:
-        from utils import send_audit_log
+        from backend.bot.utils import send_audit_log
         actor = await db.get_user(uid)
         actor_name = actor.get('name', 'ادمین محتوا') if actor else 'ادمین محتوا'
         await send_audit_log(
@@ -1631,7 +1631,7 @@ async def _show_overview(query, uid: int = None, context=None):
     # ── نسبت پاسخ صحیح سوالات ──
     q_ratio = f"{round(s['q_by_bot'] / s['q_total'] * 100)}٪ بات" if s['q_total'] else '—'
 
-    from utils import now_tehran_str
+    from backend.bot.utils import now_tehran_str
     now = now_tehran_str()
 
     text = (
@@ -2399,7 +2399,7 @@ _UI_FA = {
 async def _ui_run_bot(message, uid: int, url: str, lesson: str, topic: str):
     """📥 URL-Import در بات — همان سرویس canonical (§106)، نه منطق موازی.
     پیشرفت با edit همان پیام (§47) — نه spam صدها پیام."""
-    import url_import_service as uis
+    import backend.services.url_import_service as uis
     user = await db.get_user(uid) or {}
     admin = {"id": uid, "name": user.get("name", "")}
     scope = await db.get_content_scope(uid) or {}
@@ -2462,7 +2462,7 @@ async def ca_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'ui_url', 'ui_lesson', 'ui_topic',  # 📥 URL-Import
     }
     if ca_mode not in VALID_CA_MODES:
-        from message_router import route_message
+        from backend.bot.message_router import route_message
         return await route_message(update, context)
 
     # ── 📥 URL-Import — سه گام متنی: URL → درس → مبحث (§46) ──
@@ -2519,7 +2519,7 @@ async def ca_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return CA_WAITING_TEXT
         # normal filename input
         try:
-            from utils_file_naming import prepare_rename, get_extension
+            from backend.services.utils_file_naming import prepare_rename, get_extension
         except ImportError:
             try:
                 from humsyarx.utils_file_naming import prepare_rename, get_extension  # fallback
@@ -2571,7 +2571,7 @@ async def ca_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Store text as new candidate and show again? reuse above block logic
         # To avoid duplication, just set pending and call same prepare
         try:
-            from utils_file_naming import prepare_rename, get_extension
+            from backend.services.utils_file_naming import prepare_rename, get_extension
         except ImportError:
             try:
                 from humsyarx.utils_file_naming import prepare_rename, get_extension
@@ -2754,7 +2754,7 @@ async def ca_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Determine if re-upload needed (rename or photo->document)
         need_reupload = False
         try:
-            from utils_file_naming import get_extension as _get_ext
+            from backend.services.utils_file_naming import get_extension as _get_ext
         except ImportError:
             try:
                 from humsyarx.utils_file_naming import get_extension as _get_ext
@@ -2770,7 +2770,7 @@ async def ca_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 # Dedicated Rename Pipeline — فقط همین سرویس از Local Bot API استفاده می‌کند
                 try:
-                    from telegram_file_rename_service import rename_telegram_file
+                    from backend.services.telegram_file_rename_service import rename_telegram_file
                 except ImportError:
                     from humsyarx.telegram_file_rename_service import rename_telegram_file
                 new_id, new_name = await rename_telegram_file(uid, fid, disp_name, mime)
@@ -2841,7 +2841,7 @@ async def ca_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if need_reupload and fid:
             try:
                 try:
-                    from telegram_file_rename_service import rename_telegram_file
+                    from backend.services.telegram_file_rename_service import rename_telegram_file
                 except ImportError:
                     from humsyarx.telegram_file_rename_service import rename_telegram_file
                 new_id, new_name = await rename_telegram_file(uid, fid, disp_name, mime)
@@ -2855,7 +2855,7 @@ async def ca_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.warning(f"dedicated ref rename error: {e}")
         try:
-            from utils_file_naming import get_extension as _get_ext2
+            from backend.services.utils_file_naming import get_extension as _get_ext2
         except ImportError:
             try:
                 from humsyarx.utils_file_naming import get_extension as _get_ext2

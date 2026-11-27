@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from database import db
+from backend.database.database import db
 
 logger = logging.getLogger(__name__)
 

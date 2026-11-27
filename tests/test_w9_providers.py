@@ -51,7 +51,7 @@ class CatalogConsistencyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ.setdefault("TELEGRAM_TOKEN", "123:test")
-        import ai_solver
+        import backend.services.ai_solver as ai_solver
         cls.asv = ai_solver
 
     def test_every_provider_has_models_and_default(self):
@@ -91,7 +91,7 @@ class CatalogConsistencyTests(unittest.TestCase):
                       [m["id"] for m in payload["image_models"]])
 
     def test_all_compat_providers_registered(self):
-        import ai_solver
+        import backend.services.ai_solver as ai_solver
         for pid in ("gemini", "openrouter", "groq", "cerebras",
                     "mistral", "deepseek"):
             self.assertIn(pid, ai_solver.STREAM_PROVIDERS,
@@ -108,7 +108,7 @@ class OpenAiCompatCallerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ.setdefault("TELEGRAM_TOKEN", "123:test")
-        import ai_solver
+        import backend.services.ai_solver as ai_solver
         cls.asv = ai_solver
 
     def _call(self, handler, **kwargs):
@@ -199,13 +199,13 @@ class ProviderRuntimeTests(unittest.TestCase):
         os.environ["ADMIN_ID"] = "880901"
         os.environ.setdefault("MONGODB_URI",
                               "mongodb://127.0.0.1:27017")
-        from database import db
+        from backend.database.database import db
         cls.db = db
-        import ai_solver
+        import backend.services.ai_solver as ai_solver
         cls.asv = ai_solver
-        from api.routers import ai_management
+        from backend.api.routers import ai_management
         cls.mgmt = ai_management
-        from api.routers import ai as ai_router
+        from backend.api.routers import ai as ai_router
         cls.ai = ai_router
         from fastapi import HTTPException
         cls.HTTPException = HTTPException

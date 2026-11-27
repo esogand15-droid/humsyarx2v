@@ -45,34 +45,34 @@ from telegram.ext import (
 # unified_text_handler / unified_file_handler / CallbackQueryHandlerهای
 # standalone پایین همین فایل پوشش داده می‌شوند — همان‌ها تنها مرجع
 # باقی می‌مانند تا همیشه state واقعی و به‌روز را ببینند.
-from start import (
+from backend.bot.start import (
     start_handler, register_start_callback, step_name_handler,
     register_intake_callback, step_student_id_handler,
     REGISTER, STEP_NAME, STEP_GROUP, STEP_INTAKE, STEP_STUDENT_ID
 )
-from dashboard import dashboard_callback
-from questions import questions_callback, handle_difficulty_choice
-from schedule import schedule_callback
-from stats import stats_callback
-from notifications import notifications_callback
-from admin import (
+from backend.bot.dashboard import dashboard_callback
+from backend.bot.questions import questions_callback, handle_difficulty_choice
+from backend.bot.schedule import schedule_callback
+from backend.bot.stats import stats_callback
+from backend.bot.notifications import notifications_callback
+from backend.bot.admin import (
     admin_callback, admin_broadcast_handler,
     handle_admin_text, BROADCAST
 )
-from backup import backup_callback, backup_file_handler, backup_confirm_restore
-from utils import cancel_handler, ADMIN_ID, is_maintenance_on, maintenance_message, send_audit_log, safe_send, safe_send_ex, safe_send_status, blocked_reason_of, spawn_bg, CONTENT_ICONS, fmt_jalali, now_tehran_str, webapp_kb
-from time_utils import (
+from backend.services.backup import backup_callback, backup_file_handler, backup_confirm_restore
+from backend.bot.utils import cancel_handler, ADMIN_ID, is_maintenance_on, maintenance_message, send_audit_log, safe_send, safe_send_ex, safe_send_status, blocked_reason_of, spawn_bg, CONTENT_ICONS, fmt_jalali, now_tehran_str, webapp_kb
+from backend.core.time_utils import (
     TEHRAN, format_time_fa, now_tehran, now_utc, parse_gregorian_date,
     parse_machine_datetime, remaining_days, utc_now_iso, week_key_tehran,
 )
-from subscription import subscription_callback, screenshot_handler as sub_screenshot_handler
-from subscription_admin import subscription_admin_callback
-from grades import grades_callback
-from profile import profile_callback
-from referral import referral_callback          # 🌱 W13 — دعوت دوستان
-from dunning import dunning_job, dunning_click  # 💳 W14 — پیگیری پرداخت
-from message_router import route_message
-from basic_science import basic_science_callback
+from backend.bot.subscription import subscription_callback, screenshot_handler as sub_screenshot_handler
+from backend.bot.subscription_admin import subscription_admin_callback
+from backend.bot.grades import grades_callback
+from backend.bot.profile import profile_callback
+from backend.bot.referral import referral_callback          # 🌱 W13 — دعوت دوستان
+from backend.services.dunning import dunning_job, dunning_click  # 💳 W14 — پیگیری پرداخت
+from backend.bot.message_router import route_message
+from backend.bot.basic_science import basic_science_callback
 
 # 🌊 W5 — Flood-Control per-user (in-memory token bucket)
 import collections as _coll
@@ -106,30 +106,30 @@ def _check_flood(uid: int) -> tuple[bool, int]:
     return False, 0
 _FLOOD_WARNED: dict[int, float] = {}
 
-from references import references_callback
-from content_admin import content_admin_callback, ca_file_handler, ca_text_handler
-from faq import faq_callback
-from ticket import ticket_callback, ticket_message_handler
-from reports import report_callback, handle_report_note_text   # FIX جدید
-from ai_admin import ai_admin_callback, ai_admin_text_handler   # 🤖 هوشیار
-from hooshyar_quiz import (                                     # 📚 آزمون‌ساز PDF
+from backend.bot.references import references_callback
+from backend.bot.content_admin import content_admin_callback, ca_file_handler, ca_text_handler
+from backend.bot.faq import faq_callback
+from backend.bot.ticket import ticket_callback, ticket_message_handler
+from backend.bot.reports import report_callback, handle_report_note_text   # FIX جدید
+from backend.bot.ai_admin import ai_admin_callback, ai_admin_text_handler   # 🤖 هوشیار
+from backend.services.hooshyar_quiz import (                                     # 📚 آزمون‌ساز PDF
     quiz_callback, quiz_upload_hook, quiz_poll_answer_handler,
     quiz_housekeeping_job, quiz_retention_job,
     set_application as _quiz_set_application,
 )
-from lecture_scribe import (                                    # 🎙 دستیار جزوه‌نویس چندرسانه‌ای
+from backend.services.lecture_scribe import (                                    # 🎙 دستیار جزوه‌نویس چندرسانه‌ای
     handle_lecture_callback, show_lecture_scribe_intro, handle_lecture_file_input,
 )
-from ai_solver import (                                          # 🤖 هوشیار
+from backend.services.ai_solver import (                                          # 🤖 هوشیار
     handle_ai_text, handle_ai_media, handle_ai_image_prompt,
     ai_user_callback, show_ai_live_card,
     join_live_vc_cmd, leave_live_vc_cmd, on_video_chat_started,
 )
-from database import db
+from backend.database.database import db
 try:
     from backend.bot.web_auth_bot import web_auth_callback
 except ImportError:
-    from web_auth_bot import web_auth_callback
+    from backend.bot.web_auth_bot import web_auth_callback
 
 logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
@@ -143,9 +143,9 @@ logger = logging.getLogger(__name__)
 # 💍 Ring Street — ماژول افزودنی و ایزوله. اگر import آن (به هر دلیلی)
 # شکست بخورد، ربات مثل قبل بالا می‌آید و فقط رینگ ثبت نمی‌شود.
 try:
-    import ring as ring_street
-    from ring import handlers as ring_handlers
-    from ring import jobs as ring_jobs
+    import backend.services.ring as ring_street
+    from backend.services.ring import handlers as ring_handlers
+    from backend.services.ring import jobs as ring_jobs
 except Exception as _ring_import_error:          # pragma: no cover
     ring_street = ring_handlers = ring_jobs = None
     logger.warning("⚠️ ماژول رینگ استریت بارگذاری نشد: %s", _ring_import_error)
@@ -496,7 +496,7 @@ async def _new_resources_run(bot, force: bool = False) -> dict:
     except Exception as e:
         logger.error(f"new_resources_notif_job error: {e}")
         try:
-            from utils import now_tehran
+            from backend.bot.utils import now_tehran
             await db.set_setting('resource_notif_last_error',
                                   f"{now_tehran_str()} | {e}")
         except Exception:
@@ -537,7 +537,7 @@ async def _discount_soldout_edit_task(bot, code: str):
         discount = await db.discount_get(code)
         if not discount:
             return
-        from discount_campaign import build_soldout_message
+        from backend.services.discount_campaign import build_soldout_message
         soldout = build_soldout_message(discount)
         bcasts = await db.discount_bcast_with_msgs(code)
         if not bcasts:
@@ -579,7 +579,7 @@ async def _discount_soldout_edit_task(bot, code: str):
             })
         logger.info(f"⛔ D2 soldout edit: {code} → ✅{edited} ⏭{skipped} (مجموع {total})")
         try:
-            from utils import send_audit_log
+            from backend.bot.utils import send_audit_log
             await send_audit_log(
                 bot, 'system', 'سیستم کمپین', 0,
                 f"⛔ کد تخفیف {code} تکمیل ظرفیت شد — {edited} پیام کمپین به «اتمام موجودی» ادیت شد",
@@ -660,7 +660,7 @@ async def mini_app_outbox_job(context: ContextTypes.DEFAULT_TYPE):
             # خروجی هرگز به ادمین نمی‌رسید (فیچر مرده). حالا مصرف می‌شود.
             if text == "__EXCEL_EXPORT__":
                 try:
-                    from excel_report import build_database_excel
+                    from backend.services.excel_report import build_database_excel
                     buf, fname, caption, _counts = await build_database_excel()
                     buf.seek(0)
                     await context.bot.send_document(
@@ -691,7 +691,7 @@ async def mini_app_outbox_job(context: ContextTypes.DEFAULT_TYPE):
             if text.startswith("__BACKUP_REQUEST__"):
                 try:
                     section = text.split(":", 1)[1] if ":" in text else "all"
-                    from backup import send_backup_from_web
+                    from backend.services.backup import send_backup_from_web
                     total = await send_backup_from_web(
                         context.bot, d["chat_id"], section)
                     await coll.update_one({"_id": d["_id"]}, {"$set": {
@@ -761,7 +761,7 @@ async def mini_app_outbox_job(context: ContextTypes.DEFAULT_TYPE):
             # پیام‌های عادی قدیمی همچنان safe_send خودشان را دارند.
             campaign = d.get("campaign_id")
             if campaign and d.get("payload"):
-                from broadcast_service import send_payload, record_delivery, refresh_campaign
+                from backend.services.broadcast_service import send_payload, record_delivery, refresh_campaign
                 if not d.get("inbox_mirrored"):
                     raw_body = d["payload"].get("text") or d["payload"].get("caption") or ""
                     inbox_body = re.sub(r"<[^>]+>", "", raw_body).strip() or "پیام همگانی مدیریت"
@@ -847,7 +847,7 @@ async def mini_app_outbox_job(context: ContextTypes.DEFAULT_TYPE):
                         # کاربر است، همان‌جا علامت‌گذاری می‌شود تا از
                         # آمار فعال کم شود و دفعات بعد اصلاً صف نشود.
                         try:
-                            from utils import blocked_reason_of
+                            from backend.bot.utils import blocked_reason_of
                             _block_reason = blocked_reason_of(exc)
                             if _block_reason:
                                 await db.mark_user_blocked(
@@ -953,7 +953,7 @@ async def ticket_stale_job(context: ContextTypes.DEFAULT_TYPE):
         tickets = await db.tickets_needing_nudge(stale_h)
         if not tickets:
             return
-        from time_utils import utc_now_iso
+        from backend.core.time_utils import utc_now_iso
         now = utc_now_iso()
         for t in tickets:
             tid = t.get('ticket_id')
@@ -985,7 +985,7 @@ async def wallet_reconcile_job(context: ContextTypes.DEFAULT_TYPE):
     stuck pending قدیمی را فقط لاگ می‌کند (تصمیم دستی) — auto-complete نمی‌کند
     چون 증거 جبران نیازمند تایید انسانی است."""
     try:
-        from time_utils import parse_machine_datetime as _parse_dt, now_utc as _now_utc, utc_now_iso as _utc_iso
+        from backend.core.time_utils import parse_machine_datetime as _parse_dt, now_utc as _now_utc, utc_now_iso as _utc_iso
         import hashlib, json as _json
         items = await db.wallet_reconcile_items(limit=20)
         if not items:
@@ -1097,7 +1097,7 @@ async def audit_retention_job(context: ContextTypes.DEFAULT_TYPE):
         deleted = await db.audit_retention_cleanup()
         try:
             await db.set_setting("audit_retention_last_run",
-                                 __import__("time_utils").utc_now_iso())
+                                 __import__("backend.core.time_utils").utc_now_iso())
             await db.set_setting("audit_retention_last_deleted",
                                  int(deleted or 0))
         except Exception:
@@ -1127,7 +1127,7 @@ async def zarinpal_cleanup_job(context: ContextTypes.DEFAULT_TYPE):
         pending = await db.sub_payments.find({'status': 'zarinpal_pending', 'submitted_at': {'$lt': cutoff}}).to_list(50)
         for doc in pending:
             try:
-                flipped = await db.sub_payments.update_one({'_id': doc['_id'], 'status': 'zarinpal_pending'}, {'$set': {'status': 'cancelled', 'cancel_reason': 'timeout 1h', 'cancelled_at': __import__('time_utils').utc_now_iso()}})
+                flipped = await db.sub_payments.update_one({'_id': doc['_id'], 'status': 'zarinpal_pending'}, {'$set': {'status': 'cancelled', 'cancel_reason': 'timeout 1h', 'cancelled_at': __import__('backend.core.time_utils').utc_now_iso()}})
                 code = (doc.get('discount_code') or '').strip()
                 if code:
                     await db.discount_release(code, user_id=doc.get('user_id'))
@@ -1135,12 +1135,12 @@ async def zarinpal_cleanup_job(context: ContextTypes.DEFAULT_TYPE):
                 # ولی verify نکرده بود؛ best-effort و ثبت نتیجه روی سند.
                 if flipped.modified_count == 1 and doc.get('zarinpal_authority'):
                     try:
-                        from payments.zarinpal import zarinpal_reverse as _zp_rev
+                        from backend.integrations.zarinpal import zarinpal_reverse as _zp_rev
                         rev = await _zp_rev(doc['zarinpal_authority'])
                         await db.sub_payments.update_one({'_id': doc['_id']}, {'$set': {
                             'zarinpal_reversed': bool(rev.get('ok')),
                             'zarinpal_reverse_code': rev.get('code'),
-                            'zarinpal_reversed_at': __import__('time_utils').utc_now_iso()}})
+                            'zarinpal_reversed_at': __import__('backend.core.time_utils').utc_now_iso()}})
                     except Exception as e2:
                         logger.warning(f"zarinpal reverse failed {doc.get('_id')}: {e2}")
                 logger.info(f"zarinpal cleanup cancelled {doc['_id']} authority={doc.get('zarinpal_authority')}")
@@ -1174,8 +1174,8 @@ async def auto_backup_job(context: ContextTypes.DEFAULT_TYPE):
                 return  # کمتر از ۲۰ ساعت از آخرین بکاپ گذشته — رد کن
 
         # 🌊 W3 — streaming backup to temp file (memory-safe) + send
-        from backup import build_full_backup_file
-        from utils import send_audit_log
+        from backend.services.backup import build_full_backup_file
+        from backend.bot.utils import send_audit_log
         import os as _os
         temp_path, _auto_summary = await build_full_backup_file()
         # 🌊 W5/REL-04 — گیت حجم: ارسالِ محکوم‌به‌شکستِ بالای ۵۰MB تلگرام
@@ -1195,7 +1195,7 @@ async def auto_backup_job(context: ContextTypes.DEFAULT_TYPE):
         # 🌊 W5/REL-04 — رمزنگاری بکاپ خودکار اگر کلید تنظیم شده باشد
         _enc_suffix = ""
         try:
-            from utils_crypto import is_encryption_enabled, encrypt_bytes
+            from backend.core.utils_crypto import is_encryption_enabled, encrypt_bytes
             if is_encryption_enabled():
                 with open(temp_path, 'rb') as _rf:
                     _enc = encrypt_bytes(_rf.read())
@@ -1208,7 +1208,7 @@ async def auto_backup_job(context: ContextTypes.DEFAULT_TYPE):
             logger.warning(f"backup encryption skipped: {_ee}")
         try:
             # send file without holding json string in RAM
-            from backup import build_backup_caption
+            from backend.services.backup import build_backup_caption
             try:
                 _send_size = _os.path.getsize(temp_path)
             except Exception:
@@ -1279,7 +1279,7 @@ async def auto_backup_job(context: ContextTypes.DEFAULT_TYPE):
             nf = int(await db.get_setting('auto_backup_consec_fail', 0) or 0) + 1
             await db.set_setting('auto_backup_consec_fail', nf)
             if nf in (3, 7):
-                from utils import safe_send as _ss
+                from backend.bot.utils import safe_send as _ss
                 await _ss(context.bot, ADMIN_ID,
                           f"⚠️ بکاپ خودکار {nf} بار پشت‌سرهم ناموفق بود.\n"
                           f"آخرین خطا: {str(e)[:200]}")
@@ -1295,7 +1295,7 @@ async def auto_backup_job(context: ContextTypes.DEFAULT_TYPE):
                 parse_mode='HTML'
             )
             # FIX جدید: خطای بکاپ هم باید در Audit Log ثبت شود — CRITICAL
-            from utils import send_audit_log
+            from backend.bot.utils import send_audit_log
             await send_audit_log(
                 context.bot, 'admin', 'سیستم (Job خودکار)', 0,
                 "خطا در بکاپ خودکار", module='Backup', severity='CRITICAL',
@@ -1572,7 +1572,7 @@ async def unified_file_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # 🌊 W6.2 — اسکرین‌شات رسید شارژ کیف پول
     if context.user_data.get('sub_mode') == 'awaiting_topup_screenshot' and update.message.photo:
-        from subscription import topup_screenshot_handler
+        from backend.bot.subscription import topup_screenshot_handler
         return await topup_screenshot_handler(update, context)
 
     # 📚 آزمون‌ساز از PDF — باید *قبل از* حالت ai_query چک شود تا
@@ -1625,7 +1625,7 @@ async def unified_file_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # الف) اگر کاربر در سشن اختصاصی جزوه‌نویس است
     if context.user_data.get('mode') in ('lecture_scribe', 'lecture_scribe_attach') and (is_media_file or is_pdf_file):
-        from lecture_scribe import handle_lecture_file_input
+        from backend.services.lecture_scribe import handle_lecture_file_input
         return await handle_lecture_file_input(update, context)
 
     # ب) اگر عکس در حالت پرسش از هوش مصنوعی است
@@ -1679,7 +1679,7 @@ async def unified_file_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         # فقط ادمین برنامه
         if await db.has_permission(uid, "schedules.manage") or (await db.get_content_scope(uid) or {}).get("kind") == "global":
             if update.message.photo or (update.message.document and (update.message.document.mime_type or '').startswith('image/')):
-                from schedule import handle_schedule_scan_photo
+                from backend.bot.schedule import handle_schedule_scan_photo
                 return await handle_schedule_scan_photo(update, context)
 
     # ۳. محتوا ادمین
@@ -1690,7 +1690,7 @@ async def unified_file_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     # ۴. 🎫 تیکت پشتیبانی — دریافت عکس، صدا، ویس، سند
     ticket_mode = context.user_data.get('ticket_mode', '')
     if ticket_mode in ('waiting_message', 'user_reply', 'admin_reply'):
-        from ticket import ticket_file_handler
+        from backend.bot.ticket import ticket_file_handler
         return await ticket_file_handler(update, context)
 
 
@@ -1886,7 +1886,7 @@ async def update_last_active(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if uid is None:
         return
     try:
-        from database import db
+        from backend.database.database import db
         # FIX-R1 — رفع برچسب بلاک به‌صورت اتمیک در همان نوشتن (بدون
         # کوئری اضافه: فقط سندهایی که blocked_bot=True دارند match می‌شوند)
         await db.users.update_one(
@@ -1923,7 +1923,7 @@ async def my_chat_member_handler(update: Update, context: ContextTypes.DEFAULT_T
                   if update.my_chat_member.old_chat_member else None)
     if new_status == old_status:
         return
-    from database import db
+    from backend.database.database import db
     if new_status == 'kicked':
         await db.mark_user_blocked(uid, blocked=True, reason='blocked_by_user')
         logger.info("🚫 کاربر %s ربات را بلاک کرد (my_chat_member)", uid)
@@ -1975,7 +1975,7 @@ def _menu_button_texts() -> set:
         '🎓 پنل محتوا', '👨\u200d⚕️ پنل ادمین', '🤖 هوشیار',
     }
     try:
-        from utils import main_keyboard as _main_kb
+        from backend.bot.utils import main_keyboard as _main_kb
         for row in (getattr(_main_kb(), 'keyboard', None) or []):
             for bt in row:
                 t = getattr(bt, 'text', None)
@@ -2064,14 +2064,14 @@ async def unified_text_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             _can_broadcast = uid == ADMIN_ID
         if not _can_broadcast:
             return
-        from admin import _broadcast_ai_generate
+        from backend.bot.admin import _broadcast_ai_generate
         context.user_data['mode'] = ''
         context.user_data['bc_ai_notes'] = update.message.text or ''
         return await _broadcast_ai_generate(update.message, context, is_message=True)
 
     # ۲. FIX: profile_edit — ویرایش نام/شماره دانشجویی (هر کاربری)
     if context.user_data.get('mode') == 'profile_edit':
-        from profile import profile_text_handler
+        from backend.bot.profile import profile_text_handler
         return await profile_text_handler(update, context)
 
     # ۳. FIX: search_user ادمین
@@ -2119,22 +2119,22 @@ async def unified_text_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # ۵. افزودن برنامه کلاسی/امتحان
     if context.user_data.get('mode') == 'add_schedule':
-        from schedule import handle_add_schedule_text
+        from backend.bot.schedule import handle_add_schedule_text
         return await handle_add_schedule_text(update, context)
 
     # ۵c. FIX جدید: flex_time_change — اعلام تغییر زمان کلاس منعطف
     if uid == ADMIN_ID and context.user_data.get('mode') == 'flex_time_change':
-        from schedule import handle_flex_time_change_text
+        from backend.bot.schedule import handle_flex_time_change_text
         return await handle_flex_time_change_text(update, context)
 
     # ۵c2. FIX جدید (بخش اول): edit_schedule_field — ویرایش تک‌فیلدی برنامه
     if uid == ADMIN_ID and context.user_data.get('mode') == 'edit_schedule_field':
-        from schedule import handle_edit_schedule_field_text
+        from backend.bot.schedule import handle_edit_schedule_field_text
         return await handle_edit_schedule_field_text(update, context)
 
     # ۵d. FIX جدید: ساعت دلخواه بکاپ خودکار
     if uid == ADMIN_ID and context.user_data.get('mode') == 'set_auto_backup_hour':
-        from backup import handle_auto_backup_hour_text
+        from backend.services.backup import handle_auto_backup_hour_text
         return await handle_auto_backup_hour_text(update, context)
 
     # ۵e. FIX جدید: توضیح گزارش ایراد (دلیل 'سایر')
@@ -2211,7 +2211,7 @@ async def handle_disabled_button_tap(update: Update, context: ContextTypes.DEFAU
 
 async def handle_ai_stream_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Global handler for AI streaming cancellation requests."""
-    from ai_solver import request_stop_ai_stream
+    from backend.services.ai_solver import request_stop_ai_stream
     query = update.callback_query
     await query.answer("🛑 تولید پاسخ متوقف شد.", show_alert=False)
     data = query.data or ""
@@ -2408,7 +2408,7 @@ def build_application() -> Application:
     app.add_handler(PollAnswerHandler(quiz_poll_answer_handler))
 
     async def code_cmd_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        from profile import _get_profile_data
+        from backend.bot.profile import _get_profile_data
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         uid = update.effective_user.id
         user, _, _ = await _get_profile_data(uid)
@@ -2500,11 +2500,11 @@ def build_application() -> Application:
 #  فایل تنها محل اشتراک API و bot در یک container است؛ مسیر با
 #  BOT_HEARTBEAT_FILE قابل تغییر است (پیش‌فرض /tmp).
 # ══════════════════════════════════════════════════
-from bot_heartbeat import HEARTBEAT_INTERVAL
+from backend.services.bot_heartbeat import HEARTBEAT_INTERVAL
 
 
 async def bot_heartbeat_job(context: ContextTypes.DEFAULT_TYPE):
-    from bot_heartbeat import write_heartbeat
+    from backend.services.bot_heartbeat import write_heartbeat
     write_heartbeat({'phase': 'running'})
 
 
@@ -2553,7 +2553,7 @@ async def post_init(application: Application):
 
     # 💓 اولین تپش قلب: همان لحظه که ربات بالا آمد (قبل از هر کار کند)
     # نوشته می‌شود تا /api/health/deep بداند polling شروع شده است.
-    from bot_heartbeat import write_heartbeat
+    from backend.services.bot_heartbeat import write_heartbeat
     write_heartbeat({'phase': 'post_init', 'started_at': now_utc().isoformat()})
 
     shared_bootstrap = await db.bootstrap_shared()
@@ -2762,7 +2762,7 @@ async def post_init(application: Application):
         # ذخیره شده بود؛ اینجا در شروع ربات آن‌ها را می‌خوانیم و دوباره
         # زمان‌بندی می‌کنیم (یا اگر زمانش گذشته، فوراً ارسال می‌کنیم).
         try:
-            from admin import _scheduled_broadcast_job
+            from backend.bot.admin import _scheduled_broadcast_job
             pending = await db.get_settings_by_prefix('scheduled_broadcast_')
             for key, rec in pending.items():
                 job_id = key[len('scheduled_broadcast_'):]
@@ -2914,7 +2914,7 @@ async def _graceful_shutdown(app):
 
     # 🌊 W3 — graceful: بستن http client مشترک + آزادسازی db
     try:
-        from http_client import aclose_shared_client
+        from backend.services.http_client import aclose_shared_client
         await aclose_shared_client()
     except Exception: pass
     try:

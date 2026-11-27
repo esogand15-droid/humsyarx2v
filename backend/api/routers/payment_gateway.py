@@ -6,10 +6,10 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
-from api.auth import require_perm
+from backend.api.auth import require_perm
 # 🛡 W4/SEC-04 — گیت از «فقط مالک» به مجوز RBAC (همان چیزی که UI می‌گوید)
-from database import db
-from payments.zarinpal import _clear_cfg_cache
+from backend.database.database import db
+from backend.integrations.zarinpal import _clear_cfg_cache
 import logging
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ async def get_zarinpal_cfg(admin=Depends(require_perm("subscription.manage"))):
     # fallback to env via payments module cache? we just check DB; if None, show env default from payments module
     if sb is None:
         try:
-            from payments.zarinpal import SANDBOX, MERCHANT_ID
+            from backend.integrations.zarinpal import SANDBOX, MERCHANT_ID
             sb = SANDBOX if not mid else False
             if not mid and not MERCHANT_ID:
                 sb = True
@@ -89,7 +89,7 @@ async def put_zarinpal_cfg(body: GatewayPutBody, admin=Depends(require_perm("sub
     except: pass
     # audit
     try:
-        from utils import send_audit_log
+        from backend.bot.utils import send_audit_log
         # need bot? we don't have bot here; just log to db via database
         _audit_after = {k: v for k, v in body.model_dump(exclude_none=True).items()
                         if k != "merchant_id"}

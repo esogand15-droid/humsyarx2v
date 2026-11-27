@@ -10,9 +10,9 @@ import io
 import logging
 from datetime import datetime
 
-from database import db
-from utils import fmt_jalali_dt
-from time_utils import now_tehran
+from backend.database.database import db
+from backend.bot.utils import fmt_jalali_dt
+from backend.core.time_utils import now_tehran
 
 logger = logging.getLogger(__name__)
 

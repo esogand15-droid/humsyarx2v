@@ -37,12 +37,12 @@ def _ok_post():
 
 def _patched(fn):
     for p in reversed([
-        patch("database.db.op_claim", AsyncMock(return_value=True)),
-        patch("database.db.op_release", AsyncMock(return_value=True)),
-        patch("ai_solver.refund_lecture_quota", new_callable=AsyncMock),
+        patch("backend.database.database.db.op_claim", AsyncMock(return_value=True)),
+        patch("backend.database.database.db.op_release", AsyncMock(return_value=True)),
+        patch("backend.services.ai_solver.refund_lecture_quota", new_callable=AsyncMock),
         patch("backend.services.telegram_downloader.download_telegram_media", new_callable=AsyncMock),
         patch("backend.services.lecture_scribe.transcode_audio_file", new_callable=AsyncMock),
-        patch("ai_solver.get_ai_config", new_callable=AsyncMock),
+        patch("backend.services.ai_solver.get_ai_config", new_callable=AsyncMock),
     ]):
         fn = p(fn)
     return fn

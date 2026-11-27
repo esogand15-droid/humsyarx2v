@@ -7,10 +7,10 @@ import os
 
 from fastapi import APIRouter, Depends
 
-import growth_rules as gr
-from api.auth import get_current_user
-from api.rate_limit import rate_limit_dependency
-from database import db
+import backend.services.growth_rules as gr
+from backend.api.auth import get_current_user
+from backend.api.rate_limit import rate_limit_dependency
+from backend.database.database import db
 
 router = APIRouter()
 

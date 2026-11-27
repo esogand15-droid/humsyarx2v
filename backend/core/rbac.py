@@ -8,7 +8,7 @@
 بعد:  همین ماژول thin-wrapper روی db/rbac است؛ هر لایه همین را صدا می‌زند.
 """
 from typing import Set
-from database import db
+from backend.database.database import db
 from .errors import Code
 
 async def has_permission(uid: int, perm: str) -> bool:

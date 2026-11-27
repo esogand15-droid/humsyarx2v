@@ -34,7 +34,7 @@ class CoreHashTests(unittest.TestCase):
     """هش/مقایسهٔ کد — پایهٔ امنیت ورود."""
 
     def setUp(self):
-        from api import web_login_core as core
+        from backend.api import web_login_core as core
         self.core = core
 
     def test_code_is_six_digits(self):
@@ -76,7 +76,7 @@ class CoreHashTests(unittest.TestCase):
 class CoreExpiryTests(unittest.TestCase):
 
     def setUp(self):
-        from api import web_login_core as core
+        from backend.api import web_login_core as core
         self.core = core
 
     def test_is_past(self):
@@ -108,7 +108,7 @@ class CoreExpiryTests(unittest.TestCase):
 class CoreIdentifierTests(unittest.TestCase):
 
     def setUp(self):
-        from api import web_login_core as core
+        from backend.api import web_login_core as core
         self.core = core
 
     def test_normalization(self):
@@ -142,7 +142,7 @@ class CoreIdentifierTests(unittest.TestCase):
 class CoreRateLimitTests(unittest.TestCase):
 
     def test_window_blocks_after_limit(self):
-        from api import web_login_core as core
+        from backend.api import web_login_core as core
         limiter = core.SlidingWindowLimiter(limit=3, window_sec=60)
         self.assertTrue(limiter.allow("k", at=0))
         self.assertTrue(limiter.allow("k", at=1))
@@ -154,7 +154,7 @@ class CoreRateLimitTests(unittest.TestCase):
         self.assertTrue(limiter.allow("other", at=61))
 
     def test_request_allowed_checks_ip_first(self):
-        from api import web_login_core as core
+        from backend.api import web_login_core as core
         core.IP_LIMITER.reset()
         core.IDENT_LIMITER.reset()
         try:

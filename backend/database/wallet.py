@@ -27,7 +27,7 @@ import os
 import logging
 from pymongo.errors import DuplicateKeyError
 from bson import ObjectId
-from time_utils import utc_now_iso
+from backend.core.time_utils import utc_now_iso
 
 logger = logging.getLogger('database')
 
@@ -88,7 +88,7 @@ class DBWallet:
     # 🌊 W2 — helper داخل کلاس
     async def _wallet_daily_toman_sum(self, user_id: int) -> int:
         """جمع امروز (ok) برای کاربر — تومان."""
-        from time_utils import start_of_day_tehran
+        from backend.core.time_utils import start_of_day_tehran
         try:
             day_start = start_of_day_tehran().isoformat()
         except Exception:

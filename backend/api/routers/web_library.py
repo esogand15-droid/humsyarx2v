@@ -34,10 +34,10 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from api.auth import get_references_access_user, get_resource_access_user
-from api.routers import references as ref_router
-from api.routers import resources as res_router
-from api.routers.web_student import current_student
+from backend.api.auth import get_references_access_user, get_resource_access_user
+from backend.api.routers import references as ref_router
+from backend.api.routers import resources as res_router
+from backend.api.routers.web_student import current_student
 
 logger = logging.getLogger(__name__)
 

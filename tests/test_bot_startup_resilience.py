@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("TELEGRAM_TOKEN", "123:FAKE_TEST_TOKEN_FOR_IMPORT")
 
 try:
-    import bot  # noqa: E402
+    import backend.bot.bot as bot  # noqa: E402
     _BOT_IMPORT_ERROR = None
 except Exception as _exc:  # حالت CI بدون MONGODB_URI — تست تابعی skip می‌شود
     bot = None
@@ -113,7 +113,7 @@ class BotStartupResilienceFunctionalTests(unittest.TestCase):
             calls["n"] += 1
             return last if calls["n"] == 3 else factory()
 
-        with patch("bot.time.sleep") as sleep_mock:
+        with patch("backend.bot.bot.time.sleep") as sleep_mock:
             bot._run_polling_with_retry(counting_factory)  # نباید raise کند
 
         self.assertEqual(calls["n"], 3, "دو خطای گذرا + یک موفقیت = ۳ تلاش")
@@ -127,7 +127,7 @@ class BotStartupResilienceFunctionalTests(unittest.TestCase):
             state["n"] += 1
             return _StubApp([_StubNetworkError("Connection reset")] if state["n"] == 1 else [])
 
-        with patch("bot.time.sleep"):
+        with patch("backend.bot.bot.time.sleep"):
             bot._run_polling_with_retry(factory)
         self.assertEqual(state["n"], 2)
 
@@ -138,7 +138,7 @@ class BotStartupResilienceFunctionalTests(unittest.TestCase):
             state["n"] += 1
             return _StubApp([InvalidToken("401: Unauthorized")])
 
-        with patch("bot.time.sleep") as sleep_mock:
+        with patch("backend.bot.bot.time.sleep") as sleep_mock:
             with self.assertRaises(InvalidToken):
                 bot._run_polling_with_retry(factory)
         self.assertEqual(state["n"], 1, "خطای پیکربندی retry نمی‌شود")

@@ -1,8 +1,8 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
-from database import db
-from time_utils import (
+from backend.database.database import db
+from backend.core.time_utils import (
     TimeContractError, format_date_fa, parse_clock_time,
     parse_gregorian_date, parse_jalali_date,
 )

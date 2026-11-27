@@ -2,8 +2,8 @@ import os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
-from database import db
-from utils import esc as _esc   # 🛡 AUDIT-A6
+from backend.database.database import db
+from backend.bot.utils import esc as _esc   # 🛡 AUDIT-A6
 TERMS = ['ترم ۱', 'ترم ۲', 'ترم ۳', 'ترم ۴', 'ترم ۵']
 RESOURCE_TYPES = ['📄 جزوه', '📊 پاورپوینت', '📝 نکات', '🧠 خلاصه', '🧪 تست', '🎙 ویس']
 

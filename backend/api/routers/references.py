@@ -5,15 +5,15 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from api.auth import (
+from backend.api.auth import (
     get_current_user, get_references_access_user,
 )
-from api.telegram_send import (
+from backend.api.telegram_send import (
     PREVIEW_TTL_SEC, is_previewable, preview_token, proxy_telegram_preview,
     send_ref_file, verify_preview_token,
 )
-from database import db
-from api.rate_limit import rate_limit_user  # 🛡 W3/SEC-03
+from backend.database.database import db
+from backend.api.rate_limit import rate_limit_user  # 🛡 W3/SEC-03
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -484,7 +484,7 @@ async def download(
 
 async def _preview_user(request: Request) -> dict:
     """🌊 W8/UX-03 — احراز پیش‌نمایش رفرنس (هدر یا توکن تک‌فایل)."""
-    from core.access import require_feature_access
+    from backend.core.access import require_feature_access
     if request.headers.get("X-Init-Data"):
         user = await get_current_user(
             request, request.headers.get("X-Init-Data", ""))

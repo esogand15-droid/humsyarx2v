@@ -5,13 +5,13 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from api.auth import get_content_admin_user, get_content_global_user, get_current_user, resolve_content_intake
-from api.telegram_send import upload_and_get_file_id
-from api.routers.admin_panel import _audit
-from database import db
-from time_utils import TimeContractError, parse_gregorian_date
-from question_bank import QuestionBankService, QuestionDomainError
-from question_bank.contracts import canonical_difficulty, canonical_status, status_query
+from backend.api.auth import get_content_admin_user, get_content_global_user, get_current_user, resolve_content_intake
+from backend.api.telegram_send import upload_and_get_file_id
+from backend.api.routers.admin_panel import _audit
+from backend.database.database import db
+from backend.core.time_utils import TimeContractError, parse_gregorian_date
+from backend.services.question_bank import QuestionBankService, QuestionDomainError
+from backend.services.question_bank.contracts import canonical_difficulty, canonical_status, status_query
 
 logger = logging.getLogger(__name__)
 
@@ -736,7 +736,7 @@ class GradeBulk(BaseModel):
 
 @router.post("/grades/bulk")
 async def bulk_grades(body: GradeBulk, admin=Depends(GLOBAL_USER)):
-    from api.routers import academic_admin as academic_api
+    from backend.api.routers import academic_admin as academic_api
     try:
         entries = [academic_api.GradeEntry(
             user_id=e.get("user_id", e.get("student_id")), score=e.get("score"))
@@ -794,13 +794,13 @@ class GradeUpdate(BaseModel):
 @router.patch("/grades/{gid}")
 async def edit_grade(gid: str, body: GradeUpdate, admin=Depends(GLOBAL_USER)):
     # همان business entry point امنی که Web Admin مصرف می‌کند.
-    from api.routers import academic_admin as academic_api
+    from backend.api.routers import academic_admin as academic_api
     return await academic_api.grade_update(
         grade_id=gid, body=academic_api.GradeUpdate(score=body.score), admin=admin)
 
 @router.delete("/grades/{gid}")
 async def del_grade(gid: str, admin=Depends(GLOBAL_USER)):
-    from api.routers import academic_admin as academic_api
+    from backend.api.routers import academic_admin as academic_api
     return await academic_api.grade_delete(grade_id=gid, admin=admin)
 
 # ══════════════════════════════════════════════
@@ -1075,7 +1075,7 @@ async def bs_add_content_ep(sid: str, ctype: str = Form(...), description: str =
     # File naming pipeline — sanitize + preserve extension
     orig_fname = (file.filename or "file").strip() or "file"
     # Use utility for final name; caller may send display_name empty -> fallback to original
-    from utils_file_naming import prepare_rename, get_extension
+    from backend.services.utils_file_naming import prepare_rename, get_extension
     # If no display_name provided, use original
     clean_display = display_name if isinstance(display_name, str) else ""
     desired = clean_display.strip() or orig_fname
@@ -1164,7 +1164,7 @@ async def bs_rename_content_ep(cid: str, body: RenameBody, admin=Depends(get_con
         cid, admin, edit_scope, intake)
     old = await db.bs_get_content_item(cid) or old
     # Build sanitized new display via utility (dedup)
-    from utils_file_naming import prepare_rename, get_extension
+    from backend.services.utils_file_naming import prepare_rename, get_extension
     orig = old.get("original_file_name", "") or old.get("display_file_name", "") or "file.pdf"
     existing = set()
     try:
@@ -1180,7 +1180,7 @@ async def bs_rename_content_ep(cid: str, body: RenameBody, admin=Depends(get_con
     new_file_id = old.get("file_id", "")
     reuploaded = False
     try:
-        from api.telegram_send import download_telegram_file, upload_and_get_file_id
+        from backend.api.telegram_send import download_telegram_file, upload_and_get_file_id
         data = await download_telegram_file(old.get("file_id",""))
         if data is not None:
             # need mime
@@ -1454,7 +1454,7 @@ async def ref_add_file_ep(bid: str, lang: str = Form("fa"), volume: int = Form(1
     # ⭐ م6 — CoW: آپلود یعنی ذخیره
     bid, override_created, note = await _cow_book_write(bid, admin, edit_scope, intake)
     orig_fname = (file.filename or "file").strip() or "file"
-    from utils_file_naming import prepare_rename, get_extension
+    from backend.services.utils_file_naming import prepare_rename, get_extension
     desired = (display_name or "").strip() or orig_fname
     existing_for_upload = set()
     try:
@@ -1527,7 +1527,7 @@ async def ref_rename_file_ep(fid: str, body: RenameBody, admin=Depends(get_conte
     fid, book_id, override_created, note = await _cow_ref_file_write(
         fid, admin, edit_scope, intake)
     old = await db.ref_get_file(fid) or old
-    from utils_file_naming import prepare_rename, get_extension
+    from backend.services.utils_file_naming import prepare_rename, get_extension
     orig = old.get("original_file_name", "") or old.get("display_file_name", "") or "file.pdf"
     existing = set()
     try:
@@ -1542,7 +1542,7 @@ async def ref_rename_file_ep(fid: str, body: RenameBody, admin=Depends(get_conte
     new_file_id = old.get("file_id", "")
     reuploaded = False
     try:
-        from api.telegram_send import download_telegram_file, upload_and_get_file_id
+        from backend.api.telegram_send import download_telegram_file, upload_and_get_file_id
         data = await download_telegram_file(old.get("file_id",""))
         if data is not None:
             mime = old.get("mime_type", "application/octet-stream")
@@ -1672,7 +1672,7 @@ async def _cow_ref_file_write(fid, admin, edit_scope='auto', requested_intake=No
     twin = await db.ref_files.find_one({'book_id': tgt, 'fork_of': fid})
     if twin:
         return str(twin['_id']), tgt, created, note
-    from time_utils import utc_now_iso as _uni
+    from backend.core.time_utils import utc_now_iso as _uni
     r = await db.ref_files.insert_one({
         'book_id': tgt, 'lang': f.get('lang', 'fa'), 'volume': f.get('volume', 1),
         'description': f.get('description', ''), 'file_id': f.get('file_id', ''),
@@ -1710,7 +1710,7 @@ async def bs_fork_session_ep(sid: str, admin=Depends(get_content_admin_user),
     if not new_sid:
         raise HTTPException(422, "فقط جلسه‌ی سراسری قابل سفارشی‌سازی است")
     try:
-        from api.routers.admin_panel import _audit
+        from backend.api.routers.admin_panel import _audit
         _docs = await db.get_all_intakes()
         _lbl = next((i["label"] for i in _docs if i["code"] == target), target)
         _base = await db.bs_get_session(sid) or {}
@@ -1731,7 +1731,7 @@ async def bs_unfork_session_ep(sid: str, admin=Depends(get_content_admin_user)):
     if not base_id:
         raise HTTPException(422, "این جلسه نسخه‌ی اختصاصی نیست")
     try:
-        from api.routers.admin_panel import _audit
+        from backend.api.routers.admin_panel import _audit
         await _audit(admin, "بازگردانی جلسه به نسخه‌ی سراسری (حذف Fork)",
             "Content", severity="INFO", target_id=str(sid),
             target_type="session",
@@ -1756,7 +1756,7 @@ async def ref_fork_book_ep(bid: str, admin=Depends(get_content_admin_user),
     if not new_bid:
         raise HTTPException(422, "فقط کتاب سراسری قابل سفارشی‌سازی است")
     try:
-        from api.routers.admin_panel import _audit
+        from backend.api.routers.admin_panel import _audit
         _docs = await db.get_all_intakes()
         _lbl = next((i["label"] for i in _docs if i["code"] == target), target)
         _base = await db.ref_get_book(bid) or {}
@@ -1776,7 +1776,7 @@ async def ref_unfork_book_ep(bid: str, admin=Depends(get_content_admin_user)):
     if not base_id:
         raise HTTPException(422, "این کتاب نسخه‌ی اختصاصی نیست")
     try:
-        from api.routers.admin_panel import _audit
+        from backend.api.routers.admin_panel import _audit
         await _audit(admin, "بازگردانی کتاب به نسخه‌ی سراسری (حذف Fork)",
             "Content", severity="INFO", target_id=str(bid),
             target_type="book",

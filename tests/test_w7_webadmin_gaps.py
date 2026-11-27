@@ -46,9 +46,9 @@ class W7RuntimeTests(unittest.TestCase):
         os.environ.setdefault("TELEGRAM_TOKEN", "123:test")
         os.environ["ADMIN_ID"] = str(ADMIN_UID)  # مدیر ارشد = همه‌ی مجوزها
         os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
-        from database import db
+        from backend.database.database import db
         cls.db = db
-        from api.routers import web_admin
+        from backend.api.routers import web_admin
         cls.wa = web_admin
         from _rtloop import adopt
         adopt()

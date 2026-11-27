@@ -5,7 +5,7 @@ import unittest
 
 import pytest
 
-from question_bank.contracts import (
+from backend.services.question_bank.contracts import (
     BASIC_SCIENCE_SUBJECTS,
     QBANK_LESSON_TERM,
     default_exam_bucket_topic,
@@ -101,7 +101,7 @@ class TestEnsureTaxonomyUnit(unittest.IsolatedAsyncioTestCase):
                 self.bs_sessions = FakeColl()
                 self.questions = FakeColl()
 
-        from question_bank.service import QuestionBankService
+        from backend.services.question_bank.service import QuestionBankService
         db = FakeDB()
         svc = QuestionBankService(db)
         tax = await svc.ensure_taxonomy_for_import(

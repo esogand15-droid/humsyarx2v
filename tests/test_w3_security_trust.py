@@ -123,7 +123,7 @@ class W3MockTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        import payments.zarinpal as zp
+        import backend.integrations.zarinpal as zp
         cls.zp = zp
         # 🐞 موج ۳ — این کلاس عمداً «حالت mock» را تست می‌کند و از موج ۳
         # حالت mock به‌صورت fail-closed بسته است (محیط ناشناخته = ممنوع).
@@ -161,7 +161,7 @@ class W3MockTests(unittest.TestCase):
         asyncio.run(go())
 
     def test_rate_limiter_returns_429_with_retry_after(self):
-        import api.rate_limit as rl
+        import backend.api.rate_limit as rl
         prev, rl._ENABLED = rl._ENABLED, True
         scope = f"w3test-{time.time_ns()}"
         try:
@@ -203,7 +203,7 @@ class W3RuntimeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
-        from database import db
+        from backend.database.database import db
         cls.db = db
         from _rtloop import adopt
         adopt()
@@ -242,7 +242,7 @@ class W3RuntimeTests(unittest.TestCase):
 
     def test_sec02_cap_error_blocks_admin_credit(self):
         async def go():
-            from db.wallet import WalletError
+            from backend.database.wallet import WalletError
             db = self.db
             real = db._wallet_daily_toman_sum
 

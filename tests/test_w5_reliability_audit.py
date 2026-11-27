@@ -95,7 +95,7 @@ class W5PureRuntimeTests(unittest.TestCase):
     """runtime بدون Mongo: شمارنده، رمز، sha، کرش."""
 
     def test_counters_record_and_snapshot(self):
-        from api.api_counters import record, snapshot
+        from backend.api.api_counters import record, snapshot
         route = "/w5probe/unique-route"
         record("GET", route, 200, "r1")
         record("GET", route, 200, "r2")
@@ -113,7 +113,7 @@ class W5PureRuntimeTests(unittest.TestCase):
             from cryptography.fernet import Fernet
         except ImportError:
             self.skipTest("cryptography نصب نیست")
-        import utils_crypto as uc
+        import backend.core.utils_crypto as uc
         prev, uc._fernet = uc._fernet, Fernet(Fernet.generate_key())
         try:
             blob = b'{"w5": "probe-\xc3\xa9"}' * 100
@@ -217,7 +217,7 @@ class W5DbGatedTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
-        from database import db
+        from backend.database.database import db
         cls.db = db
         from _rtloop import adopt
         adopt()

@@ -7,12 +7,12 @@
 """
 from __future__ import annotations
 
-from time_utils import utc_now_iso   # §۴۹ (V6) — cycle_metrics به همین نیاز دارد
+from backend.core.time_utils import utc_now_iso   # §۴۹ (V6) — cycle_metrics به همین نیاز دارد
 
 import logging
 from datetime import timedelta
 
-from time_utils import now_utc
+from backend.core.time_utils import now_utc
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ COUNTERS = {
 
 async def funnel(days: int = 7) -> dict:
     """profile → consent → queue join → match → ≥1 message → end."""
-    from database import db
+    from backend.database.database import db
     rows = await db.ring_daily(days)
     acc = {k: 0 for k in COUNTERS}
     for r in rows:
@@ -55,7 +55,7 @@ async def funnel(days: int = 7) -> dict:
 
 async def mode_split(days: int = 7) -> dict:
     """تقسیم fun/serious از روی sessionها (نه شمارنده‌ها) — aggregate محدود."""
-    from database import db
+    from backend.database.database import db
     cut = _since(days)
     out = {}
     pipeline = [
@@ -88,7 +88,7 @@ async def mode_split(days: int = 7) -> dict:
 
 async def moderation_stats(days: int = 30) -> dict:
     """چند گزارش تا بن، چند تای رد شده (برای تنظیم آستانه‌ها)."""
-    from database import db
+    from backend.database.database import db
     cut = _since(days)
     out = {"by_reason": {}, "by_status": {}, "dup_share": 0.0, "total": 0}
     pipeline = [{"$match": {"created_at": {"$gte": cut}}},
@@ -116,7 +116,7 @@ async def moderation_stats(days: int = 30) -> dict:
 
 
 async def top_topics(days: int = 30, limit: int = 8) -> list[dict]:
-    from database import db
+    from backend.database.database import db
     cut = _since(days)
     try:
         rows = []
@@ -158,7 +158,7 @@ async def flush_metrics() -> int:
         return 0
     snap = dict(_metrics)
     _metrics.clear()
-    from database import db
+    from backend.database.database import db
     try:
         await db.ring_bump(**snap)
     except Exception as e:
@@ -179,7 +179,7 @@ async def cycle_metrics(days: int = 7) -> dict:
     یتیم‌ها از `ring_overview` خوانده می‌شوند (وضعیتِ زنده)، نه از آمارِ روزانه:
     ادمین باید ببیند «الان» چیزی خراب است یا نه.
     """
-    from database import db
+    from backend.database.database import db
     out = {k: 0 for k in CYCLE_KEYS}
     try:
         for r in await db.ring_daily(days):
@@ -221,7 +221,7 @@ async def flush_rejects() -> int:
         return 0
     snap = dict(_rejects)
     _rejects.clear()
-    from database import db
+    from backend.database.database import db
     try:
         await db.ring_bump(**{f"reject_{k}": v for k, v in snap.items()})
     except Exception as e:
@@ -231,7 +231,7 @@ async def flush_rejects() -> int:
 
 async def reject_reasons(days: int = 7) -> dict:
     """تفکیک دلایل رد — برای کارت «چرا مچ نمی‌شوند؟» در پنل (§۳۹)."""
-    from database import db
+    from backend.database.database import db
     out: dict[str, int] = {}
     try:
         for r in await db.ring_daily(days):
@@ -247,7 +247,7 @@ async def reject_reasons(days: int = 7) -> dict:
 
 async def summary(days: int = 7) -> dict:
     """پاسخ `/api/ring/analytics` و کارت «📊» پنل."""
-    from database import db
+    from backend.database.database import db
     ov = {}
     try:
         ov = await db.ring_overview()
@@ -264,7 +264,7 @@ async def summary(days: int = 7) -> dict:
 
 async def _max_wait(days: int = 7) -> int:
     """بیشترین انتظار ثبت‌شده (§۳۹) — از شمارندهٔ `$max` روزانه."""
-    from database import db
+    from backend.database.database import db
     best = 0
     try:
         for r in await db.ring_daily(days):
@@ -276,7 +276,7 @@ async def _max_wait(days: int = 7) -> int:
 
 async def _paused_count() -> int:
     """چند نفر «⏸ توقف جست‌وجو» زده‌اند (§۲۳/§۳۹)."""
-    from database import db
+    from backend.database.database import db
     try:
         return await db.ring_cols.profiles.count_documents(
             {"search_paused": True, "status": "active"}, limit=5000)

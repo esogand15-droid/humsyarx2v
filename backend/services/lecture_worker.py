@@ -402,7 +402,7 @@ class LectureWorkerQueue:
         # 1. Quota Refund
         if job.quota_consumed:
             try:
-                from ai_solver import refund_lecture_quota
+                from backend.services.ai_solver import refund_lecture_quota
                 await refund_lecture_quota(job.user_id)
                 logger.info("Restored lecture quota for user %s following error", job.user_id)
             except Exception as refund_err:
@@ -410,7 +410,7 @@ class LectureWorkerQueue:
 
         # 2. Release in-flight lock
         try:
-            from ai_solver import ai_release_inflight
+            from backend.services.ai_solver import ai_release_inflight
             await ai_release_inflight(job.user_id)
         except Exception:
             pass
@@ -450,12 +450,12 @@ class LectureWorkerQueue:
         """Safely refunds an enqueued job drained during server shutdown."""
         if job.quota_consumed:
             try:
-                from ai_solver import refund_lecture_quota
+                from backend.services.ai_solver import refund_lecture_quota
                 await refund_lecture_quota(job.user_id)
             except Exception:
                 pass
         try:
-            from ai_solver import ai_release_inflight
+            from backend.services.ai_solver import ai_release_inflight
             await ai_release_inflight(job.user_id)
         except Exception:
             pass

@@ -34,9 +34,9 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from api.auth import get_current_user
-from database import db
-from time_utils import now_utc
+from backend.api.auth import get_current_user
+from backend.database.database import db
+from backend.core.time_utils import now_utc
 
 logger = logging.getLogger(__name__)
 

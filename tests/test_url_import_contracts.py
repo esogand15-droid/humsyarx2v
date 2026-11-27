@@ -193,11 +193,11 @@ class UrlImportRuntimeTests(unittest.TestCase):
 
         import httpx
         cls.httpx = httpx
-        import api.main as main_mod
+        import backend.api.main as main_mod
         cls.app = main_mod.app
-        from database import db
+        from backend.database.database import db
         cls.db = db
-        import url_import_service as svc
+        import backend.services.url_import_service as svc
         cls.svc = svc
         # stub آپلود تلگرام — همان نقطه‌ی پوشش سرویس
         cls._real_upload = svc._telegram_upload

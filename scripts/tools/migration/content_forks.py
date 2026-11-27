@@ -106,7 +106,7 @@ def pick_duplicate_keepers(items: list) -> dict:
 # ── اجرا ───────────────────────────────────────────────────────
 
 async def run(apply: bool) -> int:
-    from database import db
+    from backend.database.database import db
 
     bs_sessions, bs_content = db.bs_sessions, db.bs_content
     ref_books, ref_files = db.ref_books, db.ref_files

@@ -12,8 +12,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 os.environ.setdefault('MONGODB_URI', 'mongodb://127.0.0.1:27017')
 
 import _rtloop
-import ai_solver
-from ai_solver import (
+import backend.services.ai_solver as ai_solver
+from backend.services.ai_solver import (
     _looks_like_image_model, model_free_rank, model_is_free, _voice_reply_plan,
     merge_models_with_health, list_image_models, probe_models,
     get_models_health, generate_speech_gemini, get_ai_config,
@@ -935,7 +935,7 @@ class M9GeminiLiveVoiceTests(unittest.TestCase):
 
     def test_tg_group_voice_call_pcm_mixer_and_credentials(self):
         import struct
-        import tg_group_voice_call as tvc
+        import backend.bot.tg_group_voice_call as tvc
 
         # تست میکس دو فریم PCM16 بدون سرریز (Clipping protection)
         f1 = struct.pack('<hh', 20000, -20000)
@@ -962,7 +962,7 @@ class M9GeminiLiveVoiceTests(unittest.TestCase):
 
     def test_tg_group_voice_call_m93_pyrogram_compat_and_2fa(self):
         import types
-        import tg_group_voice_call as tvc
+        import backend.bot.tg_group_voice_call as tvc
 
         # ۱) تست نرمال‌سازی ارقام فارسی و شماره موبایل
         self.assertEqual(tvc._normalize_phone('۰۹۱۲۳۴۵۶۷۸۹'), '+989123456789')
@@ -1034,7 +1034,7 @@ class M9GeminiLiveVoiceTests(unittest.TestCase):
 
     def test_tg_group_voice_call_m94_48khz_10ms_jitter_buffer_and_anti_click(self):
         import struct
-        import tg_group_voice_call as tvc
+        import backend.bot.tg_group_voice_call as tvc
 
         # ۱) تایید ثوابت حیاتی ntgcalls (فریم‌های دقیقاً 10ms = 960 بایت در 48kHz mono)
         self.assertEqual(tvc.VC_OUT_SAMPLE_RATE, 48000)
@@ -1103,7 +1103,7 @@ class M9GeminiLiveVoiceTests(unittest.TestCase):
     def test_m95_studio_live_setup_cubic_upsampler_and_adaptive_jitter(self):
         import array
         import math
-        import tg_group_voice_call as tvc
+        import backend.bot.tg_group_voice_call as tvc
 
         # ۱) بررسی پیکربندی VAD (realtimeInputConfig) و فشرده‌سازی کانتکست (contextWindowCompression)
         s38 = ai_solver.build_live_setup_message(

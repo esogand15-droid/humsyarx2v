@@ -5,7 +5,7 @@ from .contracts import (
     CONTENT_SOURCES, canonical_difficulty, canonical_source, clean_text,
     question_content_hash,
 )
-from time_utils import utc_now_iso
+from backend.core.time_utils import utc_now_iso
 
 QBANK_W1_MIGRATION = "qbank_w1_fields_1"
 

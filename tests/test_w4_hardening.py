@@ -133,7 +133,7 @@ class W4RuntimeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
-        from database import db
+        from backend.database.database import db
         cls.db = db
         from _rtloop import adopt
         adopt()
@@ -199,7 +199,7 @@ class W4RuntimeTests(unittest.TestCase):
 
     def test_db02_retention_deletes_only_old(self):
         async def go():
-            import audit as audit_mod
+            import backend.services.audit as audit_mod
             db = self.db
             now = datetime.now(timezone.utc)
             old_ts = (now - timedelta(days=400)).isoformat()

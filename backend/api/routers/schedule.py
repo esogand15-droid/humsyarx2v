@@ -6,11 +6,11 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
-from api.auth import get_current_user, require_perm
+from backend.api.auth import get_current_user, require_perm
 from backend.database.content import _normalize_term
-from database import db
-from time_utils import parse_gregorian_date, utc_now_iso
-from utils import now_tehran
+from backend.database.database import db
+from backend.core.time_utils import parse_gregorian_date, utc_now_iso
+from backend.bot.utils import now_tehran
 
 
 
@@ -382,7 +382,7 @@ async def get_conflicts(
     except (TypeError, ValueError):
         from fastapi import HTTPException
         raise HTTPException(422, "فرمت تاریخ YYYY-MM-DD")
-    from database import db as _db
+    from backend.database.database import db as _db
 
     cur = await _db.schedules.find(
         {"date": date, "is_weekly": {"$ne": True}}).to_list(200)

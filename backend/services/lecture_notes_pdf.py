@@ -24,11 +24,11 @@ from reportlab.lib.colors import HexColor
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.pagesizes import A4
 
-from qbank.fonts_rtl import (
+from backend.services.qbank.fonts_rtl import (
     ensure_fonts, rtl, fa_digits, wrap_rtl, text_width,
     REGULAR, MEDIUM, BOLD
 )
-from qbank.styles import (
+from backend.services.qbank.styles import (
     PAGE_W, PAGE_H, MARGIN, CONTENT_W, MIN_Y, FOOTER_Y,
     NAVY, NAVY_LIGHT, BRAND_GREEN, GRAY, TEXT_DARK, WHITE
 )

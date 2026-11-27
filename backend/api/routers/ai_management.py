@@ -12,11 +12,11 @@ from pydantic import (
     Field,
 )
 
-from api.auth import (
+from backend.api.auth import (
     require_perm,
 )
 
-from ai_solver import (
+from backend.services.ai_solver import (
     AIError,
     ai_catalog_payload,
     ask_ai,
@@ -39,8 +39,8 @@ from ai_solver import (
 _VAULT_PROVIDERS = ("gemini", "openrouter", "groq", "cerebras", "mistral",
                     "deepseek", "nvidia", "huggingface", "together")
 
-from database import db
-from request_context import current_request_id
+from backend.database.database import db
+from backend.core.request_context import current_request_id
 
 async def _ai_audit(actor_id: int, action: str, *, before=None, after=None, target_id="", target_label=""):
     try:

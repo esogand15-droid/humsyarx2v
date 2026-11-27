@@ -17,12 +17,12 @@ def _h(value, dash: str = '') -> str:
     فیلدهای پروفایل لگسی ممکن است int (شماره دانشجویی) یا None باشند؛
     `html.escape(123)` می‌ترکد، پس اول رشته/خط‌تیره می‌شود بعد escape.
     """
-    from utils import esc as _central          # 🛡 AUDIT-A6 — یک پیاده‌سازی مرکزی
+    from backend.bot.utils import esc as _central          # 🛡 AUDIT-A6 — یک پیاده‌سازی مرکزی
     return _central(value, dash)
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.ext import ContextTypes
-from database import db
-from utils import fmt_jalali, fmt_jalali_dt, send_audit_log, webapp_kb
+from backend.database.database import db
+from backend.bot.utils import fmt_jalali, fmt_jalali_dt, send_audit_log, webapp_kb
 from backend.bot.ui_buttons import btn, PRIMARY   # 🎨 رنگ دکمه‌ها
 
 def _tk_kb(rows, link: str):
@@ -815,7 +815,7 @@ async def _ticket_ai_draft(query, context, tid: int):
     همون صفحه‌ی «پاسخِ دستی» که قبلاً بود — این قابلیت هیچ‌وقت مسیرِ
     اصلیِ پاسخ‌دادن به تیکت رو قفل نمی‌کنه.
     """
-    from ai_solver import generate_ticket_reply_ai, AIError
+    from backend.services.ai_solver import generate_ticket_reply_ai, AIError
 
     ticket = await db.ticket_get(tid)
     if not ticket:

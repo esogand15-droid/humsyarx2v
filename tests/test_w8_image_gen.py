@@ -66,7 +66,7 @@ class ImageProviderUnitTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ.setdefault("TELEGRAM_TOKEN", "123:test")
-        import ai_solver
+        import backend.services.ai_solver as ai_solver
         cls.asv = ai_solver
         cls.patch = mock.patch.object(
             ai_solver, "IMG_RETRY_BASE_DELAY", 0.001)
@@ -322,11 +322,11 @@ class ImageEndpointRuntimeTests(unittest.TestCase):
         os.environ["ADMIN_ID"] = str(ADMIN_UID)
         os.environ.setdefault("MONGODB_URI",
                               "mongodb://127.0.0.1:27017")
-        from database import db
+        from backend.database.database import db
         cls.db = db
-        from api.routers import ai as ai_router
+        from backend.api.routers import ai as ai_router
         cls.ai = ai_router
-        import ai_solver
+        import backend.services.ai_solver as ai_solver
         cls.asv = ai_solver
         from fastapi import HTTPException
         cls.HTTPException = HTTPException
@@ -421,7 +421,7 @@ class ImageEndpointRuntimeTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 429)
 
     def asv_today(self):
-        from time_utils import today_tehran
+        from backend.core.time_utils import today_tehran
         return today_tehran().isoformat()
 
     def test_admin_bypasses_quota(self):

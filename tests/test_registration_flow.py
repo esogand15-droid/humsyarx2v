@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pymongo.errors import DuplicateKeyError          # noqa: E402
 from telegram.ext import ConversationHandler         # noqa: E402
 
-from db import DBCore                                # noqa: E402
+from backend.database import DBCore                                # noqa: E402
 
 
 # ─────────────────────────── دیتابیس درون‌حافظه ───────────────────────────
@@ -169,8 +169,8 @@ class RegistrationFlowTests(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
     def setUpClass(cls):
-        import start
-        import utils
+        import backend.bot.start as start
+        import backend.bot.utils as utils
         cls.start = start
         cls.utils = utils
         cls._orig_db = start.db

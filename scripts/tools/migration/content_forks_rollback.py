@@ -32,7 +32,7 @@ def _oid(x):
 
 
 async def run(path: str) -> int:
-    from database import db
+    from backend.database.database import db
     with open(path, encoding='utf-8') as fh:
         data = json.load(fh)
 

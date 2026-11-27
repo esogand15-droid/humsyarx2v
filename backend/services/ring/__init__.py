@@ -29,7 +29,7 @@ __all__ = ["register_handlers", "post_init", "pre_dispose"]
 def register_handlers(app) -> None:
     """ثبت هندلرهای تلگرام (callback در bot.py انجام می‌شود چون الگوی
     ربات یک لیست `cbs` است و اولویت = ترتیب ثبت)."""
-    from ring.handlers import register
+    from backend.services.ring.handlers import register
     register(app)
 
 
@@ -46,7 +46,7 @@ async def post_init(bot=None) -> dict:
     """
     out = {"flag": False, "loaded": 0, "dropped": 0, "notify": "unknown"}
     try:
-        from ring import notify
+        from backend.services.ring import notify
         if bot is not None:
             notify.bind(bot)
             out["notify"] = "bound"
@@ -58,16 +58,16 @@ async def post_init(bot=None) -> dict:
         logger.warning("💍 bind بات رینگ ناموفق: %s", e)
         out["notify"] = f"bind-error:{type(e).__name__}"
     try:
-        from ring import jobs, settings as S, state
+        from backend.services.ring import jobs, settings as S, state
         out["flag"] = await S.get_flag()
         await S.get_cfg()
         st = await S.disable_mode()
         if not out["flag"]:
             if st == "hard":
-                from database import db
+                from backend.database.database import db
                 await jobs._hard_disable(db)
             return out
-        from ring.handlers import flow_mark
+        from backend.services.ring.handlers import flow_mark
         rec = await state.load_from_db(mark=flow_mark)
         out["loaded"] = int(rec.get("loaded") or 0)
         out["dropped"] = int(rec.get("dropped") or 0)
@@ -76,7 +76,7 @@ async def post_init(bot=None) -> dict:
         # §۱۹/§۳۶ — بعد از بازیابی state، سه کار ناتمام را ببند (اطلاعیهٔ
         # نرسیده، UI معلق، یتیم‌ها). شغلِ دوره‌ای هم همین را می‌کند؛ اینجا
         # انجامش می‌دهیم تا کاربر معادلِ «یک‌دورهٔ ۳۰ ثانیه» معطل نشود.
-        from ring import service
+        from backend.services.ring import service
         out["boot_repair"] = await service.boot_repair()
         logger.info("💍 notify: %s | boot_repair: %s", out["notify"], out["boot_repair"])
         return out
@@ -88,7 +88,7 @@ async def post_init(bot=None) -> dict:
 async def db_repair() -> dict:
     """reconcile یک‌باره در بوت (session/queue یتیم)."""
     try:
-        from database import db
+        from backend.database.database import db
         r = await db.ring_reconcile()
         return {"reconciled": r}
     except Exception as e:
@@ -103,7 +103,7 @@ async def pre_dispose() -> None:
     روی شیءِ مرده صدا زده می‌شود و خطا گم می‌شود.
     """
     try:
-        from ring import notify, state
+        from backend.services.ring import notify, state
         state.clear()
         notify.unbind()
     except Exception as e:

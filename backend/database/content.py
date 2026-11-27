@@ -18,8 +18,8 @@ from urllib.parse import quote
 from bson import ObjectId
 from pymongo import ReturnDocument
 import motor.motor_asyncio
-from time_utils import today_tehran, utc_now_iso, now_utc, format_date_fa, format_time_fa
-from question_bank.contracts import (
+from backend.core.time_utils import today_tehran, utc_now_iso, now_utc, format_date_fa, format_time_fa
+from backend.services.question_bank.contracts import (
     DIFFICULTY_LABELS, and_query, approved_query, canonical_difficulty,
     canonical_status, status_query,
 )
@@ -304,7 +304,7 @@ class DBContent:
         Handles duplicate (1), sanitization assumed done by caller; here
         we defensively sanitize again and ensure extension preservation.
         """
-        from utils_file_naming import (
+        from backend.services.utils_file_naming import (
             prepare_rename, get_extension, sanitize_filename)
         # 🔴 FIX-R1 (مورد ۴) — «-» یعنی «بدون توضیح» (قرارداد ربات)؛
         # همیشه به‌صورت رشته‌ی خالی ذخیره می‌شود تا ruleهای کیفیت داده
@@ -582,7 +582,7 @@ class DBContent:
     async def bs_update_content_filename(self, content_id: str, new_display: str) -> bool:
         """Rename existing content (re-upload already done outside). Idempotent."""
         try:
-            from utils_file_naming import sanitize_filename, get_extension, truncate_display_filename
+            from backend.services.utils_file_naming import sanitize_filename, get_extension, truncate_display_filename
             # sanitize but keep ext
             ext = get_extension(new_display)
             base = new_display.rsplit('.', 1)[0] if ext and '.' in new_display else new_display
@@ -617,7 +617,7 @@ class DBContent:
                 fallback = f"{fallback}.{type_ext}"
             # try to store
             try:
-                from utils_file_naming import get_extension, sanitize_filename
+                from backend.services.utils_file_naming import get_extension, sanitize_filename
                 # simple
                 await self.bs_content.update_one({'_id': doc['_id']}, {'$set': {
                     'display_file_name': fallback[:255],
@@ -637,7 +637,7 @@ class DBContent:
             if '.' not in fallback:
                 fallback = f"{fallback}.pdf"
             try:
-                from utils_file_naming import get_extension
+                from backend.services.utils_file_naming import get_extension
                 await self.ref_files.update_one({'_id': doc['_id']}, {'$set': {
                     'display_file_name': fallback[:255],
                     'display_name': fallback[:255],
@@ -983,7 +983,7 @@ class DBContent:
                            file_extension: str = '', mime_type: str = '',
                            file_size: int = 0, branding_enabled: bool = False):
         # Extended with file-naming (backward compatible). See bs_add_content.
-        from utils_file_naming import prepare_rename, get_extension, sanitize_filename
+        from backend.services.utils_file_naming import prepare_rename, get_extension, sanitize_filename
         # 🔴 FIX-R1 (مورد ۴) — نرمال‌سازی «بدون توضیح» (قرارداد ربات: «-»)
         description = (description or '').strip()
         if description in ('-', '—', '–'):
@@ -1442,7 +1442,7 @@ class DBContent:
         _stime = (time or "").strip()
         if _stime and ("-" in _stime or "تا" in _stime) and not _etime:
             try:
-                from time_utils import en_digits as _en
+                from backend.core.time_utils import en_digits as _en
                 import re as _re
                 raw = _en(_stime).replace('—','-').replace('–','-').replace('تا','-')
                 times = _re.findall(r'(\d{1,2}:\d{2})', raw)
@@ -1586,7 +1586,7 @@ class DBContent:
     async def get_schedules(self, stype: str = None, upcoming: bool = True, group: str = None,
                             term: str = None, educational_group: str = None,
                             include_archived: bool = False, since: str = None):
-        from utils import now_tehran
+        from backend.bot.utils import now_tehran
         q = {}
         if stype:    q['type'] = stype
         # since: از اول هفتهٔ جاری (برنامهٔ هفتگی وباپ)؛ بدون آن همان «از امروز»
@@ -1746,7 +1746,7 @@ class DBContent:
 
     async def bulk_upsert_schedule_templates(self, items: list, term: str = None) -> dict:
         """Upsert weekly templates. Each item: weekday(0=Sat)..6, time HH:MM, end_time HH:MM?, lesson, teacher, location, group, educational_group, flex_type."""
-        from time_utils import parse_clock_time, TimeContractError, en_digits
+        from backend.core.time_utils import parse_clock_time, TimeContractError, en_digits
         import re as _re
         if not term:
             try:
@@ -1871,7 +1871,7 @@ class DBContent:
                                                 dry_run: bool = False, term: str = None,
                                                 educational_group: str = None) -> dict:
         """Expand weekly templates into dated schedules for range inclusive."""
-        from time_utils import parse_gregorian_date, parse_jalali_date, en_digits, TimeContractError
+        from backend.core.time_utils import parse_gregorian_date, parse_jalali_date, en_digits, TimeContractError
         if not term:
             try:
                 term = (await self.get_current_term_config())['term']
@@ -1985,7 +1985,7 @@ class DBContent:
         must remain visible to every student. ``group`` is optional so existing
         bot/admin callers keep their previous all-groups behaviour.
         """
-        from utils import now_tehran
+        from backend.bot.utils import now_tehran
         today = now_tehran().strftime('%Y-%m-%d')
         future = (now_tehran() + timedelta(days=max(0, days))).strftime('%Y-%m-%d')
         query = {
@@ -2122,7 +2122,7 @@ class DBContent:
         if not val:
             return None
         import re as _re
-        from time_utils import en_digits as _en
+        from backend.core.time_utils import en_digits as _en
         m = _re.search(r'(\d{1,2}):(\d{2})', _en(str(val)))
         if not m:
             return None
@@ -2216,7 +2216,7 @@ class DBContent:
                     wd = None
             elif date_str:
                 try:
-                    from time_utils import parse_gregorian_date
+                    from backend.core.time_utils import parse_gregorian_date
                     dt_obj = parse_gregorian_date(date_str)
                     wd = (dt_obj.weekday() - 5) % 7
                 except Exception:
@@ -2312,7 +2312,7 @@ class DBContent:
 
     async def get_current_term_config(self) -> dict:
         """دریافت تنظیمات ترم جاری (نام ترم، تاریخ پایان امتحانات، وضعیت یادآوری انتخاب واحد)."""
-        from time_utils import gregorian_to_jalali, today_tehran
+        from backend.core.time_utils import gregorian_to_jalali, today_tehran
         saved_term = _normalize_term(await self.get_setting('current_academic_term', ''))
         if not saved_term:
             try:
@@ -2362,7 +2362,7 @@ class DBContent:
         archive_previous: bool = True,
     ) -> dict:
         """ذخیره تنظیمات ترم جاری توسط ادمین + آرشیو خودکار انتخاب واحدهای ترم‌های قبل در صورت تغییر ترم."""
-        from time_utils import parse_gregorian_date, parse_jalali_date, en_digits
+        from backend.core.time_utils import parse_gregorian_date, parse_jalali_date, en_digits
         if isinstance(term, Mapping):
             if exams_end_date is None and 'exams_end_date' in term:
                 exams_end_date = term.get('exams_end_date')
@@ -2532,7 +2532,7 @@ class DBContent:
         if not term:
             term = (await self.get_current_term_config())['term']
 
-        from utils import now_tehran
+        from backend.bot.utils import now_tehran
         today_str = now_tehran().strftime('%Y-%m-%d')
 
         explicit_docs, tpl_docs, sched_docs = await asyncio.gather(
@@ -2720,7 +2720,7 @@ class DBContent:
             wd = None
             if d_str:
                 try:
-                    from time_utils import parse_gregorian_date
+                    from backend.core.time_utils import parse_gregorian_date
                     dt_obj = parse_gregorian_date(d_str)
                     wd = (dt_obj.weekday() - 5) % 7
                     day_lbl = WEEKDAY_FA[wd]
@@ -3295,7 +3295,7 @@ class DBContent:
     @staticmethod
     def _clean_persian_course_title(name: str) -> str:
         import re as _re
-        from time_utils import en_digits as _en
+        from backend.core.time_utils import en_digits as _en
         s = _en(str(name or '')).strip()
         s = s.replace('ي', 'ی').replace('ك', 'ک').replace('\u200c', ' ')
         s = _re.sub(r'\s+', ' ', s)
@@ -3310,7 +3310,7 @@ class DBContent:
         source_image: str = '',
     ) -> dict | None:
         """نرمال‌سازی و اعتبارسنجی یک ردیف استخراج‌شده از تصویر انتخاب واحد بدون حدس زدن فیلدهای غایب."""
-        from time_utils import en_digits as _en
+        from backend.core.time_utils import en_digits as _en
         if not isinstance(raw, dict):
             return None
         course_name = cls._clean_persian_course_title(
@@ -3868,7 +3868,7 @@ class DBContent:
         - هر دانشجو در هر ترم فقط یک بار پیام اول را می‌گیرد (و اگر `second_reminder_enabled` روشن باشد، پس از N روز حداکثر یک بار یادآوری دوم).
         - اگر دانشجو ربات را بلاک کرده باشد (`Forbidden`), خطا گرفته شده و `mark_user_blocked` صدا زده می‌شود.
         """
-        from utils import now_tehran
+        from backend.bot.utils import now_tehran
         term_cfg = await self.get_current_term_config()
         active_term = term_cfg['term']
         end_date = term_cfg.get('effective_exams_end_date') or ''
@@ -3929,7 +3929,7 @@ class DBContent:
                     continue
                 if not is_second_reminder:
                     try:
-                        from time_utils import parse_machine_datetime
+                        from backend.core.time_utils import parse_machine_datetime
                         elapsed_days = (now_dt - parse_machine_datetime(first_at_str)).total_seconds() / 86400.0
                         if elapsed_days < second_days:
                             skipped += 1
@@ -4096,7 +4096,7 @@ class DBContent:
         DEFAULT_FAQS را sync می‌کند (upsert-by-question، سؤالات
         دستیِ ادمین در دسته‌های دیگر دست‌نخورده می‌مانند).
         """
-        from faq import DEFAULT_FAQS
+        from backend.bot.faq import DEFAULT_FAQS
         for cat, items in DEFAULT_FAQS.items():
             for question, answer in items:
                 existing = await self.faq.find_one({'question': question})

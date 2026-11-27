@@ -6,12 +6,12 @@
 import os
 import asyncio
 import logging
-from utils import esc as escape   # 🛡 AUDIT-A6 —escape مرکزی
+from backend.bot.utils import esc as escape   # 🛡 AUDIT-A6 —escape مرکزی
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from database import db
-from time_utils import parse_gregorian_date
-from utils import progress_bar, get_rank, exam_countdown, now_tehran
+from backend.database.database import db
+from backend.core.time_utils import parse_gregorian_date
+from backend.bot.utils import progress_bar, get_rank, exam_countdown, now_tehran
 from backend.bot.ui_buttons import btn, PRIMARY   # 🎨 button colours
 
 logger   = logging.getLogger(__name__)
@@ -145,7 +145,7 @@ async def build_dashboard_text(uid: int) -> tuple:
             InlineKeyboardButton("🎫 پشتیبانی",     callback_data='ticket:main'),
         ],
     ]
-    from utils import webapp_url
+    from backend.bot.utils import webapp_url
     web_url = webapp_url('/student') or webapp_url('/dashboard')
     if web_url:
         from telegram import WebAppInfo

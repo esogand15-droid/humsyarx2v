@@ -11,7 +11,7 @@ from typing import Any, Mapping
 from bson import ObjectId
 from pymongo import ReturnDocument
 
-from time_utils import day_bounds_utc, now_utc, utc_now_iso
+from backend.core.time_utils import day_bounds_utc, now_utc, utc_now_iso
 from .contracts import (
     BASIC_SCIENCE_SUBJECTS, CLASSROOM_GROUP_META, CONTENT_SOURCE_DEFAULT,
     CONTENT_SOURCES, DIFFICULTY_LABELS, EXAM_SESSION_MONTH_ORDER,

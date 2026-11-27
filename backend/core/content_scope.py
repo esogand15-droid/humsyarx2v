@@ -2,7 +2,7 @@
 """
 📚 هسته — Content Scope واحد
 """
-from database import db
+from backend.database.database import db
 
 async def is_content_admin(uid: int) -> bool:
     return bool(await db.is_content_admin(int(uid)))

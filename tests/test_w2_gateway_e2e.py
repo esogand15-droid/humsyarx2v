@@ -115,7 +115,7 @@ class ZarinpalMockTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        import payments.zarinpal as zp
+        import backend.integrations.zarinpal as zp
         cls.zp = zp
         # 🐞 موج ۳ — این کلاس عمداً «حالت mock» را تست می‌کند و از موج ۳
         # حالت mock به‌صورت fail-closed بسته است (محیط ناشناخته = ممنوع).
@@ -190,7 +190,7 @@ class GatewayRuntimeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
-        from database import db
+        from backend.database.database import db
         cls.db = db
         from _rtloop import adopt
         adopt()

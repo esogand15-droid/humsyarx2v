@@ -7,8 +7,8 @@
 """
 from reportlab.lib.units import mm
 
-from qbank.fonts_rtl import rtl, wrap_rtl, fa_digits, REGULAR, BOLD
-from qbank.styles import (
+from backend.services.qbank.fonts_rtl import rtl, wrap_rtl, fa_digits, REGULAR, BOLD
+from backend.services.qbank.styles import (
     PAGE_W, PAGE_H, MARGIN, CONTENT_W, NAVY, TEXT_DARK, TEXT_BODY,
     WHITE, BRAND_GREEN, CARD_BORDER, OPT_LETTERS,
 )

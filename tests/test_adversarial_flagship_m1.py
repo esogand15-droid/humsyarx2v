@@ -37,8 +37,8 @@ from fastapi.testclient import TestClient
 from backend.api.main import app
 from backend.api.auth import get_current_user
 from backend.api.routers.web_student import current_student
-from database import db
-from time_utils import now_tehran
+from backend.database.database import db
+from backend.core.time_utils import now_tehran
 
 
 class MockAsyncCursor:
@@ -278,7 +278,7 @@ class TestAdversarialFlagshipM1(unittest.TestCase):
             m_hist.return_value = []
             m_setting.return_value = False
 
-            with patch("subscription.has_access", new_callable=AsyncMock) as m_access:
+            with patch("backend.bot.subscription.has_access", new_callable=AsyncMock) as m_access:
                 m_access.return_value = False
                 res = self.client.get("/api/web/subscription/status")
                 self.assertEqual(res.status_code, 200)
@@ -308,7 +308,7 @@ class TestAdversarialFlagshipM1(unittest.TestCase):
             m_hist.return_value = []
             m_setting.return_value = True
 
-            with patch("subscription.has_access", new_callable=AsyncMock) as m_access:
+            with patch("backend.bot.subscription.has_access", new_callable=AsyncMock) as m_access:
                 m_access.return_value = True
                 res = self.client.get("/api/web/subscription/status")
                 self.assertEqual(res.status_code, 200)

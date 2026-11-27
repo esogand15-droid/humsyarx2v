@@ -16,7 +16,7 @@ _HAS_MONGO_URI = bool(os.environ.get("MONGODB_URI"))
 class AuditHelperSignatureTests(unittest.TestCase):
 
     def test_audit_accepts_before_after(self):
-        import content_admin
+        import backend.bot.content_admin as content_admin
         sig = inspect.signature(content_admin._audit)
         for kw in ("before", "after"):
             self.assertIn(kw, sig.parameters,
@@ -30,7 +30,7 @@ class AuditHelperSignatureTests(unittest.TestCase):
     def test_edit_flows_call_shape_matches(self):
         """فراخوان‌های before=/after= در edit_lesson/edit_session با
         امضای helper سازگارند (بدون اجرای async — فقط inspect)."""
-        import content_admin
+        import backend.bot.content_admin as content_admin
         import inspect as _i
         src = _i.getsource(content_admin)
         # هر سه جریان ویرایش، before و after را پاس می‌دهند

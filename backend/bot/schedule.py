@@ -12,11 +12,11 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.ext import ContextTypes
 from backend.database.content import _normalize_term
-from database import db
+from backend.database.database import db
 from bson import ObjectId
-from utils import (fmt_jalali, days_until, exam_countdown, ADMIN_ID,
+from backend.bot.utils import (fmt_jalali, days_until, exam_countdown, ADMIN_ID,
                     jalali_weekday_index, JALALI_WEEK_SAT_FIRST, send_audit_log)
-from time_utils import (
+from backend.core.time_utils import (
     TimeContractError, format_time_fa, now_tehran, parse_clock_time,
     parse_gregorian_date,
     start_of_week_tehran,
@@ -35,7 +35,7 @@ def _fa_interval(start, end=None) -> str:
     if start and end:
         try:
             # normalize via en_digits if needed
-            from time_utils import en_digits as _en
+            from backend.core.time_utils import en_digits as _en
             s = _en(str(start)).strip()
             e = _en(str(end)).strip()
             # fix 01-05 -> 13-17 for display (PM)
@@ -60,7 +60,7 @@ def _doc_time_display(doc: dict) -> str:
 def _parse_interval(raw: str):
     """Parse '08:00-10:00' / '08:00 تا 10:00' / '8-10' / '08:00' -> (start, end|None) or (None,None)"""
     if not raw: return None, None
-    from time_utils import en_digits as _en
+    from backend.core.time_utils import en_digits as _en
     import re
     tmp = _en(str(raw)).replace('—','-').replace('–','-').replace('تا','-')
     times = re.findall(r'(\d{1,2}:\d{2})', tmp)
@@ -116,7 +116,7 @@ async def _notify_schedule_deleted(context, item: dict):
     که در _finalize_schedule_add جواب می‌دهد استفاده می‌کند تا رفتار و
     ظاهر پیام با بقیه‌ی نوتیف‌های برنامه یکدست بماند.
     """
-    from utils import broadcast_message
+    from backend.bot.utils import broadcast_message
     stype   = item.get('type', 'class')
     ntype   = {'exam': 'exam', 'makeup': 'makeup'}.get(stype, 'schedule')
     users   = await db.notif_users(ntype, group=item.get('group'))
@@ -160,14 +160,14 @@ def _normalize_text(text: str) -> str:
 
 def _jalali_to_gregorian(jy: int, jm: int, jd: int) -> tuple:
     """Compatibility wrapper; calendar conversion lives in time_utils."""
-    from time_utils import jalali_to_gregorian
+    from backend.core.time_utils import jalali_to_gregorian
     converted = jalali_to_gregorian(jy, jm, jd)
     return converted.year, converted.month, converted.day
 
 
 def _parse_jalali_date(date_str: str) -> str:
     """Parse Persian input to a Gregorian date-only machine value."""
-    from time_utils import en_digits, parse_gregorian_date, parse_jalali_date
+    from backend.core.time_utils import en_digits, parse_gregorian_date, parse_jalali_date
     raw = ''.join(c for c in en_digits(date_str or '') if c.isprintable()).strip()
     normalized = raw.replace('/', '-').replace('\\', '-')
     try:
@@ -924,7 +924,7 @@ async def _export_schedule_pdf(query, context, user: dict, user_group: str, styp
 
     await query.answer("⏳ در حال ساخت PDF...")
     try:
-        from schedule_pdf import generate_schedule_pdf
+        from backend.services.schedule_pdf import generate_schedule_pdf
         student_name = user.get('name', '') if user else ''
         pdf_bytes = await asyncio.to_thread(
             generate_schedule_pdf, items, user_group or 'همه', student_name, stype
@@ -940,7 +940,7 @@ async def _export_schedule_pdf(query, context, user: dict, user_group: str, styp
     display_count = len(items)
     try:
         if stype == 'class' or (stype is None and items and all((it.get('type') or 'class') == 'class' for it in items)):
-            from schedule_pdf import _should_use_weekly_grid, _collect_weekly_slots
+            from backend.services.schedule_pdf import _should_use_weekly_grid, _collect_weekly_slots
             if _should_use_weekly_grid(items, stype):
                 sm, wkinfo = _collect_weekly_slots(items) or (None, (None, None))
                 if sm and wkinfo and wkinfo[0]:
@@ -1279,7 +1279,7 @@ async def handle_edit_schedule_field_text(update: Update, context: ContextTypes.
     FIX جدید (بخش اول): پردازش مقدار جدید یک فیلد و به‌روزرسانی مستقیم
     همان رکورد در دیتابیس (UPDATE، نه INSERT) + اطلاع‌رسانی به دانشجوها.
     """
-    from utils import broadcast_message
+    from backend.bot.utils import broadcast_message
     sid   = context.user_data.pop('edit_schedule_sid', None)
     field = context.user_data.pop('edit_schedule_field', None)
     context.user_data.pop('mode', None)
@@ -1440,7 +1440,7 @@ async def handle_flex_time_change_text(update: Update, context: ContextTypes.DEF
     FIX جدید: پردازش متن زمان جدید برای کلاس منعطف + نوتیف فوری
     به همه‌ی دانشجویانی که نوتیف 'schedule' را روشن دارند.
     """
-    from utils import broadcast_message
+    from backend.bot.utils import broadcast_message
     sid = context.user_data.pop('flex_change_sid', None)
     context.user_data.pop('mode', None)
     raw = _normalize_text(update.message.text.strip())
@@ -1468,7 +1468,7 @@ async def handle_flex_time_change_text(update: Update, context: ContextTypes.DEF
     new_end = e_parsed or ''
     if new_end:
         try:
-            from time_utils import parse_clock_time as _pct
+            from backend.core.time_utils import parse_clock_time as _pct
             _pct(new_time); _pct(new_end)
             if int(new_end.split(':')[0])*60+int(new_end.split(':')[1]) <= int(new_time.split(':')[0])*60+int(new_time.split(':')[1]):
                 await update.message.reply_text("❌ پایان باید بعد از شروع باشد.")
@@ -1665,7 +1665,7 @@ async def _finalize_schedule_add(update_or_query, context):
     FIX جدید: تأیید نهایی — همان منطق ذخیره و اطلاع‌رسانی قبلی،
     اما حالا بعد از تأیید کاربر در پیش‌نمایش اجرا می‌شود.
     """
-    from utils import broadcast_message
+    from backend.bot.utils import broadcast_message
     p = context.user_data.pop('pending_schedule', {})
     if not p:
         return
@@ -1767,7 +1767,7 @@ async def handle_add_schedule_text(update: Update, context: ContextTypes.DEFAULT
     پارس متن افزودن برنامه توسط ادمین
     FIX: نرمال‌سازی کاما فارسی + تشخیص هوشمند فیلدها
     """
-    from utils import broadcast_message
+    from backend.bot.utils import broadcast_message
     stype = context.user_data.pop('schedule_type', 'class')
     raw   = update.message.text.strip()
 
@@ -2019,7 +2019,7 @@ async def _show_template_menu(query):
 
 async def _handle_template_generate(query, context):
     from datetime import timedelta
-    from time_utils import parse_gregorian_date as _pgd
+    from backend.core.time_utils import parse_gregorian_date as _pgd
     import jdatetime
     today = now_tehran().date()
     # start = this Saturday
@@ -2119,7 +2119,7 @@ async def handle_schedule_scan_photo(update: Update, context: ContextTypes.DEFAU
         pass
     await msg.reply_text("⏳ هوشیار در حال خواندن جدول است... لطفاً صبر کنید.")
     try:
-        from ai_solver import scan_weekly_schedule_image, scan_exam_schedule_image, scan_course_selection_image
+        from backend.services.ai_solver import scan_weekly_schedule_image, scan_exam_schedule_image, scan_course_selection_image
         if kind == 'portal':
             edu_grp = context.user_data.get('portal_scan_edu_group', 'mixed')
             imgs_so_far = list(context.user_data.get('portal_scan_images') or [])
@@ -2236,7 +2236,7 @@ async def handle_schedule_scan_photo(update: Update, context: ContextTypes.DEFAU
             ])
             await msg.reply_text(txt, parse_mode='HTML', reply_markup=kb)
     except Exception as e:
-        from ai_solver import AIConfigError, AIError
+        from backend.services.ai_solver import AIConfigError, AIError
         if isinstance(e, AIConfigError):
             await msg.reply_text(f"⚠️ هوشیار پیکربندی نشده: {e}\n\nاز پنل وب → تنظیمات Vault → AI API Keys یک مدل vision (gemini/openrouter) ست کنید.")
         elif isinstance(e, AIError):
@@ -2277,7 +2277,7 @@ async def _confirm_scan(query, context, kind: str):
             pass
     else:
         exams = preview.get('exams') or []
-        from time_utils import parse_gregorian_date, parse_jalali_date, TimeContractError, en_digits
+        from backend.core.time_utils import parse_gregorian_date, parse_jalali_date, TimeContractError, en_digits
         created = 0; skipped = 0
         for raw in exams:
             try:

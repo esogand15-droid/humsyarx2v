@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from ring import models as M
+from backend.services.ring import models as M
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ async def load_from_db(mark=None) -> dict:
 
     `mark(uid, field)` توسط `ring.handlers.flow_mark` داده می‌شود تا
     import-cycle ساخته نشود."""
-    from database import db
+    from backend.database.database import db
     loaded = dropped = 0
     try:
         rows = await db.ring_cols.sessions.find({"status": "active"}).to_list(2000)

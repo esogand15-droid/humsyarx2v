@@ -514,8 +514,8 @@ class TestWave6AdversarialChallenge(unittest.TestCase):
 
     def test_adv_reportlab_actual_pdf_builder_binary_generation(self):
         """Invoke actual generate_exam_pdf from qbank.builder to verify valid %PDF binary."""
-        from qbank.builder import generate_exam_pdf
-        from qbank.query import ExamMeta
+        from backend.services.qbank.builder import generate_exam_pdf
+        from backend.services.qbank.query import ExamMeta
 
         questions = [
             {

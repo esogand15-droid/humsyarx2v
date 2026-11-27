@@ -2,9 +2,9 @@
 
 from fastapi import APIRouter, Depends, Query
 
-from api.auth import get_current_user
-from database import db
-from grade_utils import calculate_weighted_transcript, summarize_grades_by_term
+from backend.api.auth import get_current_user
+from backend.database.database import db
+from backend.services.grade_utils import calculate_weighted_transcript, summarize_grades_by_term
 
 
 router = APIRouter()

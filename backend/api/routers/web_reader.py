@@ -41,12 +41,12 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from api.routers import references as ref_router
-from api.routers import resources as res_router
-from api.routers.web_library import _gate, _web_user
-from api.routers.web_student import current_student
-from database import db
-from time_utils import now_utc
+from backend.api.routers import references as ref_router
+from backend.api.routers import resources as res_router
+from backend.api.routers.web_library import _gate, _web_user
+from backend.api.routers.web_student import current_student
+from backend.database.database import db
+from backend.core.time_utils import now_utc
 
 try:
     from backend.services.pdf_renderer import PdfRenderer, WatermarkStamper, get_singleflight
@@ -171,7 +171,7 @@ async def view_url(scope: str, file_id: str, request: Request, user: dict = Depe
                                                          "message": str(exc.detail)})
         raise
 
-    from api.telegram_send import PREVIEW_TTL_SEC
+    from backend.api.telegram_send import PREVIEW_TTL_SEC
     # expires_at (افزوده): کلاینت زمان تازهسازی را دقیق میداند، حتی اگر
     # پاسخ با تأخیر برسد. فیلدهای قبلی دست نخوردهاند (سازگاری مینیاپ).
     return {**meta, "available": True, "url": out.get("url", ""),
@@ -334,7 +334,7 @@ async def _fetch_and_cache_master_pdf(scope: str, item: dict) -> bytes:
     if tg_id:
         try:
             # 🎬 PDF بزرگتر از ۲۰MB هم (سقف getFile ابری) از MTProto میآید
-            from api.telegram_send import download_telegram_file_any_size
+            from backend.api.telegram_send import download_telegram_file_any_size
             tg_bytes = await download_telegram_file_any_size(tg_id)
             if tg_bytes:
                 await storage.save_original(fid, tg_bytes)

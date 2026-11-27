@@ -38,23 +38,23 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 
-from api.auth import (
+from backend.api.auth import (
     ADMIN_ID, _hash_token, get_current_user, get_content_admin_user,
     expiry_is_past, get_content_global_user, new_session_token, resolve_content_intake,
     resolve_web_session, utc_now, WA_SESSION_COOKIE, WA_SESSION_TTL_H,
 )
-from api.rate_limit import rate_limit_user  # 🛡 W10/RATE-01
-from database import db
-from api.routers import admin_panel as owner_api
-from api.routers import subscription_management as subscription_api
-from api.routers import ai_management as ai_admin_api
-from api.routers import content_admin as content_api
-from api.routers import academic_admin as academic_api
-from api.routers import rbac as rbac_api
-from api.routers import resources as resources_api
-import backup as backup_service
-import broadcast_service
-from ai_solver import (save_persona, delete_persona, generate_broadcast_ai,
+from backend.api.rate_limit import rate_limit_user  # 🛡 W10/RATE-01
+from backend.database.database import db
+from backend.api.routers import admin_panel as owner_api
+from backend.api.routers import subscription_management as subscription_api
+from backend.api.routers import ai_management as ai_admin_api
+from backend.api.routers import content_admin as content_api
+from backend.api.routers import academic_admin as academic_api
+from backend.api.routers import rbac as rbac_api
+from backend.api.routers import resources as resources_api
+import backend.services.backup as backup_service
+import backend.services.broadcast_service as broadcast_service
+from backend.services.ai_solver import (save_persona, delete_persona, generate_broadcast_ai,
                        list_provider_models, sanitize_api_key, api_key_problem,
                        add_api_key_for_provider, remove_api_key_for_provider,
                        list_api_keys_for_provider, test_all_keys_for_provider,
@@ -68,12 +68,12 @@ from ai_solver import (save_persona, delete_persona, generate_broadcast_ai,
                        list_live_models,
                        PREBUILT_TTS_VOICES, TTS_MODEL_DEFAULT,
                        TTS_MODEL_QUALITY, VOICE_REPLY_MODES)
-from request_context import current_request_id
-from question_bank import QuestionImportService, QuestionBankService, QuestionDomainError
-from question_bank.images import (MAX_IMAGE_BYTES, QuestionImageService,
+from backend.core.request_context import current_request_id
+from backend.services.question_bank import QuestionImportService, QuestionBankService, QuestionDomainError
+from backend.services.question_bank.images import (MAX_IMAGE_BYTES, QuestionImageService,
                                      parse_bulk_filename, validate_image_upload)
-from question_bank.contracts import approved_query, canonical_difficulty, canonical_status, clean_text, status_query
-from time_utils import (
+from backend.services.question_bank.contracts import approved_query, canonical_difficulty, canonical_status, clean_text, status_query
+from backend.core.time_utils import (
     TimeContractError, canonical_utc, day_bounds_utc, diagnostics as time_diagnostics,
     format_datetime_fa, now_utc, parse_clock_time, parse_gregorian_date,
     parse_machine_datetime, remaining_days, today_tehran, utc_now_iso,
@@ -1990,7 +1990,7 @@ async def wa_data_quality_repair(item_id: str, body: WaQualityRepairBody,
     """🌊 W5 — اصلاح مستقیم متادیتای ناقص: فقط فیلدهای داده‌شده set می‌شوند،
     سپس همان rule دوباره اجرا می‌شود؛ `resolved` فقط وقتی true است که رکورد
     واقعاً از شمارش خارج شده باشد. بدون حدس، بدون overwrite خودکار."""
-    from api.routers.content_admin import CONTENT_TYPES
+    from backend.api.routers.content_admin import CONTENT_TYPES
     if not ObjectId.is_valid(item_id):
         raise HTTPException(404, "رکورد پیدا نشد")
     doc = await db.bs_content.find_one({"_id": ObjectId(item_id)})
@@ -3285,8 +3285,8 @@ async def questions_export_pdf(
     if not ordered:
         raise HTTPException(404, "هیچ سؤال در دسترس/هم‌راستا با intake شما پیدا نشد")
     # meta
-    from qbank.query import ExamMeta
-    from qbank import generate_exam_pdf
+    from backend.services.qbank.query import ExamMeta
+    from backend.services.qbank import generate_exam_pdf
     # lesson/topic از اکثریت
     from collections import Counter
     lesson = Counter([d.get("lesson","") for d in ordered]).most_common(1)[0][0] or "بانک سوال — منتخب"
@@ -3367,7 +3367,7 @@ async def wa_pending_images(job_id: str | None = Query(None),
 @router.post("/questions/{qid}/image")
 async def wa_attach_image(qid: str, file: UploadFile = File(...),
                           user=Depends(_perm("questions.import"))):
-    from api.telegram_send import upload_and_get_file_id
+    from backend.api.telegram_send import upload_and_get_file_id
     raw = await file.read(MAX_IMAGE_BYTES + 1)
     try:
         mime = validate_image_upload(mime_type=file.content_type or "", size=len(raw))
@@ -3405,7 +3405,7 @@ async def wa_bulk_match_images(job_id: str = Form(...),
                                files: list[UploadFile] = File(...),
                                user=Depends(_perm("questions.import"))):
     """تطبیق انبوه `{fingerprint}_{page}.png` به سؤالات منتظر همان job (§۷.۲)."""
-    from api.telegram_send import upload_and_get_file_id
+    from backend.api.telegram_send import upload_and_get_file_id
     job = await db.question_import_jobs.find_one({"_id": job_id, "admin_id": user["id"]})
     if not job:
         raise HTTPException(404, "job پیدا نشد")
@@ -7427,7 +7427,7 @@ class WaVcGroupActionBody(BaseModel):
 @router.get("/ai/live/vc-assistant")
 async def wa_ai_vc_assistant_status(user=Depends(_perm("ai.manage"))):
     """📞 م9.2 — وضعیت اکانت دستیار ویس‌چت گروه تلگرام (Userbot / MTProto) و تماس‌های فعال."""
-    from tg_group_voice_call import get_assistant_status
+    from backend.bot.tg_group_voice_call import get_assistant_status
     return await get_assistant_status()
 
 
@@ -7435,7 +7435,7 @@ async def wa_ai_vc_assistant_status(user=Depends(_perm("ai.manage"))):
 async def wa_ai_vc_assistant_save(body: WaVcAssistantSaveBody,
                                   user=Depends(_perm("ai.manage"))):
     """📞 م9.2 — ذخیره مستقیم API_ID، API_HASH و SESSION_STRING اکانت دستیار ویس‌چت گروه."""
-    from tg_group_voice_call import save_vc_credentials
+    from backend.bot.tg_group_voice_call import save_vc_credentials
     try:
         return await save_vc_credentials(
             api_id=body.api_id,
@@ -7451,7 +7451,7 @@ async def wa_ai_vc_assistant_save(body: WaVcAssistantSaveBody,
 async def wa_ai_vc_assistant_send_code(body: WaVcAssistantSendCodeBody,
                                        user=Depends(_perm("ai.manage"))):
     """📞 م9.2 — ارسال کد تایید تلگرام (OTP) به شماره موبایل اکانت دستیار برای ساخت خودکار session_string."""
-    from tg_group_voice_call import start_assistant_login
+    from backend.bot.tg_group_voice_call import start_assistant_login
     try:
         return await start_assistant_login(body.api_id, body.api_hash, body.phone)
     except Exception as e:
@@ -7462,7 +7462,7 @@ async def wa_ai_vc_assistant_send_code(body: WaVcAssistantSendCodeBody,
 async def wa_ai_vc_assistant_verify_code(body: WaVcAssistantVerifyBody,
                                          user=Depends(_perm("ai.manage"))):
     """📞 م9.2 — تایید کد ۵ رقمی تلگرام (و رمز دو مرحله‌ای در صورت نیاز) و ذخیره session_string دستیار."""
-    from tg_group_voice_call import verify_assistant_login
+    from backend.bot.tg_group_voice_call import verify_assistant_login
     try:
         return await verify_assistant_login(body.code, body.password)
     except Exception as e:
@@ -7473,7 +7473,7 @@ async def wa_ai_vc_assistant_verify_code(body: WaVcAssistantVerifyBody,
 async def wa_ai_vc_assistant_join(body: WaVcGroupActionBody,
                                   user=Depends(_perm("ai.manage"))):
     """📞 م9.2 — ورود دستی دستیار هوشیار به ویس‌چت یک گروه تلگرام با آیدی عددی یا @username گروه."""
-    from tg_group_voice_call import join_group_voice_chat
+    from backend.bot.tg_group_voice_call import join_group_voice_chat
     try:
         return await join_group_voice_chat(chat_id=body.chat_id, title=body.title)
     except Exception as e:
@@ -7484,7 +7484,7 @@ async def wa_ai_vc_assistant_join(body: WaVcGroupActionBody,
 async def wa_ai_vc_assistant_leave(body: WaVcGroupActionBody,
                                    user=Depends(_perm("ai.manage"))):
     """📞 م9.2 — خروج دستیار هوشیار از ویس‌چت گروه تلگرام."""
-    from tg_group_voice_call import leave_group_voice_chat
+    from backend.bot.tg_group_voice_call import leave_group_voice_chat
     try:
         return await leave_group_voice_chat(body.chat_id)
     except Exception as e:
@@ -7949,7 +7949,7 @@ async def wa_system_observability(hours: int = Query(24, ge=1, le=720),
     total, errors = int(total or 0), int(errors or 0)
     # 🌊 W5/REL-03 — شمارنده‌های همه‌ی /api/* (افزایشی؛ قرارداد قبلی سر جایش)
     try:
-        from api.api_counters import snapshot as _api_snapshot
+        from backend.api.api_counters import snapshot as _api_snapshot
         _api = _api_snapshot()
     except Exception:
         _api = {"routes": [], "recent_5xx": [], "total": 0, "ephemeral": True}
@@ -7981,7 +7981,7 @@ class FeaturePolicyBody(BaseModel):
 @router.get("/features")
 async def wa_features_list(user=Depends(_perm("subscription.manage"))):
     """🌊 W7 — کاتالوگ + پالیسی همه‌ی فیچرها برای پنل دسترسی."""
-    from core.features import FEATURE_CATALOG, default_policy
+    from backend.core.features import FEATURE_CATALOG, default_policy
     docs = await db.feature_policies.find(
         {"_id": {"$in": list(FEATURE_CATALOG)}}).to_list(50)
     by_id = {d.get("_id"): d for d in docs}
@@ -8012,7 +8012,7 @@ async def wa_features_list(user=Depends(_perm("subscription.manage"))):
 async def wa_feature_update(key: str, body: FeaturePolicyBody,
                             user=Depends(_perm("subscription.manage"))):
     """🌊 W7 — تغییر پالیسی یک فیچر (audit اجباری + جبران در شکست audit)."""
-    from core.features import FEATURE_CATALOG, ACCESS_MODES, QUOTA_KINDS
+    from backend.core.features import FEATURE_CATALOG, ACCESS_MODES, QUOTA_KINDS
     if key not in FEATURE_CATALOG:
         raise HTTPException(404, "فیچر ناشناخته")
     patch = {}
@@ -8057,7 +8057,7 @@ async def wa_feature_update(key: str, body: FeaturePolicyBody,
         raise HTTPException(422, "تغییری ارسال نشده")
     res = await db.set_feature_policy(
         key, patch, user["id"], (user.get("_db") or {}).get("name", ""))
-    from core.access import invalidate_policy_cache
+    from backend.core.access import invalidate_policy_cache
     invalidate_policy_cache(key)
     try:
         await _audit(user["id"], f"تغییر دسترسی فیچر «{key}»",
@@ -8085,14 +8085,14 @@ async def wa_feature_update(key: str, body: FeaturePolicyBody,
 async def wa_feature_rollback(key: str,
                               user=Depends(_perm("subscription.manage"))):
     """🌊 W7 — بازگردانی به پالیسی قبلی (دو بار = redo)."""
-    from core.features import FEATURE_CATALOG
+    from backend.core.features import FEATURE_CATALOG
     if key not in FEATURE_CATALOG:
         raise HTTPException(404, "فیچر ناشناخته")
     res = await db.rollback_feature_policy(
         key, user["id"], (user.get("_db") or {}).get("name", ""))
     if not res:
         raise HTTPException(409, "پالیسی قبلی وجود ندارد")
-    from core.access import invalidate_policy_cache
+    from backend.core.access import invalidate_policy_cache
     invalidate_policy_cache(key)
     try:
         await _audit(user["id"], f"بازگردانی دسترسی فیچر «{key}»",
@@ -8691,7 +8691,7 @@ async def wa_schedule_bulk_delete_post(
         if body.date_from or body.date_to:
             date_q = {}
             def _to_gregorian(s: str) -> str:
-                from time_utils import en_digits as _en
+                from backend.core.time_utils import en_digits as _en
                 s = _en(str(s)).strip()
                 if not s:
                     return ""
@@ -8699,13 +8699,13 @@ async def wa_schedule_bulk_delete_post(
                 # جلالی با ارقام فارسی یا لاتین: 14xx-xx-xx
                 try:
                     if s_norm[:2] == "14" or (len(s_norm) >= 4 and s_norm[:4].startswith("14")):
-                        from time_utils import parse_jalali_date
+                        from backend.core.time_utils import parse_jalali_date
                         d = parse_jalali_date(s)
                         return d.isoformat()
                 except Exception:
                     pass
                 try:
-                    from time_utils import parse_gregorian_date
+                    from backend.core.time_utils import parse_gregorian_date
                     d = parse_gregorian_date(s_norm[:10])
                     return d.isoformat()
                 except Exception:
@@ -9022,7 +9022,7 @@ class GrowthReviewBody(BaseModel):
 @router.get("/growth/config")
 async def wa_growth_config(user=Depends(_perm("subscription.manage"))):
     """خواندن کانفیگ رشد (ریفرال + dunning) با پیش‌فرض‌های امن."""
-    import growth_rules as _gr
+    import backend.services.growth_rules as _gr
     ref_stored = await db.get_setting("ref_cfg", None)
     dun_stored = await db.get_setting("dun_cfg", None)
     return {
@@ -9037,7 +9037,7 @@ async def wa_growth_config(user=Depends(_perm("subscription.manage"))):
 async def wa_growth_config_update(body: GrowthConfigBody,
                                   user=Depends(_perm("subscription.manage"))):
     """به‌روزرسانی کانفیگ رشد (partial؛ اعتبارسنجی + audit اجباری)."""
-    import growth_rules as _gr
+    import backend.services.growth_rules as _gr
     before_ref = await db.get_setting("ref_cfg", None) or {}
     before_dun = await db.get_setting("dun_cfg", None) or {}
     patch_ref = body.ref if isinstance(body.ref, dict) else {}
@@ -9131,7 +9131,7 @@ async def wa_growth_review(rid: str, body: GrowthReviewBody,
                 r2 = await db.ref_grant(doc, "buy")
                 granted_all["buy"] = r2.get("granted", {})
             if granted_all.get("register") or granted_all.get("buy"):
-                from referral import notify_inviter as _notify
+                from backend.bot.referral import notify_inviter as _notify
                 await _notify(int(doc["inviter_id"]),
                               {**granted_all.get("register", {}),
                                **granted_all.get("buy", {})},

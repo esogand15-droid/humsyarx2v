@@ -11,11 +11,11 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
-from ring import models as M
-from ring import notify
-from ring import settings as S
-from ring import state
-from time_utils import now_utc, utc_now_iso
+from backend.services.ring import models as M
+from backend.services.ring import notify
+from backend.services.ring import settings as S
+from backend.services.ring import state
+from backend.core.time_utils import now_utc, utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +26,13 @@ logger = logging.getLogger(__name__)
 
 async def block(uid: int, session_id: str, reason: str = "") -> dict:
     """بلاکِ پارتنرِ فعلی. اگر session باز باشد بسته می‌شود (§۱۹)."""
-    from database import db
+    from backend.database.database import db
     sess = await db.ring_session(session_id) if session_id else None
     peer = await db.ring_session_peer(sess, uid) if sess else None
     if peer is None:
         return {"ok": False, "why": "no_session"}
     await db.ring_block(uid, peer, reason)
-    from ring import service
+    from backend.services.ring import service
     if sess and sess.get("status") == "active":
         await service.end_session(uid, session_id, "blocked",
                                   requeue_uids=())        # بلاک‌شده دوباره در صف من نمی‌آید
@@ -45,7 +45,7 @@ async def block(uid: int, session_id: str, reason: str = "") -> dict:
 
 async def block_explicit(uid: int, anon_id: str) -> dict:
     """بلاک از «🛡 امنیت» با ناشناس‌آی‌دی (بدون چت فعال)."""
-    from database import db
+    from backend.database.database import db
     p = await db.ring_profile_by_anon(anon_id.strip() if anon_id else "")
     if not p:
         return {"ok": False, "why": "not_found"}
@@ -56,7 +56,7 @@ async def block_explicit(uid: int, anon_id: str) -> dict:
 
 
 async def unblock(uid: int, other: int) -> dict:
-    from database import db
+    from backend.database.database import db
     await db.ring_unblock(uid, other)
     return {"ok": True}
 
@@ -69,8 +69,8 @@ async def report(uid: int, session_id: str | None, reason_key: str,
                  details: str = "", block_too: bool = False,
                  target_anon: str | None = None) -> dict:
     """ثبت گزارش + snapshot شواهد + امتیاز severity + (اختیاری) auto-moderation."""
-    from database import db
-    from ring import relay, service
+    from backend.database.database import db
+    from backend.services.ring import relay, service
     cfg = await S.get_cfg()
     rl = await db.ring_limit_hit("report", uid, int(cfg["max_report_per_day"]), 86400)
     if not rl["ok"]:
@@ -116,7 +116,7 @@ async def report(uid: int, session_id: str | None, reason_key: str,
 
 async def _auto_moderate(uid: int, score: int, cfg: dict) -> str:
     """محدودیت/بن خودکار فقط بر اساس آستانه — و همیشه قابل بازگشت (§۲۳)."""
-    from database import db
+    from backend.database.database import db
     if not cfg.get("auto_mod_enabled"):
         return "off"
     if score >= int(cfg["report_ban_score"]):
@@ -145,7 +145,7 @@ BAN_PRESETS = {"1h": 1, "6h": 6, "24h": 24, "3d": 72, "7d": 168, "30d": 720}
 
 async def admin_ban(admin_id: int, uid: int, kind: str, hours: int | None,
                     reason: str, scope: str = "ring") -> dict:
-    from database import db
+    from backend.database.database import db
     kind = M.norm_choice(kind, ["warning", "temporary", "permanent"], "temporary")
     until = None
     if kind == "temporary":
@@ -166,7 +166,7 @@ async def admin_ban(admin_id: int, uid: int, kind: str, hours: int | None,
             {"$set": {"global_flagged": True}}, upsert=True)
     sess = await db.ring_session_active_for(uid)
     if sess:
-        from ring import service
+        from backend.services.ring import service
         await service.end_session(None, sess["session_id"], "banned", requeue_uids=())
     await db.ring_audit(admin_id, "BAN_USER", str(uid), reason[:200],
                         {"kind": kind, "until": until, "scope": scope})
@@ -178,7 +178,7 @@ async def admin_ban(admin_id: int, uid: int, kind: str, hours: int | None,
 
 
 async def admin_lift(admin_id: int, uid: int, reason: str = "") -> dict:
-    from database import db
+    from backend.database.database import db
     await db.ring_ban_lift(uid, reason[:200])
     await db.ring_cols.profiles.update_one({"_id": int(uid)}, {"$set": {"report_score": 0}})
     await db.ring_audit(admin_id, "UNBAN_USER", str(uid), reason[:200], {})
@@ -197,7 +197,7 @@ ACTIONS = {"resolve": "resolved", "dismiss": "dismissed", "review": "reviewing",
 
 async def admin_review(admin_id: int, report_id: int, action: str,
                        note: str = "") -> dict:
-    from database import db
+    from backend.database.database import db
     act = M.norm_choice(action, list(ACTIONS), "review")
     rep = await db.ring_report_get(report_id)
     if not rep:
@@ -218,7 +218,7 @@ async def admin_review(admin_id: int, report_id: int, action: str,
 
 
 async def user_report_history(uid: int) -> dict:
-    from database import db
+    from backend.database.database import db
     rows = await db.ring_cols.reports.find({"reporter_uid": int(uid)}) \
                     .sort("created_at", -1).to_list(30)
     return {"made": [{"id": r.get("report_id"), "reason": r.get("reason"),
@@ -227,7 +227,7 @@ async def user_report_history(uid: int) -> dict:
 
 async def rating(uid: int, session_id: str, score_key: str) -> dict:
     """امتیاز پس از جلسه — بی‌نام و یک‌بار (§۲۴)."""
-    from database import db
+    from backend.database.database import db
     if not (await S.get_cfg()).get("allow_rating"):
         return {"ok": False, "why": "off"}
     sess = await db.ring_session(session_id)

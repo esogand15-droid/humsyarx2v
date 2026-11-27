@@ -41,9 +41,9 @@ from fastapi.testclient import TestClient
 from backend.api.main import app
 from backend.api.auth import get_current_user
 from backend.api.routers.web_student import current_student
-from database import db
-from time_utils import gregorian_to_jalali, parse_gregorian_date
-from utils import now_tehran
+from backend.database.database import db
+from backend.core.time_utils import gregorian_to_jalali, parse_gregorian_date
+from backend.bot.utils import now_tehran
 
 
 class MockAsyncCursor:
@@ -332,7 +332,7 @@ class TestFlagshipDashboardMetrics(unittest.TestCase):
              patch.object(db, "sub_plan_list", new_callable=AsyncMock) as m_plans, \
              patch.object(db, "sub_payment_history", new_callable=AsyncMock) as m_hist, \
              patch.object(db, "get_setting", new_callable=AsyncMock) as m_setting, \
-             patch("subscription.has_access", new_callable=AsyncMock) as m_access:
+             patch("backend.bot.subscription.has_access", new_callable=AsyncMock) as m_access:
 
             m_sub.return_value = {
                 "plan_name": "طرح جامع دستیاری پزشکی",

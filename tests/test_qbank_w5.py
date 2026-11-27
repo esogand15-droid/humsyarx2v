@@ -6,20 +6,20 @@ from pathlib import Path
 
 import pytest
 
-from question_bank.contracts import (
+from backend.services.question_bank.contracts import (
     EXAM_SESSIONS,
     QuestionDomainError,
     canonical_exam_session,
     public_question,
     validate_question_payload,
 )
-from question_bank.exam_meta import (
+from backend.services.question_bank.exam_meta import (
     build_exam_metadata,
     infer_exam_session_from_filename,
     session_label,
 )
-from question_bank.importer import infer_exam_session_from_filename as importer_infer_session
-from question_bank.ocr_pipeline import (
+from backend.services.question_bank.importer import infer_exam_session_from_filename as importer_infer_session
+from backend.services.question_bank.ocr_pipeline import (
     normalize_persian_display,
     parse_answer_key_text,
     _split_stem_options,
@@ -182,7 +182,7 @@ class TestPublicQuestionSession:
 class TestArchiveExtractUnit:
     def test_inventory_on_temp_images(self, tmp_path):
         from PIL import Image
-        from question_bank.archive_extract import inventory_tree
+        from backend.services.question_bank.archive_extract import inventory_tree
 
         sub = tmp_path / "exam" / "فیزیولوژی"
         sub.mkdir(parents=True)

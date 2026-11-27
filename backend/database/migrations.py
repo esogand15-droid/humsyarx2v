@@ -17,7 +17,7 @@ Idempotent: re-running does nothing.
 import logging
 import re
 import time
-from time_utils import canonical_utc, utc_now_iso, parse_machine_datetime, now_utc
+from backend.core.time_utils import canonical_utc, utc_now_iso, parse_machine_datetime, now_utc
 
 logger = logging.getLogger("database")
 CURRENT_DB_VERSION = 5
@@ -89,7 +89,7 @@ async def _migrate_v4_feature_policies(db):
     references به subscription می‌روند تا رفتار عیناً حفظ شود. idempotent.
     """
     try:
-        from core.features import FEATURE_CATALOG, default_policy
+        from backend.core.features import FEATURE_CATALOG, default_policy
     except ImportError as e:
         logger.warning(f"migration v4: catalog import failed: {e}")
         return 0

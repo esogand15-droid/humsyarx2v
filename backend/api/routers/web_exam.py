@@ -31,13 +31,13 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
-from api.auth import get_question_access_user
-from api.routers import questions as q_router
-from api.routers.web_library import _web_user
-from api.routers.web_student import current_student
-from database import db
-from question_bank import QuestionDomainError
-from time_utils import utc_now_iso
+from backend.api.auth import get_question_access_user
+from backend.api.routers import questions as q_router
+from backend.api.routers.web_library import _web_user
+from backend.api.routers.web_student import current_student
+from backend.database.database import db
+from backend.services.question_bank import QuestionDomainError
+from backend.core.time_utils import utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -425,7 +425,7 @@ async def _mock_gate(user: dict) -> dict:
     """
     web = await _student(user)
     try:
-        from api.auth import require_feature  # همان کارخانهٔ گیت موجود
+        from backend.api.auth import require_feature  # همان کارخانهٔ گیت موجود
 
         await require_feature("mock_exam")(user=web)
     except HTTPException:
@@ -553,7 +553,7 @@ async def mock_review(session_id: str, user: dict = Depends(current_student)):
     answers = list(session.get("answers") or [])
     review = []
     try:
-        from question_bank.contracts import public_question
+        from backend.services.question_bank.contracts import public_question
 
         for a in answers:
             qid = str(a.get("question_id") or "")
@@ -638,8 +638,8 @@ async def mock_finish(session_id: str, user: dict = Depends(current_student)):
 # ══════════════════════════════════════════════════════════════
 #  🌐 هم‌پیوندی مسیرهای وب (Web Contract Aliases)
 # ══════════════════════════════════════════════════════════════
-from api.routers.schedule import list_study_tasks, create_study_task, toggle_study_task
-from api.routers.grades import grades_summary
+from backend.api.routers.schedule import list_study_tasks, create_study_task, toggle_study_task
+from backend.api.routers.grades import grades_summary
 
 router.add_api_route("/schedule/items", list_study_tasks, methods=["GET"], tags=["web-schedule"])
 router.add_api_route("/schedule/items", create_study_task, methods=["POST"], status_code=201, tags=["web-schedule"])

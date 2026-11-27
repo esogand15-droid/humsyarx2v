@@ -25,8 +25,8 @@ from urllib.parse import urlparse, urljoin, unquote
 
 import httpx
 
-from database import db
-from time_utils import utc_now_iso
+from backend.database.database import db
+from backend.core.time_utils import utc_now_iso
 
 logger = logging.getLogger("url_import")
 
@@ -218,7 +218,7 @@ def _semaphore() -> asyncio.Semaphore:
 async def _telegram_upload(admin_id: int, filename: str, raw: bytes,
                            mime: str) -> str | None:
     """پوششِ همان helper موجود — تست‌ها همین نقطه را stub می‌کنند."""
-    from api.telegram_send import upload_and_get_file_id
+    from backend.api.telegram_send import upload_and_get_file_id
     return await upload_and_get_file_id(admin_id, filename, raw, mime)
 
 

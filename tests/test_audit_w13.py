@@ -9,7 +9,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-import growth_rules as gr
+import backend.services.growth_rules as gr
 
 
 def _read(*parts: str) -> str:
@@ -144,7 +144,7 @@ def test_wiring_finalize_hook():
     assert "def _referral_first_buy_trigger(fn):" in t
     assert "    @_referral_first_buy_trigger" in t
     assert "async def finalize_approved_payment" in t
-    assert "from referral import on_first_payment" in t
+    assert "from backend.bot.referral import on_first_payment" in t
     assert "logger.exception('referral first-buy hook failed')" in t
 
 
@@ -153,13 +153,13 @@ def test_wiring_profile_button():
     assert "async def _profile_keyboard" in t
     assert t.count("await _profile_keyboard(user)") >= 7
     assert "callback_data='ref:menu'" in t
-    assert "from referral import is_enabled as _ref_on" in t
+    assert "from backend.bot.referral import is_enabled as _ref_on" in t
 
 
 def test_wiring_bot():
     t = _read("bot.py")
-    assert "from referral import referral_callback" in t
-    assert "from dunning import dunning_job, dunning_click" in t
+    assert "from backend.bot.referral import referral_callback" in t
+    assert "from backend.services.dunning import dunning_job, dunning_click" in t
     assert "r'^ref:'" in t and "r'^dun:'" in t
     assert "name='dunning_tick'" in t
 

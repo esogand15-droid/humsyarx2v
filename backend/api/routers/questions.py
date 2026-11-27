@@ -30,23 +30,23 @@ from pydantic import (
     Field,
 )
 
-from api.auth import (
+from backend.api.auth import (
     ADMIN_ID,
     get_question_access_user,
     require_feature,  # 🌊 W7
 )
 
-from api.user_metrics import (
+from backend.api.user_metrics import (
     non_negative_int,
 )
 
-from database import db
-from api.rate_limit import rate_limit_user  # 🛡 W3/SEC-03
-from time_utils import utc_now_iso
-from question_bank import ExamService, QuestionBankService, QuestionDomainError
-from question_bank.ai_practice import AIPersonalPracticeService
-from question_bank.images import QuestionImageService
-from question_bank.contracts import (
+from backend.database.database import db
+from backend.api.rate_limit import rate_limit_user  # 🛡 W3/SEC-03
+from backend.core.time_utils import utc_now_iso
+from backend.services.question_bank import ExamService, QuestionBankService, QuestionDomainError
+from backend.services.question_bank.ai_practice import AIPersonalPracticeService
+from backend.services.question_bank.images import QuestionImageService
+from backend.services.question_bank.contracts import (
     CONTENT_SOURCE_DEFAULT, CONTENT_SOURCES, and_query, approved_query,
 )
 
@@ -452,7 +452,7 @@ async def question_filters(user=Depends(get_question_access_user)):
 @router.get("/image/{qid}")
 async def question_image(qid: str, user=Depends(get_question_access_user)):
     """🌊 QBANK-W3 — پروکسی تصویر سؤال برای مینی‌اپ (با کنترل دسترسی دانشجو)."""
-    from api.telegram_send import download_telegram_file
+    from backend.api.telegram_send import download_telegram_file
     question = await db.get_question_by_id(qid)
     if not question:
         raise HTTPException(404, "سؤال پیدا نشد")
@@ -571,7 +571,7 @@ async def answer(body: AnswerInput, user=Depends(get_question_access_user)):
     except QuestionDomainError as exc:
         _domain_error(exc)
     prestige = await _answer_prestige(user["id"], question, is_correct, first_time)
-    from question_bank.contracts import public_question
+    from backend.services.question_bank.contracts import public_question
     return {"is_correct": is_correct, "correct_answer": correct_answer,
             "explanation": text(question.get("explanation")),
             "question": public_question(question, reveal=True), "prestige": prestige}
@@ -1498,7 +1498,7 @@ async def exam_pdf(session_id: str, mode: str = Query("exam", pattern="^(practic
             _ok, _used = await db.feature_consume(
                 user["id"], "pdf_generation", _q["kind"], int(_q["limit"]))
             if not _ok:
-                from core.errors import Code, DEFAULT_MESSAGE
+                from backend.core.errors import Code, DEFAULT_MESSAGE
                 await db.log_feature_event("pdf_generation", "quota_exhausted",
                                            user["id"], {})
                 raise HTTPException(status_code=429, detail={
@@ -1575,7 +1575,7 @@ def design_data(
             ),
         )
 
-    from question_bank.contracts import canonical_difficulty
+    from backend.services.question_bank.contracts import canonical_difficulty
     difficulty = canonical_difficulty(body.difficulty or "medium")
 
     return {

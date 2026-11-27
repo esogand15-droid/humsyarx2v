@@ -11,7 +11,7 @@ import difflib
 from datetime import timedelta
 from bson import ObjectId
 import motor.motor_asyncio
-from time_utils import (
+from backend.core.time_utils import (
     month_key_tehran, now_utc, parse_gregorian_date, parse_machine_datetime,
     to_tehran, utc_now_iso, week_key_tehran,
 )
@@ -349,7 +349,7 @@ class DBPrestige:
 
     @staticmethod
     def _tehran_today() -> str:
-        from utils import now_tehran
+        from backend.bot.utils import now_tehran
         return now_tehran().date().isoformat()
 
 
@@ -1019,7 +1019,7 @@ class DBPrestige:
         + دانلودها؛ اعطای Founder؛ claim اتمیک Global Firsts؛ ریپورت فارسی.
         قانون ویژه‌ی Backfill: کاربران قدیمی رنک‌ها را **بدون چالش** می‌گیرند
         (grandfather — چالش قانون جدیدی است و نباید عطف‌به‌ماسبق شود)."""
-        from utils import now_tehran
+        from backend.bot.utils import now_tehran
         today = now_tehran().date().isoformat()
         business_week = week_key_tehran(parse_gregorian_date(today))
         rep = {'scanned': 0, 'migrated': 0, 'founders': 0, 'firsts': [], 'errors': 0}
@@ -1465,7 +1465,7 @@ class DBPrestige:
         daily = ctx.get('daily') or {}
         exam_total = int(meta.get('total') or 0)
         exam_pct = float(meta.get('pct') or 0)
-        from utils import now_tehran
+        from backend.bot.utils import now_tehran
         hour = now_tehran().hour
         weekly_after = float(ctx.get('weekly_xp_after') or 0)
         conds = {
@@ -1898,7 +1898,7 @@ class DBPrestige:
 
     async def prestige_history_list(self, uid: int, limit: int = 30) -> list:
         """📜 سفر من — تایم‌لاین رنک/نشان/چالش با تاریخ جلالی (Spec §۵)"""
-        from utils import fmt_jalali_dt
+        from backend.bot.utils import fmt_jalali_dt
         rows = await self.prestige_history.find({'uid': uid}) \
             .sort('at', -1).limit(limit).to_list(limit)
         type_labels = {'rank_up': '⬆️ ارتقای رنک', 'div_up': '⭐ ارتقای دسته',

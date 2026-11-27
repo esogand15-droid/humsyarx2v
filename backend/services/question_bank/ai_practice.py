@@ -7,7 +7,7 @@ from bson import ObjectId
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
-from time_utils import day_bounds_utc, now_utc, utc_now_iso
+from backend.core.time_utils import day_bounds_utc, now_utc, utc_now_iso
 from .contracts import QuestionDomainError, clean_text, public_question, validate_question_payload
 from .service import QuestionBankService
 
@@ -90,7 +90,7 @@ class AIPersonalPracticeService:
             if not grounding:
                 raise QuestionDomainError("ai_grounding_unavailable",
                                           "برای ساخت سؤال هوشمند، منبع تأییدشده کافی برای این مبحث نداریم", 409)
-            from ai_solver import generate_question_ai
+            from backend.services.ai_solver import generate_question_ai
             try:
                 generated = await generate_question_ai(
                     lesson=taxonomy.get("lesson", ""), topic=taxonomy.get("topic", ""),

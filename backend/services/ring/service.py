@@ -13,9 +13,9 @@ import logging
 import secrets
 from datetime import timedelta
 
-from ring import models as M
-from ring import matcher, settings as S
-from time_utils import now_utc, utc_now_iso
+from backend.services.ring import models as M
+from backend.services.ring import matcher, settings as S
+from backend.core.time_utils import now_utc, utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def new_token() -> str:
 
 async def ensure_profile(uid: int, **seed) -> dict:
     """پروفایل را (اگر نیست) می‌سازد. شمارش «پروفایل جدید» هم همین‌جا."""
-    from database import db
+    from backend.database.database import db
     existed = await db.ring_profile(uid) is not None
     doc = await db.ring_profile_ensure(uid, **seed)
     if not existed:
@@ -55,7 +55,7 @@ async def ensure_profile(uid: int, **seed) -> dict:
 
 
 async def set_age(uid: int, age) -> Result:
-    from database import db
+    from backend.database.database import db
     cfg = await S.get_cfg()
     if not M.age_ok(age, int(cfg.get("min_age", 18))):
         return Result.of("too_young")
@@ -69,7 +69,7 @@ async def set_age(uid: int, age) -> Result:
 
 
 async def set_gender(uid: int, gender: str) -> Result:
-    from database import db
+    from backend.database.database import db
     g = M.norm_choice(gender, M.GENDERS)
     if not g:
         return Result.of("bad_input")
@@ -78,7 +78,7 @@ async def set_gender(uid: int, gender: str) -> Result:
 
 
 async def set_mode(uid: int, mode: str) -> Result:
-    from database import db
+    from backend.database.database import db
     m = M.norm_choice(mode, M.MODES)
     if not m:
         return Result.of("bad_input")
@@ -110,7 +110,7 @@ def rules_want(cfg: dict | None = None) -> int:
 async def accept_terms(uid: int, *, version: int | None = None) -> Result:
     """پذیرش قوانین (§۲۷): نسخه و زمانش هم ذخیره می‌شود تا با تغییر نسخهٔ
     قوانین، کاربر دوباره بپرسیم (بدون این، پذیرش همیشگی می‌ماند)."""
-    from database import db
+    from backend.database.database import db
     cfg = await S.get_cfg()
     stamp = utc_now_iso()
     await db.ring_profile_update(uid, {
@@ -122,7 +122,7 @@ async def accept_terms(uid: int, *, version: int | None = None) -> Result:
 
 async def set_view(uid: int, key: str, on: bool) -> Result:
     """«چه چیزهایی از پروفایلم دیده شود» (§۳۵) — فقط کلیدهای مجاز."""
-    from database import db
+    from backend.database.database import db
     if key not in M.PROFILE_VIEW:
         return Result.of("bad_input")
     await db.ring_profile_update(uid, {key: bool(on)})
@@ -131,7 +131,7 @@ async def set_view(uid: int, key: str, on: bool) -> Result:
 
 async def rules_pending(uid: int) -> bool:
     """آیا کاربر باید دوباره قوانین را بپذیرد؟ (§۲۷)"""
-    from database import db
+    from backend.database.database import db
     cfg = await S.get_cfg()
     p = await db.ring_profile(uid) or {}
     want = rules_want(cfg)
@@ -151,7 +151,7 @@ async def pause_search(uid: int) -> Result:
     پروفایل می‌نشیند تا بعد از ری‌استارتِ پروسه هم `state_of` همان PAUSED را
     بدهد و کاربر ناخودآگاه دوباره در صف نیفتد.
     """
-    from database import db
+    from backend.database.database import db
     q = await db.ring_queue_get(uid)
     if q and q.get("status") == "in_chat":
         return Result.of("in_chat")
@@ -163,7 +163,7 @@ async def pause_search(uid: int) -> Result:
 
 async def resume_search(uid: int) -> Result:
     """«▶️ ادامه جست‌وجو» — فلگ توقف را پاک می‌کند و کاربر دوباره آماده است."""
-    from database import db
+    from backend.database.database import db
     await db.ring_profile_update(uid, {"search_paused": False})
     return await join_queue(uid)
 
@@ -174,7 +174,7 @@ async def state_of(uid: int) -> str:
     تنها جایی که «من کجا هستم؟» تعیین می‌شود: صفحهٔ رینگ، فیلترِ رله،
     /ring status و پنل ادمین همه همین را می‌خوانند.
     """
-    from database import db
+    from backend.database.database import db
     p = await db.ring_profile(uid) or {}
     q = await db.ring_queue_get(uid)
     sess = await db.ring_session_active_for(uid)
@@ -194,7 +194,7 @@ async def pair_diagnose(uid: int, cid: int) -> dict:
     از پنل ادمین صدا زده می‌شود و *هیچ* مسیر جدیدی برای تصمیم نمی‌سازد:
     دقیقاً `_verdict` (همان که حلقهٔ مچ اجرا می‌کند) اجرا می‌شود.
     """
-    from database import db
+    from backend.database.database import db
     cfg = await S.get_cfg()
     me_p = await db.ring_profile(uid) or {}
     cand_q = await db.ring_queue_get(cid)
@@ -221,7 +221,7 @@ async def pair_diagnose(uid: int, cid: int) -> dict:
 
 async def ready(uid: int) -> tuple[bool, str]:
     """آیا کاربر می‌تواند وارد صف شود؟ (سن + جنسیت + حالت + قوانین + بن)"""
-    from database import db
+    from backend.database.database import db
     cfg = await S.get_cfg()
     p = await db.ring_profile(uid)
     if not p:
@@ -254,7 +254,7 @@ async def ready(uid: int) -> tuple[bool, str]:
 
 
 async def update_profile(uid: int, fields: dict) -> Result:
-    from database import db
+    from backend.database.database import db
     cfg = await S.get_cfg()
     rl = await db.ring_limit_hit("profile", uid, int(cfg["max_profile_per_hour"]), 3600)
     if not rl["ok"]:
@@ -304,7 +304,7 @@ async def update_profile(uid: int, fields: dict) -> Result:
 
 async def sync_queue_doc(uid: int) -> None:
     """پروفایل ← سند صف (ترجیحات برای query کاندید لازم‌اند)."""
-    from database import db
+    from backend.database.database import db
     p = await db.ring_profile(uid)
     q = await db.ring_queue_get(uid)
     if not p or not q:
@@ -322,7 +322,7 @@ async def sync_queue_doc(uid: int) -> None:
 # ══════════════════════════════════════════════════════════════
 
 async def join_queue(uid: int, mode: str | None = None) -> Result:
-    from database import db
+    from backend.database.database import db
     if not await S.get_flag():
         return Result.of("disabled")
     # §۲۳ — «توقف» با ورود دوباره به صف لغو می‌شود (وگرنه PAUSED چسبناک می‌ماند)
@@ -375,7 +375,7 @@ async def cancel_search(uid: int) -> Result:
     بماند و «در غیابش» match شود. اگر وسط گفت‌وگو باشد، چت دست‌نخورده است
     (ردیف صف‌اش `in_chat` است و اصلاً پاک نمی‌شود تا end_session درست کار کند).
     """
-    from database import db
+    from backend.database.database import db
     q = await db.ring_queue_get(uid)
     if not q:
         sess = await db.ring_session_active_for(uid)
@@ -400,7 +400,7 @@ async def cancel_search(uid: int) -> Result:
 
 
 async def leave_queue(uid: int) -> Result:
-    from database import db
+    from backend.database.database import db
     await db.ring_queue_leave(uid)
     return Result.of("ok")
 
@@ -420,7 +420,7 @@ async def _adopt_existing(uid: int, token: str) -> Result | None:
     که یک session واقعی بین‌شان ساخته شده بود (§۹/§۱۰ race). کارت گفت‌وگو را
     سمتِ برنده ارسال شده، پس اینجا `silent` است تا کارت دوتایی نشود.
     """
-    from database import db
+    from backend.database.database import db
     # تا ۴ ثانیه (با بیرون‌آمدن زودهنگام) صبر می‌کنیم: طرفِ برنده همین حالا
     # دارد session را می‌سازد؛ زیر بارِ ۲۰ جست‌وجوی هم‌زمان این کار می‌تواند
     # بیشتر از یک دورِ event loop طول بکشد و بی‌صبر بودن یعنی «کسی پیدا نشد»
@@ -469,7 +469,7 @@ async def _search_pass(uid: int, token: str, me_q: dict, me_p: dict, mode: str,
     `exclude` فیلترِ *کوئری* است و `verify_recent` همان فهرست برای چکِ
     نرم‌افزاری؛ تفکیکشان برای tier دوم (بازگشت به پارتنر اخیر) لازم است.
     """
-    from database import db
+    from backend.database.database import db
     tried: list[int] = []
     contention = 0
     for _ in range(MAX_ATTEMPTS):
@@ -491,7 +491,7 @@ async def _search_pass(uid: int, token: str, me_q: dict, me_p: dict, mode: str,
             return Result.of("empty", waited_s=int(_waited_s(me_q)), queued=others)
         cid = int(cand["user_id"])
         tried.append(cid)
-        from ring import analytics as _A
+        from backend.services.ring import analytics as _A
         _A.note_metric("candidate_found")       # §۴۹ (V6)
         logger.debug("RING_CANDIDATE_FOUND uid=%s cand=…%s", uid, str(cid)[-4:])
         v = await _verdict(uid, cid, cand, mode, cfg, blocked, verify_recent,
@@ -499,7 +499,7 @@ async def _search_pass(uid: int, token: str, me_q: dict, me_p: dict, mode: str,
         reason = "" if v["ok"] else (v["reason"] or "incompat")
         if reason:
             _reject_log(uid, cid, reason, cfg, v)
-            from ring import analytics as _A
+            from backend.services.ring import analytics as _A
             _A.note_reject(reason.split(":")[-1])          # §۳۹
             _A.note_metric("candidate_rejected")           # §۴۹ (V6)
             await db.ring_queue_release(cid)
@@ -534,7 +534,7 @@ async def _search_pass(uid: int, token: str, me_q: dict, me_p: dict, mode: str,
         if announce:
             # مسیر job (نه کاربر): کارت match را خودمان برای هر دو طرف
             # می‌فرستیم، چون هندلری که منتظر پاسخ است وجود ندارد (§۴۰).
-            from ring import handlers as H
+            from backend.services.ring import handlers as H
             await H.announce_match(uid, cid, sess, cfg)
         return Result.of("matched", session=sess, peer=cid)
     return Result.of("empty", tried=len(tried))
@@ -558,8 +558,8 @@ async def _finalize_dead(uid: int, q: dict | None) -> bool:
     «مچ شدی + کنترل‌های چت» و وگر نه «جست‌وجو تمام شد» می‌نشیند. اگر هیچ
     پیامِ قابل‌ویرایشی نباشد False برمی‌گرداند تا فراخوان شناسه را پاک کند.
     """
-    from database import db
-    from ring import keyboards as K, texts
+    from backend.database.database import db
+    from backend.services.ring import keyboards as K, texts
     p = await db.ring_profile(uid) or {}
     sm = p.get("search_msg") or {}
     if not (sm.get("m") and sm.get("c")):
@@ -590,8 +590,8 @@ async def _finalize_dead(uid: int, q: dict | None) -> bool:
 
 async def _heal_after_race(uid: int, chat_id: int, message_id: int) -> None:
     """§۲۱ — editِ ما برندهٔ مسابقه نبود؛ متنِ نهایی را برگردان."""
-    from database import db
-    from ring import notify
+    from backend.database.database import db
+    from backend.services.ring import notify
     sess = await db.ring_session_active_for(uid)
     text = ("🎉 مچ شدی! کارت گفت‌وگو همین پایین آمده ✅" if sess
             else "⌛ جست‌وجو به پایان رسید.")
@@ -640,7 +640,7 @@ def _HTML():
 
 async def _final_kb(kind, cfg: dict | None, p: dict):
     """دکمه‌های پیامِ نهایی — تا بعد از edit صفحه بن‌بست نشود (§۹/§۱۰)."""
-    from ring import keyboards as K
+    from backend.services.ring import keyboards as K
     if kind == "expired":
         return K.kb_expired((p or {}).get("mode") or "fun", cfg or {})
     return None
@@ -661,8 +661,8 @@ async def finalize_search_ui(uid: int, text: str, *, kind: str = "plain",
     `repair_search_ui` (از تیک / housekeeping / post_init) بعداً همان را
     می‌نشاند. این راهِ برگشتِ «۰۰:۰۰ تا ابد» است (§۵۵: UI هرگز نباید گم شود).
     """
-    from database import db
-    from ring import notify
+    from backend.database.database import db
+    from backend.services.ring import notify
     p = await db.ring_profile(uid) or {}
     have = p.get("search_msg") or {}
     # `sm` snapshotِ فراخوان است: اگر شناسه را *قبل از* این تابع پاک کرده باشیم
@@ -677,7 +677,7 @@ async def finalize_search_ui(uid: int, text: str, *, kind: str = "plain",
             await bot.edit_message_text(chat_id=int(sm["c"]), message_id=int(sm["m"]),
                                         text=text, parse_mode=_HTML(), reply_markup=kb)
             await db.ring_search_msg_clear(uid)
-            from ring import analytics as _A
+            from backend.services.ring import analytics as _A
             _A.note_metric("search_ui_finalized")
             logger.info("RING_SEARCH_UI_FINALIZED uid=%s result=edited kind=%s",
                         uid, kind)
@@ -697,8 +697,8 @@ async def finalize_search_ui(uid: int, text: str, *, kind: str = "plain",
 
 async def repair_search_ui(limit: int = 20) -> int:
     """§۱۴ — `pend`های معوقه را اعمال می‌کند (ترمیم حبابِ یخ‌زده)."""
-    from database import db
-    from ring import notify
+    from backend.database.database import db
+    from backend.services.ring import notify
     n = 0
     cfg = await S.get_cfg()
     for uid in await db.ring_search_msg_pend_ids(limit):
@@ -724,7 +724,7 @@ async def repair_search_ui(limit: int = 20) -> int:
                                         reply_markup=await _final_kb(sm.get("pend_k"),
                                                                      cfg, p))
             await db.ring_search_msg_clear(uid)
-            from ring import analytics as _A
+            from backend.services.ring import analytics as _A
             _A.note_metric("search_ui_finalized")
             n += 1
             logger.info("RING_SEARCH_UI_FINALIZED uid=%s result=edited-later", uid)
@@ -744,10 +744,10 @@ async def notify_match_started(session_id: str, *, cfg: dict | None = None,
     `sessions.notify[uid].s` نشانهٔ «رسید» است؛ پس نه پیامی گم می‌شود و نه دو
     تا می‌رود، حتی اگر پروسه میانِ کار بمیرد (§۱۲/§۳۴: source of truth = DB).
     """
-    from database import db
-    from ring import notify, texts
+    from backend.database.database import db
+    from backend.services.ring import notify, texts
     out = {"sent": [], "failed": [], "skipped": [], "session_id": session_id}
-    from ring import notify as _N
+    from backend.services.ring import notify as _N
     if _N._bot() is None:
         # §۳۲ (V6) — بدون بات، «تلاش» حساب نمی‌شود (وگرنه ۹۰ ثانیه بی‌باتی،
         # بودجهٔ ۳ تلاشِ backoff را صفر می‌کرد و اطلاعیه برای همیشه می‌مرد).
@@ -782,7 +782,7 @@ async def notify_match_started(session_id: str, *, cfg: dict | None = None,
         pb = await db.ring_profile(b) if b is not None else None
         card = texts.match_card(sess, pb or {}, cfg,
                                 session_no=int(seqs.get(str(a)) or 1))
-        from ring import keyboards as K
+        from backend.services.ring import keyboards as K
         try:
             kb = K.kb_chat(sess.get("mode") or "fun", cfg)
         except Exception as e:
@@ -791,7 +791,7 @@ async def notify_match_started(session_id: str, *, cfg: dict | None = None,
         ok = await notify.send_text(a, card, parse_mode=_HTML(), reply_markup=kb)
         await db.ring_session_note_sent(session_id, a, sent=bool(ok),
                                         err=None if ok else "send-failed")
-        from ring import analytics as _A
+        from backend.services.ring import analytics as _A
         _A.note_metric("notify_ok" if ok else "notify_fail")   # §۴۹ (V6)
         (out["sent"] if ok else out["failed"]).append(a)
         logger.info("RING_MATCH_NOTIFY uid=%s sid=%s result=%s reason=%s",
@@ -809,7 +809,7 @@ async def finalize_match(session_id: str, *, cfg: dict | None = None,
     idempotent است، پس `jobs._sweep`، مسیرِ کاربر و روترِ ادمین همه همین یکی را
     صدا می‌زنند (§۴: «notification نباید منطقِ پراکنده داشته باشد»).
     """
-    from database import db
+    from backend.database.database import db
     sess = await db.ring_session(session_id)
     if not sess:
         return {"ok": False, "why": "no-session"}
@@ -862,8 +862,8 @@ async def session_health(session_id: str) -> dict:
     است یا دوطرفه (در V5 دقیقاً همین را نمی‌شد فهمید؛ فقط «چیزی کار نمی‌کند»
     دیده می‌شد). هیچ query سنگینی ندارد: پنج readِ کلیددار.
     """
-    from database import db
-    from ring import notify as _N
+    from backend.database.database import db
+    from backend.services.ring import notify as _N
     out: dict = {"session_id": session_id, "found": False,
                  "steps": {"state": {}, "queue": {}, "timer": {},
                            "notify": {}, "relay": {}},
@@ -907,7 +907,7 @@ async def repair_session(session_id: str) -> dict:
     کارتِ نرسیده را می‌فرستد (idempotent). هیچ session را نمی‌بندد، هیچ
     پیامِ کاربری را پاک نمی‌کند و چیزی را «از نو» match نمی‌کند.
     """
-    from database import db
+    from backend.database.database import db
     sess = await db.ring_session(session_id)
     if not sess:
         return {"ok": False, "why": "no-session"}
@@ -952,7 +952,7 @@ async def boot_repair() -> dict:
     """
     out: dict = {}
     try:
-        from database import db  # noqa: F401  (نشان می‌دهد DB لازم است)
+        from backend.database.database import db  # noqa: F401  (نشان می‌دهد DB لازم است)
     except Exception as e:
         logger.warning("RING_BOOT_REPAIR skipped (db unavailable): %s", e)
         return {}
@@ -971,7 +971,7 @@ async def boot_repair() -> dict:
 
 async def retry_pending_notify(limit: int = 20) -> dict:
     """§۳۱/§۳۲ — اطلاعیهٔ نرسیده را با backoff دوباره می‌فرستد (فقط fallback)."""
-    from database import db
+    from backend.database.database import db
     cfg = await S.get_cfg()
     tried = 0
     for row in await db.ring_sessions_pending_notify(limit=limit):
@@ -1003,7 +1003,7 @@ async def repair_orphans(*, limit: int = 50) -> dict:
     هیچ session‌ای را نمی‌بندد و هیچ پیامِ کاربری را پاک نمی‌کند؛ فقط فلگ‌ها را
     هم‌راستا می‌کند و در `ring_admin_audit` می‌نویسد تا قابل بازرسی بماند.
     """
-    from database import db
+    from backend.database.database import db
     rep = {"orphan_matches": 0, "queue_orphans": 0, "timer_orphans": 0}
     try:
         for sid, u in await db.ring_sessions_missing_current(limit=limit):
@@ -1039,7 +1039,7 @@ async def repair_orphans(*, limit: int = 50) -> dict:
     except Exception as e:
         logger.warning("RING_ORPHAN_REPAIR type=timer skipped err=%s", str(e)[:140])
     if any(rep.values()):
-        from ring import analytics as _A
+        from backend.services.ring import analytics as _A
         for k, v in rep.items():
             _A.note_metric(k, int(v or 0))
     return rep
@@ -1052,7 +1052,7 @@ async def remember_search_msg(uid: int, chat_id: int, message_id: int,
 
     روی DB نوشته می‌شود تا ری‌استارتِ پروسه تایمر را نکُشد (§۳۵).
     """
-    from database import db
+    from backend.database.database import db
     try:
         await db.ring_search_msg_set(uid, chat_id, message_id, waited_s)
     except Exception as e:
@@ -1061,7 +1061,7 @@ async def remember_search_msg(uid: int, chat_id: int, message_id: int,
 
 async def forget_search_msg(uid: int, *, expired: bool = False) -> None:
     """تایمر را خاموش می‌کند (لغو/توقف/مچ/پایان وقت — همه از همین‌جا)."""
-    from database import db
+    from backend.database.database import db
     try:
         await db.ring_search_msg_clear(
             uid, expired_at=utc_now_iso() if expired else None)
@@ -1079,13 +1079,13 @@ async def _render_search_final(uid: int, cfg: dict, text: str,
     می‌شود؛ پیامِ تازه فقط وقتی می‌رود که هیچ شناسه‌ای در کار نباشد
     (کاربر پیامِ انتظار را پاک کرده) — و آن هم با لاگ اگر نرسید.
     """
-    from database import db
-    from ring import notify
+    from backend.database.database import db
+    from backend.services.ring import notify
     if sm is None:
         sm = (await db.ring_profile(uid) or {}).get("search_msg") or {}
     r = await finalize_search_ui(uid, text, kind="expired", cfg=cfg, sm=sm)
     if r == "none" and not (sm.get("m") and sm.get("c")):
-        from ring import keyboards as K
+        from backend.services.ring import keyboards as K
         p = await db.ring_profile(uid) or {}
         kb = K.kb_expired(p.get("mode") or "fun", cfg or {})
         if not await notify.send_text(uid, text, parse_mode=_HTML(), reply_markup=kb):
@@ -1101,7 +1101,7 @@ async def expire_search(uid: int) -> bool:
     دکمه را می‌زند و ردیفش قدیمی‌تر از timeout است، همان راه را می‌رود، تا
     دو نسخهٔ متفاوت از «کسی پیدا نشد» در محصول نداشته باشیم.
     """
-    from database import db
+    from backend.database.database import db
     q = await db.ring_queue_get(uid)
     if not q or q.get("status") not in ("waiting", "claiming"):
         return False
@@ -1123,8 +1123,8 @@ async def _expire_search(uid: int, q: dict, p: dict, cfg: dict,
     «در حال جست‌وجو» است. اگر کاربر پیام را پاک کرده باشد، `notify` جانشین
     می‌شود (§۱۰) و صفِ او هم تمیز می‌شود.
     """
-    from database import db
-    from ring import texts
+    from backend.database.database import db
+    from backend.services.ring import texts
     # §۳۸ (V6) — اگر matcher همین لحظه session ساخته، انقضا بازمی‌گردد؛
     # ترکیبِ «A=EXPIRED و B=MATCHED» غیرممکن می‌شود.
     if await db.ring_session_active_for(uid):
@@ -1159,8 +1159,8 @@ async def search_tick(*, limit: int = 200, edit_every_s: int = 10) -> dict:
       • مدتِ انتظار از `queued_at` خوانده می‌شود، نه شمارندهٔ RAM ⇒ بعد از
         ری‌استارت عدد از همان‌جا ادامه می‌یابد (§۳۴/§۶۴).
     """
-    from database import db
-    from ring import keyboards as K, notify, texts
+    from backend.database.database import db
+    from backend.services.ring import keyboards as K, notify, texts
     from telegram.constants import ParseMode
     from telegram.error import BadRequest
     stats = {"edited": 0, "expired": 0, "dropped": 0, "skipped": 0, "ui": 0}
@@ -1286,8 +1286,8 @@ async def try_match(uid: int, *, announce: bool = False) -> Result:
          `rematch_after_s` صبر tier دوم اجرا می‌شود تا صف‌های کوچک گرسنه
          نمانند — ولی پارتنرِ گفت‌وگوی *همین لحظه* هرگز برنمی‌گردد.
     """
-    from database import db
-    from ring import analytics as _A
+    from backend.database.database import db
+    from backend.services.ring import analytics as _A
     _A.note_metric("match_attempts")            # §۴۹ (V6)
     token = new_token()
     me_q = await db.ring_queue_claim_self(uid, token)
@@ -1438,7 +1438,7 @@ async def _verdict(uid: int, cid: int, cand: dict, mode: str, cfg: dict,
     «تصمیم» و «توضیحِ تصمیم» از هم جدا نمی‌شوند. `me` همان سندِ من است که در
     حلقه‌ی داغ از قبل خوانده شده (برای پرهیز از دو query اضافه به‌ازای هر کاندید).
     """
-    from database import db
+    from backend.database.database import db
     me_doc = me if me is not None else {
         **(await db.ring_queue_get(uid) or {}),
         **(await db.ring_profile(uid) or {}), "user_id": uid}
@@ -1473,8 +1473,8 @@ async def _verdict(uid: int, cid: int, cand: dict, mode: str, cfg: dict,
 
 async def _open_session(uid: int, cid: int, me_p: dict, mode: str, cfg: dict) -> dict | None:
     """ساخت جلسه + عبورِ هر دو کاربر به in_chat. None ⇒ race باخخته."""
-    from database import db
-    from ring import state
+    from backend.database.database import db
+    from backend.services.ring import state
     cp = await db.ring_profile(cid)
     sid = f"RS{now_utc().strftime('%y%m%d')}{secrets.token_hex(4).upper()}"
     alias = f"ناشناس #{(cp or {}).get('anon_id', '#0000').lstrip('#')}"
@@ -1519,7 +1519,7 @@ async def _open_session(uid: int, cid: int, me_p: dict, mode: str, cfg: dict) ->
         {"$set": {"aliases": {str(uid): my_alias, str(cid): alias},
                   "notify_seq": seqs}})
     state.attach(uid, cid, sid, mode, my_alias, alias)
-    from ring import analytics as _A
+    from backend.services.ring import analytics as _A
     _A.note_metric("state_transition", 2)            # §۴۹ (V6) — در RAM، نه DB
     _A.note_metric("queue_removed", 2)
     _A.note_metric("timer_cancelled", 2)
@@ -1536,8 +1536,8 @@ async def end_session(uid: int | None, session_id: str, reason: str, *,
                       notify_peer: str | None = None, requeue_uids: tuple = ()) -> dict | None:
     """خاتمه‌ی جلسه + آزادسازی هر دو طرف. idempotent: اگر جلسه بسته شده
     باشد، None برمی‌گردد و پیامی ارسال نمی‌شود (§۶۲)."""
-    from database import db
-    from ring import state
+    from backend.database.database import db
+    from backend.services.ring import state
     sess = await db.ring_session_end(session_id, reason, uid)
     if not sess:
         return None
@@ -1553,7 +1553,7 @@ async def end_session(uid: int | None, session_id: str, reason: str, *,
     if uid is not None:
         peer = next((u for u in uids if u != int(uid)), None)
     if peer and notify_peer:
-        from ring import notify
+        from backend.services.ring import notify
         await notify.send_text(peer, notify_peer)
     dur = 0
     try:
@@ -1567,26 +1567,26 @@ async def end_session(uid: int | None, session_id: str, reason: str, *,
 
 
 async def stop(uid: int, session_id: str) -> Result:
-    from ring import texts
+    from backend.services.ring import texts
     r = await end_session(uid, session_id, "user_stop")
     if not r:
         return Result.of("already_ended")
     if r.get("peer"):
-        from ring import notify
+        from backend.services.ring import notify
         await notify.send_text(r["peer"], texts.peer_ended())
     return Result.of("ok", peer=r.get("peer"))
 
 
 async def next_partner(uid: int, session_id: str) -> Result:
-    from ring import texts
-    from database import db
+    from backend.services.ring import texts
+    from backend.database.database import db
     sess = await db.ring_session(session_id)
     peer = None
     if sess:
         peer = await db.ring_session_peer(sess, uid)
     r = await end_session(uid, session_id, "user_next", requeue_uids=(uid,))
     if r and peer:
-        from ring import notify
+        from backend.services.ring import notify
         await notify.send_text(peer, texts.peer_next())
     out = await search(uid)
     return Result.of("ok", next=out)
@@ -1633,7 +1633,7 @@ async def recent_partners(profile: dict, cooldown_s: int) -> list[int]:
 # ══════════════════════════════════════════════════════════════
 
 async def set_paused(uid: int, paused: bool) -> Result:
-    from database import db
+    from backend.database.database import db
     await db.ring_profile_status(uid, "paused" if paused else "active")
     if paused:
         await db.ring_queue_leave(uid)
@@ -1644,8 +1644,8 @@ async def set_paused(uid: int, paused: bool) -> Result:
 
 
 async def delete_all(uid: int) -> Result:
-    from database import db
-    from ring import state
+    from backend.database.database import db
+    from backend.services.ring import state
     sess = await db.ring_session_active_for(uid)
     if sess:
         await end_session(None, sess["session_id"], "profile_deleted")
@@ -1656,8 +1656,8 @@ async def delete_all(uid: int) -> Result:
 
 async def admin_force_match(admin_id: int, a: int, b: int) -> Result:
     """match دستی — همان چک‌های ایمنی، فقط بدون نیاز به صف (§۶۷)."""
-    from database import db
-    from ring import state
+    from backend.database.database import db
+    from backend.services.ring import state
     cfg = await S.get_cfg()
     if await db.ring_blocked_between(a, b):
         return Result.of("blocked")
@@ -1675,17 +1675,17 @@ async def admin_force_match(admin_id: int, a: int, b: int) -> Result:
     if not sess:
         return Result.of("race")
     await db.ring_audit(admin_id, "FORCE_MATCH", f"{a},{b}", mode, {"session": sess["session_id"]})
-    from ring import texts
-    from ring import notify
+    from backend.services.ring import texts
+    from backend.services.ring import notify
     await notify.send_text(a, texts.match_card(sess, pb, cfg))
     await notify.send_text(b, texts.match_card(sess, pa, cfg))
     return Result.of("ok", session=sess["session_id"])
 
 
 async def admin_force_end(admin_id: int, session_id: str, reason: str) -> Result:
-    from database import db
-    from ring import texts
-    from ring import notify
+    from backend.database.database import db
+    from backend.services.ring import texts
+    from backend.services.ring import notify
     sess = await db.ring_session(session_id)
     if not sess:
         return Result.of("not_found")
@@ -1697,7 +1697,7 @@ async def admin_force_end(admin_id: int, session_id: str, reason: str) -> Result
 
 
 async def admin_remove_from_queue(admin_id: int, uid: int) -> Result:
-    from database import db
+    from backend.database.database import db
     await db.ring_queue_leave(uid)
     await db.ring_audit(admin_id, "REMOVE_FROM_QUEUE", str(uid), "", {})
     return Result.of("ok")
@@ -1708,8 +1708,8 @@ async def admin_remove_from_queue(admin_id: int, uid: int) -> Result:
 # ══════════════════════════════════════════════════════════════
 
 async def reveal_request(uid: int) -> Result:
-    from database import db
-    from ring import texts
+    from backend.database.database import db
+    from backend.services.ring import texts
     cfg = await S.get_cfg()
     if not cfg.get("allow_reveal"):
         return Result.of("off")
@@ -1722,13 +1722,13 @@ async def reveal_request(uid: int) -> Result:
     rev = dict(sess.get("reveal") or {})
     rev[str(uid)] = "requested"
     await db.ring_session_note(sess["session_id"], {"reveal": rev})
-    from ring import notify
+    from backend.services.ring import notify
     await notify.send_text(peer, texts.reveal_ask())
     return Result.of("ok", peer=peer)
 
 
 async def reveal_answer(uid: int, accept: bool) -> Result:
-    from database import db
+    from backend.database.database import db
     sess = await db.ring_session_active_for(uid)
     if not sess:
         return Result.of("no_session")
@@ -1738,13 +1738,13 @@ async def reveal_answer(uid: int, accept: bool) -> Result:
     await db.ring_session_note(sess["session_id"], {"reveal": rev})
     if rev.get(str(peer)) == "yes" and rev.get(str(uid)) == "yes":
         pa, pb = await db.ring_profile(peer), await db.ring_profile(uid)
-        from ring import texts
-        from ring import notify
+        from backend.services.ring import texts
+        from backend.services.ring import notify
         await notify.send_text(uid, texts.reveal_shared(pa))
         await notify.send_text(peer, texts.reveal_shared(pb))
         await db.ring_bump(reveal=1)
         return Result.of("both_yes", peer=peer)
-    from ring import notify
+    from backend.services.ring import notify
     if not accept:
         await notify.send_text(peer, "🙏 درخواست معرفی رد شد. ناشناس می‌مانید.")
     else:

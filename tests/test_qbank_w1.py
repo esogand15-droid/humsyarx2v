@@ -4,13 +4,13 @@ Runs without MongoDB: pure contracts, query composition and importer inference.
 """
 import pytest
 
-from question_bank import (
+from backend.services.question_bank import (
     CONTENT_SOURCE_DEFAULT, CONTENT_SOURCES, EXAM_TRACKS,
     canonical_content_source, canonical_exam_track, canonical_exam_year,
     infer_exam_track_from_filename, infer_exam_year_from_filename,
 )
-from question_bank.contracts import QuestionDomainError, validate_question_payload
-from question_bank.service import QuestionBankService
+from backend.services.question_bank.contracts import QuestionDomainError, validate_question_payload
+from backend.services.question_bank.service import QuestionBankService
 
 
 def _payload(**over):

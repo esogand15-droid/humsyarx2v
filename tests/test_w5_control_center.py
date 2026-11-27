@@ -126,9 +126,9 @@ class ControlCenterRuntimeTests(unittest.TestCase):
         os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
         import httpx
         cls.httpx = httpx
-        import api.main as main_mod
+        import backend.api.main as main_mod
         cls.app = main_mod.app
-        from database import db
+        from backend.database.database import db
         cls.db = db
         cls.admin_h = {"X-Init-Data": _signed_init_data(TEST_UID)}
         cls.student_h = {"X-Init-Data": _signed_init_data(STUDENT_UID)}

@@ -13,9 +13,9 @@ import os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from database import db
-from utils import send_audit_log, safe_send, spawn_bg   # 🛡 AUDIT-M1
-from time_utils import format_datetime_fa, now_utc, utc_now_iso
+from backend.database.database import db
+from backend.bot.utils import send_audit_log, safe_send, spawn_bg   # 🛡 AUDIT-M1
+from backend.core.time_utils import format_datetime_fa, now_utc, utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -337,7 +337,7 @@ _SUBSCRIBERS_PAGE_SIZE = 10
 
 
 async def _show_subscribers_list(query, page: int):
-    from utils import fmt_jalali_dt
+    from backend.bot.utils import fmt_jalali_dt
     total = await db.sub_count_by_status('active')
     items = await db.sub_list_by_status('active', skip=page * _SUBSCRIBERS_PAGE_SIZE, limit=_SUBSCRIBERS_PAGE_SIZE)
 
@@ -402,7 +402,7 @@ async def _show_user_detail(query, target_uid: int):
     name = user.get('name', str(target_uid)) if user else str(target_uid)
     s = await db.sub_get(target_uid)
     if s and s.get('status') == 'active' and await db.sub_is_active(target_uid):
-        from utils import progress_bar
+        from backend.bot.utils import progress_bar
         days = await db.sub_days_left(target_uid)
         total = max(1, s.get('last_plan_days', days) or 1)
         pct = min(100, round(days / total * 100))
@@ -469,7 +469,7 @@ async def _quick_activate(query, context, target_uid: int, days: int):
 
 
 async def _show_user_payment_history(query, target_uid: int):
-    from utils import fmt_jalali_dt
+    from backend.bot.utils import fmt_jalali_dt
     history = await db.sub_payment_history(target_uid)
     icons = {'pending': '⏳', 'approved': '✅', 'rejected': '❌'}
     lines = [f"🧾 <b>تاریخچه‌ی پرداخت کاربر {target_uid}</b>\n━━━━━━━━━━━━━━━━"]
@@ -560,7 +560,7 @@ async def handle_revoke_reason_text(update, context):
 # ══════════════════════════════════════════════════
 
 async def _show_discounts(query):
-    from utils import fmt_jalali_dt
+    from backend.bot.utils import fmt_jalali_dt
     codes = await db.discount_list()
     lines = ["🎟 <b>کدهای تخفیف</b>\n━━━━━━━━━━━━━━━━"]
     keyboard = []
@@ -627,15 +627,15 @@ async def handle_discount_add_text(update, context):
 
 async def _campaign_text(discount: dict):
     """متن HTML کمپین — از موتور مشترک discount_campaign (Dynamic)."""
-    from discount_campaign import build_campaign_message
+    from backend.services.discount_campaign import build_campaign_message
     _, text = await build_campaign_message(db, discount)
     return text
 
 
 def _campaign_cta_kb(discount: dict):
     """کیبورد زیر پیام کمپین: Deep Link مینی‌اپ + دیپ‌لینک بات (fallback)."""
-    from utils import webapp_kb
-    from discount_campaign import campaign_cta_link
+    from backend.bot.utils import webapp_kb
+    from backend.services.discount_campaign import campaign_cta_link
     code = discount['code']
     kb = webapp_kb(campaign_cta_link(discount), label='🎟 دریافت اشتراک با تخفیف')
     rows = list(kb.inline_keyboard) if kb else []
@@ -819,7 +819,7 @@ async def _execute_discount_broadcast(query, context, code: str, segment: str):
         })
         # اینباکس مینی‌اپ (اختیاری): برای کاربرانی که موفق گرفتند
         try:
-            link = __import__('discount_campaign', fromlist=['campaign_cta_link']) \
+            link = __import__('backend.services.discount_campaign', fromlist=['campaign_cta_link']) \
                 .campaign_cta_link(discount)
             await db.inbox_add_many([
                 {'user_id': u['user_id'], 'type': 'discount',
@@ -1127,7 +1127,7 @@ async def handle_gateway_merchant_text(update, context):
     if text.lower() in ("clear","mock","test","empty"):
         await db.set_setting('zarinpal_merchant_id', '')
         try:
-            from payments.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
+            from backend.integrations.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
         except: pass
         await update.message.reply_text("✅ Merchant پاک شد — حالت آزمایشی (mock) فعال است.")
         return
@@ -1136,7 +1136,7 @@ async def handle_gateway_merchant_text(update, context):
         return
     await db.set_setting('zarinpal_merchant_id', text.strip())
     try:
-        from payments.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
+        from backend.integrations.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
     except: pass
     masked = text[:4] + "****" + text[-4:] if len(text)>=8 else "****"
     await update.message.reply_text(f"✅ ذخیره شد: <code>{masked}</code>", parse_mode='HTML')
@@ -1153,7 +1153,7 @@ async def handle_gateway_callback_text(update, context):
     if text.lower() in ("clear","empty","default"):
         await db.set_setting('zarinpal_callback_url', '')
         try:
-            from payments.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
+            from backend.integrations.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
         except: pass
         await update.message.reply_text("✅ Callback به پیش‌فرض (WEBAPP_URL) برگشت.")
         return
@@ -1163,7 +1163,7 @@ async def handle_gateway_callback_text(update, context):
         return
     await db.set_setting('zarinpal_callback_url', cb)
     try:
-        from payments.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
+        from backend.integrations.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
     except: pass
     await update.message.reply_text(f"✅ Callback ذخیره شد:\n<code>{cb}</code>", parse_mode='HTML')
 
@@ -1193,7 +1193,7 @@ async def subscription_admin_callback(update: Update, context: ContextTypes.DEFA
             cur = not bool(cur_mid)
         await db.set_setting('zarinpal_sandbox', not cur)
         try:
-            from payments.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
+            from backend.integrations.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
         except: pass
         await _show_gateway(query)
     elif action == 'gateway_toggle_enabled':
@@ -1201,7 +1201,7 @@ async def subscription_admin_callback(update: Update, context: ContextTypes.DEFA
         if cur is None: cur = True
         await db.set_setting('zarinpal_enabled', not cur)
         try:
-            from payments.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
+            from backend.integrations.zarinpal import _clear_cfg_cache; _clear_cfg_cache()
         except: pass
         await _show_gateway(query)
     elif action == 'gateway_edit_merchant':
@@ -1221,7 +1221,7 @@ async def subscription_admin_callback(update: Update, context: ContextTypes.DEFA
         await db.set_setting('subscription_enforced', not cur)
         # 🌊 W7 — ماکرو روی پالیسی‌ها (تک‌منبع حقیقت)
         try:
-            from core.access import invalidate_policy_cache
+            from backend.core.access import invalidate_policy_cache
             _mode = "subscription" if not cur else "free"
             for _f in ("question_bank", "resources", "references"):
                 await db.set_feature_policy(_f, {"access": _mode}, uid, "")

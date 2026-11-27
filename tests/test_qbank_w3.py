@@ -1,13 +1,13 @@
 """🌊 QBANK-W3 — regression tests: question images (pure, no MongoDB)."""
 import pytest
 
-from question_bank.contracts import QuestionDomainError, public_question
-from question_bank.images import (
+from backend.services.question_bank.contracts import QuestionDomainError, public_question
+from backend.services.question_bank.images import (
     MAX_IMAGE_BYTES, image_state, parse_bulk_filename, split_photo_caption,
     validate_image_upload,
 )
-from question_bank.importer import PROMPT_PATH
-from question_bank.service import QuestionBankService
+from backend.services.question_bank.importer import PROMPT_PATH
+from backend.services.question_bank.service import QuestionBankService
 
 
 class TestImageState:

@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 _had_uri = "MONGODB_URI" in os.environ
 os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
 
-from db.core import DBCore
+from backend.database.core import DBCore
 
 if not _had_uri:
     del os.environ["MONGODB_URI"]

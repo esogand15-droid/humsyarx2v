@@ -22,7 +22,7 @@ os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017/medicalbot")
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from api.routers.academic_admin import (
+from backend.api.routers.academic_admin import (
     _parse_cohort,
     _parse_schedule_free_text,
     _tpl_doc,

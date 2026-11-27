@@ -22,11 +22,11 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
 
 try:
-    from db.core import DBCore  # noqa: F401
-    from db.finance import DBFinance  # noqa: F401
-    import api.routers.global_search as gs  # noqa: F401
-    import question_bank.exam as exam_mod  # noqa: F401
-    import qbank  # noqa: F401
+    from backend.database.core import DBCore  # noqa: F401
+    from backend.database.finance import DBFinance  # noqa: F401
+    import backend.api.routers.global_search as gs  # noqa: F401
+    import backend.services.question_bank.exam as exam_mod  # noqa: F401
+    import backend.services.qbank as qbank  # noqa: F401
     _DEPS_OK = True
     _DEPS_ERR = ""
 except Exception as e:  # pragma: no cover — محیط بدون deps
@@ -524,7 +524,7 @@ class W6DbGatedTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        from database import db
+        from backend.database.database import db
         cls.db = db
         from _rtloop import adopt
         adopt()

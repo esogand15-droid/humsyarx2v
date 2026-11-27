@@ -246,12 +246,12 @@ class TestTier1FeatureCoverage(unittest.TestCase):
         mock_consume.assert_called_once_with(uid, daily_limit=3, today=today)
         mock_refund.assert_not_called()
 
-    @patch("database.db.op_claim", AsyncMock(return_value=True))
-    @patch("database.db.op_release", AsyncMock(return_value=True))
-    @patch("ai_solver.refund_lecture_quota", new_callable=AsyncMock)
+    @patch("backend.database.database.db.op_claim", AsyncMock(return_value=True))
+    @patch("backend.database.database.db.op_release", AsyncMock(return_value=True))
+    @patch("backend.services.ai_solver.refund_lecture_quota", new_callable=AsyncMock)
     @patch("backend.services.telegram_downloader.download_telegram_media", new_callable=AsyncMock)
     @patch("backend.services.lecture_scribe.transcode_audio_file", new_callable=AsyncMock)
-    @patch("ai_solver.get_ai_config", new_callable=AsyncMock)
+    @patch("backend.services.ai_solver.get_ai_config", new_callable=AsyncMock)
     def test_t1_06_model_cascade_fallback_on_404_not_found(self, mock_cfg, mock_transcode, mock_download, mock_refund):
         """Feature 4: Model 404 (or deprecated model) smoothly falls back to next candidate model."""
         tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
@@ -286,12 +286,12 @@ class TestTier1FeatureCoverage(unittest.TestCase):
         self.assertEqual(models_attempted.count("gemini-3.5-flash"), 1)
         self.assertIn("gemini-3.6-flash", models_attempted)
 
-    @patch("database.db.op_claim", AsyncMock(return_value=True))
-    @patch("database.db.op_release", AsyncMock(return_value=True))
-    @patch("ai_solver.refund_lecture_quota", new_callable=AsyncMock)
+    @patch("backend.database.database.db.op_claim", AsyncMock(return_value=True))
+    @patch("backend.database.database.db.op_release", AsyncMock(return_value=True))
+    @patch("backend.services.ai_solver.refund_lecture_quota", new_callable=AsyncMock)
     @patch("backend.services.telegram_downloader.download_telegram_media", new_callable=AsyncMock)
     @patch("backend.services.lecture_scribe.transcode_audio_file", new_callable=AsyncMock)
-    @patch("ai_solver.get_ai_config", new_callable=AsyncMock)
+    @patch("backend.services.ai_solver.get_ai_config", new_callable=AsyncMock)
     def test_t1_07_model_cascade_fallback_on_503_unavailable(self, mock_cfg, mock_transcode, mock_download, mock_refund):
         """Feature 4: Model 503 Service Unavailable cascades to next model."""
         tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
@@ -382,8 +382,8 @@ class TestTier1FeatureCoverage(unittest.TestCase):
             self.assertNotIn(K_VAULT_1, entry["masked"])
             self.assertNotIn(K_VAULT_2, entry["masked"])
 
-    @patch("database.db.op_claim", AsyncMock(return_value=True))
-    @patch("database.db.op_release", AsyncMock(return_value=True))
+    @patch("backend.database.database.db.op_claim", AsyncMock(return_value=True))
+    @patch("backend.database.database.db.op_release", AsyncMock(return_value=True))
     def test_t1_13_inflight_lock_acquisition(self):
         """Feature 7: ai_claim_inflight locks out concurrent invocations for the same user."""
         uid = 88001
@@ -426,9 +426,9 @@ class TestTier1FeatureCoverage(unittest.TestCase):
             self.assertEqual(limit, 0)
         self.assertEqual(mock_consume.call_count, 10)
 
-    @patch("database.db.op_claim", AsyncMock(return_value=True))
-    @patch("database.db.op_release", AsyncMock(return_value=True))
-    @patch("ai_solver.check_and_consume_lecture_quota", new_callable=AsyncMock)
+    @patch("backend.database.database.db.op_claim", AsyncMock(return_value=True))
+    @patch("backend.database.database.db.op_release", AsyncMock(return_value=True))
+    @patch("backend.services.ai_solver.check_and_consume_lecture_quota", new_callable=AsyncMock)
     def test_t1_16_inflight_lock_released_on_quota_rejection(self, mock_check_quota):
         """Feature 7: Rejection due to exhausted daily quota releases in-flight lock so user is not stuck."""
         uid = 88005
@@ -466,10 +466,10 @@ class TestTier1FeatureCoverage(unittest.TestCase):
         self.assertTrue(asyncio.run(ai_claim_inflight(uid)))
         asyncio.run(ai_release_inflight(uid))
 
-    @patch("database.db.op_claim", AsyncMock(return_value=True))
-    @patch("database.db.op_release", AsyncMock(return_value=True))
-    @patch("ai_solver.check_and_consume_lecture_quota", new_callable=AsyncMock)
-    @patch("ai_solver.refund_lecture_quota", new_callable=AsyncMock)
+    @patch("backend.database.database.db.op_claim", AsyncMock(return_value=True))
+    @patch("backend.database.database.db.op_release", AsyncMock(return_value=True))
+    @patch("backend.services.ai_solver.check_and_consume_lecture_quota", new_callable=AsyncMock)
+    @patch("backend.services.ai_solver.refund_lecture_quota", new_callable=AsyncMock)
     @patch("backend.services.lecture_worker.get_lecture_worker_queue")
     def test_t1_17_inflight_lock_released_on_queue_full(self, mock_get_worker, mock_refund, mock_check_quota):
         """Feature 7: Rejection due to full worker queue refunds quota and releases in-flight lock."""
@@ -818,12 +818,12 @@ class TestTier3PairwiseInteractions(unittest.TestCase):
         self.assertEqual(rejected_count, 2)
         self.assertEqual(mock_consume.call_count, 4)
 
-    @patch("database.db.op_claim", AsyncMock(return_value=True))
-    @patch("database.db.op_release", AsyncMock(return_value=True))
-    @patch("ai_solver.refund_lecture_quota", new_callable=AsyncMock)
+    @patch("backend.database.database.db.op_claim", AsyncMock(return_value=True))
+    @patch("backend.database.database.db.op_release", AsyncMock(return_value=True))
+    @patch("backend.services.ai_solver.refund_lecture_quota", new_callable=AsyncMock)
     @patch("backend.services.telegram_downloader.download_telegram_media", new_callable=AsyncMock)
     @patch("backend.services.lecture_scribe.transcode_audio_file", new_callable=AsyncMock)
-    @patch("ai_solver.get_ai_config", new_callable=AsyncMock)
+    @patch("backend.services.ai_solver.get_ai_config", new_callable=AsyncMock)
     def test_t3_06_model_rotation_recovers_after_schema_400(self, mock_cfg, mock_transcode, mock_download, mock_refund):
         """Features 4 & 5: When model 1 400 retry still fails, system advances to model 2 instead of crashing."""
         tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
@@ -875,12 +875,12 @@ class TestTier4RealWorldScenarios(unittest.TestCase):
         ai_solver._KEY_STATE.clear()
         ai_solver._busy_users.clear()
 
-    @patch("database.db.op_claim", AsyncMock(return_value=True))
-    @patch("database.db.op_release", AsyncMock(return_value=True))
-    @patch("ai_solver.refund_lecture_quota", new_callable=AsyncMock)
+    @patch("backend.database.database.db.op_claim", AsyncMock(return_value=True))
+    @patch("backend.database.database.db.op_release", AsyncMock(return_value=True))
+    @patch("backend.services.ai_solver.refund_lecture_quota", new_callable=AsyncMock)
     @patch("backend.services.telegram_downloader.download_telegram_media", new_callable=AsyncMock)
     @patch("backend.services.lecture_scribe.transcode_audio_file", new_callable=AsyncMock)
-    @patch("ai_solver.get_ai_config", new_callable=AsyncMock)
+    @patch("backend.services.ai_solver.get_ai_config", new_callable=AsyncMock)
     def test_t4_01_end_to_end_failover_marathon(self, mock_cfg, mock_transcode, mock_download, mock_refund):
         """Realistic multi-stage failure marathon:
         
@@ -965,12 +965,12 @@ class TestTier4RealWorldScenarios(unittest.TestCase):
         self.assertIn("جزوه جامع کلاسی تدوین شد!", sent_caption)
         self.assertIn("فارماکولوژی", sent_caption)
 
-    @patch("database.db.op_claim", AsyncMock(return_value=True))
-    @patch("database.db.op_release", AsyncMock(return_value=True))
-    @patch("ai_solver.refund_lecture_quota", new_callable=AsyncMock)
+    @patch("backend.database.database.db.op_claim", AsyncMock(return_value=True))
+    @patch("backend.database.database.db.op_release", AsyncMock(return_value=True))
+    @patch("backend.services.ai_solver.refund_lecture_quota", new_callable=AsyncMock)
     @patch("backend.services.telegram_downloader.download_telegram_media", new_callable=AsyncMock)
     @patch("backend.services.lecture_scribe.transcode_audio_file", new_callable=AsyncMock)
-    @patch("ai_solver.get_ai_config", new_callable=AsyncMock)
+    @patch("backend.services.ai_solver.get_ai_config", new_callable=AsyncMock)
     def test_t4_02_total_outage_disaster_recovery(self, mock_cfg, mock_transcode, mock_download, mock_refund):
         """Catastrophic total outage disaster recovery:
         
@@ -1027,12 +1027,12 @@ class TestTier4RealWorldScenarios(unittest.TestCase):
         self.assertTrue(asyncio.run(ai_claim_inflight(99002)))
         asyncio.run(ai_release_inflight(99002))
 
-    @patch("database.db.op_claim", AsyncMock(return_value=True))
-    @patch("database.db.op_release", AsyncMock(return_value=True))
-    @patch("ai_solver.refund_lecture_quota", new_callable=AsyncMock)
+    @patch("backend.database.database.db.op_claim", AsyncMock(return_value=True))
+    @patch("backend.database.database.db.op_release", AsyncMock(return_value=True))
+    @patch("backend.services.ai_solver.refund_lecture_quota", new_callable=AsyncMock)
     @patch("backend.services.telegram_downloader.download_telegram_media", new_callable=AsyncMock)
     @patch("backend.services.lecture_scribe.transcode_audio_file", new_callable=AsyncMock)
-    @patch("ai_solver.get_ai_config", new_callable=AsyncMock)
+    @patch("backend.services.ai_solver.get_ai_config", new_callable=AsyncMock)
     def test_t4_03_full_lecture_pipeline_delivery(self, mock_cfg, mock_transcode, mock_download, mock_refund):
         """Simulated end-to-end lecture scribe flow with audio input, AI structuring, and Telegram delivery."""
         tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)

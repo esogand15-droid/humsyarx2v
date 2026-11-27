@@ -28,13 +28,13 @@ def build_parser():
 async def main(args=None):
     if args is None:
         args = build_parser().parse_args()
-    from database import db
-    from question_bank.migration import (
+    from backend.database.database import db
+    from backend.services.question_bank.migration import (
         ensure_qbank_w1_indexes, inspect_qbank_w1, inspect_questions,
         migrate_qbank_w1, migrate_questions, backfill_progress, rollback_questions,
         rollback_progress,
     )
-    from question_bank.images import ensure_qbank_w3_indexes
+    from backend.services.question_bank.images import ensure_qbank_w3_indexes
     if args.action == "inspect":
         result = await inspect_questions(db)
         if args.output:

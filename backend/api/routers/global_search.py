@@ -10,13 +10,13 @@ from fastapi import (
     Query,
 )
 
-from api.auth import (
+from backend.api.auth import (
     get_current_user,
 )
 
-from api.rate_limit import rate_limit_user  # 🛡 W10/RATE-01
-from database import db
-from question_bank.contracts import approved_query
+from backend.api.rate_limit import rate_limit_user  # 🛡 W10/RATE-01
+from backend.database.database import db
+from backend.services.question_bank.contracts import approved_query
 
 
 router = APIRouter()

@@ -26,10 +26,10 @@ from typing import Any
 
 import httpx
 
-from database import db
+from backend.database.database import db
 
 try:
-    from utils_crypto import decrypt_value as _decrypt_val, encrypt_value as _encrypt_val
+    from backend.core.utils_crypto import decrypt_value as _decrypt_val, encrypt_value as _encrypt_val
 except Exception:
     _decrypt_val = lambda x: x if isinstance(x, str) else (x.get("c", "") if isinstance(x, dict) else str(x or ""))
     _encrypt_val = lambda x: x
@@ -1061,7 +1061,7 @@ class _GroupLiveSession:
 
     async def _gemini_to_outgoing_loop(self) -> None:
         """دریافت پاسخ صوتی 24kHz PCM16 و رویدادهای ابزار/Barge-in از Gemini Live."""
-        from ai_solver import (
+        from backend.services.ai_solver import (
             build_live_language_lock_turn,
             execute_live_tool_calls,
             is_non_persian_output_drift,
@@ -1173,7 +1173,7 @@ async def join_group_voice_chat(
 ) -> dict:
     """ورود اکانت دستیار هوشیار به ویس‌چت گروه تلگرام و شروع مکالمه صوتی زنده با اعضای گروه."""
     _ensure_pyrogram_compat()
-    from ai_solver import (
+    from backend.services.ai_solver import (
         DEFAULT_LIVE_MODEL,
         DEFAULT_LIVE_TEMPERATURE,
         DEFAULT_VOICE_PROMPT,

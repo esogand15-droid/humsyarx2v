@@ -17,19 +17,19 @@ from telegram import (
 )
 from telegram.ext import ContextTypes, ConversationHandler
 from telegram.error import RetryAfter, Forbidden, BadRequest, TimedOut, NetworkError
-from database import db
-from broadcast_service import (
+from backend.database.database import db
+from backend.services.broadcast_service import (
     create_campaign as create_broadcast_campaign,
     resolve_recipients as resolve_broadcast_recipients,
     send_payload as send_broadcast_payload,
     finish_direct as finish_broadcast_direct,
 )
-from utils import (
+from backend.bot.utils import (
     main_keyboard, content_admin_keyboard, safe_send,
     esc as _esc,                                  # 🛡 AUDIT-A6 — escape مرکزی پروژه
     send_audit_log, get_keyboard_for_user, fmt_jalali_dt, now_tehran, now_tehran_str,
 )
-from time_utils import fa_digits, format_time_fa, now_utc, parse_machine_datetime
+from backend.core.time_utils import fa_digits, format_time_fa, now_utc, parse_machine_datetime
 from backend.bot.ui_buttons import btn, SUCCESS, DANGER   # 🎨 button colours
 
 logger   = logging.getLogger(__name__)
@@ -339,7 +339,7 @@ async def _show_cat_settings(query, uid: int = None):
 
 # 🌊 W7 — نیازمند اقدام در ربات: بستن/بازکردن هشدار با دلیل + مدیریت اسپم کیف پول
 async def _show_attention(query, uid: int):
-    from time_utils import utc_now_iso, now_utc, parse_machine_datetime
+    from backend.core.time_utils import utc_now_iso, now_utc, parse_machine_datetime
     from datetime import timedelta
     try:
         is_owner = uid == ADMIN_ID
@@ -364,7 +364,7 @@ async def _show_attention(query, uid: int):
             if c: items.append({'key':'tickets','icon':'🎫','label':'تیکت بدون پاسخ','count':c,'severity':'warning','urgent':True})
         except: pass
         try:
-            from api.routers.web_admin import _quality_summary
+            from backend.api.routers.web_admin import _quality_summary
             qs = await _quality_summary()
             if qs['count']: items.append({'key':'data_quality','icon':'🧬','label':'ناهنجاری کیفیت داده','count':qs['count'],'severity':'critical' if qs['critical'] else 'warning','urgent':True})
         except: pass
@@ -376,7 +376,7 @@ async def _show_attention(query, uid: int):
             for r in runs:
                 if int(r.get('failed') or 0)<=0: continue
                 try:
-                    from time_utils import parse_machine_datetime as _pm
+                    from backend.core.time_utils import parse_machine_datetime as _pm
                     if _pm(r.get('started_at') or r.get('created_at')) >= cutoff:
                         failed.append(r)
                 except: failed.append(r)
@@ -385,7 +385,7 @@ async def _show_attention(query, uid: int):
         try:
             dcol = db.client["medicalbot"]["attention_dismissals"]
             ddocs = await dcol.find({}).to_list(100)
-            from time_utils import now_utc as _nu, parse_machine_datetime as _pm2
+            from backend.core.time_utils import now_utc as _nu, parse_machine_datetime as _pm2
             now = _nu()
             dmap = {}
             for d in ddocs:
@@ -445,7 +445,7 @@ async def _show_attention(query, uid: int):
         await query.edit_message_text(f"خطا در نمایش نیازمند اقدام: {e}", parse_mode='HTML')
 
 async def _attention_dismiss_bot(query, uid, key, hours, context):
-    from time_utils import now_utc, utc_now_iso
+    from backend.core.time_utils import now_utc, utc_now_iso
     from datetime import timedelta
     allowed_keys = {"users","payments","questions","tickets","reports","failed_jobs","outbox_backlog","outbox_scheduled","dlq","imports","data_quality","wallet_issues","backup_issue"}
     if key not in allowed_keys:
@@ -711,7 +711,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(f"هشدار کیف پول {'غیرفعال' if cur else 'فعال'} شد", show_alert=True)
         await _show_attention(query, uid)
     elif action == 'att_wallet_mute24':
-        from time_utils import now_utc
+        from backend.core.time_utils import now_utc
         from datetime import timedelta
         until = (now_utc() + timedelta(hours=24)).isoformat()
         await db.set_setting('wallet_alert_muted_until', until)
@@ -1430,15 +1430,15 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]))
     elif action == 'pending_q':
         # یک صف بررسی و یک permission/lifecycle contract برای همه پنل‌ها.
-        from questions import _ca_question_list
+        from backend.bot.questions import _ca_question_list
         await _ca_question_list(query, uid, context)
     elif action == 'approve_q':
         # سازگاری callbackهای قدیمی؛ mutation همچنان از domain مشترک می‌گذرد.
-        from questions import _h_ca_q_approve
+        from backend.bot.questions import _h_ca_q_approve
         await _h_ca_q_approve(query, context, uid, parts[2])
     elif action == 'reject_q':
         # رد بدون دلیل ممنوع است؛ handler مشترک دلیل متنی می‌گیرد.
-        from questions import _h_ca_q_del
+        from backend.bot.questions import _h_ca_q_del
         await _h_ca_q_del(query, context, uid, parts[2], target='rejected')
 
     # ══════════════════════════════════════════════
@@ -1651,7 +1651,7 @@ async def _broadcast_ai_generate(query_or_msg, context, is_message: bool = False
     و ادمین رو به مسیرِ دستیِ همیشگیِ نوشتنِ اطلاعیه (که مستقل از AI
     هست) هدایت می‌کنه.
     """
-    from ai_solver import generate_broadcast_ai, AIError
+    from backend.services.ai_solver import generate_broadcast_ai, AIError
 
     notes = (context.user_data.get('bc_ai_notes', '') or '').strip()
 
@@ -2754,7 +2754,7 @@ async def _show_notif_manage(query):
     اعلان منابع جدید + دسترسی به تاریخچه ارسال هر job + دکمه‌ی
     ارسال فوری (بدون نیاز به صبر تا پایان بازه) + تشخیص خطای اخیر.
     """
-    from utils import fmt_jalali
+    from backend.bot.utils import fmt_jalali
     interval = await db.get_setting('resource_notif_interval_hours', 24)
     pending  = await db.get_unnotified_resources()
     last_sent_str = await db.get_setting('resource_notif_last_sent', None)
@@ -2802,7 +2802,7 @@ async def _show_notif_manage(query):
 
 async def _handle_notif_force_send(query):
     """FIX جدید: ارسال فوری منابع جدید — بدون نیاز به صبر تا پایان بازه‌ی ۲۴/۴۸/۷۲ ساعته"""
-    from bot import _run_new_resources_notif
+    from backend.bot.bot import _run_new_resources_notif
     # توجه: admin_callback از قبل یک‌بار query.answer() را صدا زده،
     # پس اینجا دوباره answer() نمی‌زنیم (تلگرام اجازه‌ی answer دوم را نمی‌دهد)
     result = await _run_new_resources_notif(query.get_bot(), force=True)
@@ -3157,7 +3157,7 @@ async def _export_excel(query, context):
     uid = query.from_user.id
     await query.edit_message_text("⏳ <b>در حال ساخت فایل اکسل...</b>", parse_mode='HTML')
     try:
-        from excel_report import build_database_excel
+        from backend.services.excel_report import build_database_excel
         buf, fname, caption, counts = await build_database_excel()
         await query.message.reply_document(
             document=buf, filename=fname, caption=caption, parse_mode='HTML'
@@ -3930,7 +3930,7 @@ async def handle_admin_text(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             )
             return True
 
-        from utils import send_audit_log
+        from backend.bot.utils import send_audit_log
         await send_audit_log(
             context.bot, 'admin', admin_name, update.effective_user.id,
             "ارسال پیام مستقیم به کاربر", module='Users', severity='INFO',

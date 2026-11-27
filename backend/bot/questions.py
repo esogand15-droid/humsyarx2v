@@ -11,17 +11,17 @@
 """
 import os, io, asyncio, logging, time
 from datetime import datetime
-from utils import esc as escape   # 🛡 AUDIT-A6 —escape مرکزی
+from backend.bot.utils import esc as escape   # 🛡 AUDIT-A6 —escape مرکزی
 from telegram import InputMediaPhoto, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from bot_modern_ui import ButtonGridBuilder
+from backend.bot.bot_modern_ui import ButtonGridBuilder
 from telegram.ext import ContextTypes, ConversationHandler
-from database import db
-from utils import send_audit_log, fmt_jalali_dt
-from time_utils import now_tehran, utc_now_iso
-from question_bank import ExamService, QuestionBankService, QuestionDomainError
-from question_bank.images import QuestionImageService, split_photo_caption
-from question_bank.ai_practice import AIPersonalPracticeService
-from question_bank.contracts import (
+from backend.database.database import db
+from backend.bot.utils import send_audit_log, fmt_jalali_dt
+from backend.core.time_utils import now_tehran, utc_now_iso
+from backend.services.question_bank import ExamService, QuestionBankService, QuestionDomainError
+from backend.services.question_bank.images import QuestionImageService, split_photo_caption
+from backend.services.question_bank.ai_practice import AIPersonalPracticeService
+from backend.services.question_bank.contracts import (
     CONTENT_SOURCES, DIFFICULTY_LABELS, canonical_difficulty, canonical_status,
 )
 
@@ -53,7 +53,7 @@ def _h(value) -> str:
     🛡 AUDIT-A6 — به هلپر مرکزی واگذار شد؛ رفتار قبلی `str(value or "")` بود که
     عدد صفر را به رشته‌ی خالی تبدیل می‌کرد (شماره‌ی جلسه/سوال صفر «گم» می‌شد).
     """
-    from utils import esc as _central
+    from backend.bot.utils import esc as _central
     return _central(value)
 
 
@@ -257,7 +257,7 @@ async def questions_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # FIX جدید: دفاع لایه‌دوم اشتراک — اکشن‌های ca_* (بررسی سوال توسط
     # ادمین محتوا) از این گیت مستثنی‌اند، چون کار مدیریتی است نه مصرف محتوا
     if not action.startswith('ca_'):
-        from subscription import feature_allowed
+        from backend.bot.subscription import feature_allowed
         if not await feature_allowed(uid, "question_bank"):
             await query.answer("🔒 اول باید اشتراک فعال کنی — از «🧪 بانک سوال» شروع کن.", show_alert=True)
             return
@@ -731,7 +731,7 @@ async def _picker_intake(uid: int):
 
 async def _custom_exam_menu(query, context):
     """لیست دروس دارای سؤال + مسیر خوانا برای تازه‌کار."""
-    from question_bank.contracts import QBANK_LESSON_TERM
+    from backend.services.question_bank.contracts import QBANK_LESSON_TERM
     user = await db.get_user(query.from_user.id) or {}
     tree = await question_bank.taxonomy_tree(
         visible_intakes=db.student_intake_filter(user.get('intake', '')),
@@ -1273,8 +1273,8 @@ async def handle_question_answer(update: Update, context: ContextTypes.DEFAULT_T
 
 async def _term_select(query, context, mode):
     """انتخاب مسیر محتوا: اول «بانک سؤال» (آرشیو آزمون‌ها)، بعد ترم‌های درسی."""
-    from utils import TERMS
-    from question_bank.contracts import QBANK_LESSON_TERM
+    from backend.bot.utils import TERMS
+    from backend.services.question_bank.contracts import QBANK_LESSON_TERM
 
     label = "آزمون سفارشی" if mode == 'exam' else "تمرین آزاد"
     keyboard = []
@@ -1312,8 +1312,8 @@ async def _term_select(query, context, mode):
 
 
 async def _lesson_select(query, context, mode, term_idx: int = None):
-    from utils import TERMS
-    from question_bank.contracts import QBANK_LESSON_TERM
+    from backend.bot.utils import TERMS
+    from backend.services.question_bank.contracts import QBANK_LESSON_TERM
     term = TERMS[term_idx] if term_idx is not None and term_idx < len(TERMS) else None
     context.user_data['sel_term_idx'] = term_idx
     lessons = await db.get_lessons(
@@ -1692,7 +1692,7 @@ async def _ca_question_list(query, uid: int, context):
 
     # ساخت query
     q_filter = {}
-    from question_bank.contracts import status_query, canonical_status
+    from backend.services.question_bank.contracts import status_query, canonical_status
     if f_status in ('approved', 'pending', 'rejected', 'needs_changes'):
         q_filter = status_query(f_status)
 
@@ -1721,7 +1721,7 @@ async def _ca_question_list(query, uid: int, context):
             q_filter['intake'] = _ctx_i
             _intake_note = _ctx_i
 
-    from question_bank.contracts import and_query
+    from backend.services.question_bank.contracts import and_query
     total = await db.questions.count_documents(q_filter)
     approved = await db.questions.count_documents(and_query(q_filter, status_query('approved')))
     pending = await db.questions.count_documents(and_query(q_filter, status_query('pending')))
@@ -1788,7 +1788,7 @@ async def _ca_question_list(query, uid: int, context):
 
     # 🌊 C1 — نمایش label ورودی فعال در هدر (اگر فیلتر scope فعال است)
     if _intake_note is not None:
-        from content_admin import _intake_label as _ilabel
+        from backend.bot.content_admin import _intake_label as _ilabel
         _scope_line = f"📅 ورودی: <b>{await _ilabel(_intake_note)}</b>\n"
     else:
         _scope_line = ""

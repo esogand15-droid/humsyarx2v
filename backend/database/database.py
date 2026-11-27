@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────
 # 🌊 موج Q2/W12 — Facade ماژولار: بدنه‌ی DB به mixinهای db/* منتقل شد.
 # «from database import db / DB» و تمام attributeها/متدها عیناً کار می‌کنند.
-from db import DBCore, DBContent, DBRbac, DBPrestige, DBFinance, DBRing, DBWallet, DBReferral, DBAiQuiz
+from backend.database import DBCore, DBContent, DBRbac, DBPrestige, DBFinance, DBRing, DBWallet, DBReferral, DBAiQuiz
 
 
 class DB(DBCore, DBContent, DBRbac, DBPrestige, DBFinance, DBRing, DBWallet, DBReferral, DBAiQuiz):

@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)   # §۱۵ (V6) — برای همان که 
 
 from html import escape as _e
 
-from ring import models as M
-from time_utils import fa_digits
+from backend.services.ring import models as M
+from backend.core.time_utils import fa_digits
 
 BOT_NOTE = "پیام‌ها از طریق ربات و بدون نمایش آیدی/نام شما ارسال می‌شود."
 
@@ -183,7 +183,7 @@ def rules(mode: str, cfg: dict) -> str:
 
 
 def rules_version_line(cfg: dict) -> str:
-    from ring import models as _M
+    from backend.services.ring import models as _M
     v = max(int((cfg or {}).get("rules_version") or 0), _M.RULES_VERSION)
     return f"نسخهٔ قوانین: {v}"
 

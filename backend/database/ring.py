@@ -26,7 +26,7 @@ from datetime import timedelta
 
 from pymongo import ReturnDocument
 
-from time_utils import now_utc, utc_now_iso
+from backend.core.time_utils import now_utc, utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -1266,7 +1266,7 @@ class DBRing:
         await k("bans_active", c.bans.count_documents({"active": True}))
         # ── V6: سلامتِ لایهٔ ارسال + کارهای معوقه (§۳۰/§۴۶) ──
         try:
-            from ring import notify as _N
+            from backend.services.ring import notify as _N
             out["notify_health"] = _N.health()
         except Exception as e:
             out["errors"]["notify_health"] = str(e)[:160]

@@ -159,9 +159,9 @@ class GiftRuntimeTests(unittest.TestCase):
 
         import httpx
         cls.httpx = httpx
-        import api.main as main_mod
+        import backend.api.main as main_mod
         cls.app = main_mod.app
-        from database import db
+        from backend.database.database import db
         cls.db = db
 
         cls.admin_h = {"X-Init-Data": _signed_init_data(ADMIN_UID)}
@@ -293,7 +293,7 @@ class GiftRuntimeTests(unittest.TestCase):
         """لایه‌ی دوم یک‌باربودن: finalize روی هدیه‌ی فعال‌شده روز اضافه
         نمی‌کند (حتی اگر کسی اشتباهاً دوباره صدایش کند)."""
         async def run():
-            from database import db
+            from backend.database.database import db
             pay = await db.sub_payments.find_one({"_id": P_LIFE})
             before = await db.subscriptions.find_one({"_id": RECIP_UID})
             res = await db.finalize_approved_payment(pay, ADMIN_UID)

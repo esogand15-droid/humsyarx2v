@@ -203,7 +203,7 @@ class TestProxyRouting(unittest.TestCase):
                                            "TELEGRAM_TOKEN": "1:x"})
         self.env.start()
         self.addCleanup(self.env.stop)
-        from api import telegram_send
+        from backend.api import telegram_send
         self.ts = telegram_send
 
     def test_large_file_goes_to_mtproto_with_canonical_mime(self):

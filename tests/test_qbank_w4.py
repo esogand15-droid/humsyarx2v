@@ -10,7 +10,7 @@ from pathlib import Path
 from PIL import Image
 from reportlab.lib.utils import ImageReader
 
-from question_bank.contracts import validate_question_payload
+from backend.services.question_bank.contracts import validate_question_payload
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -50,8 +50,8 @@ class TestPdfImageChain:
                 "explanation": "توضیح " * 10}
 
     def test_practice_pdf_with_image(self):
-        from qbank import generate_exam_pdf
-        from qbank.query import ExamMeta
+        from backend.services.qbank import generate_exam_pdf
+        from backend.services.qbank.query import ExamMeta
         content = generate_exam_pdf(
             [self._question()], ExamMeta(lesson="فیزیولوژی", topic="قلب"),
             mode="practice", question_images={"q1": self._png_reader()})
@@ -59,8 +59,8 @@ class TestPdfImageChain:
         assert len(content) > 5000
 
     def test_exam_pdf_with_image(self):
-        from qbank import generate_exam_pdf
-        from qbank.query import ExamMeta
+        from backend.services.qbank import generate_exam_pdf
+        from backend.services.qbank.query import ExamMeta
         content = generate_exam_pdf(
             [self._question()], ExamMeta(lesson="فیزیولوژی", topic="قلب"),
             mode="exam", question_images={"q1": self._png_reader()})

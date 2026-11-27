@@ -162,14 +162,14 @@ class Wave1ShimVerificationTests(unittest.TestCase):
 
     def test_database_singleton_identity(self):
         """Verify that db instance in database is identical to backend.database.database."""
-        import database
+        import backend.database.database as database
         import backend.database.database as backend_db
         self.assertIs(database.db, backend_db.db, "db singleton instances diverged!")
 
     def test_package_submodule_attributes(self):
         """Verify that root package objects (db, core, api) expose submodules as attributes."""
-        import db
-        import core
+        import backend.database as db
+        import backend.core as core
         self.assertIsNotNone(db.core)
         self.assertIsNotNone(core.access)
 

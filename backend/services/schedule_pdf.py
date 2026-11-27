@@ -25,8 +25,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.colors import HexColor
 
-from qbank.fonts_rtl import ensure_fonts, rtl, fa_digits, wrap_rtl, text_width, REGULAR, MEDIUM, BOLD
-from qbank.styles import (
+from backend.services.qbank.fonts_rtl import ensure_fonts, rtl, fa_digits, wrap_rtl, text_width, REGULAR, MEDIUM, BOLD
+from backend.services.qbank.styles import (
     PAGE_W, PAGE_H, MARGIN, CONTENT_W, MIN_Y, FOOTER_Y,
     NAVY, NAVY_LIGHT, BRAND_GREEN, GRAY, TEXT_DARK, WHITE, CARD_BORDER, CARD_BG,
 )
@@ -76,13 +76,13 @@ STYPE_TITLES = {
 
 
 def _today_jalali() -> str:
-    from time_utils import format_date_fa, now_utc
+    from backend.core.time_utils import format_date_fa, now_utc
     return format_date_fa(now_utc(), long=True)
 
 
 def _now_tehran_str() -> str:
     try:
-        from time_utils import format_datetime_fa, now_utc
+        from backend.core.time_utils import format_datetime_fa, now_utc
         return format_datetime_fa(now_utc(), long=True)
     except Exception:
         return _today_jalali()
@@ -122,7 +122,7 @@ def _counts(items: list) -> dict:
 
 def _days_left(item: dict):
     try:
-        from time_utils import parse_gregorian_date, today_tehran
+        from backend.core.time_utils import parse_gregorian_date, today_tehran
         d = (item.get('date') or '')[:10]
         if not d:
             return None
@@ -377,7 +377,7 @@ def _draw_row(c, item: dict, y: float):
     # از time_utils مستقیم (بدون وابستگی به telegram)
     def _fmt_jalali_local(ds: str) -> str:
         try:
-            from time_utils import format_date_fa
+            from backend.core.time_utils import format_date_fa
             raw = str(ds or '').strip()[:10]
             if not raw:
                 return ''
@@ -616,7 +616,7 @@ def _should_use_weekly_grid(items: list, stype) -> bool:
         return False
     # اگر الگوی هفتگی تکرار شده باشد، تعداد (weekday, time) متمایز خیلی کمتر از کل است
     try:
-        from utils import jalali_weekday_index
+        from backend.bot.utils import jalali_weekday_index
     except Exception:
         return False
     distinct = set()
@@ -645,7 +645,7 @@ def _should_use_weekly_grid(items: list, stype) -> bool:
 def _collect_weekly_slots(items: list):
     """از فهرست تاریخ‌دار، نگاشت (weekday -> {interval_key -> [lessons]} ) می‌سازد."""
     try:
-        from utils import jalali_weekday_index
+        from backend.bot.utils import jalali_weekday_index
     except:
         return None, None
     # interval -> label

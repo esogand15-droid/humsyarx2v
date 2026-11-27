@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 _had_uri = "MONGODB_URI" in os.environ
 os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
 
-from api import rate_limit as rl
+from backend.api import rate_limit as rl
 
 if not _had_uri:
     del os.environ["MONGODB_URI"]

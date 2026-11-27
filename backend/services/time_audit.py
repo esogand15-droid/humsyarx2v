@@ -161,7 +161,7 @@ async def inspect_collection(database, collection_name: str) -> dict:
 
 
 async def _main(args):
-    from database import db
+    from backend.database.database import db
     database = db.client["medicalbot"]
     names = sorted({item.collection for item in FIELDS}) if args.all else [args.collection]
     output = [await inspect_collection(database, name) for name in names]

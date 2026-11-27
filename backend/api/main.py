@@ -19,7 +19,7 @@ mimetypes.add_type("font/woff2", ".woff2")
 mimetypes.add_type("font/woff", ".woff")
 mimetypes.add_type("font/ttf", ".ttf")
 
-from api.routers import (
+from backend.api.routers import (
     academic_admin,
     admin_panel,
     ai,
@@ -56,13 +56,13 @@ from api.routers import (
     web_login,
     web_student,
 )
-from api.auth import get_current_user
-from database import db
-from request_context import current_request_id
-from time_utils import now_utc
+from backend.api.auth import get_current_user
+from backend.database.database import db
+from backend.core.request_context import current_request_id
+from backend.core.time_utils import now_utc
 # 🛡 W1 — rate limiter (optional, env RATE_LIMIT_ENABLED=1)
 try:
-    from api.rate_limit import check_global as _rl_check_global
+    from backend.api.rate_limit import check_global as _rl_check_global
 except Exception:
     _rl_check_global = None
 
@@ -75,12 +75,12 @@ async def lifespan(app: FastAPI):
     _BOOTSTRAP_STATE["started_at"] = now_utc().isoformat()
     # 🚀 WAVE2 — warm shared http client at startup (pool ready before first request)
     try:
-        from http_client import get_shared_client
+        from backend.services.http_client import get_shared_client
         await get_shared_client()
     except Exception: pass
     # 🌊 W3 — migrations قبل از هر چیز
     try:
-        from db.migrations import run_migrations
+        from backend.database.migrations import run_migrations
         await asyncio.wait_for(run_migrations(db), timeout=2.0)
     except Exception as _e:
         _BOOTSTRAP_STATE.setdefault("steps", {})["migrations"] = {"ok": False, "error": str(_e)}
@@ -116,7 +116,7 @@ async def lifespan(app: FastAPI):
 
     # 📥 URL-Import — §82: jobهای نیمه‌کاره‌ی پیش از restart علامت‌گذاری
     try:
-        import url_import_service as _uis
+        import backend.services.url_import_service as _uis
         _BOOTSTRAP_STATE.setdefault("steps", {})["url_import_recover"] = {
             "ok": True, "recovered": await asyncio.wait_for(_uis.recover_stale_jobs(), timeout=1.0)}
     except Exception as exc:  # pragma: no cover
@@ -127,7 +127,7 @@ async def lifespan(app: FastAPI):
 
     # 🌊 W3 — graceful: shared http client + cancel pending tasks
     try:
-        from http_client import aclose_shared_client
+        from backend.services.http_client import aclose_shared_client
         await aclose_shared_client()
     except Exception: pass
     # allow in-flight requests to finish (best-effort 2s)
@@ -215,7 +215,7 @@ async def request_context_and_safe_errors(request: Request, call_next):
     else:
         # 🆕 Audit Refactor §10 — HY-YYYYMMDD-XXXXXX برای قابلیت جستجو/مرتب‌سازی
         try:
-            from time_utils import now_tehran
+            from backend.core.time_utils import now_tehran
             today = now_tehran().strftime("%Y%m%d")
         except Exception:
             from datetime import datetime, timezone
@@ -249,12 +249,12 @@ async def request_context_and_safe_errors(request: Request, call_next):
                     # دیده می‌شود، ولی هرگز درخواست کاربر را نمی‌شکند.
                     _api_logger.debug("wa_api_metrics insert failed: %s", _me)
             # 🛡 AUDIT-M1 — تسک با مرجع و لاگ خطا
-            from utils import spawn_bg
+            from backend.bot.utils import spawn_bg
             spawn_bg(persist_metric(), 'wa_api_metric')
         # 🌊 W5/REL-03 — شمارنده‌ی ارزانِ همه‌ی /api/* (درون‌حافظه‌ای؛
         # wa_api_metrics همچنان منبع ماندگار وب‌ادمین است)
         try:
-            from api.api_counters import record as _api_count
+            from backend.api.api_counters import record as _api_count
             _p = _raw_path(request)
             if _p.startswith("/api/"):
                 _tpl = (getattr(request.scope.get("route"), "path", "")
@@ -703,7 +703,7 @@ async def health_deep():
     هرگز به‌عنوان healthcheck استقرار استفاده نشود (کندتر است و
     به فرایند ربات و دیتابیس وابسته است).
     """
-    from bot_heartbeat import read_heartbeat
+    from backend.services.bot_heartbeat import read_heartbeat
 
     hb = read_heartbeat()
 

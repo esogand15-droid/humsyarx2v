@@ -63,19 +63,19 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "ocr-status":
         # Direct submodule import avoids pulling Motor/bson via package __init__.
-        from question_bank.ocr_pipeline import ocr_available
+        from backend.services.question_bank.ocr_pipeline import ocr_available
         print(json.dumps(ocr_available(), ensure_ascii=False, indent=2))
         return 0
 
     if args.cmd == "sessions":
-        from question_bank.contracts import EXAM_SESSIONS
+        from backend.services.question_bank.contracts import EXAM_SESSIONS
         print(json.dumps(EXAM_SESSIONS, ensure_ascii=False, indent=2))
         return 0
 
     if args.cmd == "extract":
         # Import leaf modules first so extract works on OCR-only hosts.
-        from question_bank.archive_importer import run_archive_pipeline
-        from question_bank.contracts import QuestionDomainError
+        from backend.services.question_bank.archive_importer import run_archive_pipeline
+        from backend.services.question_bank.contracts import QuestionDomainError
         try:
             result = run_archive_pipeline(
                 args.source,

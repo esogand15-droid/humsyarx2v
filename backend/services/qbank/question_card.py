@@ -11,8 +11,8 @@
 """
 from reportlab.lib.units import mm
 
-from qbank.fonts_rtl import rtl, fa_digits, wrap_rtl, text_width, REGULAR, MEDIUM, BOLD
-from qbank.styles import (
+from backend.services.qbank.fonts_rtl import rtl, fa_digits, wrap_rtl, text_width, REGULAR, MEDIUM, BOLD
+from backend.services.qbank.styles import (
     PAGE_W, MARGIN, CONTENT_W, TEXT_DARK, TEXT_BODY, GRAY, WHITE,
     BRAND_GREEN, CARD_BG, CARD_BORDER, OPT_BG, OPT_BORDER, OPT_LETTERS,
     DIFF_STYLE, normalize_difficulty,

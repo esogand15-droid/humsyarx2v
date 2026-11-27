@@ -9,8 +9,8 @@
 import logging
 import time as _time
 
-import growth_rules as gr
-from time_utils import utc_now_iso
+import backend.services.growth_rules as gr
+from backend.core.time_utils import utc_now_iso
 
 logger = logging.getLogger('database')
 
@@ -226,7 +226,7 @@ class DBReferral:
                     out['errors']['sub_days'] = str(e)[:160]
             if 'wallet' in todo:
                 try:
-                    from db.wallet import TX_REFERRAL_CREDIT
+                    from backend.database.wallet import TX_REFERRAL_CREDIT
                     tx = await self.wallet_credit(
                         inviter, todo['wallet'], TX_REFERRAL_CREDIT,
                         'referral', f"{ref_doc['_id']}:{trigger}",

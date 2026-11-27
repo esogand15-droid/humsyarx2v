@@ -68,9 +68,9 @@ from backend.api.routers.web_ink import (
     SyncBatchRequest,
 )
 from backend.api.routers.web_reader import generate_page_token, READER_SECRET
-from core.access import check_feature
-from database import db
-from time_utils import utc_now_iso
+from backend.core.access import check_feature
+from backend.database.database import db
+from backend.core.time_utils import utc_now_iso
 
 
 class MockAsyncCursor:
@@ -586,7 +586,7 @@ class TestE2ETier3CrossFeatures(unittest.TestCase):
              patch.object(db, "sub_plan_list", new_callable=AsyncMock, return_value=[]), \
              patch.object(db, "sub_payment_history", new_callable=AsyncMock, return_value=[]), \
              patch.object(db, "get_setting", new_callable=AsyncMock, return_value=True), \
-             patch("subscription.has_access", new_callable=AsyncMock) as m_access:
+             patch("backend.bot.subscription.has_access", new_callable=AsyncMock) as m_access:
 
             # Phase 1: Inactive state
             m_access.return_value = False

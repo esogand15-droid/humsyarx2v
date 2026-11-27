@@ -10,7 +10,7 @@ import random
 import string
 from datetime import datetime
 from dataclasses import dataclass, field
-from time_utils import now_tehran
+from backend.core.time_utils import now_tehran
 
 
 def generate_exam_code() -> str:

@@ -29,7 +29,7 @@ AI_STATUS = {'ready', 'answered'}
 
 async def main() -> int:
     try:
-        from database import db  # DAL موجود — همان اتصال پروژه
+        from backend.database.database import db  # DAL موجود — همان اتصال پروژه
     except Exception as exc:
         print(f'❌ اتصال به دیتابیس ممکن نشد: {exc}')
         print('   MONGODB_URI را تنظیم کنید (مثلاً از vps.env).')

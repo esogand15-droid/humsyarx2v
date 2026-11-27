@@ -391,7 +391,7 @@ def _fake_ring(monkeypatch, flag):
     settings.flag_sync = lambda: flag
     pkg = types.ModuleType("ring")
     pkg.settings = settings
-    monkeypatch.setitem(sys.modules, "ring", pkg)
+    monkeypatch.setitem(sys.modules, "backend.services.ring", pkg)
 
 
 def test_ring_aware_keyboard_preserves_styles(monkeypatch):
@@ -430,6 +430,6 @@ def test_ring_aware_keyboard_keeps_markup_options(monkeypatch):
 def test_ring_aware_keyboard_error_falls_back(monkeypatch):
     from backend.bot import utils as bu
     pkg = types.ModuleType("ring")  # no .settings → ImportError inside → fallback
-    monkeypatch.setitem(sys.modules, "ring", pkg)
+    monkeypatch.setitem(sys.modules, "backend.services.ring", pkg)
     src = bu.main_keyboard()
     assert asyncio.run(bu.ring_aware_keyboard(src)) is src

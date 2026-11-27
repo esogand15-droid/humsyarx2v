@@ -36,14 +36,14 @@ os.environ.setdefault("ADMIN_ID", "1")
 
 from bson import ObjectId  # noqa: E402
 
-import backup  # noqa: E402
+import backend.services.backup as backup  # noqa: E402
 
 if not _MONGO_WAS_SET:
     os.environ.pop("MONGODB_URI", None)
 if not _ADMIN_WAS_SET:
     os.environ.pop("ADMIN_ID", None)
 del _MONGO_WAS_SET, _ADMIN_WAS_SET
-from backup import (  # noqa: E402
+from backend.services.backup import (  # noqa: E402
     BackupIntegrityError,
     _decode_backup_bytes,
     _encode_backup_bytes,
@@ -426,7 +426,7 @@ class JalaliScheduleNotifyTests(unittest.TestCase):
     def test_updated_exam_notification_is_jalali(self):
         from types import SimpleNamespace
 
-        from db.content import DBContent
+        from backend.database.content import DBContent
 
         inserted, inbox = [], []
 

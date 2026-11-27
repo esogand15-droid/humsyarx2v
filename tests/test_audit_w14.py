@@ -10,7 +10,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-import growth_rules as gr
+import backend.services.growth_rules as gr
 
 
 def _read(*parts: str) -> str:
@@ -145,7 +145,7 @@ def test_wiring_job_guards():
 def test_wiring_resume_delegates_to_verify():
     t = _read("dunning.py")
     assert "dun_log_click" in t
-    assert "from subscription import _zarinpal_check" in t
+    assert "from backend.bot.subscription import _zarinpal_check" in t
     # کنترل مالکیت قبل از تفویض
     assert "doc.get('user_id') or 0) != uid" in t
 

@@ -4,7 +4,7 @@
 import logging
 import os
 import httpx
-from database import db
+from backend.database.database import db
 
 logger = logging.getLogger(__name__)
 
@@ -320,7 +320,7 @@ async def _send(method: str, payload: dict) -> bool:
         return False
     # 🚀 PERF: shared client + keep-alive (before: new TLS per send → 22ms)
     try:
-        from http_client import get_shared_client
+        from backend.services.http_client import get_shared_client
         client = get_shared_client(timeout=httpx.Timeout(15, read=30))
         resp = await client.post(f"{API_BASE}/{method}", json=payload)
     except Exception:

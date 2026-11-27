@@ -50,7 +50,7 @@ async def _get_cfg() -> dict:
         return _CFG_CACHE["data"]
     cfg = {"merchant_id": MERCHANT_ID, "sandbox": SANDBOX, "callback_base": CALLBACK_BASE, "enabled": True}
     try:
-        from database import db as _db
+        from backend.database.database import db as _db
         mid = await _db.get_setting("zarinpal_merchant_id", None)
         if isinstance(mid, str) and mid.strip():
             cfg["merchant_id"] = mid.strip()

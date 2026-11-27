@@ -10,8 +10,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from api.auth import get_current_user, require_perm
-from database import db
+from backend.api.auth import get_current_user, require_perm
+from backend.database.database import db
 
 router = APIRouter()
 

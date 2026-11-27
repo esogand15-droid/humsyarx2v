@@ -10,8 +10,8 @@ import os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from database import db
-from utils import ADMIN_ID as _ADMIN_ID_FALLBACK, safe_send, send_audit_log
+from backend.database.database import db
+from backend.bot.utils import ADMIN_ID as _ADMIN_ID_FALLBACK, safe_send, send_audit_log
 from backend.bot.ui_buttons import btn, PRIMARY, SUCCESS   # 🎨 button colours
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ def _fmt_price(p: int) -> str:
 async def has_access(uid: int) -> bool:
     """آیا این کاربر اجازه‌ی دسترسی به منابع/بانک‌سوال را دارد؟ — W8: تفویض به هسته"""
     try:
-        from core.access import has_access as _core_has
+        from backend.core.access import has_access as _core_has
         return (await _core_has(int(uid))).allowed
     except Exception:
         # fallback بدون هسته
@@ -44,7 +44,7 @@ async def has_access(uid: int) -> bool:
 async def feature_allowed(uid: int, feature: str) -> bool:
     """🌊 W7 — چک بولین فیچر برای ربات (thin روی core؛ هرگز raise نمی‌کند)."""
     try:
-        from core.access import check_feature
+        from backend.core.access import check_feature
         return (await check_feature(int(uid), feature)).allowed
     except Exception:
         return False
@@ -71,7 +71,7 @@ async def show_paywall(target, uid: int, edit: bool = False, feature: str = ""):
     plans = await db.sub_plan_list(only_active=True)
     # 🌊 W7 — سرخط فیچرمحور (پس‌رو سازگار: بدون فیچر همان متن قبلی)
     try:
-        from core.features import FEATURE_CATALOG
+        from backend.core.features import FEATURE_CATALOG
         _flabel = (FEATURE_CATALOG.get(feature) or {}).get("label", "")
     except Exception:
         _flabel = ""
@@ -185,7 +185,7 @@ async def _show_rules(query, plan_id: str):
 async def _gateway_status() -> dict:
     """🌊 W2 — وضعیت درگاه برای دکمه‌ی پرداخت آنلاین ربات (فقط boolean؛ بدون secret)."""
     try:
-        from payments.zarinpal import gateway_public_status
+        from backend.integrations.zarinpal import gateway_public_status
         return await gateway_public_status()
     except Exception:
         return {"online_pay_enabled": False, "mock": False}
@@ -201,7 +201,7 @@ def _bot_gateway_callback() -> str:
 
 async def _zarinpal_start(query, context, uid: int, kind: str, ref: str):
     """🌊 W2 — شروع پرداخت آنلاین (plan یا topup)؛ آینه‌ی منطق API."""
-    from payments.zarinpal import zarinpal_request as _zp_req
+    from backend.integrations.zarinpal import zarinpal_request as _zp_req
     gw = await _gateway_status()
     if not gw.get("online_pay_enabled"):
         await query.answer("پرداخت آنلاین فعلاً فعال نیست.", show_alert=True)
@@ -320,7 +320,7 @@ async def _zarinpal_start(query, context, uid: int, kind: str, ref: str):
 
 async def _zarinpal_check(query, context, uid: int, authority: str):
     """🌊 W2 — بررسی نتیجه‌ی پرداخت آنلاین؛ آینه‌ی منطق API (verify)."""
-    from payments.zarinpal import zarinpal_verify as _zp_v
+    from backend.integrations.zarinpal import zarinpal_verify as _zp_v
     authority = (authority or "").strip()
     doc = await db.sub_payment_find_by_authority(authority)
     if not doc:
@@ -391,7 +391,7 @@ async def _zarinpal_check(query, context, uid: int, authority: str):
     context.user_data.pop("sub_gift_message", None)
     context.user_data.pop("sub_discount_code", None)
     context.user_data.pop("sub_final_price", None)
-    from utils import fmt_jalali_dt as _fmt_jalali_dt
+    from backend.bot.utils import fmt_jalali_dt as _fmt_jalali_dt
     act = res.get("activation") or {}
     is_topup = str(doc.get("plan_id") or "") == "wallet_topup"
     if is_topup:
@@ -559,7 +559,7 @@ async def _activate_free_via_discount(query, context, plan: dict, discount_code:
         try:
             _r1 = await db.get_actor_role_label(uid)
         except Exception: _r1="student"
-        try: await __import__('utils').send_audit_log(None,'user',(await db.get_user(uid) or {}).get('name',str(uid)),uid,"ثبت رسید رایگان (ربات)",module='Subscription',severity='INFO',actor_role=_r1,target_id=str(pid),target_type='sub_payment',target_label=plan['name'][:60],after={"final_price":0},tags=['مالی','ربات'])
+        try: await __import__('backend.bot.utils').send_audit_log(None,'user',(await db.get_user(uid) or {}).get('name',str(uid)),uid,"ثبت رسید رایگان (ربات)",module='Subscription',severity='INFO',actor_role=_r1,target_id=str(pid),target_type='sub_payment',target_label=plan['name'][:60],after={"final_price":0},tags=['مالی','ربات'])
         except Exception: pass
         await db.sub_payment_decide(pid, approved=True, admin_id=0, note='کد تخفیف ۱۰۰٪ — خودکار')
 
@@ -752,7 +752,7 @@ async def screenshot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         _r2 = await db.get_actor_role_label(uid)
     except Exception: _r2="student"
-    try: await __import__('utils').send_audit_log(None,'user',(await db.get_user(uid) or {}).get('name',str(uid)),uid,"ثبت رسید پرداخت (ربات)",module='Subscription',severity='INFO',actor_role=_r2,target_id=str(pid),target_type='sub_payment',target_label=plan['name'][:60],after={"final_price": final_price},tags=['مالی','ربات'])
+    try: await __import__('backend.bot.utils').send_audit_log(None,'user',(await db.get_user(uid) or {}).get('name',str(uid)),uid,"ثبت رسید پرداخت (ربات)",module='Subscription',severity='INFO',actor_role=_r2,target_id=str(pid),target_type='sub_payment',target_label=plan['name'][:60],after={"final_price": final_price},tags=['مالی','ربات'])
     except Exception: pass
 
     for k in ('sub_mode', 'sub_plan_id', 'sub_final_price', 'sub_discount_code',
@@ -921,7 +921,7 @@ async def topup_screenshot_handler(update: Update,
     try:
         _r3 = await db.get_actor_role_label(uid)
     except Exception: _r3="student"
-    try: await __import__('utils').send_audit_log(None,'user',(await db.get_user(uid) or {}).get('name',str(uid)),uid,"ثبت رسید شارژ کیف پول (ربات)",module='Subscription',severity='INFO',actor_role=_r3,target_id=str(pid),target_type='sub_payment',target_label="شارژ کیف پول",after={"amount": amount},tags=['مالی','ربات'])
+    try: await __import__('backend.bot.utils').send_audit_log(None,'user',(await db.get_user(uid) or {}).get('name',str(uid)),uid,"ثبت رسید شارژ کیف پول (ربات)",module='Subscription',severity='INFO',actor_role=_r3,target_id=str(pid),target_type='sub_payment',target_label="شارژ کیف پول",after={"amount": amount},tags=['مالی','ربات'])
     except Exception: pass
     for k in ('sub_mode', 'sub_topup_amount'):
         context.user_data.pop(k, None)
@@ -1288,7 +1288,7 @@ _SOURCE_LABELS = {
 
 
 async def _build_my_status(uid: int):
-    from utils import fmt_jalali_dt, progress_bar
+    from backend.bot.utils import fmt_jalali_dt, progress_bar
     s = await db.sub_get(uid)
     keyboard = []
 
@@ -1381,7 +1381,7 @@ async def show_my_status_msg(update):
 
 
 async def _show_my_history(query, uid: int):
-    from utils import fmt_jalali_dt
+    from backend.bot.utils import fmt_jalali_dt
     history = await db.sub_payment_history(uid)
     status_icons = {'pending': '⏳', 'approved': '✅', 'rejected': '❌',
                     'zarinpal_pending': '💳', 'cancelled': '🚫', 'refunded': '↩️'}
@@ -1412,7 +1412,7 @@ async def _show_my_history(query, uid: int):
 # ══════════════════════════════════════════════════
 
 async def _show_family(query, context, uid: int):
-    from utils import fmt_jalali_dt
+    from backend.bot.utils import fmt_jalali_dt
     s = await db.sub_get(uid) or {}
     kb = []
     # نمای عضو
@@ -1497,7 +1497,7 @@ async def family_code_text_handler(update, context):
     code = (update.message.text or '').strip()
     res = await db.family_redeem(code, update.effective_user.id)
     if res.get('ok'):
-        from utils import fmt_jalali_dt
+        from backend.bot.utils import fmt_jalali_dt
         await update.message.reply_text(
             "🎉 <b>به خانواده پیوستی!</b>\n\n"
             f"📦 پلن: {res.get('plan_name', '')}\n"
@@ -1585,7 +1585,7 @@ async def _wallet_confirm(query, context, plan_id: str, uid: int):
 async def _wallet_buy(query, context, plan_id: str, uid: int):
     """اجرا روی سرویس واحد db.wallet_purchase — همان منطق API، بدون idem پایدار.
     اگر فعال‌سازی بعد از کسر بشکند، ری‌تری همان رسید را تمام می‌کند و دوباره کم نمی‌کند."""
-    from db.wallet import WalletError
+    from backend.database.wallet import WalletError
     try:
         res = await db.wallet_purchase(
             uid, plan_id,
@@ -1620,7 +1620,7 @@ async def _wallet_buy(query, context, plan_id: str, uid: int):
 
 async def _show_wallet(query, uid: int, skip: int = 0):
     """💰 موجودی + تراکنش‌ها — human-readable و صفحه‌بندی‌شده (کرانه‌دار)."""
-    from utils import fmt_jalali_dt
+    from backend.bot.utils import fmt_jalali_dt
     page = max(0, min(int(skip or 0), 200))
     s = await db.wallet_summary(uid)
     txs = await db.wallet_tx_list(uid, skip=page, limit=8)

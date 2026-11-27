@@ -31,7 +31,7 @@ _ENV_KEYS = ("ZARINPAL_ALLOW_MOCK", "APP_ENV", "ENVIRONMENT",
 
 def _reload_zarinpal():
     """ماژول را با محیط تمیز دوباره بارگذاری می‌کند."""
-    import payments.zarinpal as zp
+    import backend.integrations.zarinpal as zp
     return importlib.reload(zp)
 
 

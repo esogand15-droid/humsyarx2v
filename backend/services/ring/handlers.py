@@ -24,16 +24,16 @@ from telegram.error import BadRequest
 from telegram.ext import (CallbackQueryHandler, CommandHandler, ContextTypes,
                           MessageHandler, filters)
 
-from ring import keyboards as K
-from ring import models as M
-from ring import moderation
-from ring import notify
-from ring import relay
-from ring import service
-from ring import settings as S
-from ring import state
-from ring import texts
-from time_utils import now_utc, utc_now_iso
+from backend.services.ring import keyboards as K
+from backend.services.ring import models as M
+from backend.services.ring import moderation
+from backend.services.ring import notify
+from backend.services.ring import relay
+from backend.services.ring import service
+from backend.services.ring import settings as S
+from backend.services.ring import state
+from backend.services.ring import texts
+from backend.core.time_utils import now_utc, utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ FLOW_TEXT_FIELDS = set(M.PROFILE_FIELDS)          # فیلدهایی که متن
 async def _set_st(uid: int, to: str, *, field: str | None = None) -> bool:
     """ماشین حالت در DB (`ring_profiles.state`) — تا ری‌استارت، کاربر
     دقیقاً همان‌جا باشد که بود (§۴۳)."""
-    from database import db
+    from backend.database.database import db
     p = await db.ring_profile(uid) or {}
     cur = p.get("state") or M.IDLE
     if not M.can_move(cur, to):
@@ -126,7 +126,7 @@ async def _retire_wait(uid: int, text: str = "✅ انجام شد.") -> None:
     تبدیل می‌کنیم؛ اگر پیام را کاربر پاک کرده باشد، خطا را می‌خوریم (id هم
     پاک شده و تایمر نمی‌ماند).
     """
-    from database import db
+    from backend.database.database import db
     p = await db.ring_profile(uid) or {}
     sm = p.get("search_msg") or {}
     await db.ring_search_msg_clear(uid)
@@ -151,7 +151,7 @@ async def _guard(update, context):
     if not S.flag_sync():
         if not await S.get_flag():
             return "disabled"
-    from database import db
+    from backend.database.database import db
     if await db.ring_ban_active(uid):
         return "banned"
     return None
@@ -164,7 +164,7 @@ async def _controls(uid: int, sess: dict | None) -> "K.KB | None":
 
 
 async def _profile(uid: int) -> dict | None:
-    from database import db
+    from backend.database.database import db
     return await db.ring_profile(uid)
 
 
@@ -178,7 +178,7 @@ async def _announce_match(uid: int, peer: int, sess: dict, cfg: dict) -> dict:
     فقط `service.finalize_match` را صدا می‌زند (idempotent؛ شکستِ ارسال در
     `sessions.notify` ثبت می‌شود تا housekeeping جبران کند).
     """
-    from ring import service
+    from backend.services.ring import service
     sid = sess.get("session_id") or ""
     if not sid:
         logger.warning("RING_ANNOUNCE_NO_SID uid=%s peer=%s", uid, peer)
@@ -219,7 +219,7 @@ async def ring_menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def _menu(msg, uid: int, context) -> None:
     """منوی /ring — وضعیت فعلی کاربر را از DB می‌خواند (§۴۳)."""
-    from database import db
+    from backend.database.database import db
     p = await db.ring_profile(uid) or {}
     if not p:
         await _set_st(uid, M.IDLE)
@@ -282,7 +282,7 @@ def _menu_head(p: dict, q: dict | None, sess: dict | None, *,
 
 
 async def _status_card(update: Update, context) -> None:
-    from database import db
+    from backend.database.database import db
     uid = update.effective_user.id
     p = await db.ring_profile(uid) or {}
     q = await db.ring_queue_get(uid)
@@ -400,7 +400,7 @@ async def _r_mode(q, context, uid, arg, parts):
         return
     if r["kind"] == "ok":
         # §۱۹ — حالتِ تازه persist می‌شود و پیام بعدیِ رینگ همان را نشان می‌دهد
-        from database import db
+        from backend.database.database import db
         await db.ring_profile_update(uid, {"search_expired_at": None})
         await q.answer(f"🎭 حالت: {M.MODES.get(r['mode'], r['mode'])}")
     cfg = await S.get_cfg()
@@ -444,8 +444,8 @@ async def _r_home(q, context, uid, arg, parts):
     _flow_clear(context)
     await _show(q, "↩️ از رینگ خارج شدی.")
     try:
-        from database import db
-        from utils import get_keyboard_for_user
+        from backend.database.database import db
+        from backend.bot.utils import get_keyboard_for_user
         user = await db.get_user(uid)
         if user:
             await q.message.reply_text(
@@ -469,7 +469,7 @@ async def _r_go(q, context, uid, arg, parts):
 async def _r_next(q, context, uid, arg, parts):
     """⏭ نفر بعدی — اول تأیید (§۲۴)، بعد پایانِ *همین* session و ورود دوباره
     به صف. پارتنر فقط یک اطلاعیه می‌بیند، نه پیامِ ساختگی در گفت‌وگو (§۱۰)."""
-    from database import db
+    from backend.database.database import db
     sess = await db.ring_session_active_for(uid)
     if not sess:
         await _do_search(q, context, uid)
@@ -485,7 +485,7 @@ async def _r_next(q, context, uid, arg, parts):
 
 
 async def _do_search(q, context, uid) -> None:
-    from database import db
+    from backend.database.database import db
     p = await _profile(uid) or {}
     mode = p.get("mode") or "fun"
     qrow = None
@@ -583,14 +583,14 @@ async def _r_cancelq(q, context, uid, arg, parts):
     """
     r = await service.cancel_search(uid)
     if r["kind"] == "in_chat":
-        from database import db
+        from backend.database.database import db
         await _show(q, "💬 تو الان وسط گفت‌وگویی؛ جست‌وجویی باز نیست که لغو شود.",
                     await _controls(uid, await db.ring_session_active_for(uid)))
         return
     if r["kind"] == "matched":
         # §۳۹ (V6) — دکمهٔ «لغو» درست لحظه‌ای خورد که مچ شدی؛ بگوییم چی شد
         # (و نگوییم «لغو شد» که دروغ است) و همان کنترل‌های چت را نشان بدهیم.
-        from database import db
+        from backend.database.database import db
         sess = await db.ring_session(r.get("session_id") or "")
         await _show(q, "🎉 همین حالا مچ شدی! لغو نشد — گفت‌وگو از این‌پایین باز است ✅",
                     K.kb_chat((sess or {}).get("mode") or "fun", await S.get_cfg()))
@@ -612,7 +612,7 @@ async def _r_resq(q, context, uid, arg, parts):
 
 async def _r_end(q, context, uid, arg, parts):
     """⏹ پایان گفتگو: فقط پایان session، بازگشت به منوی رینگ، بدون ورود به صف."""
-    from database import db
+    from backend.database.database import db
     _flow_clear(context)
     sess = await db.ring_session_active_for(uid)
     if not sess:
@@ -627,7 +627,7 @@ async def _r_end(q, context, uid, arg, parts):
 
 async def _r_extend(q, context, uid, arg, parts):
     """«▶️ ادامه گفتگو» در یادآوری بی‌فعالی — فقط گفت‌وگو را زنده نگه می‌دارد."""
-    from database import db
+    from backend.database.database import db
     sess = await db.ring_session_active_for(uid)
     if not sess:
         await _show(q, texts.no_session(), K.kb_menu({}))
@@ -639,14 +639,14 @@ async def _r_extend(q, context, uid, arg, parts):
             {"$set": {"last_activity_at": utc_now_iso()}})
     except Exception as e:
         logger.debug("ring extend touch failed: %s", e)
-    from ring import jobs
+    from backend.services.ring import jobs
     jobs.forget_warning(sid)
     await _show(q, "👌 گفت‌وگو باز است؛ هر وقت خواستی بنویس.", await _controls(uid, sess))
 
 
 async def _r_blocked(q, context, uid, arg, parts):
     """🚫 مسدودشده‌ها (§۲۱) — صفحهٔ جدا برای آزاد کردن."""
-    from database import db
+    from backend.database.database import db
     rows = await db.ring_blocks_list(uid)
     out = [{"uid": int(r["blocked_user_id"]),
             "anon": (await db.ring_profile(int(r["blocked_user_id"])) or {}).get("anon_id")}
@@ -660,7 +660,7 @@ async def _r_blocked(q, context, uid, arg, parts):
 
 async def _r_view(q, context, uid, arg, parts):
     """👁 «چه چیزهایی از پروفایلم دیده شود» (§۳۵)."""
-    from database import db
+    from backend.database.database import db
     if arg and arg in M.PROFILE_VIEW:
         cur = await db.ring_profile(uid) or {}
         await service.set_view(uid, arg, not M.view_on(cur, arg))
@@ -676,7 +676,7 @@ async def _r_view(q, context, uid, arg, parts):
 
 async def _r_rate(q, context, uid, arg, parts):
     """🌟 امتیاز دادن (از منو): برای آخرین گفت‌وگوی تمام‌شده."""
-    from database import db
+    from backend.database.database import db
     sess = await db.ring_last_ended_session(uid)
     if not sess:
         await _show(q, "🌟 گفت‌وگوی تمام‌شدۀ تازه‌ای نداری که به آن امتیاز بدهی.",
@@ -687,7 +687,7 @@ async def _r_rate(q, context, uid, arg, parts):
 
 
 async def _r_stop(q, context, uid, arg, parts):
-    from database import db
+    from backend.database.database import db
     _flow_clear(context)
     sess = await db.ring_session_active_for(uid)
     if sess:
@@ -699,7 +699,7 @@ async def _r_stop(q, context, uid, arg, parts):
 
 
 async def _r_chat(q, context, uid, arg, parts):
-    from database import db
+    from backend.database.database import db
     sess = await db.ring_session_active_for(uid)
     if not sess:
         await _show(q, texts.no_session(), K.kb_menu({}))
@@ -729,7 +729,7 @@ async def _r_mdiff(q, context, uid, arg, parts):
 
 
 async def _r_profile(q, context, uid, arg, parts):
-    from database import db
+    from backend.database.database import db
     p = await db.ring_profile_ensure(uid)
     cfg = await S.get_cfg()
     _flow_set(context, view="profile")
@@ -738,7 +738,7 @@ async def _r_profile(q, context, uid, arg, parts):
 
 
 async def _r_field(q, context, uid, arg, parts):
-    from database import db
+    from backend.database.database import db
     p = await db.ring_profile(uid) or {}
     if arg == "skip":
         await _set_st(uid, M.IDLE)
@@ -789,7 +789,7 @@ async def _r_field(q, context, uid, arg, parts):
 
 async def _r_profile_done_edit(q, context, uid) -> None:
     """بازگشت به منوی پروفایل بدون تغییر متن (یک refresh ساده)."""
-    from database import db
+    from backend.database.database import db
     p = await db.ring_profile(uid) or {}
     cfg = await S.get_cfg()
     await _show(q, texts.profile_summary(p), K.kb_profile_menu(p, cfg), md=True)
@@ -801,7 +801,7 @@ async def _r_intent(q, context, uid, arg, parts):
 
 
 async def _r_topic(q, context, uid, arg, parts):
-    from database import db
+    from backend.database.database import db
     if arg == "done":
         sel = _flow(context).get("topics") or []
         await service.update_profile(uid, {"topics": sel})
@@ -822,20 +822,20 @@ async def _r_topic(q, context, uid, arg, parts):
 
 async def _clear_expired(uid: int) -> None:
     """§۳۶ — با عوض‌شدن معیار/حالت، «وقت قبلی تمام شد» معنا ندارد."""
-    from database import db
+    from backend.database.database import db
     await db.ring_profile_update(uid, {"search_expired_at": None})
 
 
 async def _r_pref_gender(q, context, uid, arg, parts):
     await service.update_profile(uid, {"pref_gender": arg})
-    from database import db
+    from backend.database.database import db
     await _clear_expired(uid)
     p = await db.ring_profile(uid) or {}
     await _show(q, "✅ ترجیح جنسیت ثبت شد.", K.kb_prefs(p))
 
 
 async def _r_pref_age(q, context, uid, arg, parts):
-    from database import db
+    from backend.database.database import db
     if arg == "open":
         _flow_set(context, pa=list(str((await _profile(uid) or {}).get("pref_age_ranges") or "").split(",")))
         await _show(q, "🎂 کدام حلقه‌های سنی؟ (چندتایی مجاز است)",
@@ -862,7 +862,7 @@ async def _r_pref_age(q, context, uid, arg, parts):
 
 
 async def _r_safety(q, context, uid, arg, parts):
-    from database import db
+    from backend.database.database import db
     rows = await db.ring_blocks_list(uid)
     blocks = [{"uid": int(r["blocked_user_id"]), "anon": (await db.ring_profile(int(r["blocked_user_id"])) or {}).get("anon_id"),
                "label": None} for r in rows]
@@ -877,7 +877,7 @@ async def _r_safety(q, context, uid, arg, parts):
 
 
 async def _r_block(q, context, uid, arg, parts):
-    from database import db
+    from backend.database.database import db
     if arg == "yes":
         sess = await db.ring_session_active_for(uid)
         r = await moderation.block(uid, sess["session_id"] if sess else "")
@@ -904,7 +904,7 @@ async def _r_unblock(q, context, uid, arg, parts):
 
 
 async def _r_report(q, context, uid, arg, parts):
-    from database import db
+    from backend.database.database import db
     if arg == "anon":
         await _set_st(uid, M.REPORT_WHY, field="report_anon")
         _flow_set(context, mode="anon")
@@ -968,7 +968,7 @@ _RATING_BY_LABEL = {lbl.split(" ")[-1]: k for k, lbl in M.RATING_LABELS.items()}
 async def _r_rating(q, context, uid, arg, parts):
     """امتیاز پس از پایان (§۳۴). پیام‌های قدیمی برچسب فارسی می‌فرستادند ⇒
     هر دو قالب پذیرفته می‌شود. امتیاز منفی هیچ‌وقت بن نمی‌سازد."""
-    from database import db
+    from backend.database.database import db
     sess = await db.ring_last_ended_session(uid)
     if not sess:
         await _show(q, "🌟 الان گفت‌وگوی تمام‌شدۀ تازه‌ای نداری.", K.kb_menu({}))
@@ -1091,7 +1091,7 @@ async def ring_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not what:
         return
     txt = (msg.text or "").strip()
-    from database import db
+    from backend.database.database import db
     if what == "report_anon":
         if txt in ("رد", "skip", "-"):
             _flow_clear(context)
@@ -1185,7 +1185,7 @@ def _menu_bypass_filter(update) -> bool:
 async def ring_menu_bypass(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """تپِ منو را به مسیریابِ خودِ ربات می‌دهد — برای همین کاربر، بدون رله."""
     try:
-        from bot import unified_text_handler
+        from backend.bot.bot import unified_text_handler
         # ⚠️ SystemExit هم گرفته می‌شود: اگر bot.py در محیطِ تست (بدون توکن)
         # import نشود، `sys.exit(1)` می‌کند و آن جزو Exception نیست.
     except (Exception, SystemExit) as e:

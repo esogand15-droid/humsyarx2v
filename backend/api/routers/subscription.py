@@ -21,24 +21,24 @@ from pydantic import (
     Field,
 )
 
-from api.auth import (
+from backend.api.auth import (
     get_current_user,
 )
 try:
-    from api.rate_limit import rate_limit_user
+    from backend.api.rate_limit import rate_limit_user
     from fastapi import Request
     _HAS_RL = True
 except Exception:
     _HAS_RL = False
     rate_limit_user = None  # type: ignore
 
-from api.telegram_send import (
+from backend.api.telegram_send import (
     upload_and_get_file_id,
 )
 
 from bson import ObjectId
-from database import db
-from request_context import current_request_id
+from backend.database.database import db
+from backend.core.request_context import current_request_id
 
 async def _sub_audit(actor: dict, action: str, *, before=None, after=None, target_id="", target_label="", severity="INFO", details: str = ""):
     try:
@@ -54,7 +54,7 @@ async def _sub_audit(actor: dict, action: str, *, before=None, after=None, targe
         await db.log_action(uid, name or str(uid), role, action, "Subscription", category="subscription", severity=severity, target_id=str(target_id), target_type="sub_payment" if target_id else "subscription", target_label=target_label, before=before, after=after, details=details, tags=["مالی", "اشتراک"] )
     except Exception:
         pass
-from time_utils import utc_now_iso
+from backend.core.time_utils import utc_now_iso
 
 
 router = APIRouter()
@@ -257,7 +257,7 @@ def normalize_payment(
 def _expires_fa(subscription) -> str:
     if not subscription or not subscription.get("end_date"):
         return ""
-    from time_utils import format_date_fa
+    from backend.core.time_utils import format_date_fa
     return format_date_fa(subscription["end_date"], long=True, fallback="")
 
 
@@ -268,7 +268,7 @@ async def get_status(
     ),
 ):
     user_id = user["id"]
-    from api.auth import demo_sessions_enabled
+    from backend.api.auth import demo_sessions_enabled
     if user_id == 99999999 and demo_sessions_enabled():
         return {
             "active": True,
@@ -279,7 +279,7 @@ async def get_status(
             "enforced": True,
         }
 
-    from subscription import has_access
+    from backend.bot.subscription import has_access
 
     (
         subscription,
@@ -504,7 +504,7 @@ async def validate_discount(
 async def _features_map() -> dict:
     """🌊 W7 — {feature: {label, enabled, access}} برای فرانت (best-effort)."""
     try:
-        from core.features import FEATURE_CATALOG
+        from backend.core.features import FEATURE_CATALOG
         docs = await db.feature_policies.find(
             {"_id": {"$in": list(FEATURE_CATALOG)}}).to_list(50)
         by_id = {d.get("_id"): d for d in docs}
@@ -535,7 +535,7 @@ async def feature_event_ep(
     """🌊 W7 — ایونت فرانت (paywall/CTA)؛ کرانه‌دار و best-effort."""
     if _HAS_RL:
         await rate_limit_user(user["id"], "feature_event", 30, 60)
-    from core.features import FEATURE_CATALOG
+    from backend.core.features import FEATURE_CATALOG
     if body.feature not in FEATURE_CATALOG:
         raise HTTPException(status_code=404, detail="فیچر ناشناخته")
     if body.event not in ("paywall_viewed", "subscription_cta_clicked",
@@ -1252,7 +1252,7 @@ async def gateway_status(user=Depends(get_current_user)):
     """🌊 W2 — وضعیت عمومی درگاه برای کلاینت‌ها (فقط boolean؛ بدون secret)."""
     if _HAS_RL:
         await rate_limit_user(user["id"], "gw_status", 60, 60)
-    from payments.zarinpal import gateway_public_status
+    from backend.integrations.zarinpal import gateway_public_status
     return await gateway_public_status()
 
 
@@ -1268,7 +1268,7 @@ class ZarinpalRequestBody(BaseModel):
 async def zarinpal_request_ep(body: ZarinpalRequestBody, user=Depends(get_current_user)):
     if _HAS_RL:
         await rate_limit_user(user["id"], "zarinpal_req", 10, 60)
-    from payments.zarinpal import zarinpal_request as _zp_req, gateway_public_status
+    from backend.integrations.zarinpal import zarinpal_request as _zp_req, gateway_public_status
     user_id = user["id"]
     # 🐞 BUGFIX — مثل topup: اگر درگاه خاموش/غیرمجاز است، درخواست پرداخت ساخته نشود
     _gw = await gateway_public_status()
@@ -1309,7 +1309,7 @@ async def zarinpal_request_ep(body: ZarinpalRequestBody, user=Depends(get_curren
         # 🐞 BUGFIX — idem پیش‌فرض برای همه‌ی کاربران یکتا نیست؛ پرداخت کاربر
         # دیگر نباید replay شود. URL هم از کانفیگ واقعی sandbox ساخته می‌شود.
         if ex and int(ex.get("user_id") or 0) == user_id and ex.get("zarinpal_authority"):
-            from payments.zarinpal import _pay_url_async
+            from backend.integrations.zarinpal import _pay_url_async
             return {"ok": True, "authority": ex["zarinpal_authority"], "url": await _pay_url_async(ex["zarinpal_authority"]), "payment_id": str(ex["_id"]), "replay": True, "final_price": int(ex.get("final_price") or price)}
     # discount not consumed yet — will be consumed atomically at verify (after payment) to avoid stuck reservation
     # gateway request
@@ -1341,7 +1341,7 @@ async def zarinpal_topup_ep(body: ZarinpalTopupBody, user=Depends(get_current_us
     """🌊 W2 — شارژ کیف پول با درگاه آنلاین (مبلغ‌محور؛ بدون پلن)."""
     if _HAS_RL:
         await rate_limit_user(user["id"], "zarinpal_topup", 10, 60)
-    from payments.zarinpal import zarinpal_request as _zp_req, gateway_public_status
+    from backend.integrations.zarinpal import zarinpal_request as _zp_req, gateway_public_status
     user_id = user["id"]
     gw = await gateway_public_status()
     if not gw.get("online_pay_enabled"):
@@ -1361,7 +1361,7 @@ async def zarinpal_topup_ep(body: ZarinpalTopupBody, user=Depends(get_current_us
     ex = await db.sub_payments.find_one({"idem_key": idem})
     if ex is not None and int(ex.get("user_id") or 0) == user_id and ex.get("zarinpal_authority"):
         auth = ex["zarinpal_authority"]
-        from payments.zarinpal import _pay_url_async
+        from backend.integrations.zarinpal import _pay_url_async
         return {"ok": True, "authority": auth, "url": await _pay_url_async(auth),
                 "payment_id": str(ex["_id"]), "replay": True,
                 "final_price": int(ex.get("final_price") or amount)}
@@ -1391,7 +1391,7 @@ class ZarinpalVerifyBody(BaseModel):
 async def zarinpal_verify_ep(body: ZarinpalVerifyBody, user=Depends(get_current_user)):
     if _HAS_RL:
         await rate_limit_user(user["id"], "zarinpal_verify", 20, 60)
-    from payments.zarinpal import zarinpal_verify as _zp_v
+    from backend.integrations.zarinpal import zarinpal_verify as _zp_v
     authority = (body.authority or "").strip()
     doc = await db.sub_payment_find_by_authority(authority)
     if not doc:

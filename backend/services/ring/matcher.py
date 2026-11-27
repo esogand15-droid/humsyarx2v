@@ -9,7 +9,7 @@ fairness: اول هر که بیشتر منتظر کشیده — queue با sort 
 """
 from __future__ import annotations
 
-from ring import models as M
+from backend.services.ring import models as M
 
 
 def verdict(me: dict, cand: dict, *, mode: str, cfg: dict,

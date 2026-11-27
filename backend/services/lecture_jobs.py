@@ -163,7 +163,7 @@ def _clean_extra(extra: dict, allowed: frozenset) -> dict:
 
 def _get_collection():
     """Resolve the lecture_jobs collection via the shared db facade."""
-    from database import db  # same import as ai_solver / bot modules
+    from backend.database.database import db  # same import as ai_solver / bot modules
     col = getattr(db, COLLECTION, None)
     if col is not None:
         return col

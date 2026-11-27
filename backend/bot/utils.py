@@ -136,7 +136,7 @@ async def _role_keyboard(user: dict, uid: int) -> ReplyKeyboardMarkup:
     if role == 'content_admin':
         return content_admin_keyboard()
     # FIX جدید: چک نقش فرعی (support/broadcaster/content_scoped)
-    from database import db
+    from backend.database.database import db
     role_doc = await db.get_admin_role(uid)
     if role_doc:
         sub_role = role_doc.get('role', '')
@@ -163,7 +163,7 @@ async def ring_aware_keyboard(kb: ReplyKeyboardMarkup) -> ReplyKeyboardMarkup:
       می‌گیریم و خطا یعنی «دکمه نباشد» (fail-safe).
     """
     try:
-        from ring import settings as _rs
+        from backend.services.ring import settings as _rs
         # یک query ارزان روی bot_settings/_id=global (فقط در /start) ⇒
         # روشن/خاموش‌کردن از پنل در همان لحظه در منو اثر می‌کند، نه تا
         # ۳۰ ثانیه بعد (job). اگر DB خطا داد: دکمه نباشد (fail-safe).
@@ -260,7 +260,7 @@ def exam_countdown(days: int) -> str:
 # ══════════════════════════════════════════════════
 # این نام‌ها برای compatibility ماژول‌های قدیمی حفظ شده‌اند؛ تمام منطق
 # timezone/calendar در time_utils.py است و این فایل conversion مستقلی ندارد.
-from time_utils import (
+from backend.core.time_utils import (
     TEHRAN, UTC, day_bounds_utc, format_date_fa, format_datetime_fa,
     jalali_to_gregorian, now_tehran as _contract_now_tehran,
     now_utc, parse_gregorian_date, today_tehran, utc_now_iso,
@@ -526,7 +526,7 @@ async def safe_send_ex(bot, uid: int, text: str, **kwargs):
             reason = blocked_reason_of(e)
             if reason:
                 try:
-                    from database import db as _db
+                    from backend.database.database import db as _db
                     await _db.mark_user_blocked(uid, blocked=True, reason=reason)
                 except Exception:
                     pass
@@ -654,7 +654,7 @@ def new_correlation_id() -> str:
     Fallback: همچنان uuid کوتاه اگر timezone در دسترس نباشد.
     """
     try:
-        from time_utils import now_tehran
+        from backend.core.time_utils import now_tehran
         today = now_tehran().strftime("%Y%m%d")
     except Exception:
         from datetime import datetime, timezone
@@ -673,7 +673,7 @@ def new_event_id() -> str:
 def sanitize_audit_data(data):
     """Sanitizer مرکزی — §9: Redact قبل از Persistence."""
     try:
-        from audit import sanitize_audit_data as _san
+        from backend.services.audit import sanitize_audit_data as _san
         return _san(data)
     except Exception:
         return data
@@ -681,7 +681,7 @@ def sanitize_audit_data(data):
 
 def get_correlation_id(explicit=None) -> str:
     try:
-        from audit import get_correlation_id as _g
+        from backend.services.audit import get_correlation_id as _g
         return _g(explicit)
     except Exception:
         return explicit or new_correlation_id()
@@ -689,7 +689,7 @@ def get_correlation_id(explicit=None) -> str:
 
 def _fa_module(module: str) -> str:
     """ترجمه نام ماژول انگلیسی (پایدار در کد) به فارسی (فقط برای نمایش)"""
-    from database import db
+    from backend.database.database import db
     return db.MODULE_LABELS_FA.get(module, module)
 
 
@@ -705,7 +705,7 @@ def build_audit_log_text(category: str, actor_name: str, actor_id: int,
     سازگاری Legacy حفظ شده — تمام فراخوان‌های قدیمی بدون تغییر کار می‌کنند.
     """
     try:
-        from audit import build_audit_log_text as _central
+        from backend.services.audit import build_audit_log_text as _central
         return _central(category, actor_name, actor_id, action, module, details,
                         severity, actor_role, target_id, target_type,
                         target_label, before, after, tags)
@@ -715,7 +715,7 @@ def build_audit_log_text(category: str, actor_name: str, actor_id: int,
     def esc(v) -> str:
         return html.escape(str(v))
     try:
-        from audit import normalize_severity
+        from backend.services.audit import normalize_severity
         sev_n = normalize_severity(severity)
     except Exception:
         sev_n = (severity or "INFO").upper()
@@ -787,7 +787,7 @@ async def send_audit_log(bot, category: str, actor_name: str, actor_id: int,
     """
     # Delegate به audit.py مرکزی — Single Source of Truth §47
     try:
-        from audit import audit_event as _audit_event
+        from backend.services.audit import audit_event as _audit_event
         # تعیین source/channel اگر نداده
         src = source or ("bot" if bot else "system")
         ch = channel or "telegram"
@@ -817,8 +817,8 @@ async def send_audit_log(bot, category: str, actor_name: str, actor_id: int,
         # توسط audit.py در _delivery_health ردیابی می‌شود؛ اینجا نیاز به کار اضافی نیست
         # ولی برای سازگاری با فلگ قدیمی log_group_alerted_*, همگام می‌کنیم:
         try:
-            from database import db as _db
-            from audit import get_delivery_health
+            from backend.database.database import db as _db
+            from backend.services.audit import get_delivery_health
             health = get_delivery_health()
             alert_key = f'log_group_alerted_{category}'
             if health.get("is_healthy") and await _db.get_setting(alert_key, False):
@@ -857,7 +857,7 @@ async def send_audit_log(bot, category: str, actor_name: str, actor_id: int,
         # اگر audit.py هر دلیلی fail شد (نباید)، fallback به مسیر قدیمی با log قابل مشاهده (§34)
         logger.exception("audit_event delegation failed, falling back to legacy: %s", e)
         try:
-            from database import db as _db2
+            from backend.database.database import db as _db2
             log_id = await _db2.log_action(
                 actor_id, actor_name, actor_role, action, module, category,
                 severity, target_id, target_type, target_label,
@@ -896,12 +896,12 @@ async def send_audit_log(bot, category: str, actor_name: str, actor_id: int,
 
 async def is_maintenance_on() -> bool:
     """آیا ربات در حالت تعمیر و نگهداری است؟"""
-    from database import db
+    from backend.database.database import db
     return bool(await db.get_setting('maintenance_mode', False))
 
 
 async def maintenance_message() -> str:
-    from database import db
+    from backend.database.database import db
     custom = await db.get_setting('maintenance_text', '')
     if custom:
         return custom
@@ -960,14 +960,14 @@ def webapp_kb(link: str, label: str = '📱 باز کردن در هامزیار'
 # ─── Audit health helpers (proxy to audit.py مرکزی) ───
 def get_audit_delivery_health() -> dict:
     try:
-        from audit import get_delivery_health as _h
+        from backend.services.audit import get_delivery_health as _h
         return _h()
     except Exception:
         return {"is_healthy": True, "consecutive_failures": 0}
 
 async def get_audit_db_health(days: int = 7) -> dict:
     try:
-        from database import db as _db
+        from backend.database.database import db as _db
         return await _db.get_audit_health_metrics()
     except Exception:
         return {}

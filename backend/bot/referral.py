@@ -9,8 +9,8 @@
 import logging
 import os
 
-import growth_rules as gr
-from database import db
+import backend.services.growth_rules as gr
+from backend.database.database import db
 
 logger = logging.getLogger(__name__)
 

@@ -149,7 +149,7 @@ class FakeColl:
 
 def make_dal():
     """نمونه‌ی DAL واقعی بدون __init__ (اتصال Mongo لازم نیست) + کالکشن‌های فیک."""
-    from database import db as real_db
+    from backend.database.database import db as real_db
     dal = object.__new__(type(real_db))
     dal.bs_sessions = FakeColl()
     dal.bs_content = FakeColl()
@@ -382,7 +382,7 @@ class CowDecisionTests(unittest.TestCase):
     """ماتریس §۳ DESIGN — نقش × رکورد × اولین ذخیره"""
 
     def setUp(self):
-        import content_admin as ca
+        import backend.bot.content_admin as ca
         self.ca = ca
         self.dal = make_dal()
         seed_basic_science(self.dal)
@@ -470,7 +470,7 @@ class ApiCowWriteTests(unittest.TestCase):
     """ماتریس دسترسی API — edit_scope دستکاری‌شده نمی‌تواند scope را دور بزند"""
 
     def setUp(self):
-        import api.routers.content_admin as router
+        import backend.api.routers.content_admin as router
         self.r = router
         self.dal = make_dal()
         seed_basic_science(self.dal)

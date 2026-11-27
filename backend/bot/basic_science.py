@@ -8,8 +8,8 @@ import logging
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from database import db
-from utils import TERMS, CONTENT_ICONS
+from backend.database.database import db
+from backend.bot.utils import TERMS, CONTENT_ICONS
 BRAND_NAME = os.getenv("BRAND_NAME", "هامزیار")
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ async def basic_science_callback(update: Update, context: ContextTypes.DEFAULT_T
 
     # FIX جدید: دفاع لایه‌دوم — حتی اگه از دکمه‌ی قدیمیِ توی چت وارد بشه
     if action != 'main_admin':
-        from subscription import feature_allowed
+        from backend.bot.subscription import feature_allowed
         if not await feature_allowed(update.effective_user.id, "resources"):
             await query.answer("🔒 اول باید اشتراک فعال کنی — از «📚 منابع» شروع کن.", show_alert=True)
             return

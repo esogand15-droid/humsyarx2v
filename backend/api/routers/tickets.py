@@ -5,11 +5,11 @@ from datetime import datetime
 from html import escape
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from api.auth import get_current_user
-from database import db
-from api.rate_limit import rate_limit_user  # 🛡 W3/SEC-03
-from request_context import current_request_id
-from time_utils import utc_now_iso
+from backend.api.auth import get_current_user
+from backend.database.database import db
+from backend.api.rate_limit import rate_limit_user  # 🛡 W3/SEC-03
+from backend.core.request_context import current_request_id
+from backend.core.time_utils import utc_now_iso
 
 router = APIRouter()
 SUBJECTS = ["🔬 مشکل در منابع","🧪 مشکل در بانک سوال","💳 مشکل اشتراک","📊 مشکل نمرات","👤 مشکل حساب","⚙️ مشکل فنی","💡 پیشنهاد","❓ سوال دیگر"]

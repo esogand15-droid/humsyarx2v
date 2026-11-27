@@ -6,13 +6,13 @@
 """
 import os
 import logging
-from utils import esc as escape   # 🛡 AUDIT-A6 —escape مرکزی
+from backend.bot.utils import esc as escape   # 🛡 AUDIT-A6 —escape مرکزی
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.ext import ContextTypes, ConversationHandler
-from database import db
-from utils import send_audit_log
+from backend.database.database import db
+from backend.bot.utils import send_audit_log
 from backend.bot.ui_buttons import btn, PRIMARY   # 🎨 button colours
-from utils import progress_bar, get_rank, fmt_jalali_dt
+from backend.bot.utils import progress_bar, get_rank, fmt_jalali_dt
 
 logger   = logging.getLogger(__name__)
 ADMIN_ID = int(os.getenv('ADMIN_ID', '0'))
@@ -133,7 +133,7 @@ async def _profile_keyboard(user: dict = None) -> InlineKeyboardMarkup:
     ]
     # 🌱 W13 — دعوت دوستان (فقط وقتی کلید ریفرال روشن است)
     try:
-        from referral import is_enabled as _ref_on
+        from backend.bot.referral import is_enabled as _ref_on
         if await _ref_on():
             rows.insert(-2, [InlineKeyboardButton('🎁 دعوت دوستان',
                                                   callback_data='ref:menu')])
@@ -176,7 +176,7 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not user:
             await query.edit_message_text("❌ کاربر پیدا نشد.")
             return
-        from subscription import sub_status_line
+        from backend.bot.subscription import sub_status_line
         sub_line = await sub_status_line(uid)
         await query.edit_message_text(
             _profile_text(user, stats, open_t, sub_line),
@@ -222,7 +222,7 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 break
         await query.answer("✅ کد وب‌اپ شما با موفقیت تغییر کرد.", show_alert=True)
         user, stats, open_t = await _get_profile_data(uid)
-        from subscription import sub_status_line
+        from backend.bot.subscription import sub_status_line
         sub_line = await sub_status_line(uid)
         await query.edit_message_text(
             _profile_text(user, stats, open_t, sub_line),
@@ -660,7 +660,7 @@ async def show_profile_msg(update: Update):
     if not user:
         await update.message.reply_text("❌ کاربر پیدا نشد.")
         return
-    from subscription import sub_status_line
+    from backend.bot.subscription import sub_status_line
     sub_line = await sub_status_line(uid)
     await update.message.reply_text(
         _profile_text(user, stats, open_t, sub_line),

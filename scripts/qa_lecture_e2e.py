@@ -357,7 +357,7 @@ async def run_once(args, fail_at: str, out_dir: str) -> dict:
     import httpx
     import backend.services.ai_solver as ai_solver
     import backend.services.lecture_scribe as ls
-    import lecture_notes_pdf  # noqa: F401 — root shim; aliases to backend.services.lecture_notes_pdf
+    import backend.services.lecture_notes_pdf as lecture_notes_pdf  # noqa: F401 — root shim; aliases to backend.services.lecture_notes_pdf
     import backend.services.lecture_notes_pdf as lnp
 
     try:

@@ -63,7 +63,7 @@ def _fa_date(iso: str) -> str:
     if not iso:
         return 'بدون انقضا'
     try:
-        from utils import fmt_jalali_dt
+        from backend.bot.utils import fmt_jalali_dt
         return fmt_jalali_dt(iso, with_time=False)
     except Exception:
         return str(iso)[:10]

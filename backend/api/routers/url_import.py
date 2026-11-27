@@ -11,11 +11,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from api.auth import get_content_admin_user, resolve_content_intake
-from api.routers.admin_panel import _audit
-from database import db
-from api.rate_limit import rate_limit_user  # 🛡 W3/SEC-03
-import url_import_service as svc
+from backend.api.auth import get_content_admin_user, resolve_content_intake
+from backend.api.routers.admin_panel import _audit
+from backend.database.database import db
+from backend.api.rate_limit import rate_limit_user  # 🛡 W3/SEC-03
+import backend.services.url_import_service as svc
 
 logger = logging.getLogger("url_import")
 

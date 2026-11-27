@@ -40,11 +40,11 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from api.routers.web_library import _gate, _web_user
-from api.routers.web_reader import SCOPES, _item, _public
+from backend.api.routers.web_library import _gate, _web_user
+from backend.api.routers.web_reader import SCOPES, _item, _public
 from backend.api.routers.web_student import current_student
-from database import db
-from time_utils import now_utc, utc_now_iso
+from backend.database.database import db
+from backend.core.time_utils import now_utc, utc_now_iso
 
 logger = logging.getLogger(__name__)
 

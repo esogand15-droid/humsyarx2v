@@ -15,14 +15,14 @@ import logging
 
 from telegram.constants import ParseMode
 
-from ring import models as M
-from ring import notify
-from ring import keyboards as K
-from ring import service
-from ring import settings as S
-from ring import state
-from ring import texts
-from time_utils import now_utc
+from backend.services.ring import models as M
+from backend.services.ring import notify
+from backend.services.ring import keyboards as K
+from backend.services.ring import service
+from backend.services.ring import settings as S
+from backend.services.ring import state
+from backend.services.ring import texts
+from backend.core.time_utils import now_utc
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ async def ring_search_tick_job(context) -> None:
 
 async def _sweep(db, cfg: dict) -> int:
     """تلاش مجدد برای match کردن منتظرهای صف — idempotent (§۶۲)."""
-    from ring import handlers as H
+    from backend.services.ring import handlers as H
     rows = await db.ring_cols.queue.find(
         {"status": "waiting"}, {"user_id": 1, "mode": 1}
     ).sort("queued_at", 1).to_list(SWEEP_LIMIT)
@@ -90,7 +90,7 @@ async def ring_housekeeping_job(context) -> None:
     """§۳۵/§۴۹/§۵۱ + §۳۹ — جاروی صف و تخلیهٔ شمارنده‌های آن‌مِوری.
 
     هزینه‌ی هر دور: ۴ query محدود (§۵۳)."""
-    from database import db
+    from backend.database.database import db
     try:
         cfg = await S.get_cfg()
         flag = await S.get_flag()
@@ -147,7 +147,7 @@ async def ring_housekeeping_job(context) -> None:
                 warned += 1
         # ۳.۵) §۳۹ — شمارنده‌های «چرا مچ نشد» که در RAM جمع شده‌اند، همین‌جا
         # روی دیسک می‌نشینند (یک $inc دسته‌ای، نه به‌ازای هر رد).
-        from ring import analytics as _A
+        from backend.services.ring import analytics as _A
         await _A.flush_rejects()
         # ۳.۷) §۱۹/§۳۱/§۴۸ (V6) — «تورِ ایمنیِ» قیفِ match. مسیرِ اصلی همان
         # لحظهٔ مچ‌شدن همه‌چیز را انجام می‌دهد؛ این سه فراخوانی فقط برای
@@ -188,7 +188,7 @@ async def ring_housekeeping_job(context) -> None:
 
 
 async def _hard_disable(db) -> None:
-    from ring import state
+    from backend.services.ring import state
     for row in state.snapshot():
         await service.end_session(None, row["session_id"], "disabled_hard")
     await db.ring_cols.queue.update_many({"status": {"$in": ["waiting", "claimed", "claiming"]}},
@@ -214,7 +214,7 @@ def _age_s(iso) -> int:
 async def ring_daily_job(context) -> None:
     """چرخش آمار + پاک‌سازی شواهد (§۳۵) — TTL Mongo هم کار را می‌کند؛
     این تابع فقط برای روزهای بدون تردد و لاگ خلاصه است."""
-    from database import db
+    from backend.database.database import db
     try:
         purged = await db.ring_evidence_purge()
         ov = await db.ring_overview()

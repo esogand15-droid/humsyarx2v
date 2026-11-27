@@ -12,13 +12,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from api.auth import require_perm
-from api.serialize import doc, docs, payload
-from database import db
-from ring import moderation, service
-from ring import settings as S
-from ring import state as ring_state
-from time_utils import utc_now_iso
+from backend.api.auth import require_perm
+from backend.api.serialize import doc, docs, payload
+from backend.database.database import db
+from backend.services.ring import moderation, service
+from backend.services.ring import settings as S
+from backend.services.ring import state as ring_state
+from backend.core.time_utils import utc_now_iso
 
 logger = __import__("logging").getLogger(__name__)
 
@@ -75,7 +75,7 @@ class RulesBody(BaseModel):
 def _wait_s(iso) -> int | None:
     """مدت انتظار از `queued_at` (برای مانیتور صف) — بدون query اضافه."""
     try:
-        from time_utils import now_utc
+        from backend.core.time_utils import now_utc
         t = now_utc().fromisoformat(str(iso))
         if t.tzinfo is None:
             t = t.replace(tzinfo=now_utc().tzinfo)
@@ -125,7 +125,7 @@ async def metrics(days: int = Query(7, ge=1, le=90), user=_guard):
     فقط `$inc`های روزانه را از `ring_stats_daily` می‌خواند و یتیم‌های *الان* را
     از `ring_overview`؛ هیچ کوئریِ تازه‌ای روی sessions/queue نمی‌زند.
     """
-    from ring import analytics as A
+    from backend.services.ring import analytics as A
     await A.flush_metrics()                 # تا عددی که می‌بینید的最新ِ RAM هم باشد
     return payload(await A.cycle_metrics(days=days))
 
@@ -143,7 +143,7 @@ async def session_repair(session_id: str, user=_guard):
     ایمن است: هیچ session را نمی‌بندد، پیامِ کاربری را پاک نمی‌کند و کارت
     تکراری نمی‌فرستد (per-user sent flag). اگر همه‌چیز درست باشد no-op است.
     """
-    from database import db
+    from backend.database.database import db
     out = await service.repair_session(session_id)
     await db.ring_audit(int(user.get("id") or 0), "RING_SESSION_REPAIR",
                         session_id, str(out.get("repaired") or {})[:400], {})
@@ -199,7 +199,7 @@ async def state_post(body: StateBody, user=_guard):
     await S.set_maintenance(_admin(user), want == "maintenance")
     S.invalidate()
     if want == "disabled" and mode == "hard":
-        from ring import jobs as ring_jobs
+        from backend.services.ring import jobs as ring_jobs
         await ring_jobs._hard_disable(db)
     await _audit(user, "RING_STATE", want, mode)
     return {"ok": True, "state": want, "state_label": _STATE_LABELS.get(want, "—"),
@@ -210,8 +210,8 @@ async def state_post(body: StateBody, user=_guard):
 @router.get("/rules")
 async def rules_get(user=_guard):
     """متن قوانین (پیش‌فرض/جایگزین ادمین) + چند نفر نسخهٔ فعلی را پذیرفته‌اند."""
-    from ring import models as ring_models
-    from ring import texts as ring_texts
+    from backend.services.ring import models as ring_models
+    from backend.services.ring import texts as ring_texts
     cfg = await S.get_cfg(force=True)
     # نسخهٔ *الزامی* (کفِ کد + عددِ پنل) — وگرنه پنل عددی را نشان می‌دهد که
     # عملاً از کاربر خواسته نشده (§۴۰/§۲۷)
@@ -234,7 +234,7 @@ async def rules_get(user=_guard):
 @router.post("/rules")
 async def rules_post(body: RulesBody, user=_guard):
     """ذخیرهٔ متن (و در صورت درخواست، بالا بردن نسخه ⇒ همه دوباره می‌پذیرند)."""
-    from ring import models as ring_models
+    from backend.services.ring import models as ring_models
     cfg = await S.get_cfg(force=True)
     cur_ver = service.rules_want(cfg)
     text = (body.text or "").strip()
@@ -480,7 +480,7 @@ async def settings_get(user=_guard):
 async def flag(body: FlagBody, user=_guard):
     await S.set_enabled(_admin(user), body.enabled, body.disable_mode)
     if not body.enabled and body.disable_mode == "hard":
-        from ring import jobs as ring_jobs
+        from backend.services.ring import jobs as ring_jobs
         await ring_jobs._hard_disable(db)
     await _audit(user, "RING_FLAG", "on" if body.enabled else "off",
                  body.disable_mode)
@@ -496,7 +496,7 @@ async def settings_post(body: SettingsBody, user=_guard):
 
 @router.get("/analytics")
 async def analytics(days: int = Query(default=7, ge=1, le=180), user=_guard):
-    from ring import analytics as A
+    from backend.services.ring import analytics as A
     return payload(await A.summary(days))
 
 
@@ -524,7 +524,7 @@ async def purge_evidence(user=_guard):
 async def disable_all(body: FlagBody, user=_guard):
     """خاموشی اضطراری + بستن همه (§۷۴) — برای «یک‌دکمه‌ی خاموش»."""
     await S.set_enabled(_admin(user), False, "hard")
-    from ring import jobs as ring_jobs
+    from backend.services.ring import jobs as ring_jobs
     await ring_jobs._hard_disable(db)
     await _audit(user, "RING_DISABLE_ALL", "global", body.disable_mode)
     return {"ok": True}

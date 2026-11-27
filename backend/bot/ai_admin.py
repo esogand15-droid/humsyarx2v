@@ -11,14 +11,14 @@
 import json
 import logging
 from datetime import datetime
-from utils import esc as _esc   # 🛡 AUDIT-A6 —escape مرکزی
+from backend.bot.utils import esc as _esc   # 🛡 AUDIT-A6 —escape مرکزی
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from database import db
-from utils import ADMIN_ID, send_audit_log
-from time_utils import format_datetime_fa, today_tehran
-from ai_solver import (
+from backend.database.database import db
+from backend.bot.utils import ADMIN_ID, send_audit_log
+from backend.core.time_utils import format_datetime_fa, today_tehran
+from backend.services.ai_solver import (
     get_ai_config, set_ai_setting, ask_ai, save_persona, delete_persona,
     DEFAULT_PROMPT, DEFAULT_VOICE_PROMPT, DEFAULT_DISABLED_MSG, AIError,
     MODEL_CATALOG, PROVIDERS, IMAGE_MODEL_CATALOG, LIVE_MODEL_CATALOG,
@@ -542,7 +542,7 @@ async def ai_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             wav, _m = await generate_speech_gemini(
                 "سلام! من هوشیار هستم، دستیارِ هامزیار. با همین صدای طبیعی به سوالاتت جواب می‌دهم.")
-            from ai_solver import _transcode_wav_to_ogg_opus
+            from backend.services.ai_solver import _transcode_wav_to_ogg_opus
             ogg = await _transcode_wav_to_ogg_opus(wav)
             if ogg:
                 await query.message.reply_voice(voice=ogg)

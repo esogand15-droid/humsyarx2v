@@ -114,7 +114,7 @@ class LandingServingTests(unittest.TestCase):
         os.environ.setdefault("BOT_TOKEN", "1:test")
         os.environ.setdefault("ADMIN_ID", "1")
         from fastapi.testclient import TestClient
-        from api.main import app
+        from backend.api.main import app
         cls.client = TestClient(app)
 
     def test_root_serves_landing_or_redirects_when_not_built(self):

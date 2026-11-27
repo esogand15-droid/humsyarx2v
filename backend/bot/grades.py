@@ -10,10 +10,10 @@ import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from bot_modern_ui import CompactTableBuilder
-from database import db
-from utils import fmt_jalali_dt, safe_send, send_audit_log
-from time_utils import today_tehran
+from backend.bot.bot_modern_ui import CompactTableBuilder
+from backend.database.database import db
+from backend.bot.utils import fmt_jalali_dt, safe_send, send_audit_log
+from backend.core.time_utils import today_tehran
 
 logger = logging.getLogger(__name__)
 ADMIN_ID = int(os.getenv('ADMIN_ID', '0'))
@@ -68,7 +68,7 @@ async def _pick_lesson(query, context, idx: int):
     except Exception:
         suggested = ""
     suggested = (suggested or "").strip()
-    from grade_utils import TERM_ORDER
+    from backend.services.grade_utils import TERM_ORDER
     # گزینه‌های ترم: همان ترتیبِ برنامه‌ی درسی + پیشنهادی هم برجسته
     keyboard = []
     row = []
@@ -93,7 +93,7 @@ async def _pick_lesson(query, context, idx: int):
 
 
 async def _pick_term(query, context, idx: int, raw: str | None = None):
-    from grade_utils import TERM_ORDER
+    from backend.services.grade_utils import TERM_ORDER
     term = raw if raw is not None else (TERM_ORDER[idx] if 0 <= idx < len(TERM_ORDER) else "")
     term = (term or "").strip()
     if not term:
@@ -350,7 +350,7 @@ async def _build_my_grades_text(uid: int, term: str | None = None) -> str:
     if not grades:
         return ("📊 هنوز هیچ نمره‌ای برات ثبت نشده." if not term
                 else f"📊 برای «{term}» نمره‌ای ثبت نشده است.")
-    from grade_utils import group_grades_by_term, summarize_grades
+    from backend.services.grade_utils import group_grades_by_term, summarize_grades
 
     lines = [f"📊 <b>نمرات من{' — ' + term if term else ''}</b>\n━━━━━━━━━━━━━━━━"]
     for grp in group_grades_by_term(grades):

@@ -5,16 +5,16 @@ from typing import Any, List, Mapping
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from api.auth import ADMIN_ID, get_current_user
-from api.user_metrics import non_negative_int, normalize_stats, normalize_weekly
-from database import db
-from request_context import current_request_id
+from backend.api.auth import ADMIN_ID, get_current_user
+from backend.api.user_metrics import non_negative_int, normalize_stats, normalize_weekly
+from backend.database.database import db
+from backend.core.request_context import current_request_id
 
 async def _profile_audit(actor: dict, action: str, *, before=None, after=None, details: str = "", target_label: str = ""):
     try:
         db_user = actor.get("_db") if isinstance(actor.get("_db"), dict) else {}
         name = (db_user.get("name") or actor.get("name") or str(actor.get("id") or ""))
-        from database import db as _db
+        from backend.database.database import db as _db
         # actor role: try resolve
         try:
             role_label = await _db.get_actor_role_label(actor["id"])

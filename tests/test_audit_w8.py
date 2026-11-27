@@ -19,14 +19,14 @@ _had_uri = "MONGODB_URI" in os.environ
 os.environ.setdefault("MONGODB_URI", "mongodb://127.0.0.1:27017")
 os.environ.setdefault("TELEGRAM_TOKEN", "test-token-for-audit-w8")
 
-from db.core import DBCore
-from db.content import DBContent
-from api.telegram_send import (
+from backend.database.core import DBCore
+from backend.database.content import DBContent
+from backend.api.telegram_send import (
     is_previewable,
     preview_token,
     verify_preview_token,
 )
-from api.routers.schedule import build_ical
+from backend.api.routers.schedule import build_ical
 
 if not _had_uri:
     del os.environ["MONGODB_URI"]

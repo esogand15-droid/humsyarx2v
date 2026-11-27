@@ -10,8 +10,8 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from backend.bot.ui_buttons import btn, SUCCESS, DANGER   # 🎨 button colours
 from telegram.ext import ContextTypes
-from database import db
-from utils import fmt_jalali_dt, send_audit_log
+from backend.database.database import db
+from backend.bot.utils import fmt_jalali_dt, send_audit_log
 
 logger   = logging.getLogger(__name__)
 ADMIN_ID = int(os.getenv('ADMIN_ID', '0'))

@@ -12,7 +12,7 @@ from typing import Any, Mapping
 from bson import ObjectId
 from pymongo import UpdateOne
 
-from time_utils import utc_now_iso
+from backend.core.time_utils import utc_now_iso
 from .contracts import (
     EXAM_TRACK_DEFAULT, EXAM_YEAR_MAX, EXAM_YEAR_MIN,
     QuestionDomainError, canonical_content_source, canonical_difficulty,

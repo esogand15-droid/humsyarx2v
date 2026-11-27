@@ -39,8 +39,8 @@ from backend.api.auth import get_current_user
 from backend.api.routers import web_ink
 from backend.api.routers.web_ink import StickyNoteModel, MAX_PAGE
 from backend.api.routers.web_student import current_student
-from database import db
-from grade_utils import calculate_weighted_transcript
+from backend.database.database import db
+from backend.services.grade_utils import calculate_weighted_transcript
 
 
 class TestEmpiricalM3DashboardEdgeCases(unittest.TestCase):
@@ -222,7 +222,7 @@ class TestEmpiricalM3TicketAndSubscriptionEdgeCases(unittest.TestCase):
              patch.object(db, "sub_plan_list", new_callable=AsyncMock) as m_plans, \
              patch.object(db, "sub_payment_history", new_callable=AsyncMock) as m_hist, \
              patch.object(db, "get_setting", new_callable=AsyncMock) as m_setting, \
-             patch("subscription.has_access", new_callable=AsyncMock) as m_access:
+             patch("backend.bot.subscription.has_access", new_callable=AsyncMock) as m_access:
 
             m_sub.return_value = None
             m_active.return_value = False

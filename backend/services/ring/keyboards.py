@@ -14,7 +14,7 @@ from telegram import InlineKeyboardButton as B, InlineKeyboardMarkup as KB
 # همان هست که یک logger سطح ماژول اضافه شد (هیچ رفتاری عوض نمی‌شود).
 logger = logging.getLogger(__name__)
 
-from ring import models as M
+from backend.services.ring import models as M
 
 CB = "ring:"
 
@@ -73,7 +73,7 @@ def main_menu_labels() -> frozenset:
         return _MAIN_LABELS
     out: set[str] = set()
     try:
-        import utils
+        import backend.bot.utils as utils
         for name in ("main_keyboard", "content_admin_keyboard", "admin_keyboard",
                      "sub_admin_keyboard"):
             fn = getattr(utils, name, None)
@@ -136,7 +136,7 @@ def menu_tap_labels() -> frozenset:
         return _TAP_NORM
     out: set[str] = set(main_menu_labels()) | set(_MAIN_FALLBACK)
     try:
-        import bot                                  # lazy — در boot حلقه نسازد
+        import backend.bot.bot as bot                                  # lazy — در boot حلقه نسازد
         out |= {str(x) for x in (getattr(bot, "MENU_BUTTON_TEXTS", None) or ())}
     except (Exception, SystemExit) as e:
         # SystemExit: bot.py بدون TELEGRAM_TOKEN با sys.exit() می‌میرد (محیطِ تست)

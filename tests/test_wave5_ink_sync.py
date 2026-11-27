@@ -55,7 +55,7 @@ from backend.api.routers.web_ink import (
     SyncBatchRequest,
 )
 from backend.api.routers.web_student import current_student
-import database
+import backend.database.database as database
 
 
 class MockAsyncCursor:

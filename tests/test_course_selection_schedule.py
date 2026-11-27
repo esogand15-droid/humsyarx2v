@@ -6,7 +6,7 @@
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from database import DB as Database
+from backend.database.database import DB as Database
 
 
 def test_notif_catalog_includes_course_selection():

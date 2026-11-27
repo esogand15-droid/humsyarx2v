@@ -8,8 +8,8 @@
 import logging
 import time as _time
 
-import growth_rules as gr
-from database import db
+import backend.services.growth_rules as gr
+from backend.database.database import db
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ async def dunning_job(context) -> dict:
         due = gr.dunning_due(pendings, now, steps)
         if not due:
             return out
-        from utils import safe_send
+        from backend.bot.utils import safe_send
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         for doc, idx in due:
             pid = str(doc.get('_id'))
@@ -114,7 +114,7 @@ async def dunning_click(update, context) -> None:
         pass
     # استفاده‌ی مجدد از منطق verify (approved/expired را خودش مدیریت می‌کند)
     try:
-        from subscription import _zarinpal_check
+        from backend.bot.subscription import _zarinpal_check
         await _zarinpal_check(query, context, uid,
                               doc.get('zarinpal_authority') or '')
     except Exception as e:

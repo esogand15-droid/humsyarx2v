@@ -12,13 +12,13 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.colors import HexColor
 
-from qbank.fonts_rtl import ensure_fonts, rtl, fa_digits, text_width, REGULAR, BOLD, MEDIUM
-from qbank.styles import PAGE_W, PAGE_H, MARGIN, MIN_Y, FOOTER_Y, NAVY, NAVY_LIGHT, BRAND_GREEN, GRAY, CARD_BORDER, WHITE
-from qbank.query import ExamMeta
-from qbank.cover import draw_cover_page
-from qbank.question_card import draw_question_card, measure_card_height
-from qbank.answer_key import draw_answer_key_header, draw_answer_key_grid, CELL_H
-from qbank.explanations import draw_explanations_header, draw_explanation_block, measure_explanation_height
+from backend.services.qbank.fonts_rtl import ensure_fonts, rtl, fa_digits, text_width, REGULAR, BOLD, MEDIUM
+from backend.services.qbank.styles import PAGE_W, PAGE_H, MARGIN, MIN_Y, FOOTER_Y, NAVY, NAVY_LIGHT, BRAND_GREEN, GRAY, CARD_BORDER, WHITE
+from backend.services.qbank.query import ExamMeta
+from backend.services.qbank.cover import draw_cover_page
+from backend.services.qbank.question_card import draw_question_card, measure_card_height
+from backend.services.qbank.answer_key import draw_answer_key_header, draw_answer_key_grid, CELL_H
+from backend.services.qbank.explanations import draw_explanations_header, draw_explanation_block, measure_explanation_height
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +46,10 @@ def _draw_watermark(c, alpha=0.025):
 
 def _today_pretty():
     try:
-        from time_utils import format_datetime_fa, now_utc
+        from backend.core.time_utils import format_datetime_fa, now_utc
         return format_datetime_fa(now_utc(), long=True)
     except Exception:
-        from time_utils import format_date_fa, now_utc
+        from backend.core.time_utils import format_date_fa, now_utc
         return format_date_fa(now_utc(), long=True)
 
 

@@ -1,14 +1,14 @@
 """❓ FAQ"""
 from fastapi import APIRouter, Depends, Query
-from api.auth import get_current_user
-from database import db
+from backend.api.auth import get_current_user
+from backend.database.database import db
 
 router = APIRouter()
 
 # موج ۴.۸۰ — fallback دیگر کپی‌ای مستقل و کهنه نیست؛ دقیقاً همان
 # منبعِ ربات (faq.py) است تا رفتارِ «دیتابیس خالی» در هر دو سطح یکی
 # باشد و آینده‌ای یک‌منبعی داشته باشیم.
-from faq import DEFAULT_FAQS as _BOT_FAQS
+from backend.bot.faq import DEFAULT_FAQS as _BOT_FAQS
 
 DEFAULT_FAQS = [
     {"category": cat, "question": q, "answer": a}

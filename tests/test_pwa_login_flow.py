@@ -18,8 +18,8 @@ from datetime import timedelta
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api import web_login_core as core
-from api.routers import web_login
+from backend.api import web_login_core as core
+from backend.api.routers import web_login
 
 
 # ── فیک مینیمال Mongo ────────────────────────────────────────────
@@ -327,7 +327,7 @@ class WebLoginFlowTests(unittest.TestCase):
         """همان کوکی که روتر صادر می‌کند باید در `get_current_user` معتبر باشد."""
         import asyncio
 
-        from api import auth
+        from backend.api import auth
         self.request_code("@ali_rezaei")
         code = self.stored_code(APPROVED["user_id"])
         r = self.verify("@ali_rezaei", code)

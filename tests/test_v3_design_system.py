@@ -50,7 +50,7 @@ class CreamClientRetiredTests(unittest.TestCase):
             self.skipTest(f"TestClient در دسترس نیست: {exc}")
 
         try:
-            import api.main as main
+            import backend.api.main as main
         except Exception as exc:  # pragma: no cover
             self.skipTest(f"بارگذاری اپ ممکن نشد: {exc}")
 

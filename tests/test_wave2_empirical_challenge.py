@@ -30,7 +30,7 @@ from backend.core import student_code as sc
 from backend.api.routers import web_auth
 from backend.api.routers import web_student
 from backend.api import auth
-from api import web_login_core as core
+from backend.api import web_login_core as core
 from tests.test_wave2_web_auth import FakeDatabase
 
 

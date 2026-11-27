@@ -94,7 +94,7 @@ class QuizStaticWiring(unittest.TestCase):
 class QuizPersianText(unittest.TestCase):
 
     def test_normalize(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         # presentation forms (متن PDF های قدیمی فارسی)
         t = hq._normalize_persian("ﺳﻼم ﺩﻧﯿﺎ يك ﻛﺘﺎﺏ\u0640 ﻣﻦ")
         self.assertNotIn("ي", t.replace("ی", ""))   # ي عربی حذف/تبدیل
@@ -105,7 +105,7 @@ class QuizPersianText(unittest.TestCase):
         self.assertIn("\u200d", hq._normalize_persian("می\u200dشود"))
 
     def test_page_quality(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         good = "این یک متن فارسی نمونه است که کیفیت استخراج خوبی دارد و کلمات سالم هستند"
         bad = "���� �� 1234 $%& *"
         empty = ""
@@ -121,7 +121,7 @@ class QuizTopicHelpers(unittest.TestCase):
         return [{"no": i, "text": "متن " * 5, "chars": 25} for i in range(1, n + 1)]
 
     def test_heuristic(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         ts = hq._heuristic_topics(self._pages(22))
         self.assertTrue(ts)
         self.assertEqual(ts[0]["page_start"], 1)
@@ -131,7 +131,7 @@ class QuizTopicHelpers(unittest.TestCase):
             self.assertEqual(b["page_start"], a["page_end"] + 1)
 
     def test_sanitize_repairs(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         raw = [
             {"title": "فیزیک", "page_start": 1, "page_end": 5},
             {"title": "شیمی", "page_start": 4, "page_end": 8},      # همپوشانی
@@ -149,7 +149,7 @@ class QuizTopicHelpers(unittest.TestCase):
             self.assertEqual(b["page_start"], a["page_end"] + 1)
 
     def test_range_topics(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         doc = {"topics": [{"id": 0, "title": "الف", "page_start": 1, "page_end": 4},
                           {"id": 1, "title": "ب", "page_start": 5, "page_end": 8}]}
         self.assertEqual(len(hq._range_topics(doc, "all")), 2)
@@ -163,7 +163,7 @@ class QuizValidation(unittest.TestCase):
     """اعتبارسنجی سخت سؤال — سقف‌های رسمی تلگرام."""
 
     def setUp(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         self.hq = hq
         self.valid_pages = {3, 4, 5}
         self.good = {
@@ -269,7 +269,7 @@ class QuizDbLifecycle(unittest.TestCase):
 
     def setUp(self):
         _rtloop.adopt()
-        import database
+        import backend.database.database as database
         self.db = database.db
         self.uid = _STUDENT
         self._cleanup()
@@ -439,7 +439,7 @@ class QuizDbLifecycle(unittest.TestCase):
         async def _t():
             d = self.db
             from datetime import timedelta
-            from time_utils import now_utc
+            from backend.core.time_utils import now_utc
             # سند قدیمی → حذف؛ سند تازه → می‌ماند
             old = await d.quiz_create_document(self.uid, "قدیمی", 1)
             new = await d.quiz_create_document(self.uid, "جدید", 1)
@@ -461,7 +461,7 @@ class QuizAiFlow(unittest.TestCase):
 
     def setUp(self):
         _rtloop.adopt()
-        import database
+        import backend.database.database as database
         self.db = database.db
         self.uid = _STUDENT
         _rtloop.run(self._cleanup())
@@ -474,8 +474,8 @@ class QuizAiFlow(unittest.TestCase):
         await self.db.ai_generation_logs.delete_many({"user_id": self.uid})
 
     def test_topic_structure_ai_and_fallback(self):
-        import hooshyar_quiz as hq
-        import ai_solver
+        import backend.services.hooshyar_quiz as hq
+        import backend.services.ai_solver as ai_solver
         pages = [{"no": i, "text": f"مبحث {i} " * 30, "chars": 200}
                  for i in range(1, 13)]
 
@@ -510,8 +510,8 @@ class QuizAiFlow(unittest.TestCase):
         self.assertGreaterEqual(n, 1)
 
     def test_generate_and_verify(self):
-        import hooshyar_quiz as hq
-        import ai_solver
+        import backend.services.hooshyar_quiz as hq
+        import backend.services.ai_solver as ai_solver
         topic = {"id": 0, "title": "کلیه", "page_start": 1, "page_end": 3}
         doc = {"_id": None, "pages": [
             {"no": 1, "text": "نفرون واحد کلیه است و فیلتراسیون در گلومرول "
@@ -560,8 +560,8 @@ class QuizAiFlow(unittest.TestCase):
         self.assertGreaterEqual(n, 1)
 
     def test_verify_drops_wrong_and_applies_fix(self):
-        import hooshyar_quiz as hq
-        import ai_solver
+        import backend.services.hooshyar_quiz as hq
+        import backend.services.ai_solver as ai_solver
         cands = [
             {"stem": "سؤال یک؟", "options": ["الف", "ب", "ج", "د"],
              "correct_index": 0, "explanation_short": "توضیح اول",
@@ -611,7 +611,7 @@ class QuizUploadHookGuards(unittest.TestCase):
 
     def setUp(self):
         _rtloop.adopt()
-        import database
+        import backend.database.database as database
         self.db = database.db
         self.uid = _STUDENT
         _rtloop.run(self._cleanup())
@@ -648,13 +648,13 @@ class QuizUploadHookGuards(unittest.TestCase):
         return ctx
 
     def test_not_awaiting_passes_through(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         ctx = self._ctx(awaiting=False)
         ok = _rtloop.run(hq.quiz_upload_hook(self._mk_update(), ctx))
         self.assertFalse(ok)
 
     def test_rejects_non_pdf(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         u = self._mk_update(mime="image/jpeg")
         ok = _rtloop.run(hq.quiz_upload_hook(u, self._ctx()))
         self.assertTrue(ok)
@@ -662,9 +662,9 @@ class QuizUploadHookGuards(unittest.TestCase):
         self.assertIn("PDF", u.message.reply_text.await_args.args[0])
 
     def test_rejects_oversize(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         u = self._mk_update(file_size=25 * 1024 * 1024)
-        import subscription, ai_solver
+        import backend.bot.subscription as subscription, backend.services.ai_solver as ai_solver
         async def ff(uid, f):
             return True
         async def cfg():
@@ -677,8 +677,8 @@ class QuizUploadHookGuards(unittest.TestCase):
         self.assertIn("سقف", u.message.reply_text.await_args.args[0])
 
     def test_rejects_doc_limit(self):
-        import hooshyar_quiz as hq
-        import subscription, ai_solver
+        import backend.services.hooshyar_quiz as hq
+        import backend.bot.subscription as subscription, backend.services.ai_solver as ai_solver
         async def ff(uid, f):
             return True
         async def cfg():
@@ -705,7 +705,7 @@ class QuizReportAndFeedback(unittest.TestCase):
 
     def setUp(self):
         _rtloop.adopt()
-        import database
+        import backend.database.database as database
         self.db = database.db
         self.uid = _STUDENT
         _rtloop.run(self._cleanup())
@@ -724,7 +724,7 @@ class QuizReportAndFeedback(unittest.TestCase):
 
     def test_final_report(self):
         async def _t():
-            import hooshyar_quiz as hq
+            import backend.services.hooshyar_quiz as hq
             d = self.db
             did = await d.quiz_create_document(self.uid, "فیزیولوژی قلب", 1)
             await d.quiz_finish_document(
@@ -760,7 +760,7 @@ class QuizReportAndFeedback(unittest.TestCase):
         _rtloop.run(_t())
 
     def test_feedback_message(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         sent = []
 
         class FakeBot:
@@ -793,7 +793,7 @@ class QuizCountGuarantee(unittest.TestCase):
 
     def setUp(self):
         super().setUp()
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         async def fake_setting(key: str, *args, **kwargs):
             return hq.DEFAULTS.get(key, 2000)
         async def fake_log(*args, **kwargs):
@@ -809,7 +809,7 @@ class QuizCountGuarantee(unittest.TestCase):
         super().tearDown()
 
     def test_largest_remainder_nothing_lost(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
         # سهم هیچ چانکی گم نمی‌شود و جمع دقیقاً deficit است
         vols = [(0, 3000), (1, 2000), (2, 1000), (3, 500)]
         for deficit in (1, 5, 7, 30):
@@ -826,8 +826,8 @@ class QuizCountGuarantee(unittest.TestCase):
 
     def test_cross_call_dedup(self):
         """seen_hashes مشترک ⇒ فراخوان دوم همان سؤال را نمی‌پذیرد."""
-        import hooshyar_quiz as hq
-        import ai_solver
+        import backend.services.hooshyar_quiz as hq
+        import backend.services.ai_solver as ai_solver
         topic = {"id": 0, "title": "کلیه", "page_start": 1, "page_end": 1}
         doc = {"_id": None, "pages": [
             {"no": 1, "text": "نفرون واحد کلیه است و فیلتراسیون در "
@@ -861,8 +861,8 @@ class QuizCountGuarantee(unittest.TestCase):
 
     def test_rounds_fill_shortfall(self):
         """دور اول ۱ سؤال می‌دهد؛ کمبود با دوریِ بعد پر می‌شود (تا want)."""
-        import hooshyar_quiz as hq
-        import ai_solver
+        import backend.services.hooshyar_quiz as hq
+        import backend.services.ai_solver as ai_solver
         topic = {"id": 0, "title": "کلیه", "page_start": 1, "page_end": 1}
         doc = {"_id": None, "pages": [
             {"no": 1, "text": "نفرون واحد کلیه است و فیلتراسیون در گلومرول "
@@ -923,7 +923,7 @@ class QuizPdfEndToEnd(unittest.TestCase):
 
     def setUp(self):
         _rtloop.adopt()
-        import database
+        import backend.database.database as database
         self.db = database.db
         self.uid = _STUDENT
         try:
@@ -964,7 +964,7 @@ class QuizPdfEndToEnd(unittest.TestCase):
             self.texts.append(text)
 
     def test_process_real_pdf(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
 
         async def fake_topics(pages, user_id):
             return [{"id": 0, "title": "فیزیولوژی کلیه",
@@ -995,7 +995,7 @@ class QuizPdfEndToEnd(unittest.TestCase):
         _rtloop.run(_t())
 
     def test_rejects_scanned_pdf(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
 
         async def _t():
             did = await self.db.quiz_create_document(self.uid, "اسکن", 500)
@@ -1012,7 +1012,7 @@ class QuizPdfEndToEnd(unittest.TestCase):
         _rtloop.run(_t())
 
     def test_rejects_non_pdf_magic(self):
-        import hooshyar_quiz as hq
+        import backend.services.hooshyar_quiz as hq
 
         async def _t():
             did = await self.db.quiz_create_document(self.uid, "جعل", 10)

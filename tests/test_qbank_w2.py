@@ -5,7 +5,7 @@ Runs without MongoDB (FakeDB mimics the motor find/sort/to_list chain).
 import asyncio
 import json
 
-from question_bank.importer import (
+from backend.services.question_bank.importer import (
     IMPORT_SCHEMA_VERSION, PROMPT_PATH, QuestionImportService,
 )
 

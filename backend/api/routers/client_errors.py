@@ -8,10 +8,10 @@ ErrorBoundary فرانت خطای رندر را best-effort همین‌جا می
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from api.auth import get_current_user
-from api.rate_limit import rate_limit_user
-from database import db
-from time_utils import now_utc
+from backend.api.auth import get_current_user
+from backend.api.rate_limit import rate_limit_user
+from backend.database.database import db
+from backend.core.time_utils import now_utc
 
 router = APIRouter(tags=["client-errors"])
 

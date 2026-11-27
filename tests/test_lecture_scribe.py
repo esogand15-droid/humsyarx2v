@@ -862,7 +862,7 @@ def test_large_m4a_upload_mime_and_display_name_and_failover():
              patch("backend.services.ai_solver.ai_is_inflight", AsyncMock(return_value=False)), \
              patch("backend.services.ai_solver.ai_claim_inflight", AsyncMock(return_value=True)), \
              patch("backend.services.ai_solver.ai_release_inflight", AsyncMock()), \
-             patch("lecture_notes_pdf.generate_lecture_pdf", return_value=io.BytesIO(b"%PDF-1.4 test")), \
+             patch("backend.services.lecture_notes_pdf.generate_lecture_pdf", return_value=io.BytesIO(b"%PDF-1.4 test")), \
              patch("httpx.AsyncClient.post", AsyncMock(return_value=MagicMock(status_code=200, json=lambda: {"candidates": [{"content": {"parts": [{"text": '{"title":"جلسه فارما"}'}]}}]}))):
 
             await run_lecture_processing_worker(

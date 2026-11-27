@@ -5,12 +5,12 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from api.auth import get_current_user, get_resource_access_user
-from api.telegram_send import (
+from backend.api.auth import get_current_user, get_resource_access_user
+from backend.api.telegram_send import (
     PREVIEW_TTL_SEC, is_previewable, preview_token, proxy_telegram_preview,
     send_bs_content, verify_preview_token,
 )
-from database import db
+from backend.database.database import db
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -479,7 +479,7 @@ async def _preview_user(request: Request) -> dict:
     توکن ۱۰دقیقه‌ای می‌گیرد. مسیر توکن هم گارد فیچر W7 را رد می‌کند و
     گارد ورودی پایین‌تر با کاربر تازه‌خوانده‌شده اعمال می‌شود.
     """
-    from core.access import require_feature_access
+    from backend.core.access import require_feature_access
     if request.headers.get("X-Init-Data"):
         user = await get_current_user(
             request, request.headers.get("X-Init-Data", ""))
@@ -534,7 +534,7 @@ async def preview(
     همان گاردهای download (دسترسی + ورودی + fork)؛ توکن تلگرام هرگز
     به کلاینت داده نمی‌شود — بایت‌ها از همین سرور پروکسی می‌شوند.
     """
-    from api.rate_limit import rate_limit_user as _rl
+    from backend.api.rate_limit import rate_limit_user as _rl
     from backend.services.media_stream import is_continuation_range
 
     user_id = int(user["id"])

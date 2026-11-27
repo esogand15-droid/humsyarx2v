@@ -10,8 +10,8 @@ from urllib.parse import parse_qsl
 
 from fastapi import Depends, Header, HTTPException, Request
 
-from database import db
-from time_utils import TimeContractError, now_utc as _contract_now_utc, parse_machine_datetime
+from backend.database.database import db
+from backend.core.time_utils import TimeContractError, now_utc as _contract_now_utc, parse_machine_datetime
 
 
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN", "").strip()
@@ -380,7 +380,7 @@ def require_perm(permission: str):
     async def _guard(user=Depends(get_current_user)) -> dict:
         # W8 core path — واحد با Bot
         try:
-            from core.rbac import has_permission
+            from backend.core.rbac import has_permission
             if await has_permission(user["id"], permission):
                 return user
         except Exception:
@@ -437,7 +437,7 @@ def require_feature(feature: str):
     402 دسترسی / 429 سهمیه / 503 موقت — همیشه با {code, message, feature}.
     """
     async def _gate(user=Depends(get_current_user)) -> dict:
-        from core.access import require_feature_access
+        from backend.core.access import require_feature_access
         await require_feature_access(user["id"], feature)
         return user
     _gate.__name__ = f"require_feature_{feature}"
@@ -447,12 +447,12 @@ def require_feature(feature: str):
 async def get_question_access_user(user=Depends(get_current_user)) -> dict:
     """Single server-side subscription gate for every student Question Bank API — W8 core."""
     try:
-        from core.access import require_feature_access
+        from backend.core.access import require_feature_access
         await require_feature_access(user["id"], "question_bank")
     except HTTPException:
         raise
     except Exception:
-        from subscription import has_access
+        from backend.bot.subscription import has_access
         if not await has_access(user["id"]):
             raise HTTPException(status_code=402, detail={"code": "SUB_REQUIRED", "message": "subscription_required"})
     return user
@@ -466,12 +466,12 @@ async def get_resource_access_user(user=Depends(get_current_user)) -> dict:
     تصمیم بگیرد نه با تطبیق رشته فارسی.
     """
     try:
-        from core.access import require_feature_access
+        from backend.core.access import require_feature_access
         await require_feature_access(user["id"], "resources")
     except HTTPException:
         raise
     except Exception:
-        from subscription import has_access
+        from backend.bot.subscription import has_access
         if not await has_access(user["id"]):
             raise HTTPException(status_code=402, detail={"code": "SUB_REQUIRED", "message": "subscription_required"})
     return user
@@ -480,12 +480,12 @@ async def get_resource_access_user(user=Depends(get_current_user)) -> dict:
 async def get_references_access_user(user=Depends(get_current_user)) -> dict:
     """🌊 W7 — گیت اشتراک رفرنس‌ها (جدا از منابع؛ سوییچ مستقل)."""
     try:
-        from core.access import require_feature_access
+        from backend.core.access import require_feature_access
         await require_feature_access(user["id"], "references")
     except HTTPException:
         raise
     except Exception:
-        from subscription import has_access
+        from backend.bot.subscription import has_access
         if not await has_access(user["id"]):
             raise HTTPException(status_code=402, detail={"code": "SUB_REQUIRED", "message": "subscription_required"})
     return user

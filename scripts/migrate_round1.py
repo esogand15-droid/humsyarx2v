@@ -37,7 +37,7 @@ DRY = '--dry' in sys.argv or '-n' in sys.argv
 # ── زیرسیستم‌ها ──
 from motor.motor_asyncio import AsyncIOMotorClient           # noqa: E402
 from bson import ObjectId                                     # noqa: E402
-from time_utils import utc_now_iso                            # noqa: E402
+from backend.core.time_utils import utc_now_iso                            # noqa: E402
 
 MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017')
 # نام دیتابیس همان db/core.py است (hardcoded 'medicalbot')

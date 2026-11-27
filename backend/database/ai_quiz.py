@@ -17,7 +17,7 @@ import logging
 from datetime import timedelta
 
 from bson import ObjectId
-from time_utils import now_utc, utc_now_iso
+from backend.core.time_utils import now_utc, utc_now_iso
 
 logger = logging.getLogger('database')
 
@@ -257,7 +257,7 @@ class DBAiQuiz:
     # ── مصرف/سقف روزانه ───────────────────────────────────
 
     async def quiz_usage_today(self, user_id: int) -> int:
-        from time_utils import today_tehran
+        from backend.core.time_utils import today_tehran
         u = await self.users.find_one(
             {'user_id': int(user_id)},
             {'quiz_usage_date': 1, 'quiz_usage_count': 1}) or {}
@@ -266,7 +266,7 @@ class DBAiQuiz:
             if u.get('quiz_usage_date') == today else 0
 
     async def quiz_inc_usage(self, user_id: int, n: int) -> None:
-        from time_utils import today_tehran
+        from backend.core.time_utils import today_tehran
         today = today_tehran().isoformat()
         await self.users.update_one(
             {'user_id': int(user_id)},
