@@ -99,6 +99,36 @@ h1, h2, h3, h4, p {
   border-radius: var(--hym-radius-sm);
 }
 
+/* Skip link: hidden until a keyboard user tabs to it. */
+.skip-link {
+  position: fixed;
+  inset-block-start: 8px;
+  inset-inline-start: 8px;
+  z-index: 1000;
+  padding: 10px 16px;
+  border-radius: var(--hym-radius-sm);
+  background: var(--hym-brand-default);
+  color: var(--pal-white);
+  font-weight: 700;
+  transform: translateY(-160%);
+  transition: transform var(--mo-fast, 120ms) ease-out;
+}
+.skip-link:focus {
+  transform: none;
+}
+/* The main landmark receives focus from the skip link; no ring on the whole page. */
+#main-content:focus {
+  outline: none;
+}
+
+/* Headings and short copy wrap evenly instead of leaving one orphan word. */
+h1, h2, h3, .h1, .h2, .h3 {
+  text-wrap: balance;
+}
+p, .lede, .small {
+  text-wrap: pretty;
+}
+
 /* ── Numeric alignment ── */
 .num {
   font-feature-settings: "tnum" 1, "lnum" 1;

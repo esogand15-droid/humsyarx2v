@@ -57,10 +57,15 @@ export function Shell({
     <HeaderProvider>
       <SidebarProvider>
         <div className={`app-shell${showNav ? ' app-shell--nav' : ''}`}>
+          {showNav && (
+            <a className="skip-link" href="#main-content">
+              پرش به محتوای اصلی
+            </a>
+          )}
           {showNav && <Sidebar />}
           <div className="main-stage">
             {showNav && <DesktopHeader />}
-            <main className="stage-content" data-section={section}>
+            <main id="main-content" tabIndex={-1} className="stage-content" data-section={section}>
               {children}
             </main>
             {showNav && <TabBar />}
