@@ -5,21 +5,15 @@ import { SkeletonStack } from '../components';
 import { AppBar } from '../components/AppBar';
 import { DsButton, DsCard, DsEmpty, DsSegmented } from '../design/components';
 import { Icon } from '../icons';
-import { apiCall, errorText } from '../lib/api';
+import { errorText } from '../lib/api';
 import { faDate, faNum } from '../lib/fa';
+import {
+  markNotificationsRead,
+  useNotificationsState,
+  type InboxNotification,
+} from '../lib/notifications';
 
-interface NotificationItem {
-  id: string;
-  title: string;
-  body: string;
-  category?: string;
-  read: boolean;
-  created_at?: string;
-}
-
-interface InboxPayload {
-  items: NotificationItem[];
-}
+type NotificationItem = InboxNotification;
 
 const DATE_TIME_FA = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
   timeZone: 'Asia/Tehran',
@@ -50,43 +44,34 @@ function notifKind(item: NotificationItem): 'exam' | 'content' | 'general' {
   return 'general';
 }
 
-/** مرکز اعلان‌ها — سطح خنثی یکسان برای خوانده و خوانده‌نشده + نقطهٔ خوانده‌نشده و عنوان پررنگ (NT1). */
+/** مرکز اعلان‌ها — همگام با نشانگر زنگ هدر و جلوگیری از نمایش همزمان خطا و وضعیت خالی. */
 export function NotificationsScreen() {
-  const [items, setItems] = useState<NotificationItem[] | null>(null);
+  const { items, unread: unreadCount, reloadInbox } = useNotificationsState({ loadInbox: true });
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     setError('');
     try {
-      const res = await apiCall<InboxPayload>('/api/notifications/inbox');
-      setItems(Array.isArray(res?.items) ? res.items : []);
+      await reloadInbox();
     } catch (err) {
       setError(errorText(err, 'دریافت اعلان‌ها ممکن نشد.'));
-      setItems([]);
     }
-  }, []);
+  }, [reloadInbox]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const markRead = async (ids: string[] | null) => {
-    setItems((prev) =>
-      (prev ?? []).map((i) => (ids === null || ids.includes(i.id) ? { ...i, read: true } : i)),
-    );
     try {
-      await apiCall('/api/notifications/inbox/read', {
-        method: 'POST',
-        body: JSON.stringify({ ids }),
-      });
+      await markNotificationsRead(ids);
     } catch {
       void load();
     }
   };
 
   const list = items ?? [];
-  const unreadCount = list.filter((i) => !i.read).length;
   const filtered = filter === 'unread' ? list.filter((i) => !i.read) : list;
 
   return (
@@ -135,9 +120,9 @@ export function NotificationsScreen() {
           </DsCard>
         )}
 
-        {items === null ? (
+        {items === null && !error ? (
           <SkeletonStack rows={4} />
-        ) : filtered.length === 0 ? (
+        ) : error && list.length === 0 ? null : filtered.length === 0 ? (
           <DsCard>
             <DsEmpty
               icon={<Icon name="i-bell" size={28} />}

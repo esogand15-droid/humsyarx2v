@@ -10,6 +10,7 @@ Implements Section 2.1 of API_CONTRACTS.md:
 """
 from __future__ import annotations
 
+import html as _html
 import hmac
 import hashlib
 import logging
@@ -38,15 +39,18 @@ COOKIE_NAME = "hu_session"
 _GENERIC_DEVICE_NAMES = {"", "web browser", "مرورگر وب"}
 
 
-def _ua_platform(ua: str) -> str:
+def _ua_platform(ua: str, platform_model: Optional[str] = None) -> str:
     """Readable platform from a User-Agent. iOS never exposes the iPhone
     model to the browser, so the label stops at "iPhone"; Android often
-    carries the model ("SM-S918B", "Pixel 8") before "Build/" or ")"."""
+    carries the model ("SM-S918B", "Pixel 8") via UA or Chromium CH."""
     if "iPad" in ua or ("Macintosh" in ua and "Mobile/" in ua):
         return "iPad"
     if "iPhone" in ua:
         return "iPhone"
+    clean_model = re.sub(r"[^A-Za-z0-9 ._+\\-]", "", (platform_model or "").strip())[:40]
     if "Android" in ua:
+        if clean_model and clean_model.upper() != "K":
+            return clean_model
         m = re.search(r"Android [\d.]+; (?:[a-z]{2}[-_][A-Za-z]{2}; )?([^;)]+?)(?: Build/|\))", ua)
         model = (m.group(1).strip() if m else "")
         if model and model.upper() != "K" and len(model) <= 40:
@@ -63,6 +67,20 @@ def _ua_platform(ua: str) -> str:
     return ""
 
 
+def _ua_device_type(ua: str, hinted: Optional[str] = None, kind: Optional[str] = None) -> str:
+    if (kind or "") == "miniapp":
+        return "telegram"
+    if hinted in {"mobile", "tablet", "desktop", "telegram"}:
+        return hinted
+    if "iPad" in ua or ("Macintosh" in ua and "Mobile/" in ua):
+        return "tablet"
+    if "Android" in ua and "Mobile" not in ua:
+        return "tablet"
+    if "iPhone" in ua or "iPod" in ua or "Android" in ua or "Mobile" in ua:
+        return "mobile"
+    return "desktop"
+
+
 def _ua_browser(ua: str) -> str:
     for token, name in (
         ("Edg/", "Edge"), ("EdgiOS/", "Edge"), ("OPR/", "Opera"),
@@ -75,23 +93,39 @@ def _ua_browser(ua: str) -> str:
     return ""
 
 
-def device_label(device_name: Optional[str], user_agent: Optional[str]) -> str:
+def device_label(
+    device_name: Optional[str],
+    user_agent: Optional[str],
+    platform_model: Optional[str] = None,
+) -> str:
     """Name shown in "My devices": a specific stored name wins, otherwise
     "<platform> · <browser>" parsed from the User-Agent."""
     name = (device_name or "").strip()
     if name.lower() not in _GENERIC_DEVICE_NAMES:
         return name
     ua = (user_agent or "").strip()
-    platform, browser = _ua_platform(ua), _ua_browser(ua)
+    platform, browser = _ua_platform(ua, platform_model), _ua_browser(ua)
     if platform and browser:
         return f"{platform} · {browser}"
     return platform or browser or "مرورگر وب"
+
+
+def _client_ip(request: Request) -> str:
+    for hdr in ("cf-connecting-ip", "x-real-ip", "x-forwarded-for"):
+        raw = (request.headers.get(hdr) or "").strip()
+        if raw:
+            return raw.split(",")[0].strip()[:64]
+    return ((getattr(request, "client", None) and request.client.host) or "")[:64]
 
 
 # ── Pydantic Request / Response Schemas ──────────────────────────
 class ClientInfo(BaseModel):
     device_name: str = Field(default="Web Browser", max_length=120)
     browser: Optional[str] = Field(default=None, max_length=120)
+    device_id: Optional[str] = Field(default=None, max_length=64)
+    device_type: Optional[str] = Field(default=None, max_length=24)
+    platform_model: Optional[str] = Field(default=None, max_length=64)
+    user_agent: Optional[str] = Field(default=None, max_length=240)
 
 
 class CreateChallengeRequest(BaseModel):
@@ -110,6 +144,7 @@ class LoginChallengeResponse(BaseModel):
 class FallbackVerifyRequest(BaseModel):
     user_code: str = Field(min_length=4, max_length=32)
     fallback_otp: str = Field(min_length=4, max_length=12)
+    client_info: Optional[ClientInfo] = None
 
 
 class LegacyRequestCode(BaseModel):
@@ -191,28 +226,87 @@ async def _resolve_current_user(request: Request) -> Optional[dict]:
         session = await _sessions().find_one({"_id": token_hash, "revoked": False})
         if not session:
             return None
+        now = _now_utc()
         expires_at = session.get("expires_at")
         if expires_at:
             if getattr(expires_at, "tzinfo", None) is None:
                 expires_at = expires_at.replace(tzinfo=timezone.utc)
-            if expires_at < _now_utc():
+            if expires_at < now:
                 return None
 
-        # Touch last_active and slide expiry in the same write. Writing
-        # last_active alone would stop web_student's hourly slide check from
-        # ever firing for a user who keeps hitting web-auth endpoints.
-        await _sessions().update_one(
-            {"_id": token_hash},
-            {"$set": {"last_active": _now_utc(),
-                      "expires_at": _now_utc() + timedelta(days=SESSION_TTL_DAYS)}}
-        )
+        # Throttle activity writes (max once every 5 minutes) to reduce write amplification.
+        last_active = session.get("last_active")
+        should_touch = True
+        if isinstance(last_active, datetime):
+            la = last_active if last_active.tzinfo else last_active.replace(tzinfo=timezone.utc)
+            if (now - la).total_seconds() < 300:
+                should_touch = False
+        if should_touch:
+            await _sessions().update_one(
+                {"_id": token_hash},
+                {"$set": {"last_active": now,
+                          "expires_at": now + timedelta(days=SESSION_TTL_DAYS)}}
+            )
         user = await db.users.find_one({"user_id": int(session["uid"])})
-        if user:
-            user["_current_session_id"] = session.get("session_id", token_hash[:16])
+        if not user or not user.get("approved") or user.get("suspended") or user.get("blacklisted"):
+            return None
+        user["_current_session_id"] = session.get("session_id") or f"id_{str(token_hash)[:20]}"
         return user
     except Exception as e:
         logger.warning("Session resolve error: %s", e)
         return None
+
+
+async def _create_or_rotate_session(
+    *,
+    uid: int,
+    device_name: str,
+    peer_ip: str,
+    user_agent: str,
+    device_id: Optional[str] = None,
+    device_type: Optional[str] = None,
+    platform_model: Optional[str] = None,
+    browser: Optional[str] = None,
+    kind: str = "web",
+) -> str:
+    """Create a fresh session and rotate any prior active session for the same device."""
+    now = _now_utc()
+    clean_did = (device_id or "").strip()[:64]
+    if clean_did:
+        await _sessions().update_many(
+            {"uid": uid, "revoked": False, "device_id": clean_did},
+            {"$set": {"revoked": True, "replaced_at": now}},
+        )
+    elif user_agent and peer_ip:
+        await _sessions().update_many(
+            {"uid": uid, "revoked": False, "user_agent": user_agent, "peer_ip": peer_ip},
+            {"$set": {"revoked": True, "replaced_at": now}},
+        )
+
+    token = secrets.token_hex(32)
+    session_id = secrets.token_hex(8)
+    resolved_type = _ua_device_type(user_agent, device_type, kind)
+    resolved_os = _ua_platform(user_agent, platform_model)
+    resolved_browser = (browser or "").strip()[:60] or _ua_browser(user_agent)
+
+    await _sessions().insert_one({
+        "_id": _hash_token(token),
+        "session_id": session_id,
+        "uid": uid,
+        "kind": kind,
+        "device_id": clean_did,
+        "device_type": resolved_type,
+        "os": resolved_os,
+        "browser": resolved_browser,
+        "device_name": device_name,
+        "peer_ip": peer_ip,
+        "user_agent": user_agent,
+        "created_at": now,
+        "last_active": now,
+        "expires_at": now + timedelta(days=SESSION_TTL_DAYS),
+        "revoked": False,
+    })
+    return token
 
 
 # ── 1. Create Web Login Challenge ────────────────────────────────
@@ -225,9 +319,10 @@ async def create_challenge(body: CreateChallengeRequest, request: Request):
 
     norm_code = sc.normalize_code(raw_code)
 
-
-    ip = ((getattr(request, "client", None) and request.client.host) or "")[:64]
-    user_agent = (request.headers.get("user-agent") or "")[:200]
+    ip = _client_ip(request)
+    hdr_ua = (request.headers.get("user-agent") or "")[:240]
+    info = body.client_info
+    user_agent = ((info.user_agent if info and info.user_agent else hdr_ua) or "")[:240]
 
     # Rate limiting: 5 req/10 min
     if not core.IP_LIMITER.allow(f"web_auth_chal:{ip}"):
@@ -244,9 +339,9 @@ async def create_challenge(body: CreateChallengeRequest, request: Request):
     expires_at = now + timedelta(seconds=CHALLENGE_TTL_SEC)
     display_code = norm_code[:4] if len(norm_code) >= 4 else "HY01"
 
-    device_name = "مرورگر وب"
-    if body.client_info and body.client_info.device_name:
-        device_name = body.client_info.device_name
+    raw_device_name = info.device_name if info and info.device_name else "مرورگر وب"
+    label = device_label(raw_device_name, user_agent, info.platform_model if info else None)
+    safe_label = _html.escape(label)
 
     uid = None
 
@@ -266,8 +361,8 @@ async def create_challenge(body: CreateChallengeRequest, request: Request):
             "parse_mode": "HTML",
             "text": (
                 "🔐 <b>درخواست ورود به نسخهٔ وب هامزیار</b>\n\n"
-                f"📱 دستگاه: <b>{device_name}</b>\n"
-                f"🌐 آدرس آی‌پی: <code>{ip or 'نامشخص'}</code>\n"
+                f"📱 دستگاه: <b>{safe_label}</b>\n"
+                f"🌐 آدرس آی‌پی: <code>{_html.escape(ip or 'نامشخص')}</code>\n"
                 f"🔢 کد تاییدیه: <b><code>{display_code}</code></b>\n"
                 f"⏳ زمان اعتبار: <b>۳ دقیقه</b>\n\n"
                 "آیا شما درخواست ورود به وب‌اپ را داده‌اید؟"
@@ -296,7 +391,7 @@ async def create_challenge(body: CreateChallengeRequest, request: Request):
         "consumed": False,
         "peer_ip": ip,
         "user_agent": user_agent,
-        "client_info": body.client_info.model_dump() if body.client_info else {"device_name": device_name},
+        "client_info": info.model_dump() if info else {"device_name": raw_device_name},
     })
 
     return {
@@ -396,25 +491,20 @@ async def poll_challenge(challenge_id: str, request: Request, response: Response
         if not user or not user.get("approved") or user.get("suspended") or user.get("blacklisted"):
             raise HTTPException(status_code=403, detail="ACCOUNT_SUSPENDED")
 
-        # Create session
-        token = secrets.token_hex(32)
-        token_hash = _hash_token(token)
-        session_id = secrets.token_hex(8)
+        # Create or rotate session
         client_info = challenge.get("client_info") or {}
         device_name = client_info.get("device_name", "Web Browser")
-
-        await _sessions().insert_one({
-            "_id": token_hash,
-            "session_id": session_id,
-            "uid": uid,
-            "device_name": device_name,
-            "peer_ip": challenge.get("peer_ip", ""),
-            "user_agent": challenge.get("user_agent", ""),
-            "created_at": now,
-            "last_active": now,
-            "expires_at": now + timedelta(days=SESSION_TTL_DAYS),
-            "revoked": False,
-        })
+        token = await _create_or_rotate_session(
+            uid=uid,
+            device_name=device_name,
+            peer_ip=challenge.get("peer_ip", ""),
+            user_agent=challenge.get("user_agent", "") or client_info.get("user_agent", ""),
+            device_id=client_info.get("device_id"),
+            device_type=client_info.get("device_type"),
+            platform_model=client_info.get("platform_model"),
+            browser=client_info.get("browser"),
+            kind="web",
+        )
 
         # Set HTTP-only Cookie
         response.set_cookie(
@@ -452,7 +542,7 @@ async def fallback_verify(body: FallbackVerifyRequest, request: Request, respons
     norm_code = sc.normalize_code(body.user_code)
     clean_otp = body.fallback_otp.strip()
 
-    ip = ((getattr(request, "client", None) and request.client.host) or "")[:64]
+    ip = _client_ip(request)
     if not core.IP_LIMITER.allow(f"web_auth_fb:{ip}"):
         raise HTTPException(status_code=429, detail="RATE_LIMIT_EXCEEDED")
 
@@ -470,28 +560,28 @@ async def fallback_verify(body: FallbackVerifyRequest, request: Request, respons
     if not otp or core.is_past(otp.get("expires_at")):
         raise HTTPException(status_code=401, detail="INVALID_FALLBACK_CODE")
 
+    if int(otp.get("attempts") or 0) >= core.OTP_MAX_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="TOO_MANY_ATTEMPTS")
+
     if not core.code_matches(otp.get("code_salt"), clean_otp, otp.get("code_hash")):
         await _otps().update_one({"uid": uid}, {"$inc": {"attempts": 1}})
         raise HTTPException(status_code=401, detail="INVALID_FALLBACK_CODE")
 
-    # Success: issue session
+    # Success: issue or rotate session
     await _otps().delete_many({"uid": uid})
-    now = _now_utc()
-    token = secrets.token_hex(32)
-    session_id = secrets.token_hex(8)
-
-    await _sessions().insert_one({
-        "_id": _hash_token(token),
-        "session_id": session_id,
-        "uid": uid,
-        "device_name": "مرورگر وب (ورود اضطراری)",
-        "peer_ip": ip,
-        "user_agent": (request.headers.get("user-agent") or "")[:200],
-        "created_at": now,
-        "last_active": now,
-        "expires_at": now + timedelta(days=SESSION_TTL_DAYS),
-        "revoked": False,
-    })
+    info = body.client_info
+    ua = ((info.user_agent if info and info.user_agent else request.headers.get("user-agent")) or "")[:240]
+    token = await _create_or_rotate_session(
+        uid=uid,
+        device_name=(info.device_name if info and info.device_name else "مرورگر وب (ورود اضطراری)"),
+        peer_ip=ip,
+        user_agent=ua,
+        device_id=info.device_id if info else None,
+        device_type=info.device_type if info else None,
+        platform_model=info.platform_model if info else None,
+        browser=info.browser if info else None,
+        kind="web",
+    )
 
     response.set_cookie(
         COOKIE_NAME,
@@ -538,16 +628,22 @@ async def list_user_sessions(request: Request):
 
     session_list = []
     async for s in cursor:
-        sid = s.get("session_id") or str(s.get("_id"))[:16]
+        sid = s.get("session_id") or f"id_{str(s.get('_id'))[:20]}"
         c_at = s.get("created_at")
         c_str = c_at.isoformat() if isinstance(c_at, datetime) else (str(c_at) if c_at else None)
         l_act = s.get("last_active") or s.get("created_at")
         l_str = l_act.isoformat() if isinstance(l_act, datetime) else (str(l_act) if l_act else None)
-        # IP is deliberately not returned: the device list shows a readable
-        # device name only. peer_ip stays in the session doc for security audit.
+        ua = (s.get("user_agent") or "").strip()
+        stored_os = (s.get("os") or "").strip() or _ua_platform(ua)
+        stored_browser = (s.get("browser") or "").strip() or _ua_browser(ua)
+        stored_type = _ua_device_type(ua, s.get("device_type"), s.get("kind"))
+        # IP is deliberately not returned: the device list shows readable metadata only.
         session_list.append({
             "session_id": sid,
-            "device_name": device_label(s.get("device_name"), s.get("user_agent")),
+            "device_name": device_label(s.get("device_name"), ua),
+            "device_type": stored_type,
+            "os": stored_os,
+            "browser": stored_browser,
             "is_current": (sid == current_session_id),
             "created_at": c_str,
             "last_active": l_str,
@@ -564,8 +660,13 @@ async def revoke_user_session(session_id: str, request: Request):
         raise HTTPException(status_code=401, detail="AUTHENTICATION_REQUIRED")
 
     uid = int(user["user_id"])
+    if re.fullmatch(r"id_[0-9a-f]{16,64}", session_id):
+        filt: Dict[str, Any] = {"uid": uid, "_id": {"$regex": f"^{re.escape(session_id[3:])}"}}
+    else:
+        filt = {"uid": uid, "$or": [{"session_id": session_id}, {"_id": session_id}]}
+
     result = await _sessions().update_one(
-        {"uid": uid, "$or": [{"session_id": session_id}, {"_id": session_id}]},
+        filt,
         {"$set": {"revoked": True, "revoked_at": _now_utc()}}
     )
 

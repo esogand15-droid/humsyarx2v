@@ -81,6 +81,10 @@ export const ICON_NAMES = [
   'i-zap',
   'i-pill',
   'i-hand',
+  'i-eye',
+  'i-eye-off',
+  'i-tablet',
+  'i-monitor',
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -169,6 +173,10 @@ export function IconSprite() {
       <symbol id="i-stethoscope" viewBox="0 0 24 24"><path d="M6 3.5v4.5a4 4 0 0 0 8 0V3.5"/><path d="M10 12v3a5 5 0 0 0 10 0v-2.5"/><circle cx="20" cy="10.5" r="2"/><path d="M5 3.5h2M13 3.5h2"/></symbol>
       <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2.8 4.8 13.4H12L11 21.2l8.2-10.6H12z"/></symbol>
       <symbol id="i-pill" viewBox="0 0 24 24"><path d="m10.5 20.5 10-10a4.95 4.95 0 0 0-7-7l-10 10a4.95 4.95 0 0 0 7 7Z"/><path d="m8.5 8.5 7 7"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.2 12s3.6-6.6 9.8-6.6 9.8 6.6 9.8 6.6-3.6 6.6-9.8 6.6S2.2 12 2.2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M17.9 17.9A10.6 10.6 0 0 1 12 18.6c-6.2 0-9.8-6.6-9.8-6.6a19.7 19.7 0 0 1 5.1-5.2M9.9 5.6A9.4 9.4 0 0 1 12 5.4c6.2 0 9.8 6.6 9.8 6.6a19.4 19.4 0 0 1-2.7 3.6M14.1 14.1a3 3 0 0 1-4.2-4.2"/><path d="M3 3l18 18"/></symbol>
+      <symbol id="i-tablet" viewBox="0 0 24 24"><rect x="4.5" y="2.8" width="15" height="18.4" rx="2.2"/><path d="M12 17.8h.01"/></symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.6" y="3.6" width="18.8" height="12.6" rx="2"/><path d="M8.5 20.4h7M12 16.2v4.2"/></symbol>
     </svg>
   );
 }

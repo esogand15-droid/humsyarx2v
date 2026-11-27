@@ -335,17 +335,11 @@ html .app-shell--nav .desktop-header {
     var(--lg-shadow);
 }
 
-.sheet .iconbtn,
-.acct-sheet__close {
+.sheet .iconbtn {
   min-width: 44px;
   min-height: 44px;
   background: var(--lg-btn);
   border: 1px solid var(--lg-edge);
-}
-
-.acct-sheet__head {
-  background: var(--lg-tint);
-  border-block-end: 1px solid var(--lg-edge);
 }
 
 .toast,

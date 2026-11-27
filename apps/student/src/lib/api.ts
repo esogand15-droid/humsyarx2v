@@ -153,6 +153,65 @@ function isAuthProbePath(path: string): boolean {
   return p.startsWith('/auth/') || p.startsWith('/api/web-auth/') || p.startsWith('/api/web/auth/');
 }
 
+const DEVICE_ID_KEY = 'hy_device_id';
+
+function getOrCreateDeviceId(): string {
+  try {
+    const existing = localStorage.getItem(DEVICE_ID_KEY);
+    if (existing && existing.length >= 8) return existing.slice(0, 64);
+    const id =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+    localStorage.setItem(DEVICE_ID_KEY, id);
+    return id;
+  } catch {
+    return '';
+  }
+}
+
+function detectDeviceType(): 'mobile' | 'tablet' | 'desktop' {
+  if (typeof navigator === 'undefined') return 'desktop';
+  const ua = navigator.userAgent || '';
+  const maxTouch = navigator.maxTouchPoints ?? 0;
+  if (/iPad/i.test(ua) || (/Macintosh/i.test(ua) && maxTouch > 1)) return 'tablet';
+  if (/Android/i.test(ua) && !/Mobile/i.test(ua)) return 'tablet';
+  if (/iPhone|iPod|Mobile|Android/i.test(ua)) return 'mobile';
+  return 'desktop';
+}
+
+export async function collectClientInfo(): Promise<Record<string, unknown>> {
+  if (typeof navigator === 'undefined') {
+    return { user_agent: 'humsyar-student-web', device_type: 'desktop' };
+  }
+  const ua = navigator.userAgent || 'humsyar-student-web';
+  const device_type = detectDeviceType();
+  const device_id = getOrCreateDeviceId();
+  let platform_model = '';
+  try {
+    const uad = (navigator as Navigator & {
+      userAgentData?: { getHighEntropyValues?: (hints: string[]) => Promise<{ model?: string }> };
+    }).userAgentData;
+    if (uad?.getHighEntropyValues) {
+      const vals = await Promise.race([
+        uad.getHighEntropyValues(['model']),
+        new Promise<{ model?: string }>((resolve) => window.setTimeout(() => resolve({}), 120)),
+      ]);
+      if (typeof vals?.model === 'string' && vals.model.trim() && vals.model.trim().toUpperCase() !== 'K') {
+        platform_model = vals.model.trim().slice(0, 48);
+      }
+    }
+  } catch {
+    /* Chromium-only hint; Safari and Firefox safely ignore */
+  }
+  return {
+    user_agent: ua,
+    device_type,
+    device_id,
+    ...(platform_model ? { platform_model } : {}),
+  };
+}
+
 /** همان لایهٔ شبکه برای ماژول‌های دیگر (کتابخانه) — مسیر نسبی به /api/web. */
 export const apiCall = call;
 
@@ -176,25 +235,27 @@ export const api = {
   logout: () => call<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
 
   // ── Unified Web Auth (Feature 6 & 7) ──
-  createChallenge: (user_code: string, client_info?: Record<string, unknown>) =>
-    call<LoginChallengeResponse>('/api/web-auth/challenge/create', {
+  createChallenge: async (user_code: string, client_info?: Record<string, unknown>) => {
+    const info = client_info ?? (await collectClientInfo());
+    return call<LoginChallengeResponse>('/api/web-auth/challenge/create', {
       method: 'POST',
       body: JSON.stringify({
         user_code,
-        client_info: client_info ?? {
-          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'humsyar-student-web',
-        },
+        client_info: info,
       }),
-    }),
+    });
+  },
 
   pollChallenge: (challenge_id: string) =>
     call<LoginChallengeStatusResponse>(`/api/web-auth/challenge/${challenge_id}`),
 
-  verifyFallback: (user_code: string, fallback_otp: string) =>
-    call<LoginChallengeStatusResponse>('/api/web-auth/fallback/verify', {
+  verifyFallback: async (user_code: string, fallback_otp: string, client_info?: Record<string, unknown>) => {
+    const info = client_info ?? (await collectClientInfo());
+    return call<LoginChallengeStatusResponse>('/api/web-auth/fallback/verify', {
       method: 'POST',
-      body: JSON.stringify({ user_code, fallback_otp }),
-    }),
+      body: JSON.stringify({ user_code, fallback_otp, client_info: info }),
+    });
+  },
 
   getSessions: () =>
     call<{ sessions: UserSessionItem[] }>('/api/web-auth/sessions'),

@@ -229,7 +229,7 @@ export function LibraryScreen() {
         )}
 
         {!loading && !error && (
-          <p className="lib-foot-note">محتوا به‌صورت امن داخل هامزیار باز و همگام می‌شود.</p>
+          <p className="lib-foot-note">محتوا به‌صورت امن داخل کتابخوان اختصاصی هامزیار باز می‌شود.</p>
         )}
       </div>
     </>

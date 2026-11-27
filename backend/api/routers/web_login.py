@@ -268,6 +268,7 @@ async def verify_code(body: VerifyCode, request: Request, response: Response):
         await _otps().delete_many({"uid": uid})
         await _sessions().insert_one({
             "_id": core.hash_token(token),
+            "session_id": secrets.token_hex(8),
             "uid": uid,
             "created_at": now,
             "expires_at": now + timedelta(days=ttl_days),

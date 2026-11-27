@@ -67,6 +67,9 @@ export interface LoginChallengeStatusResponse {
 export interface UserSessionItem {
   session_id: string;
   device_name: string;
+  device_type?: 'mobile' | 'tablet' | 'desktop' | 'telegram';
+  browser?: string;
+  os?: string;
   /** دیگر از سرور نمیآید؛ فهرست دستگاهها فقط نام دستگاه را نشان میدهد. */
   ip_address?: string;
   is_current: boolean;

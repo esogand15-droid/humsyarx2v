@@ -225,10 +225,71 @@
   flex-wrap: wrap;
 }
 
+.acct-code-row {
+  display: flex;
+  align-items: center;
+  gap: var(--hym-space-2);
+  flex-wrap: wrap;
+}
+
+.acct-code-box {
+  flex: 1 1 160px;
+  min-width: 0;
+  min-height: var(--hym-control-h-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-2);
+  padding-inline: var(--hym-space-3) var(--hym-space-1);
+  border-radius: var(--hym-radius-control);
+  background: var(--hym-surface-sunken);
+  border: 1px solid var(--hym-hairline-strong);
+}
+
+.acct-code-box__val {
+  font-family: var(--hym-font-mono);
+  font-size: var(--hym-fs-body);
+  font-weight: var(--hym-fw-bold);
+  letter-spacing: 0.18em;
+  color: var(--hym-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.acct-code-box__eye {
+  display: grid;
+  place-items: center;
+  width: var(--hym-control-h-md);
+  height: var(--hym-control-h-md);
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--hym-radius-control);
+  background: transparent;
+  color: var(--hym-text-secondary);
+  cursor: pointer;
+}
+
+.acct-code-box__eye:hover {
+  background: var(--hym-bg-hover);
+  color: var(--hym-text-primary);
+}
+
+.acct-code-box__eye:focus-visible {
+  outline: none;
+  box-shadow: var(--hym-focus-ring-v2);
+}
+
+.acct-code-fallback {
+  display: flex;
+  align-items: center;
+}
+
 .acct-code-card__copy {
   display: inline-flex;
   align-items: center;
   gap: var(--hym-space-2);
+  flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
 }
 
@@ -250,13 +311,6 @@
 
 .acct-row-danger .ds-row__title {
   color: var(--hym-role-danger-text);
-}
-
-.acct-version-foot {
-  margin: 0;
-  text-align: center;
-  font-size: var(--hym-fs-caption);
-  color: var(--hym-text-muted);
 }
 
 /* Credit line at the very bottom of the profile: quiet, centred, one accent. */
@@ -284,89 +338,22 @@
   display: inline-block;
   font-size: 1.05em;
   line-height: 1;
-  animation: acct-heartbeat 2.4s ease-in-out infinite;
+  animation: acct-heartbeat 1.8s ease-in-out infinite;
 }
 @keyframes acct-heartbeat {
-  0%, 60%, 100% { transform: scale(1); }
-  12% { transform: scale(1.18); }
-  24% { transform: scale(1); }
-  36% { transform: scale(1.12); }
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.12); }
+  50% { transform: scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
   .acct-credit__heart { animation: none; }
 }
 
-/* شیت و مودال اختصاصی حساب کاربری */
-.acct-sheet-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: var(--hym-z-modal);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: var(--hym-bg-overlay);
-}
-
-@media (min-width: 768px) {
-  .acct-sheet-scrim {
-    align-items: center;
-    padding: var(--hym-space-4);
-  }
-}
-
-.acct-sheet {
-  width: 100%;
-  max-width: 520px;
-  max-height: 88vh;
-  max-height: 88dvh;
-  overflow-y: auto;
+.acct-sheet-body {
   display: flex;
   flex-direction: column;
   gap: var(--hym-space-4);
-  padding: var(--hym-space-5);
-  padding-block-end: max(var(--hym-space-6), env(safe-area-inset-bottom, 0px));
-  background: var(--hym-surface-2);
-  border: 1px solid var(--hym-hairline);
-  border-radius: var(--hym-radius-sheet) var(--hym-radius-sheet) 0 0;
-  box-shadow: var(--hym-elev-3);
-}
-
-@media (min-width: 768px) {
-  .acct-sheet {
-    border-radius: var(--hym-radius-sheet);
-    padding: var(--hym-space-6);
-  }
-}
-
-.acct-sheet__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--hym-space-3);
-}
-
-.acct-sheet__title {
-  margin: 0;
-  font-size: var(--hym-fs-h2);
-  font-weight: var(--hym-fw-heavy);
-  color: var(--hym-text-primary);
-}
-
-.acct-sheet__close {
-  display: grid;
-  place-items: center;
-  width: var(--hym-control-h-md);
-  height: var(--hym-control-h-md);
-  border: 1px solid var(--hym-hairline-strong);
-  border-radius: var(--hym-radius-control);
-  background: var(--hym-surface-1);
-  color: var(--hym-text-secondary);
-  cursor: pointer;
-}
-
-.acct-sheet__close:hover {
-  background: var(--hym-bg-hover);
-  color: var(--hym-text-primary);
+  padding-block: var(--hym-space-2) var(--hym-space-4);
 }
 
 .acct-sheet__list {

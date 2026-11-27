@@ -224,7 +224,14 @@
   line-height: var(--hym-lh-body);
   color: var(--hym-text-muted);
 }
-.device-modal__error { margin: 0; }
+.device-modal__error {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-2);
+  flex-wrap: wrap;
+}
 .device-modal__empty {
   padding: var(--hym-space-5) 0;
   text-align: center;
@@ -246,6 +253,25 @@
   border: 1px solid var(--hym-hairline);
   border-radius: var(--hym-radius-card);
   box-shadow: var(--hym-elev-1);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.device-modal__row.is-removing {
+  opacity: 0;
+  transform: scale(0.97);
+  pointer-events: none;
+}
+.device-modal__actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.device-modal__confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--hym-space-1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .device-modal__row { transition: none; }
 }
 .device-modal__row.is-current {
   border-color: var(--hym-accent-border);
@@ -335,6 +361,42 @@
    growing from the bell's corner. Full list lives on /notifications. */
 .notif-bell { position: relative; display: inline-flex; }
 .notif-bell .iconbtn.is-active { background: var(--hym-bg-hover); color: var(--hym-text-primary); }
+.notif-bell__badge {
+  position: absolute;
+  top: 2px;
+  inset-inline-end: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 4px;
+  border-radius: 99px;
+  display: inline-grid;
+  place-items: center;
+  background: var(--hym-accent);
+  color: var(--hym-accent-on);
+  border: 2px solid var(--hym-surface-1);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.notif-badge-bump {
+  animation: mo-badge-bump 300ms var(--lg-spring, cubic-bezier(.34, 1.32, .64, 1)) both;
+}
+@keyframes mo-badge-bump {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notif-badge-bump { animation: none; }
+}
+.notif-pop-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-overlay, 50) - 1);
+  background: color-mix(in srgb, var(--midnight) 8%, transparent);
+}
+.notif-pop-scrim[data-state="closing"] { pointer-events: none; }
 .notif-pop {
   --mo-origin: top left;
   position: absolute;
@@ -352,6 +414,26 @@
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 6px 8px 8px;
 }
+.notif-pop__head-lead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.notif-pop__mark {
+  min-height: 32px;
+  padding: 2px 10px;
+  border: 0;
+  border-radius: 99px;
+  background: transparent;
+  color: var(--hym-accent-text);
+  font: inherit;
+  font-size: var(--hym-fs-caption);
+  font-weight: var(--hym-fw-bold);
+  cursor: pointer;
+}
+.notif-pop__mark:hover { background: var(--hym-bg-hover); }
+.notif-pop__mark:focus-visible { outline: none; box-shadow: var(--hym-focus-ring-v2); }
 .notif-pop__title { font-size: var(--hym-fs-body); font-weight: var(--hym-fw-bold); color: var(--hym-text-primary); }
 .notif-pop__count {
   padding: 2px 8px; border-radius: 99px;
