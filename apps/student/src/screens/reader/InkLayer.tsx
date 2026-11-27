@@ -1,3 +1,4 @@
+import { notePen, PALM_CONTACT_PX, PEN_GUARD_MS } from './penInput';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 import {
@@ -43,6 +44,8 @@ interface Props {
   eraseHighlighterOnly?: boolean;
   shapeSnap?: boolean;
   stylusOnly?: boolean;
+  /** Fired the first time a stylus touches this page, so the reader can switch to pen mode. */
+  onPenDetected?: () => void;
   onPinchZoom?: (factor: number) => void;
   onNotesLoaded?: (page: number, notes: StickyNote[]) => void;
   isGesturing?: boolean;
@@ -54,7 +57,28 @@ const MAX_INK_CANVAS_PIXELS = 5_242_880;
 const STYLUS_DECAY_MS = 750;
 // Fingertip contact on iPad/Android is commonly 30-50px, so the old 25px bound rejected
 // every finger stroke ("can't write with my finger"). A resting palm reports well above 70.
-const PALM_TOUCH_BOUND_PX = 70;
+const PALM_TOUCH_BOUND_PX = PALM_CONTACT_PX;
+/** Finger travel before a touch turns into a pan, so a resting fingertip does not nudge the page. */
+const PAN_SLOP_PX = 6;
+/** Per-millisecond velocity decay of a finger fling (close to iOS scroll deceleration). */
+const FLING_FRICTION = 0.996;
+const MAX_FLING_PX_MS = 6;
+/**
+ * Highlighter strokes are painted opaque onto their own canvas and this alpha is applied to that
+ * canvas as a whole, so a stroke that crosses itself or a neighbour keeps one even tint.
+ */
+const HIGHLIGHTER_ALPHA = 0.38;
+
+function findScrollParent(el: HTMLElement | null): HTMLElement | null {
+  for (let node = el?.parentElement ?? null; node; node = node.parentElement) {
+    const { overflowX, overflowY } = window.getComputedStyle(node);
+    const scrollable = /(auto|scroll)/.test(overflowY) || /(auto|scroll)/.test(overflowX);
+    if (scrollable && (node.scrollHeight > node.clientHeight || node.scrollWidth > node.clientWidth)) {
+      return node;
+    }
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? null;
+}
 
 function isPointInPolygon(point: { x: number; y: number }, polygon: Array<{ x: number; y: number }>): boolean {
   let inside = false;
@@ -230,7 +254,7 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
     eraseHighlighterOnly = false,
     shapeSnap = false,
     stylusOnly = false,
-    onPinchZoom,
+    onPenDetected,
     onNotesLoaded,
     isGesturing = false,
   },
@@ -239,8 +263,8 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const highlighterCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scratchRef = useRef<HTMLCanvasElement | null>(null);
-  const cbs = useRef({ onCount, onHistory, onStatus, onChanged, onNotesLoaded });
-  cbs.current = { onCount, onHistory, onStatus, onChanged, onNotesLoaded };
+  const cbs = useRef({ onCount, onHistory, onStatus, onChanged, onNotesLoaded, onPenDetected });
+  cbs.current = { onCount, onHistory, onStatus, onChanged, onNotesLoaded, onPenDetected };
   const notesRef = useRef<StickyNote[]>([]);
   const gesturingRef = useRef(isGesturing);
   gesturingRef.current = isGesturing;
@@ -271,7 +295,46 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
   const isStylusActive = useRef<boolean>(false);
   const stylusDecayTimer = useRef<number | undefined>(undefined);
   const touchPointers = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const lastPinchDist = useRef<number | null>(null);
+  /** Touches classified as palm stay ignored for their whole life, even after the pen lifts. */
+  const ignoredTouches = useRef<Set<number>>(new Set());
+  const penDown = useRef(false);
+  const penSeen = useRef(false);
+  /** The one pointer allowed to draw/erase/lasso; a second hand on the glass can't end its stroke. */
+  const activePointer = useRef<number | null>(null);
+  const activeIsTouch = useRef(false);
+  const panRef = useRef<{
+    id: number;
+    startX: number;
+    startY: number;
+    lastX: number;
+    lastY: number;
+    lastT: number;
+    vx: number;
+    vy: number;
+    active: boolean;
+    scroller: HTMLElement | null;
+  } | null>(null);
+  const momentumRaf = useRef<number | null>(null);
+  const paintRaf = useRef<number | null>(null);
+  /** Bitmap of committed strokes, kept only while a stroke is live so per-frame cost stays flat. */
+  const committedCache = useRef<{
+    ink: HTMLCanvasElement;
+    hl: HTMLCanvasElement | null;
+    source: Stroke[];
+  } | null>(null);
+
+  useEffect(
+    () => () => {
+      if (momentumRaf.current != null) window.cancelAnimationFrame(momentumRaf.current);
+      if (paintRaf.current != null) window.cancelAnimationFrame(paintRaf.current);
+      const c = committedCache.current;
+      if (c) {
+        c.ink.width = 0;
+        if (c.hl) c.hl.width = 0;
+      }
+    },
+    [],
+  );
 
   const commit = useCallback(
     (next: Stroke[], opts: { history?: boolean } = { history: true }) => {
@@ -403,14 +466,21 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
         ctx.fillStyle = s.color;
         ctx.globalAlpha = s.opacity ?? 1.0;
         ctx.globalCompositeOperation = 'source-over';
-      } else {
-        ctx.lineCap = s.tool === 'highlighter' ? 'square' : 'round';
+      } else if (s.tool === 'highlighter') {
+        // Rounded, marker-like ends; the translucency comes from the canvas (HIGHLIGHTER_ALPHA).
+        ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.strokeStyle = s.color;
         ctx.fillStyle = s.color;
-        ctx.globalAlpha = s.opacity ?? (s.tool === 'highlighter' ? 0.35 : 1.0);
-        ctx.globalCompositeOperation =
-          s.blend_mode ?? (s.tool === 'highlighter' ? 'multiply' : 'source-over');
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      } else {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = s.color;
+        ctx.fillStyle = s.color;
+        ctx.globalAlpha = s.opacity ?? 1.0;
+        ctx.globalCompositeOperation = s.blend_mode ?? 'source-over';
       }
 
       const isPencil = s.tool === 'pencil';
@@ -546,11 +616,70 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
       sCtx?.clearRect(0, 0, scratch.width, scratch.height);
     }
 
-    for (const s of strokesRef.current) {
-      if (s.tool === 'highlighter' && hlCtx) {
-        drawStrokeOnCtx(hlCtx, s);
-      } else {
-        drawStrokeOnCtx(ctx, s);
+    const live = drawing.current !== null || lassoPoints.current.length > 1;
+    if (live) {
+      // While a stroke is under way the committed strokes come from one cached bitmap instead of
+      // being re-stroked every frame; that per-frame re-stroking is what made busy pages stutter.
+      let cache = committedCache.current;
+      const stale =
+        !cache ||
+        cache.source !== strokesRef.current ||
+        cache.ink.width !== pxW ||
+        cache.ink.height !== pxH ||
+        (hlCtx !== null) !== (cache.hl !== null);
+      if (!cache || stale) {
+        const inkLayer = cache?.ink ?? document.createElement('canvas');
+        let hlLayer = cache?.hl ?? null;
+        if (hlCtx && !hlLayer) hlLayer = document.createElement('canvas');
+        if (!hlCtx && hlLayer) {
+          hlLayer.width = 0;
+          hlLayer = null;
+        }
+        const prep = (c: HTMLCanvasElement) => {
+          if (c.width !== pxW || c.height !== pxH) {
+            c.width = pxW;
+            c.height = pxH;
+          }
+          const cx = c.getContext('2d');
+          if (cx) {
+            cx.setTransform(1, 0, 0, 1, 0, 0);
+            cx.clearRect(0, 0, pxW, pxH);
+            cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          }
+          return cx;
+        };
+        const inkCtx = prep(inkLayer);
+        const hlCacheCtx = hlLayer ? prep(hlLayer) : null;
+        for (const s of strokesRef.current) {
+          const target = s.tool === 'highlighter' && hlCacheCtx ? hlCacheCtx : inkCtx;
+          if (target) drawStrokeOnCtx(target, s);
+        }
+        cache = { ink: inkLayer, hl: hlLayer, source: strokesRef.current };
+        committedCache.current = cache;
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(cache.ink, 0, 0);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (hlCtx && cache.hl) {
+        hlCtx.setTransform(1, 0, 0, 1, 0, 0);
+        hlCtx.drawImage(cache.hl, 0, 0);
+        hlCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+    } else {
+      // Idle pages hold no extra bitmaps: several full-page canvases per page would blow
+      // iPad Safari's canvas memory budget.
+      const c = committedCache.current;
+      if (c) {
+        c.ink.width = 0;
+        if (c.hl) c.hl.width = 0;
+        committedCache.current = null;
+      }
+      for (const s of strokesRef.current) {
+        if (s.tool === 'highlighter' && hlCtx) {
+          drawStrokeOnCtx(hlCtx, s);
+        } else {
+          drawStrokeOnCtx(ctx, s);
+        }
       }
     }
 
@@ -685,70 +814,137 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
     [],
   );
 
-  // ── بررسی فیلتر نخل و لمس دست (Palm Rejection) ──────────────
-  const isPalmRejected = useCallback(
-    (e: React.PointerEvent<HTMLCanvasElement>): boolean => {
-      // حالت اختصاصی قلم: رد کامل لمس انگشت برای نوشتن
-      if (stylusOnly && e.pointerType === 'touch') {
-        return true;
+  // ── Pen / finger routing (Noteful-style) ─────────────────────
+  // Pen mode: the stylus writes, one finger pans the reader with momentum, two fingers are left to
+  // the reader's pinch-zoom, and any contact that lands while the pen is down (or is wider than a
+  // fingertip) is the palm. Without pen mode a finger draws, as on a phone with no stylus.
+  const markPen = () => {
+    notePen();
+    lastStylusTime.current = performance.now();
+    isStylusActive.current = true;
+    if (stylusDecayTimer.current) window.clearTimeout(stylusDecayTimer.current);
+    stylusDecayTimer.current = window.setTimeout(() => {
+      isStylusActive.current = false;
+    }, STYLUS_DECAY_MS);
+    if (!penSeen.current) {
+      penSeen.current = true;
+      cbs.current.onPenDetected?.();
+    }
+  };
+
+  const classifyPointer = (e: React.PointerEvent<HTMLCanvasElement>): 'draw' | 'pan' | 'ignore' => {
+    if (e.pointerType === 'pen') {
+      markPen();
+      return 'draw';
+    }
+    if (e.pointerType !== 'touch') return 'draw';
+    if (penDown.current) return 'ignore';
+    if (e.width > PALM_TOUCH_BOUND_PX || e.height > PALM_TOUCH_BOUND_PX) return 'ignore';
+    const sincePen = performance.now() - lastStylusTime.current;
+    if (stylusOnly) return sincePen < PEN_GUARD_MS ? 'ignore' : 'pan';
+    return isStylusActive.current || sincePen < STYLUS_DECAY_MS ? 'ignore' : 'draw';
+  };
+
+  const stopMomentum = () => {
+    if (momentumRaf.current != null) {
+      window.cancelAnimationFrame(momentumRaf.current);
+      momentumRaf.current = null;
+    }
+  };
+
+  const beginPan = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const now = performance.now();
+    panRef.current = {
+      id: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      lastT: now,
+      vx: 0,
+      vy: 0,
+      active: false,
+      scroller: findScrollParent(e.currentTarget),
+    };
+  };
+
+  const movePan = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const p = panRef.current;
+    if (!p || !p.scroller) return;
+    const now = performance.now();
+    if (!p.active) {
+      if (Math.hypot(e.clientX - p.startX, e.clientY - p.startY) < PAN_SLOP_PX) return;
+      p.active = true;
+      p.lastX = e.clientX;
+      p.lastY = e.clientY;
+      p.lastT = now;
+      return;
+    }
+    const dx = e.clientX - p.lastX;
+    const dy = e.clientY - p.lastY;
+    const dt = Math.max(1, now - p.lastT);
+    p.scroller.scrollLeft -= dx;
+    p.scroller.scrollTop -= dy;
+    // Smoothed px/ms velocity, used for the fling on release.
+    p.vx = 0.75 * (dx / dt) + 0.25 * p.vx;
+    p.vy = 0.75 * (dy / dt) + 0.25 * p.vy;
+    p.lastX = e.clientX;
+    p.lastY = e.clientY;
+    p.lastT = now;
+  };
+
+  const endPan = (fling: boolean) => {
+    const p = panRef.current;
+    panRef.current = null;
+    if (!fling || !p || !p.active || !p.scroller) return;
+    // A finger that came to rest before lifting should not fling.
+    if (performance.now() - p.lastT > 60) return;
+    const el = p.scroller;
+    const cap = (v: number) => Math.max(-MAX_FLING_PX_MS, Math.min(MAX_FLING_PX_MS, v));
+    let vx = cap(p.vx);
+    let vy = cap(p.vy);
+    let last = performance.now();
+    const step = (t: number) => {
+      const dt = Math.min(32, Math.max(1, t - last));
+      last = t;
+      const decay = Math.pow(FLING_FRICTION, dt);
+      vx *= decay;
+      vy *= decay;
+      if (Math.hypot(vx, vy) < 0.02) {
+        momentumRaf.current = null;
+        return;
       }
+      el.scrollLeft -= vx * dt;
+      el.scrollTop -= vy * dt;
+      momentumRaf.current = window.requestAnimationFrame(step);
+    };
+    stopMomentum();
+    momentumRaf.current = window.requestAnimationFrame(step);
+  };
 
-      if (e.pointerType === 'pen') {
-        lastStylusTime.current = performance.now();
-        isStylusActive.current = true;
-        if (stylusDecayTimer.current) window.clearTimeout(stylusDecayTimer.current);
-        stylusDecayTimer.current = window.setTimeout(() => {
-          isStylusActive.current = false;
-        }, STYLUS_DECAY_MS);
-        return false;
-      }
+  /** Drop whatever the active pointer had started (palm takeover, cancel, pinch). */
+  const abandonActive = () => {
+    activePointer.current = null;
+    if (dwellTimer.current) window.clearTimeout(dwellTimer.current);
+    drawing.current = null;
+    lassoPoints.current = [];
+    if (isDraggingSelection.current) {
+      isDraggingSelection.current = false;
+      dragStartPt.current = null;
+      commit([...strokesRef.current]);
+    }
+    scratchRef.current?.getContext('2d')?.clearRect(0, 0, width, height);
+    paint();
+  };
 
-      if (e.pointerType === 'touch') {
-        touchPointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-        // لمس چندانگشتی (>= 2): رهاسازی ترسیم و واگذاری ژست به ریدر
-        if (touchPointers.current.size >= 2) {
-          if (drawing.current) {
-            drawing.current = null;
-            paint();
-          }
-          try {
-            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-              e.currentTarget.releasePointerCapture(e.pointerId);
-            }
-          } catch {
-            // ignore
-          }
-          if (onPinchZoom && touchPointers.current.size === 2) {
-            const pts = Array.from(touchPointers.current.values());
-            const curDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-            if (lastPinchDist.current !== null && lastPinchDist.current > 5) {
-              const factor = curDist / lastPinchDist.current;
-              if (Math.abs(factor - 1.0) > 0.003) {
-                onPinchZoom(factor);
-              }
-            }
-            lastPinchDist.current = curDist;
-          }
-          return true;
-        }
-
-        // مساحت برخورد بزرگ‌تر از انگشت (نخل یا کنارهٔ دست)
-        if (e.width > PALM_TOUCH_BOUND_PX || e.height > PALM_TOUCH_BOUND_PX) {
-          return true;
-        }
-
-        // پنجرهٔ تاخیر قلم (750ms decay timer)
-        const elapsed = performance.now() - lastStylusTime.current;
-        if (isStylusActive.current || elapsed < STYLUS_DECAY_MS) {
-          return true;
-        }
-      }
-
-      return false;
-    },
-    [stylusOnly, paint],
-  );
+  /** Coalesce live-stroke repaints to one per frame; 240Hz pens otherwise repaint 4× a frame. */
+  const schedulePaint = () => {
+    if (paintRaf.current != null) return;
+    paintRaf.current = window.requestAnimationFrame(() => {
+      paintRaf.current = null;
+      paint();
+    });
+  };
 
   // ── پاک‌سازی انتخاب در صورت تغییر ابزار ───────────────
   useEffect(() => {
@@ -785,13 +981,52 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
 
   const onDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!tool) return;
-    if (isPalmRejected(e)) return;
+    const route = classifyPointer(e);
+    if (e.pointerType === 'touch') {
+      if (route === 'ignore') {
+        ignoredTouches.current.add(e.pointerId);
+        return;
+      }
+      touchPointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      stopMomentum();
+      if (touchPointers.current.size >= 2) {
+        // A second finger means pinch-zoom, which the reader handles; drop what the first began.
+        endPan(false);
+        if (activePointer.current !== null && activeIsTouch.current) abandonActive();
+        return;
+      }
+    } else if (route === 'ignore') {
+      return;
+    }
     if (e.pointerType === 'touch' || e.pointerType === 'pen') {
       e.preventDefault();
       // Drop a selection made before the pen came down so the iOS callout menu does not linger.
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) sel.removeAllRanges();
     }
+    try {
+      // Keep the pointer on this page even when it crosses into the next page's canvas.
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // best effort; touch pointers are implicitly captured anyway
+    }
+    if (route === 'pan') {
+      beginPan(e);
+      return;
+    }
+    if (activePointer.current !== null && activePointer.current !== e.pointerId) {
+      // Only the pen may take over a stroke already under way (a palm that touched down first).
+      if (e.pointerType !== 'pen' || !activeIsTouch.current) return;
+      abandonActive();
+    }
+    if (e.pointerType === 'pen') {
+      penDown.current = true;
+      notePen(true);
+      endPan(false);
+      stopMomentum();
+    }
+    activePointer.current = e.pointerId;
+    activeIsTouch.current = e.pointerType === 'touch';
 
     const rect = e.currentTarget.getBoundingClientRect();
     strokeStartTime.current = performance.now();
@@ -874,7 +1109,16 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
 
   const onMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!tool) return;
-    if (isPalmRejected(e)) return;
+    if (panRef.current && panRef.current.id === e.pointerId) {
+      movePan(e);
+      return;
+    }
+    if (e.pointerType === 'pen' && e.buttons === 0 && e.pressure === 0) {
+      // A hovering pencil means the writing hand is near: feed finger-mode palm rejection.
+      if (!stylusOnly) lastStylusTime.current = performance.now();
+      return;
+    }
+    if (e.pointerId !== activePointer.current) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
 
@@ -946,7 +1190,7 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
         live.points.push(pt);
       }
     }
-    paint();
+    schedulePaint();
 
     // مدیریت مکث برای صاف‌سازی (Dwell Detection)
     const curPt = live.points[live.points.length - 1];
@@ -966,12 +1210,22 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
   };
 
   const onUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    touchPointers.current.delete(e.pointerId);
+    ignoredTouches.current.delete(e.pointerId);
+    if (panRef.current && panRef.current.id === e.pointerId) {
+      endPan(e.type === 'pointerup');
+      return;
+    }
+    if (e.pointerType === 'pen' && penDown.current) {
+      penDown.current = false;
+      notePen(false);
+      markPen();
+    }
+    // Lifting a palm (or any other pointer) must never end the pen's stroke.
+    if (e.pointerId !== activePointer.current) return;
+    activePointer.current = null;
     if (tool === 'eraser') {
       scratchRef.current?.getContext('2d')?.clearRect(0, 0, width, height);
-    }
-    touchPointers.current.delete(e.pointerId);
-    if (touchPointers.current.size < 2) {
-      lastPinchDist.current = null;
     }
     if (dwellTimer.current) window.clearTimeout(dwellTimer.current);
 
@@ -1032,17 +1286,8 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
         pressure: p0.pressure,
         time: p0.time + 10,
       });
-    } else if (live.tool === 'highlighter' && live.points.length >= 3) {
-      // صاف‌سازی خودکار هایلایتر روی خطوط متن به سبک GoodNotes
-      const p0 = live.points[0];
-      const pn = live.points[live.points.length - 1];
-      const dx = Math.abs(pn.x - p0.x);
-      const dy = Math.abs(pn.y - p0.y);
-      if (dx > 0.03 && dy / dx < 0.28) {
-        const avgY = (p0.y + pn.y) / 2;
-        live.points = live.points.map((p) => ({ ...p, y: avgY }));
-      }
-    } else if (shapeSnap) {
+    } else if (shapeSnap && live.tool !== 'highlighter') {
+      // Highlighter keeps the hand-drawn path; it only straightens on a deliberate hold (dwell).
       live.points = snapToCleanShape(live.points);
     }
 
@@ -1052,20 +1297,16 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
 
   const onCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
     touchPointers.current.delete(e.pointerId);
-    if (touchPointers.current.size < 2) {
-      lastPinchDist.current = null;
+    ignoredTouches.current.delete(e.pointerId);
+    if (panRef.current && panRef.current.id === e.pointerId) {
+      endPan(false);
+      return;
     }
-    if (dwellTimer.current) window.clearTimeout(dwellTimer.current);
-    if (tool === 'lasso') {
-      lassoPoints.current = [];
-      isDraggingSelection.current = false;
-      dragStartPt.current = null;
-      paint();
+    if (e.pointerType === 'pen' && penDown.current) {
+      penDown.current = false;
+      notePen(false);
     }
-    if (drawing.current) {
-      drawing.current = null;
-      paint();
-    }
+    if (e.pointerId === activePointer.current) abandonActive();
   };
 
   useImperativeHandle(ref, () => ({
@@ -1117,6 +1358,7 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
           inset: 0,
           zIndex: 2,
           mixBlendMode: 'multiply',
+          opacity: HIGHLIGHTER_ALPHA,
           pointerEvents: 'none',
         }}
         aria-hidden="true"
@@ -1124,11 +1366,12 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
       <canvas
         ref={canvasRef}
         className={`ink-canvas${tool ? ' ink-canvas--active' : ''}`}
-        style={{ width, height, position: 'absolute', inset: 0, zIndex: 3, touchAction: tool ? (stylusOnly ? 'pan-y' : 'none') : 'auto' }}
+        style={{ width, height, position: 'absolute', inset: 0, zIndex: 3, touchAction: tool ? 'none' : 'auto' }}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onCancel}
+        onLostPointerCapture={onUp}
         aria-label={
           tool
             ? 'سطح حاشیه‌نویسی دیجیتال؛ با قلم یا ماوس خط بکشید'

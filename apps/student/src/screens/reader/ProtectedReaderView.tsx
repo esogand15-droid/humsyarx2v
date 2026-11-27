@@ -1,3 +1,4 @@
+import { isPenBusy, PALM_CONTACT_PX } from './penInput';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { DsButton, DsEmpty, DsSkeleton } from '../../design/components';
@@ -48,6 +49,26 @@ export interface DocumentManifest {
 
 /** چند ثانیه قبل از انقضا مانیفست بیصدا تازه شود. */
 const MANIFEST_REFRESH_LEAD_SEC = 120;
+
+const PEN_MODE_KEY = 'hz.reader.penMode';
+
+/** Stored pen-mode choice for this device; `null` until the student (or a detected pen) sets it. */
+function readPenMode(): boolean | null {
+  try {
+    const v = window.localStorage.getItem(PEN_MODE_KEY);
+    return v === null ? null : v === '1';
+  } catch {
+    return null;
+  }
+}
+
+function writePenMode(on: boolean): void {
+  try {
+    window.localStorage.setItem(PEN_MODE_KEY, on ? '1' : '0');
+  } catch {
+    // private mode / full storage: the toggle still works for this session
+  }
+}
 
 /** One zoom range for wheel, pinch, keys and buttons; before this, '+' above 2.0 zoomed out. */
 const ZOOM_MIN = 0.5;
@@ -117,6 +138,8 @@ export function ProtectedReaderView({
 
   // لایه ابزارهای نوت‌برداری
   const [tool, setTool] = useState<ReaderTool>(null);
+  const toolActiveRef = useRef(false);
+  toolActiveRef.current = tool !== null;
   const [color, setColor] = useState(INK_COLORS[1]);
   const [strokeWidth, setStrokeWidth] = useState(0.0035);
   const [status, setStatus] = useState<InkStatus>('idle');
@@ -125,7 +148,16 @@ export function ProtectedReaderView({
   const [eraserMode, setEraserMode] = useState<'stroke' | 'partial'>('stroke');
   const [eraseHighlighterOnly, setEraseHighlighterOnly] = useState(false);
   const [shapeSnap, setShapeSnap] = useState(false);
-  const [stylusOnly, setStylusOnly] = useState(false);
+  // Pen mode (stylus writes, finger scrolls/zooms) is remembered per device and turns itself on
+  // the first time a stylus touches a page, unless the student already chose.
+  const [stylusOnly, setStylusOnlyState] = useState(() => readPenMode() === true);
+  const setStylusOnly = useCallback((on: boolean) => {
+    setStylusOnlyState(on);
+    writePenMode(on);
+  }, []);
+  const handlePenDetected = useCallback(() => {
+    if (readPenMode() === null) setStylusOnly(true);
+  }, [setStylusOnly]);
 
   // While any ink tool is active, nothing on the page (headers, toolbar labels,
   // PDF text layer) may be picked up as a text selection by the pen.
@@ -346,10 +378,26 @@ export function ProtectedReaderView({
       scheduleCommitZoom(140);
     };
 
+    // While inking only real fingers may pinch: a pencil touch or a resting palm must never zoom.
+    const pinchTouches = (e: TouchEvent): Touch[] => {
+      const list = Array.from(e.touches);
+      if (!toolActiveRef.current) return list;
+      if (isPenBusy()) return [];
+      return list.filter((t) => {
+        const kind = (t as Touch & { touchType?: string }).touchType;
+        return (
+          kind !== 'stylus' &&
+          (t.radiusX || 0) * 2 <= PALM_CONTACT_PX &&
+          (t.radiusY || 0) * 2 <= PALM_CONTACT_PX
+        );
+      });
+    };
+
     const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        const p1 = e.touches[0];
-        const p2 = e.touches[1];
+      const t = pinchTouches(e);
+      if (t.length === 2) {
+        const p1 = t[0];
+        const p2 = t[1];
         touchDistRef.current = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
         touchStartZoomRef.current = gestureRef.current.active
           ? gestureRef.current.targetZoom
@@ -358,10 +406,11 @@ export function ProtectedReaderView({
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2 && touchDistRef.current !== null && touchDistRef.current > 10) {
+      const t = pinchTouches(e);
+      if (t.length === 2 && touchDistRef.current !== null && touchDistRef.current > 10) {
         e.preventDefault();
-        const p1 = e.touches[0];
-        const p2 = e.touches[1];
+        const p1 = t[0];
+        const p2 = t[1];
         const curDist = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
         const factor = curDist / touchDistRef.current;
         applyGestureTransform(
@@ -369,11 +418,15 @@ export function ProtectedReaderView({
           (p1.clientX + p2.clientX) / 2,
           (p1.clientY + p2.clientY) / 2,
         );
+      } else if (touchDistRef.current !== null && t.length < 2) {
+        // The pen or a palm interrupted the pinch: settle the zoom where it is.
+        touchDistRef.current = null;
+        commitGestureZoom();
       }
     };
 
     const onTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2 && touchDistRef.current !== null) {
+      if (pinchTouches(e).length < 2 && touchDistRef.current !== null) {
         touchDistRef.current = null;
         commitGestureZoom();
       }
@@ -382,10 +435,14 @@ export function ProtectedReaderView({
     let safariStartZoom = 1.0;
     const onGestureStart = (e: Event) => {
       e.preventDefault();
+      // Safari's gesture events can't tell a palm from a finger; while inking the filtered
+      // touch path above owns pinch-zoom.
+      if (toolActiveRef.current) return;
       safariStartZoom = gestureRef.current.active ? gestureRef.current.targetZoom : zoomRef.current;
     };
     const onGestureChange = (e: Event) => {
       e.preventDefault();
+      if (toolActiveRef.current) return;
       const ge = e as Event & { scale?: number; clientX?: number; clientY?: number };
       if (typeof ge.scale === 'number') {
         applyGestureTransform(safariStartZoom * ge.scale, ge.clientX, ge.clientY);
@@ -913,6 +970,7 @@ export function ProtectedReaderView({
                     eraseHighlighterOnly={eraseHighlighterOnly}
                     shapeSnap={shapeSnap}
                     stylusOnly={stylusOnly}
+                    onPenDetected={handlePenDetected}
                     textContent={textContents.get(dim.page) || null}
                     viewport={dim}
                     searchQuery={searchQuery}
@@ -1039,6 +1097,7 @@ interface VirtualPageContainerProps {
   eraseHighlighterOnly?: boolean;
   shapeSnap?: boolean;
   stylusOnly?: boolean;
+  onPenDetected?: () => void;
   textContent?: any;
   viewport?: any;
   searchQuery?: string;
@@ -1077,6 +1136,7 @@ function VirtualPageContainer({
   eraseHighlighterOnly = false,
   shapeSnap = false,
   stylusOnly = false,
+  onPenDetected,
   textContent,
   viewport,
   searchQuery,
@@ -1277,6 +1337,7 @@ function VirtualPageContainer({
             eraseHighlighterOnly={eraseHighlighterOnly}
             shapeSnap={shapeSnap}
             stylusOnly={stylusOnly}
+            onPenDetected={onPenDetected}
           />
         </>
       ) : (
