@@ -13,11 +13,14 @@ from pymongo import ReturnDocument
 
 from time_utils import day_bounds_utc, now_utc, utc_now_iso
 from .contracts import (
-    BASIC_SCIENCE_SUBJECTS, CONTENT_SOURCES, DIFFICULTY_LABELS, EXAM_TRACK_DEFAULT,
-    QBANK_LESSON_TERM, QUESTION_STATUSES, QuestionDomainError, and_query,
-    approved_query, canonical_content_source, canonical_difficulty,
+    BASIC_SCIENCE_SUBJECTS, CLASSROOM_GROUP_META, CONTENT_SOURCE_DEFAULT,
+    CONTENT_SOURCES, DIFFICULTY_LABELS, EXAM_SESSION_MONTH_ORDER,
+    EXAM_SESSIONS, EXAM_TRACK_DEFAULT, QBANK_LESSON_TERM, QUESTION_STATUSES,
+    SUBJECT_GROUPS, QuestionDomainError, and_query, approved_query,
+    canonical_content_source, canonical_difficulty, canonical_exam_session,
     canonical_exam_year, canonical_source, canonical_status,
-    clean_text, default_exam_bucket_topic, normalize_basic_science_lesson,
+    classify_subject_group, classify_topic_kind, clean_text,
+    default_exam_bucket_topic, normalize_basic_science_lesson,
     normalized_question_text, public_question, status_query,
     validate_question_payload,
 )
@@ -281,8 +284,9 @@ class QuestionBankService:
     @staticmethod
     def _year_source_clauses(*, exam_year_from: str | None = None,
                              exam_year_to: str | None = None,
+                             exam_session: str | None = None,
                              content_source=None) -> list[dict]:
-        """🌊 QBANK-W1 — فیلترهای مستقل سال/منبع؛ AND با taxonomy، نه جایگزین آن."""
+        """🌊 QBANK-W1 — فیلترهای مستقل سال/نوبت/منبع؛ AND با taxonomy، نه جایگزین آن."""
         clauses = []
         year_from = canonical_exam_year(exam_year_from)
         year_to = canonical_exam_year(exam_year_to)
@@ -296,6 +300,12 @@ class QuestionBankService:
                 year_clause["$lte"] = year_to
             # سؤال‌های بدون سال (null/غایب) در فیلتر سال‌دار شرکت نمی‌کنند.
             clauses.append({"exam_year": year_clause})
+        if exam_session is not None and clean_text(exam_session):
+            session_key = canonical_exam_session(exam_session, strict=True)
+            clauses.append({"$or": [
+                {"exam_session": session_key},
+                {"provenance.exam_session": session_key},
+            ]})
         if content_source is None or content_source == "":
             return clauses
         sources = [content_source] if isinstance(content_source, str) else list(content_source)
@@ -311,6 +321,7 @@ class QuestionBankService:
                        difficulty: str | None = None,
                        exam_year_from: str | None = None,
                        exam_year_to: str | None = None,
+                       exam_session: str | None = None,
                        content_source=None) -> dict:
         # 🌊 QBANK-W3 — سؤالِ منتظرِ تصویر در هیچ تمرین/آزمونی نیست (§۱۰).
         # 🌊 QBANK-W5 — سؤال بدون پاسخ قطعی (import needs_review) eligible نیست.
@@ -323,7 +334,7 @@ class QuestionBankService:
             parts.append({"difficulty": {"$in": [canonical, legacy]}})
         parts.extend(self._year_source_clauses(
             exam_year_from=exam_year_from, exam_year_to=exam_year_to,
-            content_source=content_source))
+            exam_session=exam_session, content_source=content_source))
         return and_query(*parts)
 
     #  §W8 — سقفِ کرانه‌دار برای `$nin`.
@@ -877,37 +888,81 @@ class QuestionBankService:
 
     async def practice_next(self, *, user: Mapping, taxonomy: Mapping,
                             mode: str = "free",
+                            difficulty: str | None = None,
                             exam_year_from: str | None = None,
                             exam_year_to: str | None = None,
-                            content_source=None) -> dict:
-        """Return one unsolved question without a client/Python-side ID fetch.
+                            exam_session: str | None = None,
+                            content_source=None,
+                            include_solved: bool = False,
+                            exclude_ids: list[str] | None = None,
+                            question_ids: list[str] | None = None) -> dict:
+        """Return one question for practice without a client/Python-side full ID dump.
 
-        The progress lookup is executed in MongoDB and uses the unique
-        `(user_id, question_id)` index. This avoids the legacy unbounded
-        `distinct → $nin` array as the bank grows toward 100k questions.
+        For standard modes (`free`/`weak`/`hard` with `include_solved=False`),
+        the progress lookup runs in MongoDB against `(user_id, question_id)`.
+        For targeted review (`wrong`, `flagged`, or `include_solved=True`),
+        bounded session exclusions avoid back-to-back repeats.
         """
         intakes = self.student_intakes(user)
-        difficulty = "hard" if mode == "hard" else None
-        eligible = self.eligible_query(taxonomy, intakes=intakes, difficulty=difficulty,
+        effective_difficulty = "hard" if mode == "hard" else difficulty
+        eligible = self.eligible_query(taxonomy, intakes=intakes, difficulty=effective_difficulty,
                                        exam_year_from=exam_year_from, exam_year_to=exam_year_to,
-                                       content_source=content_source)
+                                       exam_session=exam_session, content_source=content_source)
         uid = int(user.get("id") or 0)
 
-        # 🐛 §W8 — سؤالی که همین کاربر گزارش کرده نباید دوباره به او
-        # نشان داده شود.
-        #
-        # پیش‌تر فقط `question_progress` (سؤال‌های حل‌شده) دیده می‌شد، پس
-        # سؤالِ گزارش‌شده در نمونه‌برداریِ تصادفی دوباره بالا می‌آمد —
-        # در آزمون واقعی ۱۴ بار از ۴۰ نمونه.
-        #
-        # فیلتر عمداً «کاربر-محور» است: گزارشِ یک دانشجو نباید سؤال را
-        # برای بقیه حذف کند. حذفِ سراسری کارِ چرخهٔ عمرِ سؤال است، نه
-        # گزارش.
+        # 🐛 §W8 — سؤالی که همین کاربر گزارش کرده نباید دوباره به او نشان داده شود.
         excluded = await self.reported_question_ids(uid)
+        excluded_set = set(excluded)
         if excluded:
             eligible = and_query(eligible, {"_id": {"$nin": excluded}})
 
+        if question_ids is not None:
+            target_oids = [
+                ObjectId(str(qid)) for qid in question_ids[:500]
+                if ObjectId.is_valid(str(qid)) and ObjectId(str(qid)) not in excluded_set
+            ]
+            if not target_oids:
+                return {"question": None,
+                        "progress": {"total": 0, "solved_unique": 0, "remaining": 0, "exhausted": True},
+                        "ai_available": False, "cycle_completed": False}
+            eligible = and_query(eligible, {"_id": {"$in": target_oids}})
+
+        if mode == "wrong":
+            wrong_rows = await self.db.question_progress.find(
+                {"user_id": uid, "last_correct": False}, {"question_id": 1}
+            ).limit(500).to_list(500)
+            wrong_oids = [
+                ObjectId(str(r.get("question_id"))) for r in wrong_rows
+                if ObjectId.is_valid(str(r.get("question_id")))
+                and ObjectId(str(r.get("question_id"))) not in excluded_set
+            ]
+            if not wrong_oids:
+                return {"question": None,
+                        "progress": {"total": 0, "solved_unique": 0, "remaining": 0, "exhausted": True},
+                        "ai_available": False, "cycle_completed": False}
+            eligible = and_query(eligible, {"_id": {"$in": wrong_oids}})
+
         total = await self.db.questions.count_documents(eligible)
+        session_excl = [
+            ObjectId(str(x)) for x in (exclude_ids or [])[:100]
+            if ObjectId.is_valid(str(x))
+        ]
+
+        if mode in ("wrong", "flagged") or include_solved:
+            sample_match = and_query(eligible, {"_id": {"$nin": session_excl}}) if session_excl else eligible
+            rows = await self.db.questions.aggregate([
+                {"$match": sample_match},
+                {"$sample": {"size": 1}},
+            ]).to_list(1)
+            reviewed = min(len(session_excl), total)
+            remaining = max(0, total - reviewed)
+            exhausted = not bool(rows)
+            return {"question": public_question(rows[0]) if rows else None,
+                    "progress": {"total": total, "solved_unique": reviewed,
+                                 "remaining": remaining, "exhausted": exhausted},
+                    "ai_available": False,
+                    "cycle_completed": bool(exhausted and total > 0 and session_excl)}
+
         lookup = {"$lookup": {
             "from": "question_progress",
             "let": {"qid": {"$toString": "$_id"}},
@@ -919,8 +974,9 @@ class QuestionBankService:
             ],
             "as": "_user_progress",
         }}
+        sample_match = and_query(eligible, {"_id": {"$nin": session_excl}}) if session_excl else eligible
         unsolved_pipeline = [
-            {"$match": eligible}, lookup,
+            {"$match": sample_match}, lookup,
             {"$match": {"_user_progress.0": {"$exists": False}}},
             {"$sample": {"size": 1}}, {"$project": {"_user_progress": 0}},
         ]
@@ -942,11 +998,429 @@ class QuestionBankService:
                        difficulty: str | None = None,
                        exam_year_from: str | None = None,
                        exam_year_to: str | None = None,
+                       exam_session: str | None = None,
                        content_source=None) -> int:
         return await self.db.questions.count_documents(
             self.eligible_query(taxonomy, intakes=self.student_intakes(user), difficulty=difficulty,
                                 exam_year_from=exam_year_from, exam_year_to=exam_year_to,
-                                content_source=content_source))
+                                exam_session=exam_session, content_source=content_source))
+
+    async def filter_facets(self, *, user: Mapping) -> dict:
+        """Available sources, exam years, sessions, and difficulties for this student."""
+        intakes = self.student_intakes(user)
+        base_match = self.eligible_query({}, intakes=intakes)
+        src_merged: dict[str, int] = {}
+        try:
+            src_rows = await self.db.questions.aggregate([
+                {"$match": base_match},
+                {"$group": {"_id": "$content_source", "count": {"$sum": 1}}},
+            ]).to_list(30)
+            for row in src_rows:
+                code = clean_text(row.get("_id"))
+                if code not in CONTENT_SOURCES:
+                    code = CONTENT_SOURCE_DEFAULT
+                src_merged[code] = src_merged.get(code, 0) + int(row.get("count") or 0)
+        except Exception:
+            logger.exception("question filter_facets sources failed")
+        sources = [
+            {"code": code, "label": CONTENT_SOURCES[code], "count": src_merged[code]}
+            for code in sorted(src_merged, key=lambda c: (-src_merged[c], c))
+        ]
+
+        years: list[str] = []
+        try:
+            year_rows = await self.db.questions.aggregate([
+                {"$match": and_query(base_match, {"exam_year": {"$ne": None}})},
+                {"$group": {"_id": "$exam_year"}},
+            ]).to_list(100)
+            years = sorted({str(r.get("_id")) for r in year_rows if r.get("_id")}, reverse=True)
+        except Exception:
+            logger.exception("question filter_facets years failed")
+
+        sess_merged: dict[str, int] = {}
+        try:
+            sess_rows = await self.db.questions.aggregate([
+                {"$match": and_query(base_match, {"exam_session": {"$ne": None}})},
+                {"$group": {"_id": "$exam_session", "count": {"$sum": 1}}},
+            ]).to_list(30)
+            for row in sess_rows:
+                key = canonical_exam_session(row.get("_id"), strict=False)
+                if key and key in EXAM_SESSIONS:
+                    sess_merged[key] = sess_merged.get(key, 0) + int(row.get("count") or 0)
+        except Exception:
+            logger.exception("question filter_facets sessions failed")
+        sessions = [
+            {"code": code, "label": EXAM_SESSIONS[code], "count": sess_merged[code]}
+            for code in sorted(sess_merged, key=lambda c: (-EXAM_SESSION_MONTH_ORDER.get(c, 0), c))
+        ]
+
+        diff_merged: dict[str, int] = {}
+        try:
+            diff_rows = await self.db.questions.aggregate([
+                {"$match": base_match},
+                {"$group": {"_id": "$difficulty", "count": {"$sum": 1}}},
+            ]).to_list(20)
+            for row in diff_rows:
+                code = canonical_difficulty(row.get("_id"), strict=False)
+                diff_merged[code] = diff_merged.get(code, 0) + int(row.get("count") or 0)
+        except Exception:
+            logger.exception("question filter_facets difficulty failed")
+        difficulties = [
+            {"code": code, "label": DIFFICULTY_LABELS[code], "count": diff_merged[code]}
+            for code in ("easy", "medium", "hard") if diff_merged.get(code, 0) > 0
+        ]
+        return {
+            "sources": sources,
+            "years": years,
+            "year_min": years[-1] if years else None,
+            "year_max": years[0] if years else None,
+            "sessions": sessions,
+            "difficulties": difficulties,
+        }
+
+    async def web_catalog(
+        self,
+        *,
+        user: Mapping,
+        content_source=None,
+        exam_year_from: str | None = None,
+        exam_year_to: str | None = None,
+        exam_session: str | None = None,
+        difficulty: str | None = None,
+    ) -> dict:
+        """Structured discipline-grouped catalog, exam-period index, and smart queue counts."""
+        intakes = self.student_intakes(user)
+        uid = int(user.get("id") or 0)
+        lessons = await self.db.bs_lessons.find({"intake": {"$in": intakes}}).sort([("term", 1), ("order", 1)]).to_list(1000)
+        lesson_ids = [str(x["_id"]) for x in lessons]
+        sessions = (
+            await self.db.bs_sessions.find({"lesson_id": {"$in": lesson_ids}}).sort("number", 1).to_list(5000)
+            if lesson_ids else []
+        )
+
+        filtered_match = self.eligible_query(
+            {}, intakes=intakes, difficulty=difficulty,
+            exam_year_from=exam_year_from, exam_year_to=exam_year_to,
+            exam_session=exam_session, content_source=content_source,
+        )
+        unfiltered_match = self.eligible_query({}, intakes=intakes)
+
+        # Fallback map for legacy questions lacking lesson_id
+        qbank_name_to_id: dict[str, str] = {}
+        any_name_to_id: dict[str, str] = {}
+        for item in lessons:
+            lid = str(item["_id"])
+            nm = normalize_basic_science_lesson(item.get("name")) or clean_text(item.get("name"))
+            if clean_text(item.get("term")) == QBANK_LESSON_TERM and nm not in qbank_name_to_id:
+                qbank_name_to_id[nm] = lid
+            if nm not in any_name_to_id:
+                any_name_to_id[nm] = lid
+
+        lesson_counts: dict[str, int] = {}
+        topic_counts: dict[tuple[str, str], int] = {}
+        total_questions = 0
+        try:
+            q_rows = await self.db.questions.aggregate([
+                {"$match": filtered_match},
+                {"$group": {
+                    "_id": {"lesson_id": "$lesson_id", "topic_id": "$topic_id", "lesson": "$lesson"},
+                    "count": {"$sum": 1},
+                }},
+            ]).to_list(20000)
+            for row in q_rows:
+                key = row.get("_id") or {}
+                cnt = int(row.get("count") or 0)
+                total_questions += cnt
+                lid = str(key.get("lesson_id") or "")
+                tid = str(key.get("topic_id") or "")
+                if not lid:
+                    nm = normalize_basic_science_lesson(key.get("lesson")) or clean_text(key.get("lesson"))
+                    lid = qbank_name_to_id.get(nm) or any_name_to_id.get(nm) or ""
+                if lid:
+                    lesson_counts[lid] = lesson_counts.get(lid, 0) + cnt
+                    if tid:
+                        topic_counts[(lid, tid)] = topic_counts.get((lid, tid), 0) + cnt
+        except Exception:
+            logger.exception("web_catalog counts failed")
+
+        topics_meta_by_lesson: dict[str, tuple[int, int]] = {}
+        for sess in sessions:
+            lid = str(sess.get("lesson_id") or "")
+            tid = str(sess.get("_id"))
+            if topic_counts.get((lid, tid), 0) <= 0:
+                continue
+            t_cnt, p_cnt = topics_meta_by_lesson.get(lid, (0, 0))
+            if classify_topic_kind(sess.get("topic")) == "exam_period":
+                p_cnt += 1
+            else:
+                t_cnt += 1
+            topics_meta_by_lesson[lid] = (t_cnt, p_cnt)
+
+        # User per-lesson progress (solved count & accuracy)
+        progress_by_lesson: dict[str, dict[str, int]] = {}
+        wrong_count = 0
+        try:
+            prog_rows = await self.db.question_progress.aggregate([
+                {"$match": {"user_id": uid}},
+                {"$group": {
+                    "_id": "$lesson_id",
+                    "solved": {"$sum": 1},
+                    "attempts": {"$sum": "$attempts"},
+                    "correct": {"$sum": "$correct_count"},
+                    "wrong_current": {"$sum": {"$cond": [{"$eq": ["$last_correct", False]}, 1, 0]}},
+                }},
+            ]).to_list(500)
+            for row in prog_rows:
+                lid = str(row.get("_id") or "")
+                wc = int(row.get("wrong_current") or 0)
+                wrong_count += wc
+                if lid:
+                    progress_by_lesson[lid] = {
+                        "solved": int(row.get("solved") or 0),
+                        "attempts": int(row.get("attempts") or 0),
+                        "correct": int(row.get("correct") or 0),
+                    }
+        except Exception:
+            logger.exception("web_catalog progress failed")
+
+        # Build grouped active lessons & empty list
+        grouped_buckets: dict[str, list[tuple[int, dict]]] = {k: [] for k, *_ in SUBJECT_GROUPS}
+        grouped_buckets[CLASSROOM_GROUP_META[0]] = []
+        empty_lessons: list[dict] = []
+        seen_empty: set[tuple[str, str]] = set()
+
+        for item in lessons:
+            lid = str(item["_id"])
+            name = clean_text(item.get("name"))
+            term = clean_text(item.get("term"))
+            count = lesson_counts.get(lid, 0)
+            group_key, order_idx = classify_subject_group(name, term)
+            if count <= 0:
+                sig = (name, term)
+                if sig not in seen_empty:
+                    seen_empty.add(sig)
+                    empty_lessons.append({"id": lid, "name": name, "term": term, "group": group_key, "count": 0})
+                continue
+            prog = progress_by_lesson.get(lid, {})
+            attempts = prog.get("attempts", 0)
+            correct = prog.get("correct", 0)
+            t_cnt, p_cnt = topics_meta_by_lesson.get(lid, (0, 0))
+            entry = {
+                "id": lid,
+                "name": name,
+                "term": term if term != QBANK_LESSON_TERM else "",
+                "group": group_key,
+                "count": count,
+                "solved_count": min(prog.get("solved", 0), count),
+                "accuracy": round(correct * 100 / attempts, 1) if attempts else None,
+                "topics_count": t_cnt,
+                "periods_count": p_cnt,
+            }
+            grouped_buckets.setdefault(group_key, []).append((order_idx, entry))
+
+        groups = []
+        for key, title, desc, _ in (*SUBJECT_GROUPS, (*CLASSROOM_GROUP_META, ())):
+            rows = grouped_buckets.get(key, [])
+            if not rows:
+                continue
+            rows.sort(key=lambda pair: (pair[0], pair[1]["term"], pair[1]["name"]))
+            items = [pair[1] for pair in rows]
+            groups.append({
+                "key": key,
+                "title": title,
+                "description": desc,
+                "lesson_count": len(items),
+                "question_count": sum(x["count"] for x in items),
+                "lessons": items,
+            })
+
+        # Reverse-chronological exam periods index (data-driven)
+        periods_map: dict[tuple[str, str], dict] = {}
+        try:
+            period_rows = await self.db.questions.aggregate([
+                {"$match": and_query(unfiltered_match, {"$or": [
+                    {"exam_year": {"$ne": None}},
+                    {"exam_session": {"$ne": None}},
+                ]})},
+                {"$group": {
+                    "_id": {
+                        "exam_year": "$exam_year",
+                        "exam_session": "$exam_session",
+                        "exam_session_label": "$exam_session_label",
+                        "lesson_id": "$lesson_id",
+                        "lesson": "$lesson",
+                    },
+                    "count": {"$sum": 1},
+                }},
+            ]).to_list(10000)
+            for row in period_rows:
+                k = row.get("_id") or {}
+                year = clean_text(k.get("exam_year")) or ""
+                sess_raw = k.get("exam_session")
+                sess = canonical_exam_session(sess_raw, strict=False) if sess_raw else ""
+                sess = sess or ""
+                if not year and not sess:
+                    continue
+                cnt = int(row.get("count") or 0)
+                if cnt <= 0:
+                    continue
+                pkey = (year, sess)
+                label = clean_text(k.get("exam_session_label"))
+                if not label:
+                    fa_sess = EXAM_SESSIONS.get(sess, "")
+                    y_fa = year.translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")) if year else ""
+                    label = f"{fa_sess} {y_fa}".strip() or (f"سال {y_fa}" if y_fa else "دورهٔ آزمون")
+                bucket = periods_map.setdefault(pkey, {
+                    "key": f"{year or 'any'}:{sess or 'any'}",
+                    "exam_year": year or None,
+                    "exam_session": sess or None,
+                    "label": label,
+                    "count": 0,
+                    "_lessons": {},
+                })
+                bucket["count"] += cnt
+                lid = str(k.get("lesson_id") or "")
+                lname = clean_text(k.get("lesson")) or "نامشخص"
+                lkey = lid or lname
+                prev_l = bucket["_lessons"].get(lkey)
+                if prev_l:
+                    prev_l["count"] += cnt
+                else:
+                    bucket["_lessons"][lkey] = {"lesson_id": lid, "lesson": lname, "count": cnt}
+        except Exception:
+            logger.exception("web_catalog periods failed")
+
+        periods = []
+        for bucket in periods_map.values():
+            lesson_list = sorted(bucket.pop("_lessons").values(), key=lambda x: (-x["count"], x["lesson"]))
+            bucket["lessons"] = lesson_list
+            periods.append(bucket)
+        periods.sort(key=lambda p: (
+            -(int(p["exam_year"]) if p["exam_year"] and str(p["exam_year"]).isdigit() else 0),
+            -EXAM_SESSION_MONTH_ORDER.get(p["exam_session"] or "other", 0),
+            p["label"],
+        ))
+
+        facets = await self.filter_facets(user=user)
+        hard_count = 0
+        try:
+            hard_count = await self.db.questions.count_documents(
+                self.eligible_query({}, intakes=intakes, difficulty="hard")
+            )
+        except Exception:
+            hard_count = 0
+
+        return {
+            "total_questions": total_questions,
+            "active_lessons_count": sum(g["lesson_count"] for g in groups),
+            "groups": groups,
+            "empty_lessons": empty_lessons,
+            "periods": periods,
+            "filters": facets,
+            "smart_queues": {
+                "wrong_count": wrong_count,
+                "hard_count": hard_count,
+            },
+        }
+
+    async def lesson_topics_view(
+        self,
+        *,
+        lesson: str,
+        user: Mapping,
+        content_source=None,
+        exam_year_from: str | None = None,
+        exam_year_to: str | None = None,
+        exam_session: str | None = None,
+        difficulty: str | None = None,
+    ) -> dict:
+        """Topics for one lesson split by scientific topic vs exam sitting, with user accuracy."""
+        intakes = self.student_intakes(user)
+        uid = int(user.get("id") or 0)
+        try:
+            resolved = await self.resolve_taxonomy(
+                lesson_id=lesson if ObjectId.is_valid(str(lesson)) else None,
+                lesson=None if ObjectId.is_valid(str(lesson)) else lesson,
+                visible_intakes=intakes,
+                require_topic=False,
+            )
+        except QuestionDomainError as exc:
+            if exc.code == "lesson_not_found":
+                raise QuestionDomainError("lesson_not_found", "درس پیدا نشد", 404) from exc
+            raise
+        lid = resolved["lesson_id"]
+        sessions = await self.db.bs_sessions.find({"lesson_id": lid}).sort("number", 1).to_list(1000)
+
+        match = self.eligible_query(
+            {"lesson_id": lid, "lesson": resolved["lesson"]},
+            intakes=intakes, difficulty=difficulty,
+            exam_year_from=exam_year_from, exam_year_to=exam_year_to,
+            exam_session=exam_session, content_source=content_source,
+        )
+        counts_by_tid: dict[str, int] = {}
+        counts_by_name: dict[str, int] = {}
+        try:
+            rows = await self.db.questions.aggregate([
+                {"$match": match},
+                {"$group": {"_id": {"topic_id": "$topic_id", "topic": "$topic"}, "count": {"$sum": 1}}},
+            ]).to_list(2000)
+            for row in rows:
+                k = row.get("_id") or {}
+                cnt = int(row.get("count") or 0)
+                tid = str(k.get("topic_id") or "")
+                tname = clean_text(k.get("topic"))
+                if tid:
+                    counts_by_tid[tid] = counts_by_tid.get(tid, 0) + cnt
+                elif tname:
+                    counts_by_name[tname] = counts_by_name.get(tname, 0) + cnt
+        except Exception:
+            logger.exception("lesson_topics_view counts failed lesson_id=%s", lid)
+
+        stats_by_tid: dict[str, dict] = {}
+        try:
+            st_rows = await self.db.question_topic_stats.find(
+                {"user_id": uid, "lesson_id": lid}
+            ).to_list(500)
+            for row in st_rows:
+                tid = str(row.get("topic_id") or "")
+                ta = int(row.get("attempts") or 0)
+                tc = int(row.get("correct") or 0)
+                if tid and ta > 0:
+                    stats_by_tid[tid] = {
+                        "attempts": ta, "correct": tc, "accuracy": round(tc * 100 / ta, 1),
+                    }
+        except Exception:
+            logger.exception("lesson_topics_view stats failed lesson_id=%s", lid)
+
+        topics = []
+        seen_names: set[str] = set()
+        for sess in sessions:
+            tid = str(sess["_id"])
+            tname = clean_text(sess.get("topic"))
+            cnt = counts_by_tid.get(tid, 0) + counts_by_name.get(tname, 0)
+            if cnt <= 0:
+                continue
+            seen_names.add(tname)
+            st = stats_by_tid.get(tid)
+            topics.append({
+                "id": tid,
+                "name": tname,
+                "count": cnt,
+                "kind": classify_topic_kind(tname),
+                "attempts": st["attempts"] if st else 0,
+                "accuracy": st["accuracy"] if st else None,
+            })
+        for tname, cnt in counts_by_name.items():
+            if cnt > 0 and tname and tname not in seen_names:
+                topics.append({
+                    "id": "",
+                    "name": tname,
+                    "count": cnt,
+                    "kind": classify_topic_kind(tname),
+                    "attempts": 0,
+                    "accuracy": None,
+                })
+        return {"lesson_id": lid, "lesson": resolved["lesson"], "topics": topics}
 
     async def stats(self, *, user: Mapping) -> dict:
         uid = int(user.get("id") or 0)

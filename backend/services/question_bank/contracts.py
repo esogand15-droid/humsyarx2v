@@ -103,6 +103,60 @@ _BASIC_SCIENCE_LESSON_ALIASES = {
     "جنین‌شناسی": "جنین شناسی",
 }
 
+# دسته‌بندی رشته‌ای دروس بانک سؤال برای نمایش منظم (بدون تغییر کاتالوگ ۱۵تایی پایه)
+SUBJECT_GROUPS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    (
+        "basic_structural",
+        "دروس پایه و ساختاری",
+        "آناتومی، بافت‌شناسی، جنین‌شناسی، فیزیولوژی و بیوشیمی",
+        ("آناتومی", "بافت شناسی", "جنین شناسی", "فیزیولوژی", "بیوشیمی"),
+    ),
+    (
+        "microbiology_immuno",
+        "میکروب‌شناسی و ایمنی",
+        "باکتری‌شناسی، ویروس‌شناسی، انگل‌شناسی، حشره‌شناسی، قارچ‌شناسی و ایمونولوژی",
+        ("باکتری شناسی", "ویروس شناسی", "انگل شناسی", "حشره شناسی", "قارچ شناسی", "ایمونولوژی"),
+    ),
+    (
+        "health_general",
+        "سلامت، آمار و عمومی",
+        "اپیدمیولوژی، اصول خدمات سلامت، زبان انگلیسی و معارف",
+        ("اپیدمیولوژی", "اصول خدمات سلامت", "زبان انگلیسی", "انقلاب و اندیشه اسلامی"),
+    ),
+    (
+        "clinical_extended",
+        "علوم تکمیلی و بالینی",
+        "پاتولوژی، ژنتیک، تغذیه، فیزیک پزشکی، فارماکولوژی و بالین",
+        (
+            "پاتولوژی", "ژنتیک", "تغذیه", "فیزیک پزشکی", "فارماکولوژی",
+            "فیزیوپاتولوژی", "روان شناسی بالینی", "روانشناسی بالینی",
+            "سلامت دهان و جامعه", "پاتوفیزیولوژی",
+        ),
+    ),
+)
+
+CLASSROOM_GROUP_META = (
+    "classroom",
+    "دروس ترمی و کلاسی",
+    "سؤالات تفکیک‌شده بر پایهٔ ترم تحصیلی",
+)
+
+EXAM_SESSION_MONTH_ORDER = {
+    "farvardin": 1,
+    "ordibehesht": 2,
+    "mordad": 5,
+    "shahrivar": 6,
+    "mehr": 7,
+    "azar": 9,
+    "dey": 10,
+    "esfand": 12,
+    "other": 0,
+}
+
+_EXAM_PERIOD_TOPIC_RE = re.compile(
+    r"^(?:شهریور|اسفند|اردیبهشت|مهر|آذر|دی|فروردین|مرداد|آزمون)(?:\s+[۰-۹0-9]{2,4})?(?:\s+(?:قطب|ریفرم).*)?$"
+)
+
 
 @dataclass
 class QuestionDomainError(ValueError):
@@ -193,6 +247,27 @@ def normalize_basic_science_lesson(value: Any) -> str:
         if name.replace(" ", "") == compact:
             return name
     return text
+
+
+def classify_subject_group(lesson_name: Any, term: Any = "") -> tuple[str, int]:
+    """Return `(group_key, order_index)` for structured medical QBank grouping."""
+    normalized = normalize_basic_science_lesson(lesson_name)
+    compact = normalized.replace(" ", "")
+    for key, _title, _desc, subjects in SUBJECT_GROUPS:
+        for idx, subj in enumerate(subjects):
+            if normalized == subj or compact == subj.replace(" ", ""):
+                return key, idx
+    if clean_text(term) == QBANK_LESSON_TERM:
+        return "clinical_extended", 100
+    return "classroom", 100
+
+
+def classify_topic_kind(topic_name: Any) -> str:
+    """Distinguish exam-sitting buckets (شهریور ۱۴۰۴) from subject chapters."""
+    text = clean_text(topic_name).replace("\u200c", " ")
+    if text and _EXAM_PERIOD_TOPIC_RE.match(" ".join(text.split())):
+        return "exam_period"
+    return "topic"
 
 
 def default_exam_bucket_topic(*, exam_session: str | None = None,

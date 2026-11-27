@@ -69,7 +69,7 @@ export function ExamResult() {
     <>
       <AppBar
         title="کارنامه"
-        sub={data ? `${data.lesson}${data.topic ? ` · ${data.topic}` : ''}` : 'نتیجهٔ آزمون'}
+        sub={data ? `${data.lesson || 'آزمون جامع'}${data.topic ? ` · ${data.topic}` : ''}` : 'نتیجهٔ آزمون'}
         back
         onBack={() => navigate('/exam')}
       />
@@ -97,7 +97,7 @@ export function ExamResult() {
 
               <div className="exam-result-badges">
                 <DsBadge tone="accent">
-                  {data.lesson}
+                  {data.lesson || 'آزمون جامع'}
                   {data.topic ? ` · ${data.topic}` : ''}
                 </DsBadge>
                 <DsBadge tone="neutral">{faNum(data.total)} سؤال</DsBadge>

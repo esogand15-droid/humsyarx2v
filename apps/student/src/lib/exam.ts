@@ -21,6 +21,91 @@ export interface TopicItem {
   id: string;
   name: string;
   count: number;
+  kind?: 'topic' | 'exam_period';
+  attempts?: number;
+  accuracy?: number | null;
+}
+
+export interface CatalogLessonItem {
+  id: string;
+  name: string;
+  term: string;
+  group: string;
+  count: number;
+  solved_count: number;
+  accuracy: number | null;
+  topics_count: number;
+  periods_count: number;
+}
+
+export interface CatalogGroup {
+  key: string;
+  title: string;
+  description: string;
+  lesson_count: number;
+  question_count: number;
+  lessons: CatalogLessonItem[];
+}
+
+export interface PeriodLessonCount {
+  lesson_id: string;
+  lesson: string;
+  count: number;
+}
+
+export interface ExamPeriodItem {
+  key: string;
+  exam_year: string | null;
+  exam_session: string | null;
+  label: string;
+  count: number;
+  lessons: PeriodLessonCount[];
+}
+
+export interface FilterOption {
+  code: string;
+  label: string;
+  count: number;
+}
+
+export interface CatalogFilters {
+  sources: FilterOption[];
+  years: string[];
+  year_min: string | null;
+  year_max: string | null;
+  sessions: FilterOption[];
+  difficulties: FilterOption[];
+}
+
+export interface CatalogPayload {
+  total_questions: number;
+  active_lessons_count: number;
+  groups: CatalogGroup[];
+  empty_lessons: CatalogLessonItem[];
+  periods: ExamPeriodItem[];
+  filters: CatalogFilters;
+  smart_queues: {
+    flagged_count: number;
+    wrong_count: number;
+    hard_count: number;
+  };
+}
+
+export type PracticeMode = 'free' | 'weak' | 'hard' | 'wrong' | 'flagged';
+
+export interface PracticeQuery {
+  lesson?: string;
+  topic?: string;
+  lesson_id?: string;
+  topic_id?: string;
+  mode?: PracticeMode;
+  difficulty?: string;
+  exam_year_from?: string;
+  exam_year_to?: string;
+  exam_session?: string;
+  content_source?: string[];
+  include_solved?: boolean;
+  exclude?: string[];
 }
 
 export interface Question {
@@ -53,6 +138,8 @@ export interface NextPayload {
   question: Question | null;
   progress: Progress;
   ai_available: boolean;
+  cycle_completed?: boolean;
+  weak_topic?: TopicStat;
   message?: string;
 }
 
@@ -106,20 +193,67 @@ export interface HistoryPayload {
 
 const q = (v?: string | null) => (v ? `?${v}` : '');
 
+function buildFilterSearch(params?: {
+  difficulty?: string;
+  exam_year_from?: string;
+  exam_year_to?: string;
+  exam_session?: string;
+  content_source?: string[];
+}): URLSearchParams {
+  const sp = new URLSearchParams();
+  if (!params) return sp;
+  if (params.difficulty) sp.set('difficulty', params.difficulty);
+  if (params.exam_year_from) sp.set('exam_year_from', params.exam_year_from);
+  if (params.exam_year_to) sp.set('exam_year_to', params.exam_year_to);
+  if (params.exam_session) sp.set('exam_session', params.exam_session);
+  for (const src of params.content_source ?? []) {
+    if (src) sp.append('content_source', src);
+  }
+  return sp;
+}
+
 export const exam = {
+  catalog: (params?: {
+    difficulty?: string;
+    exam_year_from?: string;
+    exam_year_to?: string;
+    exam_session?: string;
+    content_source?: string[];
+  }) => apiCall<CatalogPayload>(`/exam/catalog${q(buildFilterSearch(params).toString())}`),
+
+  filters: () => apiCall<CatalogFilters>('/exam/filters'),
+
   lessons: () => apiCall<{ lessons: LessonItem[] }>('/exam/lessons'),
 
-  topics: (lesson: string) =>
-    apiCall<{ lesson_id: string; topics: TopicItem[] }>(`/exam/topics/${encodeURIComponent(lesson)}`),
-
-  next: (lesson?: string, topic?: string) =>
-    apiCall<NextPayload>(
-      `/exam/next${q(
-        [lesson && `lesson=${encodeURIComponent(lesson)}`, topic && `topic=${encodeURIComponent(topic)}`]
-          .filter(Boolean)
-          .join('&'),
-      )}`,
+  topics: (
+    lesson: string,
+    params?: {
+      difficulty?: string;
+      exam_year_from?: string;
+      exam_year_to?: string;
+      exam_session?: string;
+      content_source?: string[];
+    },
+  ) =>
+    apiCall<{ lesson_id: string; topics: TopicItem[] }>(
+      `/exam/topics/${encodeURIComponent(lesson)}${q(buildFilterSearch(params).toString())}`,
     ),
+
+  next: (lessonOrQuery?: string | PracticeQuery, topic?: string) => {
+    const query: PracticeQuery =
+      typeof lessonOrQuery === 'object' && lessonOrQuery !== null
+        ? lessonOrQuery
+        : { lesson: lessonOrQuery, topic };
+    const sp = buildFilterSearch(query);
+    if (query.lesson) sp.set('lesson', query.lesson);
+    if (query.topic) sp.set('topic', query.topic);
+    if (query.lesson_id) sp.set('lesson_id', query.lesson_id);
+    if (query.topic_id) sp.set('topic_id', query.topic_id);
+    if (query.mode && query.mode !== 'free') sp.set('mode', query.mode);
+    if (query.include_solved) sp.set('include_solved', 'true');
+    if (query.exclude?.length) sp.set('exclude', query.exclude.slice(-50).join(','));
+    return apiCall<NextPayload>(`/exam/next${q(sp.toString())}`);
+  },
 
   answer: (question_id: string, selected: number) =>
     apiCall<AnswerPayload>('/exam/answer', {
@@ -158,6 +292,11 @@ export interface MockStartBody {
   count: number;
   minutes: number;
   allow_smaller?: boolean;
+  difficulty?: string | null;
+  exam_year_from?: string | null;
+  exam_year_to?: string | null;
+  exam_session?: string | null;
+  content_source?: string[] | null;
 }
 
 export interface MockPreview {

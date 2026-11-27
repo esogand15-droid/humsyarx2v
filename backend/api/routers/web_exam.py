@@ -109,8 +109,49 @@ def _domain_errors(fn):
 
 
 # ─────────────────────────────────────────────────────────────
-#  📚 تاکسونومی
+#  📚 تاکسونومی و کاتالوگ طبقه‌بندی‌شده
 # ─────────────────────────────────────────────────────────────
+@router.get("/exam/catalog")
+@_domain_errors
+async def catalog(
+    difficulty: str | None = Query(None, max_length=20),
+    exam_year_from: str | None = Query(None, max_length=4),
+    exam_year_to: str | None = Query(None, max_length=4),
+    exam_session: str | None = Query(None, max_length=32),
+    content_source: list[str] | None = Query(None),
+    user: dict = Depends(current_student),
+):
+    """کاتالوگ منظم بانک سؤال: گروه‌های درسی، آرشیو دوره/سال، فیلترها و صف‌های مرور."""
+    web = await _student(user)
+    data = await q_router.question_bank.web_catalog(
+        user=web,
+        difficulty=difficulty,
+        exam_year_from=exam_year_from,
+        exam_year_to=exam_year_to,
+        exam_session=exam_session,
+        content_source=content_source,
+    )
+    uid = int(web["id"])
+    col = _bookmarks_col()
+    flagged_count = 0
+    if col is not None:
+        try:
+            flagged_rows = await col.find({"user_id": uid}, {"_id": 1}).to_list(1000)
+            flagged_count = len(flagged_rows)
+        except Exception:
+            flagged_count = 0
+    data.setdefault("smart_queues", {})["flagged_count"] = flagged_count
+    return data
+
+
+@router.get("/exam/filters")
+@_domain_errors
+async def filters(user: dict = Depends(current_student)):
+    """منابع، سال‌ها، نوبت‌ها و سطوح سختی موجود در بانک سؤال."""
+    web = await _student(user)
+    return await q_router.question_bank.filter_facets(user=web)
+
+
 @router.get("/exam/lessons")
 @_domain_errors
 async def lessons(user: dict = Depends(current_student)):
@@ -121,9 +162,25 @@ async def lessons(user: dict = Depends(current_student)):
 
 @router.get("/exam/topics/{lesson}")
 @_domain_errors
-async def topics(lesson: str, user: dict = Depends(current_student)):
+async def topics(
+    lesson: str,
+    difficulty: str | None = Query(None, max_length=20),
+    exam_year_from: str | None = Query(None, max_length=4),
+    exam_year_to: str | None = Query(None, max_length=4),
+    exam_session: str | None = Query(None, max_length=32),
+    content_source: list[str] | None = Query(None),
+    user: dict = Depends(current_student),
+):
     web = await _student(user)
-    return await q_router.get_topics(lesson=lesson, user=web)
+    return await q_router.question_bank.lesson_topics_view(
+        lesson=lesson,
+        user=web,
+        difficulty=difficulty,
+        exam_year_from=exam_year_from,
+        exam_year_to=exam_year_to,
+        exam_session=exam_session,
+        content_source=content_source,
+    )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -136,27 +193,93 @@ async def next_question(
     topic: str | None = Query(None, max_length=100),
     lesson_id: str | None = Query(None),
     topic_id: str | None = Query(None),
+    mode: str = Query("free", pattern="^(free|weak|hard|wrong|flagged)$"),
+    difficulty: str | None = Query(None, max_length=20),
+    exam_year_from: str | None = Query(None, max_length=4),
+    exam_year_to: str | None = Query(None, max_length=4),
+    exam_session: str | None = Query(None, max_length=32),
+    content_source: list[str] | None = Query(None),
+    include_solved: bool = Query(False),
+    exclude: str | None = Query(None, max_length=3000),
     user: dict = Depends(current_student),
 ):
-    """سؤال بعدی **حل‌نشده** در همان محدوده.
-
-    اگر چیزی نماند، `question: null` با `progress.exhausted: true` می‌آید —
-    حالت عادی است، نه خطا. کلاینت خودش پیام «این بخش را تمام کردی» را
-    نشان می‌دهد؛ هیچ سؤال تکراری هم پشت سر هم نمی‌آید چون سرور فقط
-    حل‌نشده‌ها را برمی‌گرداند.
-    """
+    """سؤال بعدی تمرین در محدوده و فیلتر انتخابی."""
     web = await _student(user)
-    return await q_router.practice(
-        user=web,
-        lesson_id=lesson_id,
-        topic_id=topic_id,
-        lesson=lesson,
-        topic=topic,
-        exclude=None,
-        exam_year_from=None,
-        exam_year_to=None,
-        content_source=None,
-    )
+    exclude_ids = [x.strip() for x in (exclude or "").split(",") if x.strip()]
+
+    if mode == "weak" and not any((lesson_id, topic_id, lesson, topic)):
+        stats_data = await q_router.question_bank.stats(user=web)
+        weak_topics = sorted(
+            stats_data.get("weak_topics") or [],
+            key=lambda x: (x.get("accuracy", 0), -x.get("attempts", 0)),
+        )
+        if not weak_topics:
+            return {
+                "question": None,
+                "progress": {"total": 0, "solved_unique": 0, "remaining": 0, "exhausted": True},
+                "ai_available": False,
+                "message": "برای تشخیص نقاط ضعف، تمرین بیشتری لازم است",
+            }
+        selected = weak_topics[0]
+        taxonomy = {
+            "lesson_id": selected.get("lesson_id", ""),
+            "topic_id": selected.get("topic_id", ""),
+            "lesson": selected.get("lesson", ""),
+            "topic": selected.get("topic", ""),
+        }
+        out = await q_router.question_bank.practice_next(
+            user=web,
+            taxonomy=taxonomy,
+            mode="weak",
+            difficulty=difficulty,
+            exam_year_from=exam_year_from,
+            exam_year_to=exam_year_to,
+            exam_session=exam_session,
+            content_source=content_source,
+            include_solved=include_solved,
+            exclude_ids=exclude_ids,
+        )
+        out["weak_topic"] = selected
+    elif mode == "flagged":
+        taxonomy = await q_router._request_taxonomy(web, lesson_id, topic_id, lesson, topic)
+        col = _bookmarks_col()
+        flagged_ids: list[str] = []
+        if col is not None:
+            cursor = col.find({"user_id": int(web["id"])}, {"question_id": 1}).sort("created_at", -1)
+            items = await cursor.to_list(1000)
+            flagged_ids = [str(x["question_id"]) for x in items if x.get("question_id")]
+        out = await q_router.question_bank.practice_next(
+            user=web,
+            taxonomy=taxonomy,
+            mode="flagged",
+            difficulty=difficulty,
+            exam_year_from=exam_year_from,
+            exam_year_to=exam_year_to,
+            exam_session=exam_session,
+            content_source=content_source,
+            include_solved=True,
+            exclude_ids=exclude_ids,
+            question_ids=flagged_ids,
+        )
+    else:
+        taxonomy = await q_router._request_taxonomy(web, lesson_id, topic_id, lesson, topic)
+        out = await q_router.question_bank.practice_next(
+            user=web,
+            taxonomy=taxonomy,
+            mode=mode,
+            difficulty=difficulty,
+            exam_year_from=exam_year_from,
+            exam_year_to=exam_year_to,
+            exam_session=exam_session,
+            content_source=content_source,
+            include_solved=include_solved,
+            exclude_ids=exclude_ids,
+        )
+
+    q = out.get("question") if isinstance(out, dict) else None
+    if isinstance(q, dict) and q.get("image_url"):
+        q["image_url"] = f"/api/web/exam/image/{q.get('id')}"
+    return out
 
 
 class AnswerBody(BaseModel):
@@ -275,6 +398,22 @@ class MockExamStart(BaseModel):
     count: int = Field(ge=5, le=100)
     minutes: int = Field(ge=0, le=180)
     allow_smaller: bool = False
+    difficulty: str | None = None
+    exam_year_from: str | None = None
+    exam_year_to: str | None = None
+    exam_session: str | None = None
+    content_source: list[str] | None = None
+
+
+def _mock_filter_kwargs(body: MockExamStart) -> dict:
+    raw = {
+        "difficulty": body.difficulty,
+        "exam_year_from": body.exam_year_from,
+        "exam_year_to": body.exam_year_to,
+        "exam_session": body.exam_session,
+        "content_source": body.content_source,
+    }
+    return {k: v for k, v in raw.items() if v not in (None, "", [])}
 
 
 async def _mock_gate(user: dict) -> dict:
@@ -308,7 +447,7 @@ async def mock_preview(body: MockExamStart, user: dict = Depends(current_student
     )
     return await q_router.exam_domain.preview(
         user=web, taxonomy=taxonomy, requested_count=body.count,
-        minutes=body.minutes, output_mode="app",
+        minutes=body.minutes, output_mode="app", **_mock_filter_kwargs(body),
     )
 
 
@@ -326,6 +465,7 @@ async def mock_start(body: MockExamStart, user: dict = Depends(current_student))
     return await q_router.exam_domain.create(
         user=web, taxonomy=taxonomy, requested_count=body.count,
         minutes=body.minutes, output_mode="app", allow_smaller=body.allow_smaller,
+        **_mock_filter_kwargs(body),
     )
 
 
