@@ -473,8 +473,8 @@ class TestFlagshipBotSync(unittest.TestCase):
     def test_route_inventory_non_regression_invariant(self):
         """Verify OpenAPI operation count and route objects count match frozen baseline."""
         stats = _count_api_operations()
-        EXPECTED_OPS = 762
-        EXPECTED_OBJS = 769
+        EXPECTED_OPS = 764
+        EXPECTED_OBJS = 771
 
         self.assertEqual(
             stats["openapi_operations"],
