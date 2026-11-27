@@ -9,6 +9,7 @@ import './design/ui.css';
 import './design/components.css';
 import './design/shell.css';
 import './design/glass.css';
+import './design/motion.css';
 
 import { App } from './App';
 import { IconSprite } from './icons';

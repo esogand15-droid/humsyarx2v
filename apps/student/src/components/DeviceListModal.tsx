@@ -6,6 +6,19 @@ import { SkeletonStack } from './Skeleton';
 import { Icon } from '../icons';
 import { api, errorText } from '../lib/api';
 import type { UserSessionItem } from '../lib/api-types';
+import { faDigits } from '../lib/fa';
+
+/** «۵ دقیقه پیش» / «۳ روز پیش» از زمان ISO؛ ورودی نامعتبر → «نامشخص». */
+function lastActiveLabel(iso: string | null | undefined): string {
+  const t = iso ? Date.parse(iso) : NaN;
+  if (Number.isNaN(t)) return 'نامشخص';
+  const min = Math.max(0, Math.round((Date.now() - t) / 60_000));
+  if (min < 2) return 'همین حالا';
+  if (min < 60) return `${faDigits(String(min))} دقیقه پیش`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${faDigits(String(h))} ساعت پیش`;
+  return `${faDigits(String(Math.round(h / 24)))} روز پیش`;
+}
 
 export function DeviceListModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [sessions, setSessions] = useState<UserSessionItem[]>([]);
@@ -45,7 +58,7 @@ export function DeviceListModal({ open, onClose }: { open: boolean; onClose: () 
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="دستگاه‌های متصل">
+    <Sheet open={open} onClose={onClose} title="دستگاه‌های متصل" size="compact">
       <div className="device-modal">
         <p className="device-modal__intro">
           فهرست تمام دستگاه‌هایی که با این حساب کاربری وارد شده‌اند. می‌توانی دسترسی دستگاه‌های ناشناس را لغو کنی.
@@ -79,12 +92,9 @@ export function DeviceListModal({ open, onClose }: { open: boolean; onClose: () 
                       </span>
                       {sess.is_current && <Chip variant="cyan">این دستگاه</Chip>}
                     </div>
-                    <div className="device-modal__ip">
-                      <span>نشانی IP: </span>
-                      <bdi dir="ltr" className="num">
-                        {sess.ip_address || '—'}
-                      </bdi>
-                    </div>
+                    {sess.is_current ? null : (
+                      <div className="device-modal__ip">آخرین فعالیت: {lastActiveLabel(sess.last_active)}</div>
+                    )}
                   </div>
                 </div>
 

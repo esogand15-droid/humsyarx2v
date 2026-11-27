@@ -67,7 +67,8 @@ export interface LoginChallengeStatusResponse {
 export interface UserSessionItem {
   session_id: string;
   device_name: string;
-  ip_address: string;
+  /** دیگر از سرور نمیآید؛ فهرست دستگاهها فقط نام دستگاه را نشان میدهد. */
+  ip_address?: string;
   is_current: boolean;
   created_at: string;
   last_active: string;

@@ -34,6 +34,59 @@ CHALLENGE_TTL_SEC = 180  # 3 minutes (API_CONTRACTS.md § 2.1)
 SESSION_TTL_DAYS = 30
 COOKIE_NAME = "hu_session"
 
+# Names the client or older code stored when it knew nothing better.
+_GENERIC_DEVICE_NAMES = {"", "web browser", "مرورگر وب"}
+
+
+def _ua_platform(ua: str) -> str:
+    """Readable platform from a User-Agent. iOS never exposes the iPhone
+    model to the browser, so the label stops at "iPhone"; Android often
+    carries the model ("SM-S918B", "Pixel 8") before "Build/" or ")"."""
+    if "iPad" in ua or ("Macintosh" in ua and "Mobile/" in ua):
+        return "iPad"
+    if "iPhone" in ua:
+        return "iPhone"
+    if "Android" in ua:
+        m = re.search(r"Android [\d.]+; (?:[a-z]{2}[-_][A-Za-z]{2}; )?([^;)]+?)(?: Build/|\))", ua)
+        model = (m.group(1).strip() if m else "")
+        if model and model.upper() != "K" and len(model) <= 40:
+            return model
+        return "Android"
+    if "Windows" in ua:
+        return "Windows"
+    if "Macintosh" in ua or "Mac OS X" in ua:
+        return "Mac"
+    if "CrOS" in ua:
+        return "Chromebook"
+    if "Linux" in ua:
+        return "Linux"
+    return ""
+
+
+def _ua_browser(ua: str) -> str:
+    for token, name in (
+        ("Edg/", "Edge"), ("EdgiOS/", "Edge"), ("OPR/", "Opera"),
+        ("SamsungBrowser/", "Samsung Internet"), ("YaBrowser/", "Yandex"),
+        ("Firefox/", "Firefox"), ("FxiOS/", "Firefox"),
+        ("CriOS/", "Chrome"), ("Chrome/", "Chrome"), ("Safari/", "Safari"),
+    ):
+        if token in ua:
+            return name
+    return ""
+
+
+def device_label(device_name: Optional[str], user_agent: Optional[str]) -> str:
+    """Name shown in "My devices": a specific stored name wins, otherwise
+    "<platform> · <browser>" parsed from the User-Agent."""
+    name = (device_name or "").strip()
+    if name.lower() not in _GENERIC_DEVICE_NAMES:
+        return name
+    ua = (user_agent or "").strip()
+    platform, browser = _ua_platform(ua), _ua_browser(ua)
+    if platform and browser:
+        return f"{platform} · {browser}"
+    return platform or browser or "مرورگر وب"
+
 
 # ── Pydantic Request / Response Schemas ──────────────────────────
 class ClientInfo(BaseModel):
@@ -490,10 +543,11 @@ async def list_user_sessions(request: Request):
         c_str = c_at.isoformat() if isinstance(c_at, datetime) else (str(c_at) if c_at else None)
         l_act = s.get("last_active") or s.get("created_at")
         l_str = l_act.isoformat() if isinstance(l_act, datetime) else (str(l_act) if l_act else None)
+        # IP is deliberately not returned: the device list shows a readable
+        # device name only. peer_ip stays in the session doc for security audit.
         session_list.append({
             "session_id": sid,
-            "device_name": s.get("device_name", "مرورگر وب"),
-            "ip_address": s.get("peer_ip", ""),
+            "device_name": device_label(s.get("device_name"), s.get("user_agent")),
             "is_current": (sid == current_session_id),
             "created_at": c_str,
             "last_active": l_str,

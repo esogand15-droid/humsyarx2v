@@ -1,0 +1,166 @@
+/* ═══════════════════════════════════════════════════════════
+   Motion system: one set of durations/easings for the whole app.
+   Only transform and opacity animate. Every overlay has an enter AND
+   an exit (data-state="open" | "closing", driven by lib/motion.ts).
+   Loaded after glass.css so it wins over the older sheet rules.
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --mo-fast: 120ms;
+  --mo-popover: 200ms;
+  --mo-sheet: 260ms;
+  --mo-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Spring-like curve with a little overshoot, close to stiffness ~380 / damping ~30. */
+  --mo-ease-spring: cubic-bezier(0.32, 1.18, 0.42, 1);
+  --mo-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --mo-press-scale: 0.97;
+}
+
+/* ── Bottom sheet ─────────────────────────────────────────── */
+/* The page behind stays readable: a light tint plus a small blur instead of
+   the old 42% midnight wash that greyed out the whole screen. */
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sheet);
+  background: color-mix(in srgb, var(--midnight, #0a1222) 16%, transparent);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  animation: mo-fade-in var(--mo-sheet) var(--mo-ease-out) both;
+}
+.sheet-scrim[data-state="closing"] {
+  animation: mo-fade-out var(--mo-sheet) var(--mo-ease-in) both;
+  pointer-events: none;
+}
+
+.sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: calc(var(--z-sheet) + 1);
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  max-height: min(92dvh, 92vh);
+  padding: 6px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-radius: 22px 22px 0 0;
+  overflow: hidden;
+  outline: none;
+  will-change: transform;
+  animation: mo-sheet-in var(--mo-sheet) var(--mo-ease-spring) both;
+}
+.sheet[data-state="closing"] {
+  animation: mo-sheet-out 200ms var(--mo-ease-in) both;
+  pointer-events: none;
+}
+/* About half the screen; longer lists scroll inside the sheet. */
+.sheet--compact { max-height: min(56dvh, 56vh); }
+.sheet__head { flex: 0 0 auto; }
+.sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  margin-inline: -16px;
+  padding-inline: 16px;
+}
+
+@media (min-width: 900px) {
+  .sheet {
+    bottom: 24px;
+    border-radius: 22px;
+    border: 1px solid var(--line);
+  }
+}
+
+@keyframes mo-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mo-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes mo-sheet-in {
+  from { transform: translate3d(0, 100%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes mo-sheet-out {
+  from { transform: translate3d(0, 0, 0); opacity: 1; }
+  to { transform: translate3d(0, 100%, 0); opacity: 0.6; }
+}
+
+/* ── Anchored popover (notifications, composer + menu) ────── */
+.mo-popover {
+  transform-origin: var(--mo-origin, top center);
+  animation: mo-pop-in var(--mo-popover) var(--mo-ease-out) both;
+  will-change: transform, opacity;
+}
+.mo-popover[data-state="closing"] {
+  animation: mo-pop-out 150ms var(--mo-ease-in) both;
+  pointer-events: none;
+}
+@keyframes mo-pop-in {
+  from { opacity: 0; transform: translate3d(0, var(--mo-shift, -6px), 0) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes mo-pop-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate3d(0, var(--mo-shift, -6px), 0) scale(0.96); }
+}
+/* Rows arrive one after another; --i is set inline per row. */
+.mo-stagger > * {
+  animation: mo-row-in 220ms var(--mo-ease-out) both;
+  animation-delay: calc(var(--i, 0) * 25ms + 40ms);
+}
+@keyframes mo-row-in {
+  from { opacity: 0; transform: translate3d(0, 4px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Press feedback ───────────────────────────────────────── */
+/* Buttons, rows and tappable cards shrink a little and settle back. */
+.btn,
+.ds-btn,
+.ds-row,
+.iconbtn,
+.ds-iconbtn,
+.chip,
+.aic-composer__btn,
+.notif-pop__item {
+  transition: transform var(--mo-fast) var(--mo-ease-out), background-color var(--mo-fast) linear,
+    color var(--mo-fast) linear, border-color var(--mo-fast) linear, opacity var(--mo-fast) linear;
+}
+.btn:active:not(:disabled),
+.ds-btn:active:not(:disabled),
+.ds-row:active,
+.iconbtn:active:not(:disabled),
+.ds-iconbtn:active:not(:disabled),
+.chip:active,
+.notif-pop__item:active {
+  transform: scale(var(--mo-press-scale));
+}
+
+/* Theme switch fades colours instead of flashing. */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 220ms linear, color 220ms linear, border-color 220ms linear,
+    fill 220ms linear, stroke 220ms linear !important;
+}
+
+/* Removes the 300ms tap delay on every control. */
+a, button, [role="button"], input, label, select, textarea { touch-action: manipulation; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .sheet[data-state="closing"],
+  .sheet-scrim,
+  .sheet-scrim[data-state="closing"],
+  .mo-popover,
+  .mo-popover[data-state="closing"],
+  .mo-stagger > * {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+  .btn:active, .ds-btn:active, .ds-row:active, .iconbtn:active,
+  .ds-iconbtn:active, .chip:active, .notif-pop__item:active { transform: none; }
+}
