@@ -1,0 +1,50 @@
+/* هوشیار داخل ریدر: همان .aic صفحهٔ هوشیار، فقط به‌اندازهٔ پنل (نه تمام‌صفحه) و بدون فهرست کناری. */
+.aic.aic--embedded {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.aic--embedded .aic-embed-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hym-space-2, 8px);
+  padding: 6px var(--hym-space-3, 12px);
+  border-bottom: 1px solid var(--hym-hairline, var(--line));
+}
+
+.aic-embed-ctx {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--hym-fs-caption, 12px);
+  font-weight: var(--hym-fw-bold, 700);
+  color: var(--hym-text-secondary, var(--ink-2));
+}
+
+.aic-embed-ctx__text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.aic-embed-actions {
+  flex: none;
+  display: flex;
+  gap: 2px;
+}
+
+.aic--embedded .aic-hero {
+  padding-block: var(--hym-space-4, 16px);
+}
+
+.aic--embedded .aic-starters {
+  grid-template-columns: 1fr;
+}
+
+.aic--embedded .aic-disclaimer {
+  margin-block-end: 0;
+}

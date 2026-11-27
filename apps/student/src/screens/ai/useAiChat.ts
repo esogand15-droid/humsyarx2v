@@ -26,6 +26,8 @@ export interface ChatMsg {
   /** پیوست تصویری محلی (تحلیل تصویر؛ روی سرور ذخیره نمیشود) */
   image?: string;
   chips?: string[];
+  /** آنچه واقعاً برای مدل فرستاده شد، اگر با متن نمایشی فرق دارد (زمینهٔ صفحه در ریدر). */
+  prompt?: string;
 }
 
 export const PAGE = 40;
@@ -145,19 +147,20 @@ export function useAiChat(opts: UseAiChatOptions) {
   }, [patch]);
 
   const send = useCallback(
-    async (raw: string) => {
+    async (raw: string, prompt?: string) => {
       const text = raw.trim();
+      const ask = prompt?.trim() || text;
       if (!text || abortRef.current) return false;
       const now = new Date().toISOString();
       const aKey = newKey('a');
       setMsgs((prev) => [
         ...prev,
-        { key: newKey('u'), role: 'user', text, at: now, status: 'done' },
+        { key: newKey('u'), role: 'user', text, at: now, status: 'done', prompt: ask !== text ? ask : undefined },
         { key: aKey, role: 'assistant', text: '', at: now, status: 'streaming' },
       ]);
       const cid = await ensureCid(aKey);
       if (!cid) return true;
-      await stream(text, cid, aKey, false);
+      await stream(ask, cid, aKey, false);
       return true;
     },
     [ensureCid, stream],
@@ -175,7 +178,7 @@ export function useAiChat(opts: UseAiChatOptions) {
       patch(key, { text: '', status: 'streaming', error: undefined, at: new Date().toISOString() });
       const cid = await ensureCid(key);
       if (!cid) return;
-      await stream(user.text, cid, key, true);
+      await stream(user.prompt ?? user.text, cid, key, true);
     },
     [ensureCid, patch, stream],
   );
