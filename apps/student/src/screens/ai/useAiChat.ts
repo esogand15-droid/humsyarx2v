@@ -31,7 +31,7 @@ export interface ChatMsg {
 }
 
 export const PAGE = 40;
-const FLUSH_MS = 50;
+/* Tokens are painted once per animation frame: as fast as the screen refreshes, never a React render per token. */
 
 let seq = 0;
 const newKey = (p: string) => `${p}${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -78,7 +78,7 @@ export function useAiChat(opts: UseAiChatOptions) {
   }, []);
 
   const flush = useCallback(() => {
-    if (timerRef.current) window.clearTimeout(timerRef.current);
+    if (timerRef.current) cancelAnimationFrame(timerRef.current);
     timerRef.current = 0;
     const chunk = bufRef.current;
     if (!chunk) return;
@@ -90,7 +90,7 @@ export function useAiChat(opts: UseAiChatOptions) {
   const onToken = useCallback(
     (t: string) => {
       bufRef.current += t;
-      if (!timerRef.current) timerRef.current = window.setTimeout(flush, FLUSH_MS);
+      if (!timerRef.current) timerRef.current = requestAnimationFrame(flush);
     },
     [flush],
   );
@@ -98,7 +98,7 @@ export function useAiChat(opts: UseAiChatOptions) {
   useEffect(
     () => () => {
       abortRef.current?.abort();
-      if (timerRef.current) window.clearTimeout(timerRef.current);
+      if (timerRef.current) cancelAnimationFrame(timerRef.current);
     },
     [],
   );

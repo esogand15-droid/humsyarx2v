@@ -366,7 +366,10 @@ class _MediaAwareGZip(GZipMiddleware):
         if scope.get("type") == "http":
             path = scope.get("path") or ""
             has_range = any(k == b"range" for k, _v in scope.get("headers") or [])
-            if has_range or "/preview/" in path:
+            # SSE (پاسخ زندهٔ هوشیار) هرگز فشرده نمی‌شود: gzip توکن‌ها را تا پر شدن بافر نگه می‌دارد
+            # و پاسخ به‌جای جریان کلمه‌به‌کلمه تکه‌تکه می‌رسد (Starlette 0.41 خودش SSE را مستثنا نمی‌کند).
+            wants_sse = any(k == b"accept" and b"text/event-stream" in v for k, v in scope.get("headers") or [])
+            if has_range or wants_sse or "/preview/" in path or path.endswith("/stream"):
                 await self.app(scope, receive, send)
                 return
         await super().__call__(scope, receive, send)
