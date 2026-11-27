@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { MicGlyph } from './VoiceNotes';
 import { Icon } from '../../icons';
 import { faDigits } from '../../lib/fa';
 import { type InkTool } from '../../lib/ink';
@@ -114,6 +115,9 @@ interface Props {
   onNextPage?: () => void;
   onToggleAi?: () => void;
   isAiOpen?: boolean;
+  /** Arm voice recording: the next tap on a page records a note pinned there. */
+  onVoiceNote?: () => void;
+  voiceArmed?: boolean;
 }
 
 export function InkToolbar({
@@ -150,6 +154,8 @@ export function InkToolbar({
   onNextPage,
   onToggleAi,
   isAiOpen = false,
+  onVoiceNote,
+  voiceArmed = false,
 }: Props) {
   const [showPenMenu, setShowPenMenu] = useState(false);
   const [showEraserMenu, setShowEraserMenu] = useState(false);
@@ -761,6 +767,20 @@ export function InkToolbar({
                   <Icon name="i-lasso" size={18} />
                   <span>کمند</span>
                 </button>
+                {onVoiceNote && (
+                  <button
+                    type="button"
+                    className={`ink-dock__sheet-item${voiceArmed ? ' is-on' : ''}`}
+                    aria-pressed={voiceArmed}
+                    onClick={() => {
+                      onVoiceNote();
+                      setToolbarTier('primary');
+                    }}
+                  >
+                    <MicGlyph size={18} />
+                    <span>ضبط صدا</span>
+                  </button>
+                )}
                 {setShapeSnap && (
                   <button
                     type="button"
@@ -1157,6 +1177,19 @@ export function InkToolbar({
                   <Icon name="i-lasso" size={16} />
                   <span className="ink-dock__btn-label">کمند</span>
                 </button>
+
+                {onVoiceNote && (
+                  <button
+                    type="button"
+                    className={`ink-dock__btn${voiceArmed ? ' is-on' : ''}`}
+                    aria-pressed={voiceArmed}
+                    onClick={onVoiceNote}
+                    title="ضبط صدا روی صفحه"
+                  >
+                    <MicGlyph size={16} />
+                    <span className="ink-dock__btn-label">ضبط صدا</span>
+                  </button>
+                )}
 
                 {setShapeSnap && (
                   <button

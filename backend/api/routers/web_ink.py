@@ -37,7 +37,8 @@ import time
 import uuid
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from backend.api.routers.web_library import _gate, _web_user
@@ -378,6 +379,173 @@ async def put_inserts(scope: str, file_id: str, body: InsertsBody,
         logger.warning("ink_inserts_write_failed uid=%s err=%s", uid, type(exc).__name__)
         raise HTTPException(status_code=503, detail="ink_unavailable")
     return {"ok": True, "count": len(body.pages), "updated_at": str(now)}
+
+
+# ─────────────────────────────────────────────────────────────
+#  Voice notes pinned to a spot on a page (Noteful-style)
+# ─────────────────────────────────────────────────────────────
+# Registered before "/ink/{scope}/{file_id}/{page}" so these paths are never read as a page.
+MAX_VOICE_BYTES = 8 * 1024 * 1024
+MAX_VOICE_MS = 10 * 60 * 1000
+MAX_VOICE_NOTES = 300
+VOICE_MIMES = ("audio/webm", "audio/mp4", "audio/ogg", "audio/mpeg", "audio/aac", "audio/x-m4a", "audio/wav")
+
+
+def _voice_key(uid: int, voice_id: str) -> str:
+    return f"{int(uid)}:{voice_id}"
+
+
+def _voice_public(d: dict) -> dict:
+    return {
+        "voice_id": str(d.get("voice_id") or ""),
+        "file_id": str(d.get("file_id") or ""),
+        "page": int(d.get("page") or 1),
+        "x": float(d.get("x") or 0.0),
+        "y": float(d.get("y") or 0.0),
+        "duration_ms": int(d.get("duration_ms") or 0),
+        "mime": str(d.get("mime") or "audio/webm"),
+        "created_at": str(d.get("created_at") or ""),
+    }
+
+
+def _unit(v: float, name: str) -> float:
+    if not math.isfinite(v) or v < 0.0 or v > 1.0:
+        raise HTTPException(status_code=422, detail=f"{name}_invalid")
+    return float(v)
+
+
+def _voice_id_ok(voice_id: str) -> str:
+    if not voice_id or len(voice_id) > 64 or not voice_id.isalnum():
+        raise HTTPException(status_code=404, detail="voice_not_found")
+    return voice_id
+
+
+class VoiceMoveBody(BaseModel):
+    x: float = Field(..., ge=0.0, le=1.0)
+    y: float = Field(..., ge=0.0, le=1.0)
+
+
+@router.get("/ink/voice/{scope}/{file_id}")
+async def list_voice(scope: str, file_id: str, user: dict = Depends(current_student)):
+    """Voice notes of this student on this handout (metadata only, no audio)."""
+    if scope not in SCOPES:
+        raise HTTPException(status_code=422, detail="scope_invalid")
+    uid = int(user["user_id"])
+    try:
+        cur = (
+            _coll("web_ink_voice")
+            .find({"uid": uid, "scope": scope, "file_id": file_id}, {"audio": 0})
+            .sort("created_at", 1)
+            .limit(MAX_VOICE_NOTES)
+        )
+        docs = [d async for d in cur]
+    except Exception as exc:  # pragma: no cover
+        logger.warning("ink_voice_list_failed uid=%s err=%s", uid, type(exc).__name__)
+        raise HTTPException(status_code=503, detail="ink_unavailable")
+    return {"items": [_voice_public(d) for d in docs]}
+
+
+@router.post("/ink/voice/{scope}/{file_id}/{page}")
+async def upload_voice(
+    scope: str,
+    file_id: str,
+    page: int,
+    file: UploadFile = File(...),
+    x: float = Form(...),
+    y: float = Form(...),
+    duration_ms: int = Form(0),
+    user: dict = Depends(current_student),
+):
+    """Store one recording pinned at (x, y) on a page; same access rule as the page's ink."""
+    _page_ok(page)
+    await _guard(scope, file_id, user)
+    uid = int(user["user_id"])
+    x = _unit(x, "x")
+    y = _unit(y, "y")
+    mime = (file.content_type or "").split(";")[0].strip().lower()
+    if mime not in VOICE_MIMES:
+        raise HTTPException(status_code=415, detail="audio_type_invalid")
+    data = await file.read(MAX_VOICE_BYTES + 1)
+    if not data:
+        raise HTTPException(status_code=422, detail="audio_empty")
+    if len(data) > MAX_VOICE_BYTES:
+        raise HTTPException(status_code=413, detail="audio_too_large")
+    coll = _coll("web_ink_voice")
+    try:
+        count = await coll.count_documents({"uid": uid, "scope": scope, "file_id": file_id})
+    except Exception as exc:  # pragma: no cover
+        logger.warning("ink_voice_count_failed uid=%s err=%s", uid, type(exc).__name__)
+        raise HTTPException(status_code=503, detail="ink_unavailable")
+    if count >= MAX_VOICE_NOTES:
+        raise HTTPException(status_code=409, detail="voice_limit_reached")
+    voice_id = uuid.uuid4().hex
+    doc = {
+        "_id": _voice_key(uid, voice_id),
+        "voice_id": voice_id,
+        "uid": uid,
+        "scope": scope,
+        "file_id": file_id,
+        "page": int(page),
+        "x": x,
+        "y": y,
+        "duration_ms": max(0, min(MAX_VOICE_MS, int(duration_ms))),
+        "mime": mime,
+        "size": len(data),
+        "audio": data,
+        "created_at": str(utc_now_iso()),
+    }
+    try:
+        await coll.insert_one(doc)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("ink_voice_write_failed uid=%s err=%s", uid, type(exc).__name__)
+        raise HTTPException(status_code=503, detail="ink_unavailable")
+    return {"item": _voice_public(doc)}
+
+
+@router.get("/ink/voice-item/{voice_id}/audio")
+async def voice_audio(voice_id: str, user: dict = Depends(current_student)):
+    uid = int(user["user_id"])
+    _voice_id_ok(voice_id)
+    try:
+        doc = await _coll("web_ink_voice").find_one({"_id": _voice_key(uid, voice_id)})
+    except Exception as exc:  # pragma: no cover
+        logger.warning("ink_voice_read_failed uid=%s err=%s", uid, type(exc).__name__)
+        raise HTTPException(status_code=503, detail="ink_unavailable")
+    if not doc:
+        raise HTTPException(status_code=404, detail="voice_not_found")
+    return Response(
+        content=bytes(doc.get("audio") or b""),
+        media_type=str(doc.get("mime") or "audio/webm"),
+        headers={"Cache-Control": "private, max-age=604800"},
+    )
+
+
+@router.patch("/ink/voice-item/{voice_id}")
+async def move_voice(voice_id: str, body: VoiceMoveBody, user: dict = Depends(current_student)):
+    uid = int(user["user_id"])
+    _voice_id_ok(voice_id)
+    try:
+        res = await _coll("web_ink_voice").update_one(
+            {"_id": _voice_key(uid, voice_id)}, {"$set": {"x": body.x, "y": body.y}}
+        )
+    except Exception as exc:  # pragma: no cover
+        logger.warning("ink_voice_move_failed uid=%s err=%s", uid, type(exc).__name__)
+        raise HTTPException(status_code=503, detail="ink_unavailable")
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="voice_not_found")
+    return {"ok": True}
+
+
+@router.delete("/ink/voice-item/{voice_id}")
+async def delete_voice(voice_id: str, user: dict = Depends(current_student)):
+    uid = int(user["user_id"])
+    _voice_id_ok(voice_id)
+    try:
+        await _coll("web_ink_voice").delete_one({"_id": _voice_key(uid, voice_id)})
+    except Exception as exc:  # pragma: no cover
+        logger.warning("ink_voice_delete_failed uid=%s err=%s", uid, type(exc).__name__)
+        raise HTTPException(status_code=503, detail="ink_unavailable")
+    return {"ok": True}
 
 
 @router.get("/ink/notes")

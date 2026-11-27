@@ -52,6 +52,8 @@ interface InsertedPageViewProps {
   onActivate: () => void;
   onChangeTemplate: () => void;
   onDelete: () => void;
+  /** Extra layer over the page (voice notes). */
+  overlay?: React.ReactNode;
 }
 
 /** A blank/ruled/grid/dotted page the student inserted between two handout pages. */
@@ -80,6 +82,7 @@ export function InsertedPageView({
   onActivate,
   onChangeTemplate,
   onDelete,
+  overlay,
 }: InsertedPageViewProps) {
   return (
     <div
@@ -134,6 +137,7 @@ export function InsertedPageView({
         stylusOnly={stylusOnly}
         onPenDetected={onPenDetected}
       />
+      {overlay}
     </div>
   );
 }

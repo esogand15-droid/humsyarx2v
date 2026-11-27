@@ -23,6 +23,15 @@ import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { ThumbnailDrawer } from './ThumbnailDrawer';
 import { PageOverview } from './PageOverview';
 import { InsertedPageView, PageInserter, PageTemplatePicker } from './InsertedPage';
+import { voiceNotes, type VoiceNote } from '../../lib/voiceNotes';
+import {
+  VoicePageLayer,
+  seedVoiceAudio,
+  shareVoiceAudio,
+  useVoiceRecorder,
+  voiceRecordingSupported,
+  type VoiceNoteView,
+} from './VoiceNotes';
 import { TextLayer } from './components/TextLayer';
 import {
   acquirePageUrl,
@@ -993,6 +1002,192 @@ export function ProtectedReaderView({
     };
   }, [newInsertId]);
 
+  // ── Voice notes pinned to a spot on a page (Noteful-style) ──
+  const recorder = useVoiceRecorder();
+  const [voiceList, setVoiceList] = useState<VoiceNoteView[]>([]);
+  const voiceListRef = useRef(voiceList);
+  voiceListRef.current = voiceList;
+  const [voiceArmed, setVoiceArmed] = useState(false);
+  const [recordingAt, setRecordingAt] = useState<{ fileId: string; page: number; x: number; y: number } | null>(
+    null,
+  );
+  const recordingAtRef = useRef(recordingAt);
+  recordingAtRef.current = recordingAt;
+  const [voiceMsg, setVoiceMsg] = useState<string | null>(null);
+  const voiceMsgTimer = useRef<number | undefined>(undefined);
+
+  const flashVoice = useCallback((msg: string) => {
+    setVoiceMsg(msg);
+    if (voiceMsgTimer.current) window.clearTimeout(voiceMsgTimer.current);
+    voiceMsgTimer.current = window.setTimeout(() => setVoiceMsg(null), 3600);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(voiceMsgTimer.current), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setVoiceList([]);
+    void Promise.all([
+      voiceNotes.list(scope, id).catch(() => [] as VoiceNote[]),
+      voiceNotes.list(scope, insertedInkId(id)).catch(() => [] as VoiceNote[]),
+    ]).then(([a, b]) => {
+      if (!cancelled) setVoiceList([...a, ...b]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [scope, id]);
+
+  useEffect(() => {
+    if (!voiceArmed) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setVoiceArmed(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [voiceArmed]);
+
+  const voiceByPage = useMemo(() => {
+    const m = new Map<string, VoiceNoteView[]>();
+    for (const n of voiceList) {
+      const k = `${n.file_id}|${n.page}`;
+      const g = m.get(k);
+      if (g) g.push(n);
+      else m.set(k, [n]);
+    }
+    return m;
+  }, [voiceList]);
+
+  const toggleVoiceArm = () => {
+    if (recordingAtRef.current) return;
+    if (!voiceRecordingSupported()) {
+      flashVoice(
+        window.isSecureContext
+          ? 'این مرورگر ضبط صدا را پشتیبانی نمی‌کند.'
+          : 'ضبط صدا فقط روی اتصال امن (https) کار می‌کند.',
+      );
+      return;
+    }
+    setVoiceArmed((v) => !v);
+  };
+
+  const handlePlaceVoice = (fileId: string, page: number, x: number, y: number) => {
+    setVoiceArmed(false);
+    setRecordingAt({ fileId, page, x, y });
+    recorder.start().catch((err: unknown) => {
+      setRecordingAt(null);
+      const name = (err as { name?: string } | null)?.name;
+      flashVoice(
+        name === 'NotAllowedError' || name === 'SecurityError'
+          ? 'اجازهٔ میکروفون داده نشد؛ از تنظیمات مرورگر اجازه بده.'
+          : 'میکروفون در دسترس نیست.',
+      );
+    });
+  };
+
+  const uploadVoice = (localId: string, note: VoiceNoteView, blob: Blob) => {
+    setVoiceList((l) => l.map((n) => (n.voice_id === localId ? { ...n, local: { blob, status: 'uploading' } } : n)));
+    voiceNotes
+      .upload(scope, note.file_id, note.page, note.x, note.y, note.duration_ms, blob)
+      .then((item) => {
+        shareVoiceAudio(localId, item.voice_id);
+        const cur = voiceListRef.current.find((n) => n.voice_id === localId);
+        const x = cur?.x ?? item.x;
+        const y = cur?.y ?? item.y;
+        // Moved while it was uploading: send the new spot now that it has a server id.
+        if (x !== item.x || y !== item.y) void voiceNotes.move(item.voice_id, x, y).catch(() => undefined);
+        setVoiceList((l) => l.map((n) => (n.voice_id === localId ? { ...item, x, y } : n)));
+      })
+      .catch(() => {
+        setVoiceList((l) => l.map((n) => (n.voice_id === localId ? { ...n, local: { blob, status: 'failed' } } : n)));
+        flashVoice('صدا ذخیره نشد؛ روی نشانش بزن تا دوباره ارسال شود.');
+      });
+  };
+
+  const handleStopVoice = () => {
+    const at = recordingAtRef.current;
+    void recorder.stop().then((res) => {
+      setRecordingAt(null);
+      if (!res || !at) return;
+      if (res.durationMs < 700) {
+        flashVoice('ضبط خیلی کوتاه بود.');
+        return;
+      }
+      const localId = `local${generateUUID().replace(/-/g, '')}`;
+      seedVoiceAudio(localId, res.blob);
+      const entry: VoiceNoteView = {
+        voice_id: localId,
+        file_id: at.fileId,
+        page: at.page,
+        x: at.x,
+        y: at.y,
+        duration_ms: res.durationMs,
+        mime: res.blob.type || 'audio/webm',
+        created_at: new Date().toISOString(),
+        local: { blob: res.blob, status: 'uploading' },
+      };
+      setVoiceList((l) => [...l, entry]);
+      uploadVoice(localId, entry, res.blob);
+    });
+  };
+
+  const handleCancelVoice = () => {
+    recorder.cancel();
+    setRecordingAt(null);
+  };
+
+  const handleMoveVoice = (note: VoiceNoteView, x: number, y: number) => {
+    setVoiceList((l) => l.map((n) => (n.voice_id === note.voice_id ? { ...n, x, y } : n)));
+    if (!note.local) voiceNotes.move(note.voice_id, x, y).catch(() => flashVoice('جای تازهٔ صدا ذخیره نشد.'));
+  };
+
+  const handleDeleteVoice = (note: VoiceNoteView) => {
+    if (!window.confirm('این یادداشت صوتی حذف شود؟')) return;
+    setVoiceList((l) => l.filter((n) => n.voice_id !== note.voice_id));
+    if (note.local) return;
+    voiceNotes.remove(note.voice_id).catch(() => {
+      setVoiceList((l) => [...l, note]);
+      flashVoice('حذف انجام نشد.');
+    });
+  };
+
+  const handleRetryVoice = (note: VoiceNoteView) => {
+    if (note.local) uploadVoice(note.voice_id, note, note.local.blob);
+  };
+
+  const renderVoice = (fileId: string, page: number, w: number, h: number) => {
+    const notes = voiceByPage.get(`${fileId}|${page}`) ?? [];
+    const rec = recordingAt && recordingAt.fileId === fileId && recordingAt.page === page ? recordingAt : null;
+    if (!voiceArmed && !rec && notes.length === 0) return null;
+    return (
+      <VoicePageLayer
+        width={w}
+        height={h}
+        notes={notes}
+        armed={voiceArmed}
+        onPlace={(x, y) => handlePlaceVoice(fileId, page, x, y)}
+        recording={
+          rec
+            ? {
+                x: rec.x,
+                y: rec.y,
+                startedAt: recorder.startedAt,
+                live: recorder.phase === 'recording',
+                analyser: recorder.analyser,
+                onStop: handleStopVoice,
+                onCancel: handleCancelVoice,
+              }
+            : null
+        }
+        onMove={handleMoveVoice}
+        onDelete={handleDeleteVoice}
+        onRetry={handleRetryVoice}
+      />
+    );
+  };
+
   const activeInkApi = inkApis.current.get(inkFocus ?? currentPage);
   const shownZoomPct = Math.round((gestureBadgeZoom ?? zoom) * 100);
 
@@ -1052,6 +1247,7 @@ export function ProtectedReaderView({
                   <Fragment key={dim.page}>
                   <VirtualPageContainer
                     onActivate={() => setInkFocus(dim.page)}
+                    overlay={renderVoice(id, dim.page, targetW, targetH)}
                     page={dim.page}
                     width={targetW}
                     height={targetH}
@@ -1126,6 +1322,7 @@ export function ProtectedReaderView({
                         onInkHistory={setHistory}
                         onInkChanged={handleInkChanged}
                         onActivate={() => setInkFocus(-entry.slot)}
+                        overlay={renderVoice(insertedInkId(id), entry.slot, targetW, targetH)}
                         onChangeTemplate={() =>
                           setInsertPicker({ after: entry.after, editId: entry.id, current: entry.template })
                         }
@@ -1193,6 +1390,8 @@ export function ProtectedReaderView({
           onNextPage={() => scrollToPage(Math.min(manifest.total_pages, currentPage + 1))}
           onToggleAi={onToggleSplitWorkspace}
           isAiOpen={isAiOpen}
+          onVoiceNote={toggleVoiceArm}
+          voiceArmed={voiceArmed}
         />
       )}
 
@@ -1229,6 +1428,38 @@ export function ProtectedReaderView({
           setInsertPicker({ after: currentPage });
         }}
       />
+
+      {(voiceArmed || recordingAt || voiceMsg) && (
+        <div className={`voice-banner${recordingAt ? ' is-recording' : ''}`} role="status" aria-live="polite">
+          {recordingAt ? (
+            <>
+              <span className="voice-banner__dot" aria-hidden="true" />
+              <span>{recorder.phase === 'recording' ? 'در حال ضبط صدا' : 'در حال آماده‌سازی میکروفون…'}</span>
+              <button
+                type="button"
+                className="voice-banner__btn is-primary"
+                onClick={handleStopVoice}
+                disabled={recorder.phase !== 'recording'}
+              >
+                ذخیره
+              </button>
+              <button type="button" className="voice-banner__btn" onClick={handleCancelVoice}>
+                لغو
+              </button>
+            </>
+          ) : voiceArmed ? (
+            <>
+              <span className="voice-banner__dot" aria-hidden="true" />
+              <span>روی هر جای صفحه بزن تا ضبط صدا همان‌جا شروع شود</span>
+              <button type="button" className="voice-banner__btn" onClick={() => setVoiceArmed(false)}>
+                لغو
+              </button>
+            </>
+          ) : (
+            <span>{voiceMsg}</span>
+          )}
+        </div>
+      )}
 
       <PageTemplatePicker
         open={insertPicker !== null}
@@ -1296,6 +1527,8 @@ interface VirtualPageContainerProps {
   onPageLoaded?: () => void;
   /** Pen/finger touched this page: undo/redo should act on it. */
   onActivate?: () => void;
+  /** Extra layer over the page (voice notes). */
+  overlay?: React.ReactNode;
 }
 
 function VirtualPageContainer({
@@ -1336,6 +1569,7 @@ function VirtualPageContainer({
   textLayerRef,
   onPageLoaded,
   onActivate,
+  overlay,
 }: VirtualPageContainerProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const textLayerRefInternal = useRef<any>(null);
@@ -1530,6 +1764,7 @@ function VirtualPageContainer({
             stylusOnly={stylusOnly}
             onPenDetected={onPenDetected}
           />
+          {overlay}
         </>
       ) : (
         <div className="page-placeholder" aria-busy="true">
