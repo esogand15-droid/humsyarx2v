@@ -145,6 +145,14 @@ function ContinueStudyCard({ item }: { item: ContinueItem | null }) {
   );
 }
 
+function getPersianWeekdayIndex(isoDate?: string): number | null {
+  if (!isoDate) return null;
+  const dt = new Date(`${isoDate.slice(0, 10)}T12:00:00Z`);
+  if (Number.isNaN(dt.getTime())) return null;
+  // JS: Sun=0..Sat=6 → Persian week: Sat=0, Sun=1, Mon=2, Tue=3, Wed=4, Thu=5, Fri=6
+  return (dt.getUTCDay() + 1) % 7;
+}
+
 /* ── ۲. گرید ۴ ویجت آنالیتیکس بالینی (هر ویجت با رنگ نقش خودش) ────────── */
 function ClinicalAnalyticsGrid({
   streak,
@@ -162,12 +170,28 @@ function ClinicalAnalyticsGrid({
   weekly: WeeklyActivityItem[];
 }) {
   const weeklyCounts = weekly && weekly.length > 0 ? weekly : [];
-  const maxActivity = Math.max(1, ...weeklyCounts.map((w) => w.count || 0));
+  const countsByWeekday = new Array<number>(7).fill(0);
+  weeklyCounts.forEach((entry, idx) => {
+    const wd = getPersianWeekdayIndex(entry?.date);
+    const target = wd !== null ? wd : idx % 7;
+    countsByWeekday[target] += Math.max(0, entry?.count || 0);
+  });
+  const maxActivity = Math.max(1, ...countsByWeekday);
 
   const radius = 24;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset =
+  const targetOffset =
     circumference - (Math.min(100, Math.max(0, accuracy)) / 100) * circumference;
+  const [gaugeOffset, setGaugeOffset] = useState(circumference);
+  const [barsReady, setBarsReady] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      setGaugeOffset(targetOffset);
+      setBarsReady(true);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [targetOffset]);
 
   const accuracySection: DsSection =
     accuracy >= 70 ? 'grades' : accuracy >= 45 ? 'schedule' : totalAnswers > 0 ? 'danger' : 'grades';
@@ -192,7 +216,7 @@ function ClinicalAnalyticsGrid({
               <span className="home-stat-card__label">پیوستگی مطالعه</span>
             </div>
             <div className="home-stat-card__val-row">
-              <span className="home-stat-card__num">{faNum(streak)}</span>
+              <span className={`home-stat-card__num${streak === 0 ? ' is-zero' : ''}`}>{faNum(streak)}</span>
               <span className="home-stat-card__unit">روز</span>
             </div>
             {streak === 0 && bestStreak === 0 ? (
@@ -229,7 +253,7 @@ function ClinicalAnalyticsGrid({
                     r={radius}
                     strokeWidth="5"
                     strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
+                    strokeDashoffset={gaugeOffset}
                     strokeLinecap="round"
                     className="home-gauge__fill"
                   />
@@ -258,7 +282,7 @@ function ClinicalAnalyticsGrid({
               <span className="home-stat-card__label">تست‌های تمرینی</span>
             </div>
             <div className="home-stat-card__val-row">
-              <span className="home-stat-card__num">{faNum(totalAnswers)}</span>
+              <span className={`home-stat-card__num${totalAnswers === 0 ? ' is-zero' : ''}`}>{faNum(totalAnswers)}</span>
               <span className="home-stat-card__unit">سؤال</span>
             </div>
             <div className="home-stat-card__sub">
@@ -278,10 +302,11 @@ function ClinicalAnalyticsGrid({
             </div>
             <div className="home-weekly" aria-label="نمودار فعالیت ۷ روز اخیر">
               {PERSIAN_WEEK_DAYS.map((d, idx) => {
-                const count = weeklyCounts[idx]?.count ?? 0;
+                const count = countsByWeekday[idx] ?? 0;
                 const pct = count > 0
                   ? Math.max(18, Math.round((count / maxActivity) * 100))
                   : 8;
+                const barH = barsReady ? pct : 8;
                 return (
                   <div key={d.key} className="home-weekly__col" title={`${d.full}: ${faNum(count)} فعالیت`}>
                     <div className="home-weekly__track">
@@ -289,9 +314,9 @@ function ClinicalAnalyticsGrid({
                         <rect
                           className={`home-weekly__bar${count > 0 ? ' is-active' : ''}`}
                           x={0}
-                          y={100 - pct}
+                          y={100 - barH}
                           width={10}
-                          height={pct}
+                          height={barH}
                           rx={4}
                         />
                       </svg>
@@ -355,18 +380,8 @@ function AcademicIdentityCard({
           </div>
           <div className="home-identity__meta">
             {studentId && <span>شماره: {faDigits(studentId)}</span>}
-            {intake && (
-              <>
-                {studentId && <span aria-hidden="true">·</span>}
-                <span>{intake}</span>
-              </>
-            )}
-            {group && (
-              <>
-                {(studentId || intake) && <span aria-hidden="true">·</span>}
-                <span>{group}</span>
-              </>
-            )}
+            {intake && <span>{intake}</span>}
+            {group && <span>{group}</span>}
           </div>
         </div>
       </div>
@@ -378,9 +393,11 @@ function AcademicIdentityCard({
             <span>{planName}</span>
           </span>
           <span className="home-sub-strip__meta">
-            {isSubActive
-              ? `${faNum(daysLeft)} روز مانده${expireJalali ? ` · تا ${expireJalali}` : ''}`
-              : 'اشتراک غیرفعال'}
+            <span>
+              {isSubActive
+                ? `${faNum(daysLeft)} روز مانده${expireJalali ? ` · تا ${expireJalali}` : ''}`
+                : 'اشتراک غیرفعال'}
+            </span>
             {(!isSubActive || daysLeft <= 3) && (
               <DsBadge tone={isSubActive ? 'warning' : 'danger'}>تمدید</DsBadge>
             )}
@@ -595,6 +612,14 @@ const COMMAND_MODULES: QuickModule[] = [
     icon: 'i-message-circle',
     tag: 'پاسخگویی',
     section: 'brand',
+  },
+  {
+    to: '/subscription',
+    label: 'اشتراک و دسترسی',
+    sub: 'وضعیت اشتراک، پلن‌ها و تمدید',
+    icon: 'i-credit-card',
+    tag: 'اشتراک',
+    section: 'money',
   },
 ];
 

@@ -5,6 +5,7 @@ import './auth.css';
 import { Brand } from '../components/Brand';
 import { DsButton, DsSegmented } from '../design/components';
 import { Icon } from '../icons';
+import { useSession } from '../lib/session';
 import { useTheme } from '../lib/theme';
 
 export type PlatformType = 'ios' | 'android' | 'desktop';
@@ -63,6 +64,7 @@ interface InstallGuideScreenProps {
 
 export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScreenProps) {
   const navigate = useNavigate();
+  const { status } = useSession();
   const { resolved, setMode } = useTheme();
   const [detected] = useState<PlatformType>(() => detectPlatform());
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>(detected);
@@ -124,6 +126,9 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
   const handleCloseOrContinue = () => {
     if (onClose) {
       onClose();
+    } else if (status === 'active') {
+      if (window.history.length > 1) navigate(-1);
+      else navigate('/');
     } else {
       navigate('/login');
     }
@@ -138,7 +143,7 @@ export function InstallGuideScreen({ onClose, isModal = false }: InstallGuideScr
           onClick={handleCloseOrContinue}
         >
           <Icon name="i-chevron-r" size={16} />
-          <span>{onClose ? 'بستن' : 'ورود به حساب'}</span>
+          <span>{onClose ? 'بستن' : status === 'active' ? 'بازگشت' : 'ورود به حساب'}</span>
         </button>
 
         <button

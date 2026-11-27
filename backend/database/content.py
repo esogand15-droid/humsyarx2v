@@ -1610,9 +1610,11 @@ class DBContent:
             if term and item.get('term') and str(item.get('term')).strip() != str(term).strip():
                 continue
             if educational_group is not None:
-                if not self.class_matches_user_educational_group(
-                    item.get('educational_group'), educational_group
-                ):
+                eff_edu = self.effective_class_educational_group(
+                    item.get('educational_group'),
+                    item.get('lesson') or item.get('course_name'),
+                )
+                if not self.class_matches_user_educational_group(eff_edu, educational_group):
                     continue
             out.append(item)
         return out
@@ -1720,9 +1722,11 @@ class DBContent:
             if term and item.get('term') and str(item.get('term')).strip() != str(term).strip():
                 continue
             if educational_group is not None:
-                if not self.class_matches_user_educational_group(
-                    item.get('educational_group'), educational_group
-                ):
+                eff_edu = self.effective_class_educational_group(
+                    item.get('educational_group'),
+                    item.get('lesson') or item.get('course_name'),
+                )
+                if not self.class_matches_user_educational_group(eff_edu, educational_group):
                     continue
             out.append(item)
         return out
@@ -2143,6 +2147,16 @@ class DBContent:
         return None
 
     @classmethod
+    def effective_class_educational_group(cls, edu_group_raw, lesson_title=None) -> str:
+        """Return explicit educational_group, falling back to gendered lesson title when mixed/unknown."""
+        edu_grp = cls.normalize_class_educational_group(edu_group_raw, default='mixed')
+        if edu_grp in ('mixed', 'unknown') and lesson_title:
+            inferred = cls._gender_from_lesson_title(lesson_title)
+            if inferred:
+                return inferred
+        return edu_grp
+
+    @classmethod
     def detect_schedule_conflicts(cls, items: list, active_term: str = None,
                                   user_educational_group: str = None) -> list:
         """تشخیص تداخل زمانی استاندارد بین دو درس مختلف در یک روز (یا یک روز هفته).
@@ -2165,13 +2179,10 @@ class DBContent:
             it_term = str(it.get('term') or it.get('academic_term') or '').strip()
             if active_term and it_term and it_term != str(active_term).strip():
                 continue
-            edu_grp = cls.normalize_class_educational_group(it.get('educational_group'), default='mixed')
-            if edu_grp in ('mixed', 'unknown'):
-                # Many imported rows leave educational_group empty and carry the
-                # section only in the title ("آیین زندگی دختران"). Without this,
-                # a girls' section and a boys' section at the same hour were
-                # reported as a clash for every student.
-                edu_grp = cls._gender_from_lesson_title(it.get('lesson') or it.get('course_name')) or edu_grp
+            edu_grp = cls.effective_class_educational_group(
+                it.get('educational_group'),
+                it.get('lesson') or it.get('course_name'),
+            )
             if user_educational_group and user_educational_group != 'unknown':
                 if not cls.class_matches_user_educational_group(edu_grp, user_educational_group):
                     continue
@@ -2540,7 +2551,11 @@ class DBContent:
                 return False
             if include_all_educational_groups or educational_group is None:
                 return True
-            return self.class_matches_user_educational_group(d.get('educational_group'), educational_group)
+            eff_edu = self.effective_class_educational_group(
+                d.get('educational_group'),
+                d.get('lesson') or d.get('course_name'),
+            )
+            return self.class_matches_user_educational_group(eff_edu, educational_group)
 
         explicit_docs = [d for d in (explicit_docs or []) if _doc_matches_scope(d)]
         tpl_docs = [d for d in (tpl_docs or []) if _doc_matches_scope(d)]
@@ -2586,7 +2601,7 @@ class DBContent:
                 c['has_explicit_or_tpl'] = True
             if course_code and not c['course_code']:
                 c['course_code'] = str(course_code).strip()
-            edu_grp = self.normalize_class_educational_group(edu_grp_raw, default='mixed')
+            edu_grp = self.effective_class_educational_group(edu_grp_raw, lesson_name)
             c['educational_groups'].add(edu_grp)
             if credit_val is not None:
                 try:
@@ -2647,7 +2662,7 @@ class DBContent:
                     'time': str(doc.get('time') or ''),
                     'end_time': str(doc.get('end_time') or ''),
                     'location': str(doc.get('location') or ''),
-                    'educational_group': self.normalize_class_educational_group(doc.get('educational_group'), default='mixed'),
+                    'educational_group': self.effective_class_educational_group(doc.get('educational_group'), doc.get('lesson')),
                     'term': term,
                 }
             _add_entry(
@@ -2673,7 +2688,7 @@ class DBContent:
                 'time': str(tpl.get('time') or ''),
                 'end_time': str(tpl.get('end_time') or ''),
                 'location': str(tpl.get('location') or ''),
-                'educational_group': self.normalize_class_educational_group(tpl.get('educational_group'), default='mixed'),
+                'educational_group': self.effective_class_educational_group(tpl.get('educational_group'), tpl.get('lesson')),
                 'term': term,
             }
             _add_entry(
@@ -2723,7 +2738,7 @@ class DBContent:
                 'time': str(sch.get('time') or ''),
                 'end_time': str(sch.get('end_time') or ''),
                 'location': str(sch.get('location') or ''),
-                'educational_group': self.normalize_class_educational_group(sch.get('educational_group'), default='mixed'),
+                'educational_group': self.effective_class_educational_group(sch.get('educational_group'), lsn_name),
                 'term': term,
             }
             _add_entry(
@@ -2831,7 +2846,13 @@ class DBContent:
             mismatch = False
             if matching_offs:
                 # اگر تمام رکوردهای این درس+گروه در دیتابیس مخصوص جنس مخالف باشد، مغایرت دارد
-                if all(not self.class_matches_user_educational_group(o.get('educational_group'), ug) for o in matching_offs):
+                if all(
+                    not self.class_matches_user_educational_group(
+                        self.effective_class_educational_group(o.get('educational_group'), o.get('lesson') or lsn),
+                        ug,
+                    )
+                    for o in matching_offs
+                ):
                     mismatch = True
             sel_filt = {'_id': sel['_id']} if '_id' in sel else {'user_id': uid, 'term': term, 'lesson': lsn}
             await self.course_selections.update_one(

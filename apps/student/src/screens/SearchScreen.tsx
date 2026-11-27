@@ -91,9 +91,9 @@ export function SearchScreen() {
       const map = res.results || {};
       Object.entries(map).forEach(([type, items]) => {
         if (Array.isArray(items)) {
-          items.forEach((it: any) => {
+          items.forEach((it: any, idx: number) => {
             all.push({
-              id: it.id || it._id || String(Math.random()),
+              id: it.id || it._id || `${type}-${idx}`,
               title: it.title || it.name || it.question || it.lesson || '—',
               type: type.replace(/s$/, '') as SearchResultItem['type'],
               subtitle:

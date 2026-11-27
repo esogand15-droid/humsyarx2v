@@ -559,7 +559,7 @@ export function ScheduleScreen() {
 
         {/* ═══════════ تب برنامه کلاسی و امتحانات ═══════════ */}
         {activeTab === 'timetable' && (
-          <div className="sched-stack">
+          <div key="timetable" className="sched-stack mo-sheet-swap">
             {(meta.cohortTitle || termBadgeText) && (
               <DsCard level="raised">
                 <div className="sched-cohort">

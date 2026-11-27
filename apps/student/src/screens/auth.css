@@ -953,6 +953,16 @@
   margin-block-start: 4px;
 }
 
+@media (max-width: 599px) {
+  .welcome-cta-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .welcome-cta-row .ds-btn {
+    width: 100%;
+  }
+}
+
 .welcome-preview-card {
   border-radius: var(--hym-radius-card);
   padding: 16px;

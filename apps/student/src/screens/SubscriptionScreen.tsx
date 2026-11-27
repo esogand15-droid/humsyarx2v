@@ -198,7 +198,7 @@ export function SubscriptionScreen() {
                     </h2>
                     {status.active && (
                       <p className="ds-card__sub">
-                        {faNum(status.days_left)} روز باقی‌مانده
+                        {faNum(status.days_left ?? 0)} روز باقی‌مانده
                         {expiresLabel ? ` · تا ${expiresLabel}` : ''}
                       </p>
                     )}
