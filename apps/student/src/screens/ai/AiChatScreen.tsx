@@ -7,7 +7,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppBar } from '../../components/AppBar';
 import { Icon } from '../../icons';
-import { ai, aiErrorFrom, type AiConversation, type AiStatus, type VisionDiagnosisResult } from '../../lib/ai';
+import {
+  ai,
+  aiErrorFrom,
+  diagnoseClinicalImage,
+  type AiConversation,
+  type AiStatus,
+  type VisionDiagnosisResult,
+} from '../../lib/ai';
 import { AiVisionModal } from './AiVisionModal';
 import { ChatMessage } from './ChatMessage';
 import { Composer, type ComposerHandle } from './Composer';
@@ -252,6 +259,13 @@ export function AiChatScreen() {
     ]);
   };
 
+  /* تصویر پیوستشده از منوی «+»: همان سرویس تحلیل تصویر، بدون شیت میانی.
+     خطا به Composer برمیگردد تا زیر چیپ نمایش داده شود. */
+  const onSendImage = async (file: File, prompt: string) => {
+    const result = await diagnoseClinicalImage(file, prompt);
+    onVision(result, URL.createObjectURL(file), prompt);
+  };
+
   const loadOlder = () => {
     const el = scrollRef.current;
     if (el) olderAnchor.current = el.scrollHeight - el.scrollTop;
@@ -427,6 +441,7 @@ export function AiChatScreen() {
                   onSend={send}
                   onStop={chat.stop}
                   onAttach={() => setVision(true)}
+                  onSendImage={onSendImage}
                 />
               </>
             )}

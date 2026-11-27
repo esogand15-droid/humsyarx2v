@@ -471,3 +471,88 @@ ol.md__list[dir="rtl"] { list-style-type: persian; }
 @media (prefers-reduced-motion: reduce) {
   .aic-msg, .aic-typing span:first-child { animation: none; }
 }
+
+/* ── Composer layout (A6) ─────────────────────────────────────────────
+   RTL row: send is the first child (physical right), "+" the last (physical left). */
+.aic-composer { position: relative; }
+.aic-composer__send:disabled { opacity: .55; transform: scale(.92); }
+.aic-composer__send.is-ready { opacity: 1; transform: scale(1); }
+.aic-composer__send {
+  transition: transform 160ms var(--mo-ease-spring, ease), opacity 160ms linear, background-color 120ms linear;
+}
+
+/* "+" turns into "×" while the menu is open. */
+.aic-attach { position: relative; flex: 0 0 auto; }
+.aic-attach__plus svg { transition: transform 200ms var(--mo-ease-out, ease); }
+.aic-attach__plus.is-open { background: var(--hym-bg-hover); color: var(--hym-text-primary); }
+.aic-attach__plus.is-open svg { transform: rotate(45deg); }
+
+/* Compact popover anchored above "+", opening upward from its corner. */
+.aic-attach__menu {
+  --mo-origin: bottom left;
+  --mo-shift: 8px;
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: var(--z-sheet, 30);
+  width: min(264px, calc(100vw - 32px));
+  padding: 6px;
+  border-radius: 24px;
+  background: var(--hym-surface-raised, var(--hym-surface-1));
+  box-shadow: inset 0 0 0 1px var(--hym-hairline), 0 18px 40px -18px rgba(10, 18, 34, .45);
+}
+.aic-attach__menu > .mo-stagger { display: flex; flex-direction: column; gap: 2px; }
+.aic-attach__item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; min-height: 48px; padding: 6px 10px;
+  border: 0; border-radius: 18px; background: transparent;
+  color: var(--hym-text-primary); font: inherit; font-size: var(--hym-fs-body);
+  text-align: start; cursor: pointer; touch-action: manipulation;
+  transition: background-color 120ms linear, transform 120ms var(--mo-ease-out, ease);
+}
+.aic-attach__item:hover { background: var(--hym-bg-hover); }
+.aic-attach__item:active { transform: scale(.97); }
+.aic-attach__item:focus-visible { outline: none; box-shadow: var(--hym-focus-ring-v2); }
+.aic-attach__item-icon {
+  display: grid; place-items: center; flex: 0 0 auto;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--hym-surface-sunken); color: var(--hym-text-secondary);
+}
+
+/* Picked image waits above the input as a chip until it is sent. */
+.aic-attach-tray { display: flex; flex-direction: column; gap: 6px; padding: 0 4px 8px; }
+.aic-attach-chip {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  max-width: 320px; padding: 6px 6px 6px 10px; overflow: hidden;
+  border-radius: 16px; background: var(--hym-surface-2);
+  box-shadow: inset 0 0 0 1px var(--hym-hairline);
+  animation: mo-pop-in 200ms var(--mo-ease-out, ease) both;
+}
+.aic-attach-chip__thumb { width: 44px; height: 44px; flex: 0 0 auto; border-radius: 10px; object-fit: cover; }
+.aic-attach-chip__name { display: flex; flex-direction: column; min-width: 0; font-size: var(--hym-fs-small); color: var(--hym-text-primary); }
+.aic-attach-chip__name bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aic-attach-chip__meta { font-size: var(--hym-fs-caption); color: var(--hym-text-muted); }
+.aic-attach-chip__remove {
+  display: grid; place-items: center; flex: 0 0 auto; margin-inline-start: auto;
+  width: 32px; height: 32px; border: 0; border-radius: 50%;
+  background: var(--hym-surface-sunken); color: var(--hym-text-secondary); cursor: pointer;
+}
+.aic-attach-chip__remove:focus-visible { outline: none; box-shadow: var(--hym-focus-ring-v2); }
+/* Indeterminate bar: the vision endpoint reports no byte progress. */
+.aic-attach-chip__bar { position: absolute; inset-inline: 0; bottom: 0; height: 3px; overflow: hidden; background: var(--hym-hairline); }
+.aic-attach-chip__bar::after {
+  content: ""; position: absolute; inset-block: 0; width: 40%;
+  background: var(--hym-accent); animation: aic-indeterminate 1.1s ease-in-out infinite;
+}
+@keyframes aic-indeterminate { from { transform: translateX(-120%); } to { transform: translateX(300%); } }
+.aic-attach-error {
+  display: flex; align-items: center; gap: 6px; margin: 0;
+  font-size: var(--hym-fs-caption); color: var(--hym-role-danger-text);
+  animation: mo-pop-in 180ms var(--mo-ease-out, ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aic-attach__plus svg, .aic-composer__send { transition: none; }
+  .aic-attach-chip, .aic-attach-error { animation: none; }
+  .aic-attach-chip__bar::after { animation-duration: 3s; }
+}
