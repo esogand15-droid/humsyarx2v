@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import './core.css';
 import { AppBar, ProgressBar, SkeletonStack } from '../components';
 import { InstallCard } from '../components/InstallPrompt';
+import { NotificationBell } from '../components/NotificationBell';
 import { DsBadge, DsButton, DsCard, DsEmpty, DsSegmented } from '../design/components';
 import type { DsSection } from '../design/components';
 import { Icon } from '../icons';
@@ -761,14 +762,7 @@ export function HomeScreen() {
             <Link to="/search" className="iconbtn" aria-label="جستجو" title="جستجو در سامانه">
               <Icon name="i-search" size={18} />
             </Link>
-            <Link
-              to="/notifications"
-              className="iconbtn"
-              aria-label="اعلان‌ها"
-              title="مرکز اعلان‌ها"
-            >
-              <Icon name="i-bell" size={18} />
-            </Link>
+            <NotificationBell />
           </div>
         }
       />

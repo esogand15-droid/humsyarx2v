@@ -337,3 +337,74 @@ html[data-theme="light"] .desktop-header {
 /* ── 404 (audit NF1) ─────────────────────────────────────────────────── */
 .not-found { display: grid; place-items: center; min-height: 50vh; min-height: 50dvh; }
 .not-found__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--hym-space-2); }
+
+/* ── Notification bell popover (A1) ──────────────────────────────────
+   Compact card anchored to the bell (physical left in RTL headers),
+   growing from the bell's corner. Full list lives on /notifications. */
+.notif-bell { position: relative; display: inline-flex; }
+.notif-bell .iconbtn.is-active { background: var(--hym-bg-hover); color: var(--hym-text-primary); }
+.notif-pop {
+  --mo-origin: top left;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: var(--z-overlay, 50);
+  width: min(340px, calc(100vw - 24px));
+  padding: 8px;
+  border-radius: 20px;
+  background: var(--hym-surface-raised, var(--hym-surface-1));
+  box-shadow: inset 0 0 0 1px var(--hym-hairline), 0 22px 44px -22px rgba(10, 18, 34, .5);
+  text-align: start;
+}
+.notif-pop__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 8px 8px;
+}
+.notif-pop__title { font-size: var(--hym-fs-body); font-weight: var(--hym-fw-bold); color: var(--hym-text-primary); }
+.notif-pop__count {
+  padding: 2px 8px; border-radius: 99px;
+  font-size: var(--hym-fs-caption); color: var(--hym-accent-text);
+  background: var(--hym-accent-subtle);
+}
+.notif-pop__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.notif-pop__item {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%;
+  min-height: 48px; padding: 10px; border: 0; border-radius: 14px;
+  background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer;
+}
+.notif-pop__item:hover { background: var(--hym-bg-hover); }
+.notif-pop__item:focus-visible { outline: none; box-shadow: var(--hym-focus-ring-v2); }
+.notif-pop__dot {
+  flex: 0 0 auto; width: 8px; height: 8px; margin-block-start: 7px; border-radius: 50%;
+  background: transparent;
+}
+.notif-pop__item.is-unread .notif-pop__dot { background: var(--hym-accent); }
+.notif-pop__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notif-pop__item-title { font-size: var(--hym-fs-small); color: var(--hym-text-primary); }
+.notif-pop__item.is-unread .notif-pop__item-title { font-weight: var(--hym-fw-bold); }
+.notif-pop__item-text {
+  font-size: var(--hym-fs-caption); color: var(--hym-text-secondary); line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.notif-pop__time { font-size: var(--hym-fs-caption); color: var(--hym-text-muted); }
+.notif-pop__state {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 18px 8px; font-size: var(--hym-fs-small); color: var(--hym-text-muted); text-align: center;
+}
+.notif-pop__state p { margin: 0; }
+.notif-pop__skel { display: block; width: 100%; height: 44px; border-radius: 12px; background: var(--hym-surface-sunken); }
+.notif-pop__retry {
+  min-height: 40px; padding: 0 14px; border: 0; border-radius: 99px;
+  background: var(--hym-surface-sunken); color: var(--hym-text-primary); font: inherit; cursor: pointer;
+}
+.notif-pop__retry:focus-visible { outline: none; box-shadow: var(--hym-focus-ring-v2); }
+.notif-pop__all {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+  min-height: 44px; margin-block-start: 6px; border: 0; border-block-start: 1px solid var(--hym-hairline);
+  border-radius: 0 0 14px 14px; background: transparent;
+  color: var(--hym-accent-text); font: inherit; font-size: var(--hym-fs-small); font-weight: var(--hym-fw-bold); cursor: pointer;
+}
+.notif-pop__all:hover { background: var(--hym-bg-hover); }
+.notif-pop__all:focus-visible { outline: none; box-shadow: var(--hym-focus-ring-v2); }
+/* chevron-r points "forward" in RTL, i.e. to the left */
+.notif-pop__all-chev { transform: scaleX(-1); }

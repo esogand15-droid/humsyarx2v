@@ -5,6 +5,7 @@ import { useHeader } from './HeaderContext';
 import { useSidebar } from './SidebarContext';
 import { Brand } from '../components/Brand';
 import { IconButton } from '../components/IconButton';
+import { NotificationBell } from '../components/NotificationBell';
 import { fallbackTitleFor } from './nav';
 
 const PRIMARY_ROUTE_TITLES: Record<string, string> = {
@@ -105,16 +106,7 @@ export function DesktopHeader() {
           <Icon name={resolved === 'dark' ? 'i-sun' : 'i-moon'} size={18} />
         </button>
 
-        <button
-          type="button"
-          className="iconbtn iconbtn--relative"
-          aria-label="اعلان‌ها"
-          title="مرکز اعلان‌ها"
-          onClick={() => navigate('/notifications')}
-        >
-          <Icon name="i-bell" size={18} />
-          <span className="badge-dot badge-dot--cyan" aria-hidden="true" />
-        </button>
+        <NotificationBell />
       </div>
     </header>
   );
