@@ -22,6 +22,8 @@ interface PageOverviewProps {
   onToggleBookmark: (page: number) => void;
   /** The reader viewport, so the chosen page zooms into the spot where it will appear. */
   targetRect?: () => DOMRect | null;
+  /** Insert a blank page after the current one (opens the template picker). */
+  onInsertPage?: () => void;
 }
 
 const ZOOM_MS = 300;
@@ -103,6 +105,7 @@ export function PageOverview({
   bookmarkedPages,
   onToggleBookmark,
   targetRect,
+  onInsertPage,
 }: PageOverviewProps) {
   const [filter, setFilter] = useState<Filter>('all');
   const [inked, setInked] = useState<Set<number>>(() => new Set());
@@ -299,6 +302,13 @@ export function PageOverview({
               <Icon name="i-search" size={15} />
             </button>
           </form>
+
+          {onInsertPage && (
+            <button type="button" className="page-ov__add" onClick={onInsertPage}>
+              <Icon name="i-plus" size={15} />
+              <span>صفحهٔ تازه</span>
+            </button>
+          )}
 
           <button type="button" className="iconbtn page-ov__close" onClick={dismiss} aria-label="بستن" title="بستن (Esc)">
             <Icon name="i-x" size={18} />

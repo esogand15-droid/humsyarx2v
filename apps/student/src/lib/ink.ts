@@ -624,6 +624,108 @@ export const bookmarks = {
   },
 };
 
+// ── Pages the student inserted between handout pages ─────────
+export type PageTemplate = 'blank' | 'ruled' | 'grid' | 'dotted';
+
+export interface InsertedPage {
+  id: string;
+  /** Ink of this page is stored as page `slot` of {@link insertedInkId}. */
+  slot: number;
+  /** Handout page it follows; entries with the same `after` keep their array order. */
+  after: number;
+  template: PageTemplate;
+  created_at: string;
+}
+
+const PAGE_TEMPLATE_IDS: PageTemplate[] = ['blank', 'ruled', 'grid', 'dotted'];
+
+/** Ink of inserted pages lives under its own file id, so page numbers never collide with the PDF's. */
+export const insertedInkId = (id: string) => `${id}~p`;
+
+interface InsertsRecord {
+  pages: InsertedPage[];
+  /** A local change the server has not confirmed yet (offline edit). */
+  dirty: boolean;
+}
+
+const insertsKey = (scope: Scope, id: string) => `hy_ins_${scope}_${id}`;
+
+function cleanInserts(raw: unknown): InsertedPage[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: InsertedPage[] = [];
+  for (const p of raw as Partial<InsertedPage>[]) {
+    if (!p || typeof p.id !== 'string' || seen.has(p.id)) continue;
+    const slot = Number(p.slot);
+    const after = Number(p.after);
+    if (!Number.isInteger(slot) || slot < 1 || !Number.isInteger(after) || after < 0) continue;
+    seen.add(p.id);
+    out.push({
+      id: p.id,
+      slot,
+      after,
+      template: PAGE_TEMPLATE_IDS.includes(p.template as PageTemplate) ? (p.template as PageTemplate) : 'blank',
+      created_at: typeof p.created_at === 'string' ? p.created_at : new Date().toISOString(),
+    });
+  }
+  return out;
+}
+
+function readInserts(scope: Scope, id: string): InsertsRecord {
+  try {
+    const raw = localStorage.getItem(insertsKey(scope, id));
+    if (!raw) return { pages: [], dirty: false };
+    const parsed = JSON.parse(raw) as { pages?: unknown; dirty?: unknown };
+    return { pages: cleanInserts(parsed.pages), dirty: parsed.dirty === true };
+  } catch {
+    return { pages: [], dirty: false };
+  }
+}
+
+function writeInserts(scope: Scope, id: string, rec: InsertsRecord): void {
+  try {
+    localStorage.setItem(insertsKey(scope, id), JSON.stringify(rec));
+  } catch {
+    // storage full / private mode: the server copy still holds it
+  }
+}
+
+export const insertedPages = {
+  /** Instant local copy, for the first render. */
+  get: (scope: Scope, id: string): InsertedPage[] => readInserts(scope, id).pages,
+
+  /** Server copy wins, unless this device holds an unsynced edit, which is pushed up instead. */
+  load: async (scope: Scope, id: string): Promise<InsertedPage[]> => {
+    const local = readInserts(scope, id);
+    if (local.dirty) {
+      await insertedPages.save(scope, id, local.pages);
+      return local.pages;
+    }
+    try {
+      const res = await apiCall<{ pages?: unknown }>(`/ink/inserts/${scope}/${encodeURIComponent(id)}`);
+      const pages = cleanInserts(res?.pages);
+      writeInserts(scope, id, { pages, dirty: false });
+      return pages;
+    } catch {
+      return local.pages;
+    }
+  },
+
+  save: async (scope: Scope, id: string, pages: InsertedPage[]): Promise<boolean> => {
+    writeInserts(scope, id, { pages, dirty: true });
+    try {
+      await apiCall<{ ok: boolean }>(`/ink/inserts/${scope}/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ pages }),
+      });
+      writeInserts(scope, id, { pages, dirty: false });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
+
 // ── گوش‌به‌زنگ اتصال مجدد اینترنت ──────────────────────────────
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {

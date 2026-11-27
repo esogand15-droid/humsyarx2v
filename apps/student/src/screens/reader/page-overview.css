@@ -145,6 +145,31 @@
   cursor: default;
 }
 
+.page-ov__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--brand);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--t-fast), filter var(--t-fast);
+}
+
+.page-ov__add:hover {
+  filter: brightness(1.08);
+}
+
+.page-ov__add:active {
+  transform: scale(0.96);
+}
+
 /* ── Grid ───────────────────────────────────────────────── */
 .page-ov__grid {
   flex: 1;

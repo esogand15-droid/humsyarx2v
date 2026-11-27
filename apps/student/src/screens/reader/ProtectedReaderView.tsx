@@ -1,17 +1,28 @@
 import { isPenBusy, PALM_CONTACT_PX } from './penInput';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { DsButton, DsEmpty, DsSkeleton } from '../../design/components';
 import { Icon } from '../../icons';
 import { apiCall } from '../../lib/api';
 import { fa } from '../../lib/library';
-import { bookmarks, generateUUID, ink, type Scope, type StickyNote } from '../../lib/ink';
+import {
+  bookmarks,
+  generateUUID,
+  ink,
+  insertedInkId,
+  insertedPages,
+  type InsertedPage,
+  type PageTemplate,
+  type Scope,
+  type StickyNote,
+} from '../../lib/ink';
 import { InkLayer, type InkApi, type InkStatus } from './InkLayer';
 import { INK_COLORS, InkToolbar, type ReaderTool } from './InkToolbar';
 import { NotebookPanel } from './NotebookPanel';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { ThumbnailDrawer } from './ThumbnailDrawer';
 import { PageOverview } from './PageOverview';
+import { InsertedPageView, PageInserter, PageTemplatePicker } from './InsertedPage';
 import { TextLayer } from './components/TextLayer';
 import {
   acquirePageUrl,
@@ -139,6 +150,10 @@ export function ProtectedReaderView({
 
   // لایه ابزارهای نوت‌برداری
   const [tool, setTool] = useState<ReaderTool>(null);
+  // Page the pen last touched (inserted pages use -slot), so undo/redo reach the page being written on.
+  const [inkFocus, setInkFocus] = useState<number | null>(null);
+  const inkFocusRef = useRef<number | null>(null);
+  inkFocusRef.current = inkFocus;
   const toolActiveRef = useRef(false);
   toolActiveRef.current = tool !== null;
   const [color, setColor] = useState(INK_COLORS[1]);
@@ -755,7 +770,7 @@ export function ProtectedReaderView({
       const total = manifest?.total_pages || 1;
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
-        const api = inkApis.current.get(currentPage);
+        const api = inkApis.current.get(inkFocusRef.current ?? currentPage);
         if (e.shiftKey) api?.redo();
         else api?.undo();
         return;
@@ -883,7 +898,102 @@ export function ProtectedReaderView({
     // hook preserved for anchored annotations
   }, []);
 
-  const activeInkApi = inkApis.current.get(currentPage);
+  // ── Pages inserted between handout pages (Noteful-style) ──
+  const [inserts, setInserts] = useState<InsertedPage[]>(() => insertedPages.get(scope, id));
+  const [insertPicker, setInsertPicker] = useState<{
+    after: number;
+    afterId?: string;
+    editId?: string;
+    current?: PageTemplate;
+  } | null>(null);
+  const [newInsertId, setNewInsertId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setInserts(insertedPages.get(scope, id));
+    void insertedPages.load(scope, id).then((list) => {
+      if (!cancelled) setInserts(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [scope, id]);
+
+  useEffect(() => {
+    setInkFocus(null);
+  }, [currentPage]);
+
+  const insertsByAfter = useMemo(() => {
+    const m = new Map<number, InsertedPage[]>();
+    for (const p of inserts) {
+      const g = m.get(p.after);
+      if (g) g.push(p);
+      else m.set(p.after, [p]);
+    }
+    return m;
+  }, [inserts]);
+
+  const saveInserts = useCallback(
+    (next: InsertedPage[]) => {
+      setInserts(next);
+      void insertedPages.save(scope, id, next);
+    },
+    [scope, id],
+  );
+
+  const handlePickTemplate = (template: PageTemplate) => {
+    const req = insertPicker;
+    setInsertPicker(null);
+    if (!req) return;
+    if (req.editId) {
+      saveInserts(inserts.map((p) => (p.id === req.editId ? { ...p, template } : p)));
+      return;
+    }
+    const entry: InsertedPage = {
+      id: generateUUID(),
+      slot: inserts.reduce((m, p) => Math.max(m, p.slot), 0) + 1,
+      after: req.after,
+      template,
+      created_at: new Date().toISOString(),
+    };
+    const next = [...inserts];
+    let at: number;
+    if (req.afterId) {
+      const i = next.findIndex((p) => p.id === req.afterId);
+      at = i < 0 ? next.length : i + 1;
+    } else {
+      // Right after the handout page, ahead of pages inserted there earlier.
+      const i = next.findIndex((p) => p.after === req.after);
+      at = i < 0 ? next.length : i;
+    }
+    next.splice(at, 0, entry);
+    saveInserts(next);
+    setNewInsertId(entry.id);
+  };
+
+  const handleDeleteInsert = (entry: InsertedPage) => {
+    if (!window.confirm('این صفحه و هر چه رویش نوشتهای حذف شود؟')) return;
+    saveInserts(inserts.filter((p) => p.id !== entry.id));
+    inkApis.current.delete(-entry.slot);
+    if (inkFocusRef.current === -entry.slot) setInkFocus(null);
+    void ink.clearPage(scope, insertedInkId(id), entry.slot);
+  };
+
+  // Bring a freshly inserted page into view while its entrance animation plays.
+  useEffect(() => {
+    if (!newInsertId) return;
+    const raf = window.requestAnimationFrame(() => {
+      const el = scrollRef.current?.querySelector<HTMLElement>(`[data-insert-id="${newInsertId}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    const t = window.setTimeout(() => setNewInsertId(null), 900);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(t);
+    };
+  }, [newInsertId]);
+
+  const activeInkApi = inkApis.current.get(inkFocus ?? currentPage);
   const shownZoomPct = Math.round((gestureBadgeZoom ?? zoom) * 100);
 
   return (
@@ -936,10 +1046,12 @@ export function ProtectedReaderView({
               {manifest.page_dimensions.map((dim) => {
                 const targetW = Math.floor(baseWidth * zoom);
                 const targetH = Math.floor(targetW / (dim.aspect_ratio || 0.7071));
+                const group = insertsByAfter.get(dim.page) ?? [];
 
                 return (
+                  <Fragment key={dim.page}>
                   <VirtualPageContainer
-                    key={dim.page}
+                    onActivate={() => setInkFocus(dim.page)}
                     page={dim.page}
                     width={targetW}
                     height={targetH}
@@ -982,6 +1094,50 @@ export function ProtectedReaderView({
                     enableTextSelection={true}
                     onPageLoaded={handlePageLoaded}
                   />
+                  <PageInserter
+                    label={`افزودن صفحه بعد از صفحهٔ ${fa(dim.page)}`}
+                    onInsert={() => setInsertPicker({ after: dim.page })}
+                  />
+                  {group.map((entry) => (
+                    <Fragment key={entry.id}>
+                      <InsertedPageView
+                        scope={scope}
+                        id={id}
+                        entry={entry}
+                        afterLabel={`صفحهٔ افزوده · پس از ${fa(dim.page)}`}
+                        width={targetW}
+                        height={targetH}
+                        tool={tool}
+                        color={color}
+                        strokeWidth={strokeWidth}
+                        eraserMode={eraserMode}
+                        eraseHighlighterOnly={eraseHighlighterOnly}
+                        shapeSnap={shapeSnap}
+                        stylusOnly={stylusOnly}
+                        onPenDetected={handlePenDetected}
+                        invertContrast={invertContrast}
+                        isNew={entry.id === newInsertId}
+                        onRegisterInkApi={(api) => {
+                          if (api) inkApis.current.set(-entry.slot, api);
+                          else inkApis.current.delete(-entry.slot);
+                        }}
+                        onInkStatus={setStatus}
+                        onInkCount={setInkCount}
+                        onInkHistory={setHistory}
+                        onInkChanged={handleInkChanged}
+                        onActivate={() => setInkFocus(-entry.slot)}
+                        onChangeTemplate={() =>
+                          setInsertPicker({ after: entry.after, editId: entry.id, current: entry.template })
+                        }
+                        onDelete={() => handleDeleteInsert(entry)}
+                      />
+                      <PageInserter
+                        label="افزودن صفحه بعد از این صفحه"
+                        onInsert={() => setInsertPicker({ after: entry.after, afterId: entry.id })}
+                      />
+                    </Fragment>
+                  ))}
+                  </Fragment>
                 );
               })}
             </div>
@@ -1068,6 +1224,22 @@ export function ProtectedReaderView({
         bookmarkedPages={bookmarkedPages}
         onToggleBookmark={handleToggleBookmark}
         targetRect={() => scrollRef.current?.getBoundingClientRect() ?? null}
+        onInsertPage={() => {
+          setOverviewOpen(false);
+          setInsertPicker({ after: currentPage });
+        }}
+      />
+
+      <PageTemplatePicker
+        open={insertPicker !== null}
+        title={
+          insertPicker?.editId
+            ? 'قالب این صفحه'
+            : `صفحهٔ تازه بعد از صفحهٔ ${fa(insertPicker?.after ?? currentPage)}`
+        }
+        current={insertPicker?.current}
+        onPick={handlePickTemplate}
+        onClose={() => setInsertPicker(null)}
       />
 
       <ThumbnailDrawer
@@ -1122,6 +1294,8 @@ interface VirtualPageContainerProps {
   enableTextSelection?: boolean;
   textLayerRef?: React.RefObject<any>;
   onPageLoaded?: () => void;
+  /** Pen/finger touched this page: undo/redo should act on it. */
+  onActivate?: () => void;
 }
 
 function VirtualPageContainer({
@@ -1161,6 +1335,7 @@ function VirtualPageContainer({
   enableTextSelection = true,
   textLayerRef,
   onPageLoaded,
+  onActivate,
 }: VirtualPageContainerProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const textLayerRefInternal = useRef<any>(null);
@@ -1275,6 +1450,7 @@ function VirtualPageContainer({
         }
       }}
       data-page={page}
+      onPointerDownCapture={onActivate}
       className={`pdf-page${isCurrent ? ' is-active' : ''}${invertContrast ? ' is-inverted' : ''}`}
     >
       {isNearViewport ? (

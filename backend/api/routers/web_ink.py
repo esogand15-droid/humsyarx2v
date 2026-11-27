@@ -70,6 +70,17 @@ def _doc_prefix(uid: int, scope: str, file_id: str) -> str:
     return f"{int(uid)}:{scope}:{file_id}:"
 
 
+#: Ink on pages a student inserted into a handout is stored under "<file_id>~p",
+#: with the inserted page's slot as its page number, so it never collides with PDF pages.
+INSERTED_SUFFIX = "~p"
+
+
+def base_file_id(file_id: str) -> str:
+    if file_id.endswith(INSERTED_SUFFIX):
+        return file_id[: -len(INSERTED_SUFFIX)]
+    return file_id
+
+
 class PointModel(BaseModel):
     """نقطهٔ وکتور نرمال‌شده در بازهٔ [0.0, 1.0] همراه فشار و زمان."""
 
@@ -256,6 +267,7 @@ async def _guard(scope: str, file_id: str, user: dict) -> dict:
     """
     if scope not in SCOPES:
         raise HTTPException(status_code=422, detail="scope_invalid")
+    file_id = base_file_id(file_id)
     if file_id in ("demo", "sample", "test"):
         return {"_id": file_id, "name": "جزوه نمونه فیزیولوژی پزشکی هامزیار (تستی)"}
     web = _web_user(user)
@@ -287,6 +299,87 @@ async def summary(scope: str, file_id: str, user: dict = Depends(current_student
     return {"pages": pages, "total": sum(p["count"] for p in pages)}
 
 
+# ─────────────────────────────────────────────────────────────
+#  Pages inserted between handout pages (Noteful-style)
+# ─────────────────────────────────────────────────────────────
+PAGE_TEMPLATES = ("blank", "ruled", "grid", "dotted")
+MAX_INSERTED_PAGES = 300
+
+
+class InsertedPageModel(BaseModel):
+    id: str = Field(..., min_length=1, max_length=64)
+    slot: int = Field(..., ge=1, le=MAX_PAGE)
+    after: int = Field(..., ge=0, le=MAX_PAGE)
+    template: str = Field(default="blank", max_length=16)
+    created_at: str = Field(default_factory=utc_now_iso, max_length=40)
+
+    @field_validator("template")
+    @classmethod
+    def _template_ok(cls, v: str) -> str:
+        if v not in PAGE_TEMPLATES:
+            raise ValueError("invalid_template")
+        return v
+
+
+class InsertsBody(BaseModel):
+    pages: list[InsertedPageModel] = Field(default_factory=list, max_length=MAX_INSERTED_PAGES)
+
+    @model_validator(mode="after")
+    def _unique(self) -> "InsertsBody":
+        ids = [p.id for p in self.pages]
+        slots = [p.slot for p in self.pages]
+        if len(set(ids)) != len(ids) or len(set(slots)) != len(slots):
+            raise ValueError("duplicate_inserted_page")
+        return self
+
+
+def _inserts_key(uid: int, scope: str, file_id: str) -> str:
+    return f"{int(uid)}:{scope}:{file_id}"
+
+
+@router.get("/ink/inserts/{scope}/{file_id}")
+async def get_inserts(scope: str, file_id: str, user: dict = Depends(current_student)):
+    """Blank/ruled/grid/dotted pages this student inserted into this handout."""
+    if scope not in SCOPES:
+        raise HTTPException(status_code=422, detail="scope_invalid")
+    uid = int(user["user_id"])
+    try:
+        doc = await _coll("web_ink_inserts").find_one({"_id": _inserts_key(uid, scope, file_id)})
+    except Exception as exc:  # pragma: no cover
+        logger.warning("ink_inserts_read_failed uid=%s err=%s", uid, type(exc).__name__)
+        raise HTTPException(status_code=503, detail="ink_unavailable")
+    if not doc:
+        return {"pages": [], "updated_at": None}
+    return {"pages": list(doc.get("pages") or []), "updated_at": str(doc.get("updated_at") or "") or None}
+
+
+@router.put("/ink/inserts/{scope}/{file_id}")
+async def put_inserts(scope: str, file_id: str, body: InsertsBody,
+                      user: dict = Depends(current_student)):
+    """Replace the whole inserted-page list (idempotent)."""
+    await _guard(scope, file_id, user)
+    uid = int(user["user_id"])
+    now = utc_now_iso()
+    try:
+        await _coll("web_ink_inserts").update_one(
+            {"_id": _inserts_key(uid, scope, file_id)},
+            {
+                "$set": {
+                    "uid": uid,
+                    "scope": scope,
+                    "file_id": file_id,
+                    "pages": [p.model_dump() for p in body.pages],
+                    "updated_at": now,
+                }
+            },
+            upsert=True,
+        )
+    except Exception as exc:  # pragma: no cover
+        logger.warning("ink_inserts_write_failed uid=%s err=%s", uid, type(exc).__name__)
+        raise HTTPException(status_code=503, detail="ink_unavailable")
+    return {"ok": True, "count": len(body.pages), "updated_at": str(now)}
+
+
 @router.get("/ink/notes")
 async def notes(user: dict = Depends(current_student)):
     """همهٔ فایل‌هایی که این کاربر روی آن‌ها خط کشیده — برای صفحهٔ «دفتر من».
@@ -305,7 +398,7 @@ async def notes(user: dict = Depends(current_student)):
     grouped: dict[tuple[str, str], dict] = {}
     for d in docs:
         scope = str(d.get("scope") or "")
-        fid = str(d.get("file_id") or "")
+        fid = base_file_id(str(d.get("file_id") or ""))
         if scope not in SCOPES or not fid:
             continue
         key = (scope, fid)
