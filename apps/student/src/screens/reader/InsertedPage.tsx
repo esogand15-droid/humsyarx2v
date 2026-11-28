@@ -1,7 +1,14 @@
 import { useEffect, type CSSProperties } from 'react';
 import { Icon } from '../../icons';
-import { insertedInkId, type InsertedPage, type PageTemplate, type Scope } from '../../lib/ink';
+import {
+  insertedInkId,
+  type InsertedPage,
+  type PageTemplate,
+  type Scope,
+  type StickyNote,
+} from '../../lib/ink';
 import { InkLayer, type InkApi, type InkStatus } from './InkLayer';
+import { StickyNoteOverlay } from './StickyNoteOverlay';
 import type { ReaderTool } from './InkToolbar';
 import './inserted-pages.css';
 
@@ -49,6 +56,9 @@ interface InsertedPageViewProps {
   onInkCount: (n: number) => void;
   onInkHistory: (h: { undo: number; redo: number }) => void;
   onInkChanged: () => void;
+  onNotesLoaded: (loaded: StickyNote[]) => void;
+  notes: StickyNote[];
+  onUpdateNotes: (notes: StickyNote[]) => void;
   onActivate: () => void;
   onChangeTemplate: () => void;
   onDelete: () => void;
@@ -79,6 +89,9 @@ export function InsertedPageView({
   onInkCount,
   onInkHistory,
   onInkChanged,
+  onNotesLoaded,
+  notes,
+  onUpdateNotes,
   onActivate,
   onChangeTemplate,
   onDelete,
@@ -127,15 +140,26 @@ export function InsertedPageView({
         tool={tool}
         color={color}
         strokeWidth={strokeWidth}
+        notes={notes}
         onCount={onInkCount}
         onHistory={onInkHistory}
         onStatus={onInkStatus}
         onChanged={onInkChanged}
+        onNotesLoaded={(_inkPage, loaded) => onNotesLoaded(loaded)}
         eraserMode={eraserMode}
         eraseHighlighterOnly={eraseHighlighterOnly}
         shapeSnap={shapeSnap}
         stylusOnly={stylusOnly}
         onPenDetected={onPenDetected}
+      />
+      {/* یادداشت چسبان روی صفحات افزوده — کلید والد: -slot (بدون تصادم با صفحات عادی) */}
+      <StickyNoteOverlay
+        page={-entry.slot}
+        width={width}
+        height={height}
+        notes={notes}
+        onUpdateNotes={onUpdateNotes}
+        interactive={!tool}
       />
       {overlay}
     </div>

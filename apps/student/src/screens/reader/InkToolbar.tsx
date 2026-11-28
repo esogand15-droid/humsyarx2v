@@ -509,7 +509,6 @@ export const InkToolbar = memo(function InkToolbar({
         : dockY;
       const maxH = Math.max(180, H - clampedY - 12);
 
-      nav.style.setProperty('--ink-pos-x', `${posX}px`);
       nav.style.setProperty('--ink-pos-y', `${posY}px`);
       nav.style.setProperty('--ink-inline', `${inlineStart}px`);
       nav.style.setProperty('--ink-dock-y', `${clampedY}px`);

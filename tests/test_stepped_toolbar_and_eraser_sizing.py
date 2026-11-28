@@ -77,14 +77,20 @@ class SteppedToolbarAndEraserSizingTests(unittest.TestCase):
         self.assertIn('step="0.0005"', self.toolbar_code)
         self.assertIn('ink-width-preview-dot', self.toolbar_code)
 
-    def test_css_variables_and_containment_in_ui_css(self):
-        """Verify --ink-pos-x and --ink-pos-y rules in ui.css prevent right overflow."""
-        self.assertIn("--ink-pos-x", self.ui_css)
-        self.assertIn("--ink-pos-y", self.ui_css)
+    def test_css_variables_and_containment_in_reader_css(self):
+        """Verify dock containment vars and live toolbar selectors after the
+        ui.css dead-block cleanup (2026-11-28): the old WAVE6 floating-island
+        CSS is gone; the live pieces live in reader.css / reader-shell.css."""
+        reader_css = (READER_DIR / "reader.css").read_text(encoding="utf-8")
+        # موقعیت داکِ آزاد هنوز با متغیرها مهار می‌شود
+        self.assertIn("--ink-pos-y", reader_css)
+        self.assertIn("--ink-inline", reader_css)
         self.assertIn(".ink-stepper-btn", self.ui_css)
-        self.assertIn(".ink-stepped-drawer", self.ui_css)
         self.assertIn(".ink-subdock--eraser", self.ui_css)
         self.assertIn(".ink-eraser-preview-dot", self.ui_css)
+        # قبایید قدیمی جزیرهٔ شناور باید از ui.css حذف شده باشد
+        self.assertNotIn(".ink-stepped-drawer", open(DESIGN_DIR / "ui.css", encoding="utf-8").read())
+        self.assertNotIn(".ink-floating-island", open(DESIGN_DIR / "ui.css", encoding="utf-8").read())
 
     def test_ink_layer_dynamic_eraser_radius_and_scratch_reticle(self):
         """Verify InkLayer.tsx calculates dynamic r based on strokeWidth and renders reticle."""
@@ -94,27 +100,31 @@ class SteppedToolbarAndEraserSizingTests(unittest.TestCase):
         self.assertIn("(strokeWidth || 0.0035) * 3.5", self.ink_layer_code)
 
     def test_vertical_edge_rails_and_magnetic_docking(self):
-        """Verify left and right edge docks are vertical rails (flex-direction: column) with 44px width."""
-        self.assertIn("flex-direction: column !important;", self.ui_css)
-        self.assertIn("width: 44px !important;", self.ui_css)
+        """Left/right edge docks are vertical rails; edge snapping exists."""
+        reader_css = (READER_DIR / "reader.css").read_text(encoding="utf-8")
+        self.assertIn("flex-direction: column", reader_css)  # .ink-dock.is-vertical capsule
         self.assertIn("setDockEdge('right')", self.toolbar_code)
         self.assertIn("setDockEdge('left')", self.toolbar_code)
         self.assertIn("isVertical", self.toolbar_code)
+        # magnetic edge snap on drag release
+        self.assertIn("EDGE_SNAP", self.toolbar_code)
 
     def test_compact_icon_pill_architecture(self):
-        """Verify compact 32px icon pill buttons and hidden text labels in CSS."""
-        self.assertIn("width: 32px", self.ui_css)
-        self.assertIn("height: 32px", self.ui_css)
-        self.assertIn(".ink-pill-title", self.ui_css)
-        self.assertIn("display: none !important;", self.ui_css)
+        """Compact icon-only pills: no text labels anywhere, 44px touch targets."""
+        self.assertNotIn("ink-pill-title", self.toolbar_code)
+        self.assertNotIn("ink-dock__btn-label", self.toolbar_code)
+        reader_css = (READER_DIR / "reader.css").read_text(encoding="utf-8")
+        self.assertNotIn("ink-pill-title", reader_css)
+        # coarse pointers get 44px targets (Noteful/HIG)
+        self.assertIn("min-width: 44px", reader_css)
 
     def test_adaptive_mobile_detection_and_safe_area(self):
         """Verify adaptive mobile detection (isMobile <= 640px) and bottom safe area."""
         self.assertIn("isMobile", self.toolbar_code)
         self.assertIn("window.innerWidth <= 640", self.toolbar_code)
         self.assertIn("is-mobile-dock", self.toolbar_code)
-        self.assertIn("@media (max-width: 640px)", self.ui_css)
-        self.assertIn("env(safe-area-inset-bottom", self.ui_css)
+        self.assertIn("@media (max-width: 767px)", (READER_DIR / "reader.css").read_text(encoding="utf-8"))
+        self.assertIn("env(safe-area-inset-bottom", (READER_DIR / "reader.css").read_text(encoding="utf-8"))
 
     def test_circular_stylus_dot_and_easy_detach_physics(self):
         """Verify 48px circular geometry for collapsed stylus dot and EDGE_SNAP effortless detach."""

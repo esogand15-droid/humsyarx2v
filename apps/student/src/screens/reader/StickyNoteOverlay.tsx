@@ -185,7 +185,7 @@ export function StickyNoteOverlay({
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerCancel}
               onLostPointerCapture={handlePointerCancel}
-              title={`یادداشت حاشیه (صفحه ${note.page}) — برای باز کردن کلیک کنید`}
+              title={note.page < 0 ? 'یادداشت حاشیه (صفحهٔ افزوده) — برای باز کردن کلیک کنید' : `یادداشت حاشیه (صفحه ${note.page}) — برای باز کردن کلیک کنید`}
               aria-label="باز کردن یادداشت چسبان"
             >
               <Icon name="i-pin" size={16} />

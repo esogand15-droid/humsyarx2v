@@ -1021,10 +1021,17 @@ export function ProtectedReaderView({
   // افزودن یادداشت چسبان به صفحهٔ جاری — جای spawn داخل محدودهٔ clamp تا
   // هیچ‌وقت لبهٔ صفحه کلیپ نشود (clamp درگ وابسته به عرض واقعی یادداشت است)
   const handleAddStickyNote = useCallback(() => {
-    const currentList = pageNotes.get(currentPage) || [];
+    // صفحهٔ هدف: برای صفحات عادی «صفحهٔ دیدنی فعلی»؛ فقط برای صفحات افزوده
+    // (کلید منفی) فوکوسِ تپ‌شده ملاک است تا inkFocus کهنه یادداشت را جابه‌جا نکند
+    const focus = inkFocusRef.current;
+    const target = focus != null && focus < 0 ? focus : currentPage;
+    const isInsert = target < 0;
+    const docId = isInsert ? insertedInkId(id) : id;
+    const inkPage = isInsert ? -target : target;
+    const currentList = pageNotes.get(target) || [];
     const newNote: StickyNote = {
       note_id: generateUUID(),
-      page: currentPage,
+      page: target,
       x: 0.5,
       y: 0.12,
       text: '',
@@ -1034,11 +1041,11 @@ export function ProtectedReaderView({
     };
     const nextList = [...currentList, newNote];
     const nextMap = new Map(pageNotes);
-    nextMap.set(currentPage, nextList);
+    nextMap.set(target, nextList);
     setPageNotes(nextMap);
-    const cachedInk = getCachedInkPage(scope, id, currentPage);
-    if (cachedInk) setCachedInkPage(scope, id, currentPage, { ...cachedInk, notes: nextList });
-    void ink.save(scope, id, currentPage, undefined, nextList);
+    const cachedInk = getCachedInkPage(scope, docId, inkPage);
+    if (cachedInk) setCachedInkPage(scope, docId, inkPage, { ...cachedInk, notes: nextList });
+    void ink.save(scope, docId, inkPage, undefined, nextList);
   }, [pageNotes, currentPage, scope, id]);
 
   const handleUpdatePageNotes = useCallback(
@@ -1048,8 +1055,12 @@ export function ProtectedReaderView({
         nextMap.set(page, updatedNotes);
         return nextMap;
       });
-      const cachedInk = getCachedInkPage(scope, id, page);
-      if (cachedInk) setCachedInkPage(scope, id, page, { ...cachedInk, notes: updatedNotes });
+      // کلید منفی = صفحهٔ افزوده: جوهرش زیر سند insertedInkId با slot مثبت ذخیره می‌شود
+      const isInsert = page < 0;
+      const docId = isInsert ? insertedInkId(id) : id;
+      const inkPage = isInsert ? -page : page;
+      const cachedInk = getCachedInkPage(scope, docId, inkPage);
+      if (cachedInk) setCachedInkPage(scope, docId, inkPage, { ...cachedInk, notes: updatedNotes });
       // ذخیرهٔ debounce‌شده: هر ضربهٔ کلید نباید IndexedDB + POST بسازد
       const timers = noteSaveTimersRef.current;
       const prevTimer = timers.get(page);
@@ -1058,7 +1069,7 @@ export function ProtectedReaderView({
         page,
         window.setTimeout(() => {
           timers.delete(page);
-          void ink.save(scope, id, page, undefined, updatedNotes);
+          void ink.save(scope, docId, inkPage, undefined, updatedNotes);
         }, 600),
       );
     },
@@ -1708,6 +1719,9 @@ export function ProtectedReaderView({
                         onInkCount={setInkCount}
                         onInkHistory={setHistory}
                         onInkChanged={handleInkChanged}
+                        onNotesLoaded={(loaded) => handleNotesLoaded(-entry.slot, loaded)}
+                        notes={pageNotes.get(-entry.slot) || []}
+                        onUpdateNotes={(next) => handleUpdatePageNotes(-entry.slot, next)}
                         onActivate={() => setInkFocus(-entry.slot)}
                         overlay={renderVoice(insertedInkId(id), entry.slot, targetW, targetH)}
                         onChangeTemplate={() =>

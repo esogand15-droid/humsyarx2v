@@ -72,24 +72,6 @@
   box-shadow: var(--sh-2);
 }
 
-/* ECG Vital Pulse Wave */
-.ecg-line {
-  height: 2px;
-  background: linear-gradient(90deg, transparent 0%, var(--hym-accent-default) 50%, transparent 100%);
-  position: relative;
-  overflow: hidden;
-}
-.ecg-line::after {
-  content: '';
-  position: absolute;
-  top: -2px;
-  width: 24px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--hym-neon-cyan);
-  filter: blur(2px);
-  animation: ecg-scan 2.4s ease-in-out infinite;
-}
 @keyframes ecg-scan {
   0% { left: 0%; opacity: 0; }
   50% { opacity: 1; }
@@ -341,7 +323,6 @@ html[data-theme="dark"] .rtool button[aria-pressed="true"]{color:var(--on-brand-
 /* دسترسی سریع — کارت افقی فشرده */
 .quick{display:grid;grid-template-columns:1fr;gap:10px}
 @container app-frame (min-width:400px){.quick{grid-template-columns:1fr 1fr}}
-@media (min-width:0px){}
 .qcard{
   display:flex;align-items:center;gap:11px;text-align:right;cursor:pointer;
   background:var(--paper-2);border:1px solid var(--line);border-radius:16px;
@@ -601,7 +582,6 @@ html[data-theme="dark"] .tabchip[aria-selected="true"]{background:var(--brand);c
   .pagination__nav-label { display: none; }
   .pagination__summary { display: none; }
 }
-
 /* Interactive Card & List Rows */
 .card--interactive {
   cursor: pointer;
@@ -717,7 +697,6 @@ html[data-theme="dark"] .tabchip[aria-selected="true"]{background:var(--brand);c
     transition-duration: 0.01ms !important;
   }
 }
-
 /* ═══════════════════════════════════════════════════════════
    اصلاحات یکپارچگی (پس از بازبینی تصویری P0)
    ═══════════════════════════════════════════════════════════ */
@@ -1107,7 +1086,6 @@ a:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:
     gap: 8px;
   }
 }
-
 /* Landscape Stylus Tablets (1024px - 1279px) */
 @media (min-width: 1024px) and (max-width: 1279px) and (orientation: landscape),
        (min-width: 1024px) and (hover: none) and (pointer: coarse) {
@@ -1148,7 +1126,6 @@ a:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:
     gap: 8px;
   }
 }
-
 /* ریل ناوبری شناور دسکتاپ هنگام جمع‌شدن سایدبار (Desktop Collapsible Floating Rail) */
 @media (min-width: 1024px) {
   .sidebar.is-collapsed,
@@ -1202,7 +1179,6 @@ a:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:
     gap: 8px !important;
   }
 }
-
 /* Tablet (incl. iPad landscape): the rail width is forced above, so the collapse toggles change
    nothing except squeezing the logo next to a chevron. Hide them; the rail stays a rail. */
 @media (min-width: 768px) and (max-width: 1023px),
@@ -1217,7 +1193,6 @@ a:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:
     pointer-events: none;
   }
 }
-
 .desktop-header__sidebar-toggle {
   transition: all 0.18s ease;
   margin-inline-end: 2px;
@@ -1242,7 +1217,6 @@ a:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:
     padding-top: calc(12px + env(safe-area-inset-top, 0px));
   }
 }
-
 /* Desktop Main Workspace Stage */
 .main-stage {
   flex: 1;
@@ -1381,14 +1355,12 @@ html[data-theme="light"] .desktop-header {
     width: 170px;
   }
 }
-
 /* Desktop De-duplication Rule: Eliminate duplicate headers on desktop/tablet */
 @media (min-width: 768px) {
   .stage-content .appbar {
     display: none !important;
   }
 }
-
 .stage-content {
   flex: 1;
   width: 100%;
@@ -1402,7 +1374,6 @@ html[data-theme="light"] .desktop-header {
     padding: 16px 16px 0;
   }
 }
-
 /* Multi-Column Grid Layouts */
 @media (min-width: 768px) {
   .dash-grid {
@@ -1419,7 +1390,6 @@ html[data-theme="light"] .desktop-header {
     gap: 16px;
   }
 }
-
 /* ═══════════════════════════════════════════════════════════
    موج P3 — ریدر
    سطح خواندن عمداً آرام است: بدون کارت، بدون سایه، بدون رنگ برند
@@ -1726,7 +1696,6 @@ html[data-theme="light"] .desktop-header {
   .ink-bar{padding:10px 16px}
   .ink-btn{padding:0 14px}
 }
-
 /* ═══════════════════════════════════════════════════════════
    P5 — تمرین بانک سؤال
    قاعده: صورت سؤال و گزینه‌ها مثل برگهٔ آزمون خوانده می‌شوند؛
@@ -1789,7 +1758,6 @@ html[data-theme="light"] .desktop-header {
   .q-card{max-width:720px;padding:22px 24px}
   .q-stem{font-size:16.5px}
 }
-
 /* ── P5.2: آزمون زمان‌دار ─────────────────────────────────── */
 .chip-btn.is-on{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
 .chip-btn.is-on .tiny{color:var(--on-brand);opacity:.85}
@@ -1831,7 +1799,6 @@ html[data-theme="light"] .desktop-header {
   .sheet{border-radius:16px;border:1px solid var(--line);box-shadow:0 24px 48px -30px rgba(10,18,34,.6)}
   .q-card--review{max-width:720px}
 }
-
 .study-workspace__secondary-header {
   height: 54px;
   display: flex;
@@ -1991,452 +1958,9 @@ html[data-theme="light"] .desktop-header {
   color: #EAB308;
 }
 
-/* ==========================================================================
-   WAVE 6: GOODNOTES-STYLE FLOATING ISLAND TOOLBAR & APPLE NOTES PALETTE
-   ========================================================================== */
-.ink-floating-island {
-  position: fixed !important;
-  z-index: 45 !important;
-  margin: 0 !important;
-  height: 42px !important;
-  min-height: 42px !important;
-  max-height: 42px !important;
-  box-sizing: border-box !important;
-  padding: 0 8px !important;
-  border-radius: 9999px !important;
-  background: rgba(13, 19, 33, 0.94) !important;
-  border: 1px solid rgba(255, 255, 255, 0.16) !important;
-  backdrop-filter: var(--blur-lg) !important;
-  -webkit-backdrop-filter: var(--blur-lg) !important;
-  box-shadow: 0 16px 45px -8px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: auto !important;
-  max-width: calc(100vw - 24px) !important;
-  overflow: visible !important;
-  animation: inkFloatIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.2s ease !important;
-}
-
-/* لنگرگاه پایین (افقی) */
-.ink-floating-island.dock-bottom,
-.ink-floating-island:not(.is-dragged):not(.dock-free):not(.dock-right):not(.dock-left):not(.dock-top) {
-  bottom: 20px !important;
-  top: auto !important;
-  left: 50% !important;
-  right: auto !important;
-  transform: translateX(-50%) !important;
-  flex-direction: row !important;
-  height: 42px !important;
-  max-height: 42px !important;
-  width: auto !important;
-}
-
-/* لنگرگاه بالا (افقی) */
-.ink-floating-island.dock-top {
-  top: 68px !important;
-  bottom: auto !important;
-  left: 50% !important;
-  right: auto !important;
-  transform: translateX(-50%) !important;
-  flex-direction: row !important;
-  height: 42px !important;
-  max-height: 42px !important;
-  width: auto !important;
-}
-
-/* ── لنگرگاه‌های مغناطیسی عمودی لبه راست و چپ (Vertical Magnetic Rails) ── */
-.ink-floating-island.dock-right,
-.ink-floating-island.dock-left {
-  flex-direction: column !important;
-  width: 44px !important;
-  min-width: 44px !important;
-  max-width: 44px !important;
-  height: auto !important;
-  min-height: auto !important;
-  max-height: calc(100vh - 120px) !important;
-  padding: 8px 4px !important;
-  border-radius: 26px !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  scrollbar-width: none;
-  box-shadow: 0 16px 45px -8px rgba(0, 0, 0, 0.8) !important;
-}
-.ink-floating-island.dock-right::-webkit-scrollbar,
-.ink-floating-island.dock-left::-webkit-scrollbar {
-  display: none;
-}
-
-.ink-floating-island.dock-right {
-  right: 12px !important;
-  left: auto !important;
-  top: 50% !important;
-  bottom: auto !important;
-  transform: translateY(-50%) !important;
-}
-
-.ink-floating-island.dock-left {
-  left: 12px !important;
-  right: auto !important;
-  top: 50% !important;
-  bottom: auto !important;
-  transform: translateY(-50%) !important;
-}
-
-/* در لنگرگاه‌های عمودی، محفظه درونی نیز عمودی می‌شود */
-.ink-floating-island.dock-right .ink-floating-capsule,
-.ink-floating-island.dock-left .ink-floating-capsule {
-  flex-direction: column !important;
-  width: 100% !important;
-  height: auto !important;
-  gap: 3px !important;
-}
-
-.ink-floating-island.dock-right .ink-stepped-drawer,
-.ink-floating-island.dock-left .ink-stepped-drawer {
-  flex-direction: column !important;
-  width: 100% !important;
-  gap: 3px !important;
-}
-
-.ink-floating-island.dock-right .ink-capsule-divider,
-.ink-floating-island.dock-left .ink-capsule-divider {
-  width: 22px !important;
-  height: 1px !important;
-  margin: 3px auto !important;
-}
-
-.ink-floating-island.dock-right .ink-quick-color-slots,
-.ink-floating-island.dock-left .ink-quick-color-slots {
-  flex-direction: column !important;
-  gap: 4px !important;
-}
-
-.ink-floating-island.dock-right .ink-page-nav-pill,
-.ink-floating-island.dock-left .ink-page-nav-pill {
-  flex-direction: column !important;
-  padding: 4px 2px !important;
-  gap: 2px !important;
-}
-.ink-floating-island.dock-right .ink-page-nav-counter,
-.ink-floating-island.dock-left .ink-page-nav-counter {
-  font-size: 10px !important;
-  min-width: unset !important;
-}
-
-/* جهت‌گیری پالت ثانویه رنگ و پاک‌کن به سمت درون صفحه */
-.ink-floating-island.dock-right .ink-floating-subdock {
-  right: calc(100% + 12px) !important;
-  left: auto !important;
-  top: 50% !important;
-  bottom: auto !important;
-  transform: translateY(-50%) !important;
-}
-
-.ink-floating-island.dock-left .ink-floating-subdock {
-  left: calc(100% + 12px) !important;
-  right: auto !important;
-  top: 50% !important;
-  bottom: auto !important;
-  transform: translateY(-50%) !important;
-}
-
-.ink-floating-island.dock-right .ink-popover-menu {
-  right: calc(100% + 10px) !important;
-  left: auto !important;
-  top: 50% !important;
-  bottom: auto !important;
-  transform: translateY(-50%) !important;
-}
-
-.ink-floating-island.dock-left .ink-popover-menu {
-  left: calc(100% + 10px) !important;
-  right: auto !important;
-  top: 50% !important;
-  bottom: auto !important;
-  transform: translateY(-50%) !important;
-}
-
-/* لنگرگاه شناور آزاد */
-.ink-floating-island.dock-free,
-.ink-floating-island.is-dragged {
-  left: var(--ink-pos-x, 20px) !important;
-  top: var(--ink-pos-y, 80px) !important;
-  bottom: auto !important;
-  right: auto !important;
-  transform: none !important;
-  animation: none !important;
-  flex-direction: row !important;
-  height: 42px !important;
-  max-height: 42px !important;
-}
-
-/* حالت فشرده و جمع‌شده به دات شناور (Collapsed Stylus Dot) */
-.ink-floating-island.is-collapsed,
-.ink-floating-island.dock-right.is-collapsed,
-.ink-floating-island.dock-left.is-collapsed,
-.ink-floating-island.dock-top.is-collapsed,
-.ink-floating-island.dock-bottom.is-collapsed,
-.ink-floating-island.dock-free.is-collapsed {
-  width: 48px !important;
-  min-width: 48px !important;
-  max-width: 48px !important;
-  height: 48px !important;
-  min-height: 48px !important;
-  max-height: 48px !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  cursor: grab !important;
-  border-radius: 50% !important;
-  overflow: visible !important;
-}
-.ink-dot-dock-glyph {
-  position: absolute;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--cyan, var(--pal-cyan-neon));
-  opacity: 0.85;
-  pointer-events: none;
-  line-height: 1;
-}
-.dock-right .ink-dot-dock-glyph {
-  left: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-.dock-left .ink-dot-dock-glyph {
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-.dock-bottom .ink-dot-dock-glyph {
-  top: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-.dock-top .ink-dot-dock-glyph {
-  bottom: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-.dock-free .ink-dot-dock-glyph {
-  display: none;
-}
-
-.ink-drag-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 6px;
-  cursor: grab;
-  color: var(--ink-3, var(--pal-slate-400));
-  font-size: 13px;
-  letter-spacing: -2px;
-  opacity: 0.55;
-  transition: opacity 0.15s ease, color 0.15s ease;
-  touch-action: none;
-  user-select: none;
-}
-.ink-drag-handle:hover,
-.ink-drag-handle:active {
-  opacity: 1;
-  color: var(--cyan, var(--pal-cyan-neon));
-}
-.ink-drag-handle:active {
-  cursor: grabbing;
-}
-
-.ink-collapse-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-3, var(--pal-slate-400));
-  opacity: 0.7;
-  transition: opacity 0.15s ease, color 0.15s ease, transform 0.15s ease;
-}
-.ink-collapse-btn:hover {
-  opacity: 1;
-  color: var(--cyan, var(--pal-cyan-neon));
-  transform: scale(1.1);
-}
-
-.ink-dock-menu {
-  min-width: 155px;
-  padding: 6px;
-  gap: 4px;
-  z-index: 99;
-}
-
-/* ==========================================================================
-   DEDICATED ADAPTIVE MOBILE ARCHITECTURE (Smartphones: Android & iPhone <= 640px)
-   ========================================================================== */
-@media (max-width: 640px) {
-  /* نوار ابزار پایین تمام‌عرض و مهارشده در گوشی‌های هوشمند */
-  .ink-floating-island.is-mobile-dock:not(.is-collapsed),
-  .ink-floating-island:not(.is-collapsed) {
-    position: fixed !important;
-    bottom: 0 !important;
-    inset-inline: 0 !important;
-    top: auto !important;
-    width: 100vw !important;
-    max-width: 100vw !important;
-    height: calc(52px + env(safe-area-inset-bottom, 0px)) !important;
-    min-height: calc(52px + env(safe-area-inset-bottom, 0px)) !important;
-    max-height: calc(52px + env(safe-area-inset-bottom, 0px)) !important;
-    border-radius: 20px 20px 0 0 !important;
-    padding: 0 8px env(safe-area-inset-bottom, 8px) 8px !important;
-    transform: none !important;
-    background: rgba(9, 14, 26, 0.96) !important;
-    border-top: 1px solid rgba(0, 242, 254, 0.3) !important;
-    border-inline: none !important;
-    border-bottom: none !important;
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.75) !important;
-    justify-content: flex-start !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .ink-floating-island:not(.is-collapsed)::-webkit-scrollbar {
-    display: none;
-  }
-
-  .ink-floating-capsule {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    width: max-content !important;
-    min-width: 100% !important;
-    height: 100% !important;
-    gap: 4px !important;
-    padding: 0 4px !important;
-    overflow: visible !important;
-  }
-
-  /* دات شناور در موبایل: اندازه دایره کامل ۴۸ پیکسلی در گوشه پایین */
-  .ink-floating-island.is-collapsed {
-    position: fixed !important;
-    bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important;
-    left: 16px !important;
-    right: auto !important;
-    top: auto !important;
-    width: 48px !important;
-    height: 48px !important;
-    border-radius: 50% !important;
-    transform: none !important;
-    z-index: 50 !important;
-  }
-
-  /* پالت تکمیلی رنگ و پاک‌کن روی موبایل بالای نوار اصلی */
-  .ink-floating-subdock {
-    position: fixed !important;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
-    inset-inline: 8px !important;
-    top: auto !important;
-    width: calc(100vw - 16px) !important;
-    max-width: calc(100vw - 16px) !important;
-    height: 44px !important;
-    border-radius: 9999px !important;
-    transform: none !important;
-    padding: 0 10px !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    justify-content: flex-start !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7) !important;
-  }
-  .ink-floating-subdock::-webkit-scrollbar {
-    display: none;
-  }
-
-  .ink-drag-handle {
-    display: none !important;
-  }
-
-  .ink-stepped-drawer {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 4px !important;
-  }
-
-  .ink-pill-btn {
-    padding: 0 !important;
-    width: 34px !important;
-    min-width: 34px !important;
-    height: 34px !important;
-  }
-}
-
-/* پالت مکمل انتخاب رنگ و اسلایدر شناور بالای جزیره اصلی */
-.ink-floating-subdock {
-  position: absolute !important;
-  bottom: calc(100% + 10px) !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  height: 42px !important;
-  min-height: 42px !important;
-  max-height: 42px !important;
-  box-sizing: border-box !important;
-  background: rgba(13, 19, 33, 0.96) !important;
-  border: 1px solid rgba(255, 255, 255, 0.16) !important;
-  border-radius: 9999px !important;
-  backdrop-filter: var(--blur-lg) !important;
-  -webkit-backdrop-filter: var(--blur-lg) !important;
-  padding: 0 14px !important;
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  gap: 8px !important;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65) !important;
-  white-space: nowrap !important;
-  z-index: 55 !important;
-  animation: subdockFloat 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-}
 @keyframes subdockFloat {
   from { opacity: 0; transform: translate(-50%, 6px) scale(0.97); }
   to { opacity: 1; transform: translate(-50%, 0) scale(1); }
-}
-
-.ink-palette-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.ink-clear-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 9px;
-  border-radius: 9999px;
-  background: rgba(220, 38, 38, 0.18);
-  border: 1px solid rgba(220, 38, 38, 0.4);
-  color: #fca5a5;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
-.ink-clear-btn:hover {
-  background: rgba(220, 38, 38, 0.32);
-  color: var(--pal-white);
-}
-
-/* عدم نمایش فوتر سنتی هنگام فعال بودن ریدر لمسی */
-.reader--ink ~ .reader__foot,
-.reader-shell:has(.ink-floating-island) .reader__foot {
-  display: none !important;
 }
 
 @keyframes inkFloatIn {
@@ -2444,147 +1968,6 @@ html[data-theme="light"] .desktop-header {
   to { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
 
-.ink-floating-capsule {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: nowrap;
-  height: 100%;
-}
-
-.ink-tool-wrap {
-  position: relative;
-  display: inline-flex;
-}
-
-.ink-pill-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  min-width: 32px;
-  max-width: 32px;
-  height: 32px;
-  padding: 0;
-  border-radius: 50%;
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--pal-slate-300);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
-  user-select: none;
-  flex-shrink: 0;
-}
-
-/* مخفی‌سازی عنوان متنی ابزارها برای ساختار اولترا کامپکت و مینیمال اپل پنسل */
-.ink-pill-title,
-.ink-arrow-glyph {
-  display: none !important;
-}
-
-.ink-pill-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--pal-white);
-  border-color: rgba(255, 255, 255, 0.18);
-  transform: scale(1.08);
-}
-.ink-pill-btn.is-on {
-  background: linear-gradient(135deg, var(--pal-blue-700) 0%, var(--pal-blue-600) 50%, var(--pal-cyan-neon) 100%);
-  color: var(--pal-white);
-  border-color: rgba(0, 242, 254, 0.5);
-  box-shadow: none;
-  transform: scale(1.08);
-}
-
-.ink-capsule-divider {
-  width: 1px;
-  height: 18px;
-  background: rgba(255, 255, 255, 0.15);
-  margin: 0 2px;
-  flex: 0 0 1px;
-}
-
-/* ۳ اسلات رنگ دسترسی سریع GoodNotes */
-.ink-quick-color-slots {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 1px;
-}
-.ink-quick-swatch {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  padding: 0;
-}
-.ink-quick-swatch:hover {
-  transform: scale(1.18);
-}
-.ink-quick-swatch.is-active {
-  transform: scale(1.25);
-  border-color: var(--pal-white);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
-}
-.ink-swatch-expand {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 12px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-.ink-swatch-expand:hover, .ink-swatch-expand.is-open {
-  background: rgba(0, 242, 254, 0.2);
-  border-color: var(--pal-cyan-neon);
-  box-shadow: none;
-}
-
-.ink-mini-action {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--pal-slate-400);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  padding: 0;
-}
-.ink-mini-action:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--pal-white);
-}
-.ink-mini-action:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-.ink-mini-action.is-active {
-  background: rgba(0, 242, 254, 0.15);
-  color: var(--pal-cyan-neon);
-  border-color: rgba(0, 242, 254, 0.35);
-}
-
-/* ── نشانگر سینک دایره‌ای ابری هامزیار (Circular Sync Pulse) ── */
-.ink-sync-wrap {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  cursor: help;
-}
 .ink-sync-circle {
   border-radius: 50%;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -2623,111 +2006,9 @@ html[data-theme="light"] .desktop-header {
   50% { opacity: 1; transform: scale(1.15); box-shadow: 0 0 8px rgba(245, 158, 11, 0.6); }
 }
 
-/* ── پیمایش صفحات در جزیره شناور ── */
-.ink-page-nav-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-.ink-page-nav-btn {
-  background: transparent;
-  border: none;
-  color: var(--pal-slate-300);
-  cursor: pointer;
-  padding: 3px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  transition: all 0.15s ease;
-}
-.ink-page-nav-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: var(--pal-white);
-}
-.ink-page-nav-counter {
-  font-size: 11.5px;
-  font-weight: 800;
-  color: var(--pal-slate-100);
-  min-width: 44px;
-  text-align: center;
-  user-select: none;
-}
-
-/* منوی پاپ‌اور انتخاب قلم و پاک‌کن */
-.ink-popover-menu {
-  position: absolute;
-  bottom: calc(100% + 12px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  backdrop-filter: var(--blur-lg);
-  border-radius: 14px;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
-  z-index: 60;
-  min-width: 155px;
-  animation: inkFadeUp 0.18s ease-out;
-}
 @keyframes inkFadeUp {
   from { opacity: 0; transform: translate(-50%, 6px); }
   to { opacity: 1; transform: translate(-50%, 0); }
-}
-.ink-popover-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  background: transparent;
-  border: none;
-  color: var(--pal-slate-300);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  text-align: right;
-  cursor: pointer;
-  transition: all 0.12s ease;
-}
-.ink-popover-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--pal-white);
-}
-.ink-popover-item.is-active {
-  background: rgba(37, 99, 235, 0.25);
-  color: var(--pal-cyan-neon);
-  font-weight: 700;
-}
-.ink-popover-check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  font-size: 11.5px;
-  color: var(--pal-slate-400);
-  cursor: pointer;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin-top: 3px;
-}
-.ink-stepper-glyph {
-  font-size: 9px;
-  line-height: 1;
-}
-
-/* محفظه کشویی ابزارهای تکمیلی پله ۲ (Tier 2 Animated Drawer) */
-.ink-stepped-drawer {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  animation: drawerSlideOpen 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: visible;
 }
 @keyframes drawerSlideOpen {
   from {
@@ -2767,406 +2048,20 @@ html[data-theme="light"] .desktop-header {
   box-shadow: none;
 }
 
-.ink-popover-slider-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-}
-.ink-popover-slider-label {
-  font-size: 11px;
-  color: var(--pal-slate-400);
-  white-space: nowrap;
-}
-.ink-popover-divider {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.1);
-  margin: 4px 0;
-}
-
-/* ==========================================================================
-   LOGIN SCREEN: STELLAR OBSIDIAN SaaS REDESIGN
-   ========================================================================== */
-.login-universe-wrap {
-  min-height: 100vh;
-  min-height: 100dvh;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow-x: hidden;
-  background-color: var(--hym-surface-canvas, #060B16);
-  padding: 32px 16px;
-  direction: rtl;
-}
-
-.login-ambient-glow {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  filter: blur(100px);
-  opacity: 0.18;
-  z-index: 1;
-}
-.login-ambient-glow--cyan {
-  width: 500px;
-  height: 500px;
-  top: -120px;
-  right: -100px;
-  background: radial-gradient(circle, var(--pal-cyan-neon) 0%, transparent 70%);
-}
-.login-ambient-glow--blue {
-  width: 580px;
-  height: 580px;
-  bottom: -150px;
-  left: -120px;
-  background: radial-gradient(circle, var(--pal-blue-600) 0%, transparent 70%);
-}
-
-.login-grid-overlay {
-  position: absolute;
-  inset: 0;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 44px 44px;
-  pointer-events: none;
-  z-index: 1;
-  mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 45%, transparent 85%);
-}
-
-.login-stellar-card {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  max-width: 520px;
-  background: linear-gradient(180deg, rgba(16, 24, 39, 0.95), rgba(11, 18, 34, 0.98));
-  border: 1px solid rgba(56, 189, 248, 0.16);
-  border-radius: 24px;
-  padding: 32px 26px;
-  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.75),
-              0 0 35px rgba(6, 182, 212, 0.1),
-              inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  backdrop-filter: var(--blur-lg);
-  -webkit-backdrop-filter: var(--blur-lg);
-  animation: loginCardPop 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
 @keyframes loginCardPop {
   from { opacity: 0; transform: translateY(18px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.login-logo-glow-halo {
-  display: inline-block;
-  padding: 8px;
-  border-radius: 24px;
-  background: rgba(0, 242, 254, 0.06);
-  border: 1px solid rgba(0, 242, 254, 0.22);
-  box-shadow: none;
-}
-
-.login-medical-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 12px;
-  border-radius: 9999px;
-  background: rgba(0, 242, 254, 0.08);
-  border: 1px solid rgba(0, 242, 254, 0.24);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--pal-cyan-neon);
-}
-.login-badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--pal-cyan-neon);
-  box-shadow: 0 0 8px var(--pal-cyan-neon);
-  animation: loginPulse 1.6s ease-in-out infinite;
-}
 @keyframes loginPulse {
   0%, 100% { opacity: 0.5; transform: scale(0.9); }
   50% { opacity: 1; transform: scale(1.3); }
 }
 
-/* اسلات‌های کد اختصاصی Crockford */
-.login-crockford-wrap {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.login-crockford-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--pal-slate-300);
-}
-.login-prefix-tag {
-  font-size: 10.5px;
-  color: var(--pal-cyan-neon);
-  background: rgba(0, 242, 254, 0.1);
-  padding: 2px 7px;
-  border-radius: 6px;
-  border: 1px solid rgba(0, 242, 254, 0.2);
-}
-.login-slots-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 10px;
-  border-radius: 18px;
-  background: rgba(11, 16, 31, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  cursor: text;
-  transition: all 0.2s ease;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
-}
-.login-slots-container:hover, .login-slots-container:focus-within {
-  border-color: rgba(0, 242, 254, 0.5);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
-}
-.login-slots-group {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.login-slot-box {
-  width: 34px;
-  height: 44px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--pal-white);
-  font-family: var(--hym-font-mono, monospace);
-  font-size: 17px;
-  font-weight: 800;
-  display: grid;
-  place-items: center;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-.login-slot-box.is-filled {
-  background: rgba(0, 242, 254, 0.08);
-  border-color: rgba(0, 242, 254, 0.35);
-  color: var(--pal-cyan-neon);
-  text-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
-}
-.login-slot-box.is-active {
-  border-color: var(--pal-cyan-neon);
-  box-shadow: none;
-}
-.login-slot-cursor {
-  width: 2px;
-  height: 20px;
-  background: var(--pal-cyan-neon);
-  animation: cursorBlink 0.9s infinite;
-}
 @keyframes cursorBlink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
-.login-slots-separator {
-  color: var(--pal-slate-500);
-  font-weight: 800;
-  font-size: 14px;
-}
-.login-hidden-input {
-  position: absolute;
-  opacity: 0;
-  width: 1px;
-  height: 1px;
-  pointer-events: none;
-}
-.login-slots-hint {
-  font-size: 11px;
-  color: var(--pal-slate-400);
-  margin-top: 2px;
-}
-
-/* دکمه‌های اکشن فرم لاگین */
-.login-action-btn {
-  width: 100%;
-  min-height: 48px;
-  padding: 11px 18px;
-  border-radius: 14px;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 800;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid transparent;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.login-action-btn--primary {
-  background: linear-gradient(135deg, var(--pal-blue-800) 0%, var(--pal-blue-600) 50%, var(--pal-cyan-neon) 100%);
-  color: var(--pal-white);
-  border-color: rgba(0, 242, 254, 0.5);
-  box-shadow: 0 4px 18px rgba(0, 242, 254, 0.28), 0 2px 8px rgba(37, 99, 235, 0.35);
-}
-.login-action-btn--primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 26px rgba(0, 242, 254, 0.45);
-  border-color: rgba(0, 242, 254, 0.8);
-}
-.login-action-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none !important;
-}
-
-.login-divider-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.login-divider-line {
-  flex: 1;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.1);
-}
-.login-divider-label {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--pal-slate-400);
-  white-space: nowrap;
-}
-
-/* کارت دمو با هویت دانشجویی */
-.login-demo-card {
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: all 0.2s ease;
-}
-.login-demo-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(0, 242, 254, 0.35);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-}
-.login-demo-card-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.login-demo-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--pal-blue-600), var(--pal-cyan-neon));
-  color: var(--pal-white);
-  font-size: 12px;
-  font-weight: 800;
-  display: grid;
-  place-items: center;
-  box-shadow: none;
-}
-.login-demo-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.login-demo-name {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--pal-slate-100);
-}
-.login-demo-role {
-  font-size: 11px;
-  color: var(--pal-slate-400);
-}
-.login-demo-vip-badge {
-  font-size: 10px;
-  font-weight: 900;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: rgba(0, 242, 254, 0.14);
-  border: 1px solid rgba(0, 242, 254, 0.35);
-  color: var(--pal-cyan-neon);
-}
-.login-action-btn--demo {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: var(--pal-white);
-  min-height: 42px;
-  font-size: 13px;
-}
-.login-action-btn--demo:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.4), rgba(0, 242, 254, 0.3));
-  border-color: var(--pal-cyan-neon);
-  box-shadow: none;
-}
-
-.login-text-link {
-  background: transparent;
-  border: none;
-  color: var(--pal-slate-400);
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  transition: color 0.15s ease;
-}
-.login-text-link:hover {
-  color: var(--pal-cyan-neon);
-}
-
-.login-telegram-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  color: var(--pal-blue-400);
-  text-decoration: none;
-  transition: color 0.15s ease;
-}
-.login-telegram-link:hover {
-  color: var(--pal-blue-300);
-  text-decoration: underline;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   🌟 SMOOTH CIRCULAR SPINNER (GPU-Accelerated 60fps for iPad, iOS, Android, Windows)
-   ═══════════════════════════════════════════════════════════════════════ */
-.hym-circular-spinner-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.hym-circular-spinner {
-  animation: hym-spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  transform-origin: center center;
-  will-change: transform;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-}
-
-.hym-circular-track {
-  stroke: rgba(255, 255, 255, 0.08);
-}
-
-.hym-circular-arc {
-  stroke: var(--pal-cyan-neon);
-  stroke-dasharray: 90, 150;
-  stroke-dashoffset: 0;
-  animation: hym-arc-pulse 1.8s ease-in-out infinite;
-  filter: drop-shadow(0 0 8px rgba(0, 242, 254, 0.65));
-}
-
 @keyframes hym-spin {
   0% {
     transform: rotate(0deg);
@@ -3191,17 +2086,6 @@ html[data-theme="light"] .desktop-header {
   }
 }
 
-.hym-circular-core-glow {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--pal-cyan-neon) 0%, rgba(37, 99, 235, 0.4) 70%, transparent 100%);
-  filter: blur(4px);
-  animation: hym-core-pulse 1.8s ease-in-out infinite;
-  pointer-events: none;
-}
-
 @keyframes hym-core-pulse {
   0%, 100% {
     opacity: 0.35;
@@ -3215,35 +2099,6 @@ html[data-theme="light"] .desktop-header {
 @keyframes aiBubblePop {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
-}
-.embedded-ai-bubble--assistant {
-  align-self: flex-start;
-  background: rgba(17, 24, 39, 0.85);
-  border: 1px solid rgba(0, 242, 254, 0.2);
-  color: var(--pal-slate-100);
-}
-.embedded-ai-bubble--user {
-  align-self: flex-end;
-  background: linear-gradient(135deg, var(--pal-blue-700) 0%, var(--pal-blue-600) 100%);
-  color: var(--pal-white);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-.embedded-ai-chip--reset {
-  background: color-mix(in srgb, var(--hym-info-default) 12%, transparent);
-  border-color: color-mix(in srgb, var(--hym-info-default) 32%, transparent);
-  color: var(--hym-info-default);
-}
-.embedded-ai-chip--reset:hover {
-  background: color-mix(in srgb, var(--hym-info-default) 22%, transparent);
-}
-.embedded-ai-time {
-  font-size: 10px;
-  opacity: 0.65;
-  margin-top: 6px;
-  align-self: flex-start;
-}
-.embedded-ai-bubble--assistant .embedded-ai-time {
-  align-self: flex-end;
 }
 @keyframes aiTyping {
   0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
@@ -3314,150 +2169,6 @@ html[data-theme="light"] .desktop-header {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.ai-top-flow-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--pal-slate-300);
-  border-radius: 10px;
-  padding: 6px 12px;
-  font-family: inherit;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.15s ease;
-}
-
-.ai-top-flow-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--pal-white);
-  border-color: rgba(56, 189, 248, 0.35);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   📲 راهنمای تصویری نصب PWA (مشابه روبیکا — اختصاصی هامزیار)
-   ═══════════════════════════════════════════════════════════════════════ */
-.pwa-guide-container {
-  min-height: 100dvh;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px;
-  position: relative;
-  overflow-x: hidden;
-  background-color: var(--hym-surface-canvas, #060B16);
-  direction: rtl;
-}
-
-.pwa-guide-container--modal {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(6, 11, 22, 0.85);
-  backdrop-filter: var(--blur-sm);
-  overflow-y: auto;
-}
-
-.pwa-guide-card {
-  position: relative;
-  z-index: 10;
-  width: 100%;
-  max-width: 520px;
-  background: linear-gradient(180deg, rgba(16, 24, 39, 0.95), rgba(11, 18, 34, 0.98));
-  border: 1px solid rgba(56, 189, 248, 0.16);
-  border-radius: 24px;
-  padding: 28px 24px;
-  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 30px rgba(6, 182, 212, 0.08);
-}
-
-.pwa-guide-hero {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.pwa-brand-wrapper {
-  margin-bottom: 16px;
-  position: relative;
-  filter: drop-shadow(0 0 20px rgba(14, 165, 233, 0.35));
-}
-
-.pwa-guide-title {
-  font-size: 19px;
-  font-weight: 900;
-  color: var(--pal-slate-50);
-  line-height: 1.6;
-  margin: 0 0 8px 0;
-}
-
-.pwa-guide-subtitle {
-  font-size: 13px;
-  color: var(--pal-slate-400);
-  line-height: 1.8;
-  margin: 0 0 20px 0;
-  max-width: 440px;
-}
-
-.pwa-tabs-wrapper {
-  display: flex;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 4px;
-  gap: 4px;
-  margin-top: 6px;
-}
-
-.pwa-tab-item {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 42px;
-  border-radius: 10px;
-  border: none;
-  background: transparent;
-  color: var(--pal-slate-400);
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
-  padding: 0 6px;
-}
-
-.pwa-tab-item:hover {
-  color: var(--pal-slate-100);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.pwa-tab-item--active {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.85), rgba(6, 182, 212, 0.85));
-  color: var(--pal-white) !important;
-  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.25);
-}
-
-.pwa-detected-badge {
-  font-size: 9.5px;
-  background: rgba(34, 211, 238, 0.2);
-  color: var(--pal-cyan-400);
-  padding: 1px 5px;
-  border-radius: 99px;
-  margin-right: 2px;
-  white-space: nowrap;
-}
-
-.pwa-tab-item--active .pwa-detected-badge {
-  background: rgba(255, 255, 255, 0.25);
-  color: var(--pal-white);
-}
-
 .pwa-steps-content {
   margin-top: 20px;
 }
@@ -3524,60 +2235,11 @@ html[data-theme="light"] .desktop-header {
   flex-shrink: 0;
 }
 
-.pwa-step-visual--ios-share {
-  background: rgba(0, 122, 255, 0.1);
-  border-color: rgba(0, 122, 255, 0.3);
-}
-
-.pwa-step-visual--ios-add {
-  background: rgba(148, 163, 184, 0.1);
-  border-color: rgba(148, 163, 184, 0.3);
-}
-
-.pwa-step-visual--text-badge {
-  font-size: 13px;
-  font-weight: 800;
-  color: #007AFF;
-  padding: 0 8px;
-  border-color: rgba(0, 122, 255, 0.3);
-  background: rgba(0, 122, 255, 0.1);
-}
-
-.pwa-step-visual--cyan {
-  color: var(--hym-info-default);
-  border-color: color-mix(in srgb, var(--hym-info-default) 30%, transparent);
-  background: color-mix(in srgb, var(--hym-info-default) 10%, transparent);
-}
-
 .pwa-direct-install-box {
   margin-bottom: 6px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.pwa-direct-btn {
-  width: 100%;
-  min-height: 48px;
-  border-radius: 14px;
-  border: none;
-  background: linear-gradient(135deg, var(--pal-blue-700), var(--pal-blue-600) 50%, var(--pal-cyan-500));
-  color: var(--pal-white);
-  font-size: 14px;
-  font-weight: 800;
-  font-family: inherit;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.pwa-direct-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.45);
 }
 
 .pwa-direct-hint {
@@ -3606,94 +2268,6 @@ html[data-theme="light"] .desktop-header {
   flex-direction: column;
   gap: 10px;
 }
-
-.pwa-footer-btn {
-  width: 100%;
-  min-height: 46px;
-  border-radius: 14px;
-  font-size: 13.5px;
-  font-weight: 800;
-  font-family: inherit;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-
-.pwa-footer-btn--primary {
-  background: linear-gradient(135deg, var(--pal-blue-600), var(--pal-cyan-600));
-  color: var(--pal-white);
-  border: none;
-  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.3);
-}
-
-.pwa-footer-btn--primary:hover {
-  opacity: 0.94;
-  transform: translateY(-1px);
-}
-
-.pwa-footer-btn--ghost {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--pal-slate-400);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.pwa-footer-btn--ghost:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--pal-slate-100);
-}
-
-/* ── دکمه راهنمای نصب در صفحه ورود ── */
-.login-install-banner-btn {
-  width: 100%;
-  background: rgba(14, 165, 233, 0.07);
-  border: 1px dashed rgba(56, 189, 248, 0.3);
-  border-radius: 14px;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--pal-sky-400);
-  font-size: 12.5px;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-top: 14px;
-}
-
-.login-install-banner-btn:hover {
-  background: rgba(14, 165, 233, 0.14);
-  border-color: rgba(56, 189, 248, 0.5);
-  color: var(--pal-white);
-  transform: translateY(-1px);
-}
-
-.login-install-banner-btn .pwa-icon {
-  font-size: 16px;
-}
-
-.login-install-banner-btn .pwa-arrow {
-  font-size: 14px;
-  color: var(--pal-slate-500);
-  transition: transform 0.15s ease;
-}
-
-.login-install-banner-btn:hover .pwa-arrow {
-  color: var(--pal-sky-400);
-  transform: translateX(-3px);
-}
-
-
-/* 🔢 خانه‌های کد ورود — سیال؛ روی iPhone SE (۳۷۵px) هشت خانهٔ ۳۴px ثابت
-   از کارت بیرون می‌زد. حالا خانه‌ها با عرض کارت کوچک می‌شوند. */
-.login-slots-container{max-width:100%;min-width:0;padding-inline:8px;gap:6px}
-.login-slots-group{flex:1 1 0;min-width:0;gap:4px}
-.login-slot-box{flex:1 1 0;width:auto;min-width:0;max-width:40px;height:46px}
-.login-slots-separator{flex:0 0 auto}
-.login-crockford-label{gap:8px;flex-wrap:wrap}
-.login-prefix-tag{white-space:nowrap}
 
 /* T3: session-expired banner, non-blocking: sits above the screen, never replaces it */
 .session-banner{
