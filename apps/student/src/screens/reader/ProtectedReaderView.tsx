@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { DsButton, DsEmpty, DsSkeleton } from '../../design/components';
 import { Icon } from '../../icons';
 import { apiCall } from '../../lib/api';
+import { enDigits } from '../../lib/fa';
 import { fa } from '../../lib/library';
 import {
   bookmarks,
@@ -18,6 +19,7 @@ import {
 } from '../../lib/ink';
 import { InkLayer, type InkApi, type InkStatus } from './InkLayer';
 import { INK_COLORS, InkToolbar, type ReaderTool } from './InkToolbar';
+import { pushRecentColor } from './CustomColorPicker';
 import { NotebookPanel } from './NotebookPanel';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { ThumbnailDrawer } from './ThumbnailDrawer';
@@ -39,6 +41,7 @@ import {
   getCachedPageUrl,
   invalidatePageCache,
   prefetchPageUrl,
+  prefetchThumbUrl,
   setCachedInkPage,
 } from './readerPageCache';
 
@@ -161,6 +164,8 @@ export function ProtectedReaderView({
   const [tool, setTool] = useState<ReaderTool>(null);
   // Page the pen last touched (inserted pages use -slot), so undo/redo reach the page being written on.
   const [inkFocus, setInkFocus] = useState<number | null>(null);
+  /** تایمرهای debounce ذخیرهٔ یادداشت‌ها per page */
+  const noteSaveTimersRef = useRef<Map<number, number>>(new Map());
   const inkFocusRef = useRef<number | null>(null);
   inkFocusRef.current = inkFocus;
   const toolActiveRef = useRef(false);
@@ -206,6 +211,20 @@ export function ProtectedReaderView({
   const [notebookOpen, setNotebookOpen] = useState(false);
   const [notebookKey, setNotebookKey] = useState(0);
 
+  // شمارندهٔ شناور صفحه (پایین-چپ) + پرش سریع + رفع تداخل با نوار ابزار و کیبورد
+  const [pagePillActive, setPagePillActive] = useState(true);
+  const [pageJumpOpen, setPageJumpOpen] = useState(false);
+  const [pageJumpText, setPageJumpText] = useState('');
+  const [toolbarBottomClearance, setToolbarBottomClearance] = useState(0);
+  const [toolbarSideClearance, setToolbarSideClearance] = useState(0);
+  const [keyboardLift, setKeyboardLift] = useState(0);
+  const [eyedropperActive, setEyedropperActive] = useState(false);
+  const pagePillWrapRef = useRef<HTMLDivElement | null>(null);
+  const pageJumpInputRef = useRef<HTMLInputElement | null>(null);
+  const pagePillTimerRef = useRef<number | null>(null);
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
+
   // Text layer state
   const [textContents] = useState<Map<number, any>>(new Map());
   const [searchQuery] = useState('');
@@ -220,6 +239,75 @@ export function ProtectedReaderView({
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const totalPagesRef = useRef(0);
   totalPagesRef.current = manifest?.total_pages ?? 0;
+
+  const wakePagePill = useCallback(() => {
+    setPagePillActive(true);
+    if (pagePillTimerRef.current) window.clearTimeout(pagePillTimerRef.current);
+    pagePillTimerRef.current = window.setTimeout(() => {
+      setPagePillActive(false);
+    }, 2200);
+  }, []);
+
+  useEffect(() => {
+    wakePagePill();
+    return () => {
+      if (pagePillTimerRef.current) window.clearTimeout(pagePillTimerRef.current);
+    };
+  }, [currentPage, wakePagePill]);
+
+  // Keep page pill clear of on-screen soft keyboard on mobile/iPad
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    if (!vv) return;
+    const syncVv = () => {
+      const lift = Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height)));
+      setKeyboardLift(lift > 60 ? lift : 0);
+    };
+    syncVv();
+    vv.addEventListener('resize', syncVv);
+    vv.addEventListener('scroll', syncVv);
+    return () => {
+      vv.removeEventListener('resize', syncVv);
+      vv.removeEventListener('scroll', syncVv);
+    };
+  }, []);
+
+  // Close jump popover when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!pageJumpOpen) return;
+    const raf = window.requestAnimationFrame(() => pageJumpInputRef.current?.focus());
+    const onDocDown = (e: PointerEvent) => {
+      if (pagePillWrapRef.current && !pagePillWrapRef.current.contains(e.target as Node)) {
+        setPageJumpOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setPageJumpOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onDocDown);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      document.removeEventListener('pointerdown', onDocDown);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [pageJumpOpen]);
+
+  // Cancel eyedropper overlay on Escape
+  useEffect(() => {
+    if (!eyedropperActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setEyedropperActive(false);
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [eyedropperActive]);
 
   // ── لنگرگاه هوشمند زوم + ژست ۶۰ فریم بدون رندر مکرر (pdf.js pattern) ──
   const zoomAnchorRef = useRef<{ page: number; rx: number; ry: number; px: number; py: number } | null>(null);
@@ -541,10 +629,22 @@ export function ProtectedReaderView({
     [silentRefresh],
   );
 
+  /** آدرس تازهٔ پیش‌نمایش برای بندانگشتی‌ها هنگام انقضای توکن. */
+  const freshThumbUrl = useCallback(
+    async (page: number): Promise<string | null> => {
+      const data = await silentRefresh();
+      const dim = data?.page_dimensions.find((d) => d.page === page);
+      return dim?.thumbnail_url || dim?.url || null;
+    },
+    [silentRefresh],
+  );
+
   // پیش‌بارگذاری آرام صفحات همسایه (+1، +2، +3، -1) داخل کش RAM
   const prefetchedUrlsRef = useRef<Set<string>>(new Set());
+  const prefetchedThumbsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     prefetchedUrlsRef.current.clear();
+    prefetchedThumbsRef.current.clear();
   }, [scope, id]);
 
   useEffect(() => {
@@ -568,6 +668,66 @@ export function ProtectedReaderView({
 
     return () => window.clearTimeout(timer);
   }, [manifest, currentPage, prefetchTick, scope, id, freshPageUrl]);
+
+  // پیش‌ساخت و کش هوشمند پیش‌نمایش صفحات در زمان بیکاری مرورگر (requestIdleCallback)
+  useEffect(() => {
+    if (!manifest || !manifest.page_dimensions?.length) return;
+    const conn =
+      typeof navigator !== 'undefined'
+        ? (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
+        : undefined;
+    if (conn?.saveData || /(^|-)(2g)$/.test(conn?.effectiveType ?? '')) return;
+
+    let cancelled = false;
+    const total = manifest.total_pages;
+    const dimsByPage = new Map(manifest.page_dimensions.map((d) => [d.page, d]));
+    const center = Math.max(1, Math.min(total, currentPageRef.current));
+    const order: number[] = [center];
+    for (let offset = 1; offset < total; offset++) {
+      if (center + offset <= total) order.push(center + offset);
+      if (center - offset >= 1) order.push(center - offset);
+    }
+
+    const warmBatchLimit = Math.min(order.length, 36);
+    let cursor = 0;
+    let idleId = 0;
+    let timerId = 0;
+
+    const ric = (window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    }).requestIdleCallback;
+    const cancelRic = (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback;
+
+    const step = () => {
+      if (cancelled || cursor >= warmBatchLimit) return;
+      const batchEnd = Math.min(warmBatchLimit, cursor + 4);
+      while (cursor < batchEnd) {
+        const p = order[cursor++];
+        const dim = dimsByPage.get(p);
+        const thumbUrl = dim?.thumbnail_url || dim?.url;
+        if (dim && thumbUrl && !prefetchedThumbsRef.current.has(thumbUrl)) {
+          prefetchedThumbsRef.current.add(thumbUrl);
+          prefetchThumbUrl(scope, id, p, thumbUrl, () => freshThumbUrl(p), dim.url);
+        }
+      }
+      if (cursor < warmBatchLimit) {
+        if (ric) idleId = ric(step, { timeout: 1500 });
+        else timerId = window.setTimeout(step, 260);
+      }
+    };
+
+    timerId = window.setTimeout(() => {
+      if (ric) idleId = ric(step, { timeout: 1500 });
+      else step();
+    }, 550);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timerId);
+      if (idleId && cancelRic) cancelRic(idleId);
+    };
+  }, [manifest, scope, id, freshThumbUrl]);
 
   // زمانبندی تازهسازی ~۲ دقیقه قبل از انقضا
   useEffect(() => {
@@ -659,12 +819,12 @@ export function ProtectedReaderView({
     };
   }, [manifest, notebookOpen]);
 
-  // ناظر متمرکز پنجره‌بندی (۱ ناظر برای کل سند) + تشخیص دقیق صفحهٔ فعال بر مبنای مرکز دید
+  // ناظر متمرکز پنجره‌بندی (۱ ناظر برای کل سند) + تشخیص دقیق صفحهٔ فعلی با IntersectionObserver
   useEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller || !manifest) return;
 
-    const obs = new IntersectionObserver(
+    const nearObs = new IntersectionObserver(
       (entries) => {
         setNearPages((prev) => {
           let changed = false;
@@ -688,47 +848,52 @@ export function ProtectedReaderView({
       { root: scroller, rootMargin: '1200px 0px 1200px 0px' },
     );
 
+    const visibleArea = new Map<number, number>();
+    const activeObs = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const pageNum = Number((entry.target as HTMLElement).dataset.page || 0);
+          if (!pageNum) continue;
+          if (entry.isIntersecting && entry.intersectionRect.height > 0) {
+            visibleArea.set(pageNum, entry.intersectionRect.height * entry.intersectionRect.width);
+          } else {
+            visibleArea.delete(pageNum);
+          }
+        }
+        if (isZoomingRef.current || visibleArea.size === 0) return;
+        let bestPage = currentPageRef.current;
+        let bestArea = -1;
+        for (const [p, area] of visibleArea.entries()) {
+          if (area > bestArea) {
+            bestArea = area;
+            bestPage = p;
+          }
+        }
+        if (bestPage !== currentPageRef.current) {
+          currentPageRef.current = bestPage;
+          setCurrentPage(bestPage);
+          progressRef.current(bestPage, totalPagesRef.current);
+        }
+      },
+      { root: scroller, threshold: [0, 0.1, 0.25, 0.5, 0.75, 1.0] },
+    );
+
     for (const el of pageRefs.current.values()) {
-      obs.observe(el);
+      nearObs.observe(el);
+      activeObs.observe(el);
     }
 
-    let scrollRaf = 0;
-    const pickActivePage = () => {
-      scrollRaf = 0;
-      if (isZoomingRef.current) return;
-      const sr = scroller.getBoundingClientRect();
-      const midY = sr.top + sr.height * 0.45;
-      let bestPage = currentPage;
-      let bestDist = Infinity;
-      for (const [p, el] of pageRefs.current.entries()) {
-        const r = el.getBoundingClientRect();
-        if (r.bottom < sr.top || r.top > sr.bottom) continue;
-        const pageCenter = (r.top + r.bottom) / 2;
-        const dist = Math.abs(pageCenter - midY);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestPage = p;
-        }
-      }
-      if (bestPage !== currentPage) {
-        setCurrentPage(bestPage);
-        progressRef.current(bestPage, totalPagesRef.current);
-      }
-    };
-
     const onScroll = () => {
-      if (!scrollRaf) {
-        scrollRaf = window.requestAnimationFrame(pickActivePage);
-      }
+      wakePagePill();
     };
 
     scroller.addEventListener('scroll', onScroll, { passive: true });
     return () => {
-      obs.disconnect();
+      nearObs.disconnect();
+      activeObs.disconnect();
       scroller.removeEventListener('scroll', onScroll);
-      if (scrollRaf) window.cancelAnimationFrame(scrollRaf);
     };
-  }, [manifest, currentPage]);
+  }, [manifest, wakePagePill]);
 
   // پرش به صفحه با اسکرول نرم
   const scrollToPage = useCallback(
@@ -853,14 +1018,15 @@ export function ProtectedReaderView({
     });
   }, []);
 
-  // افزودن یادداشت چسبان به صفحهٔ جاری
-  const handleAddStickyNote = () => {
+  // افزودن یادداشت چسبان به صفحهٔ جاری — جای spawn داخل محدودهٔ clamp تا
+  // هیچ‌وقت لبهٔ صفحه کلیپ نشود (clamp درگ وابسته به عرض واقعی یادداشت است)
+  const handleAddStickyNote = useCallback(() => {
     const currentList = pageNotes.get(currentPage) || [];
     const newNote: StickyNote = {
       note_id: generateUUID(),
       page: currentPage,
-      x: 0.82,
-      y: 0.15,
+      x: 0.5,
+      y: 0.12,
       text: '',
       color: 'yellow',
       collapsed: false,
@@ -873,7 +1039,7 @@ export function ProtectedReaderView({
     const cachedInk = getCachedInkPage(scope, id, currentPage);
     if (cachedInk) setCachedInkPage(scope, id, currentPage, { ...cachedInk, notes: nextList });
     void ink.save(scope, id, currentPage, undefined, nextList);
-  };
+  }, [pageNotes, currentPage, scope, id]);
 
   const handleUpdatePageNotes = useCallback(
     (page: number, updatedNotes: StickyNote[]) => {
@@ -884,7 +1050,17 @@ export function ProtectedReaderView({
       });
       const cachedInk = getCachedInkPage(scope, id, page);
       if (cachedInk) setCachedInkPage(scope, id, page, { ...cachedInk, notes: updatedNotes });
-      void ink.save(scope, id, page, undefined, updatedNotes);
+      // ذخیرهٔ debounce‌شده: هر ضربهٔ کلید نباید IndexedDB + POST بسازد
+      const timers = noteSaveTimersRef.current;
+      const prevTimer = timers.get(page);
+      if (prevTimer !== undefined) window.clearTimeout(prevTimer);
+      timers.set(
+        page,
+        window.setTimeout(() => {
+          timers.delete(page);
+          void ink.save(scope, id, page, undefined, updatedNotes);
+        }, 600),
+      );
     },
     [scope, id],
   );
@@ -1060,7 +1236,7 @@ export function ProtectedReaderView({
     return m;
   }, [voiceList]);
 
-  const toggleVoiceArm = () => {
+  const toggleVoiceArm = useCallback(() => {
     if (recordingAtRef.current) return;
     if (!voiceRecordingSupported()) {
       flashVoice(
@@ -1071,7 +1247,7 @@ export function ProtectedReaderView({
       return;
     }
     setVoiceArmed((v) => !v);
-  };
+  }, []);
 
   const handlePlaceVoice = (fileId: string, page: number, x: number, y: number) => {
     setVoiceArmed(false);
@@ -1188,8 +1364,121 @@ export function ProtectedReaderView({
     );
   };
 
+  const submitPageJump = useCallback(() => {
+    const total = manifest?.total_pages || 0;
+    const n = parseInt(enDigits(pageJumpText).trim(), 10);
+    if (!total || !Number.isFinite(n)) return;
+    const target = Math.max(1, Math.min(total, n));
+    scrollToPage(target, false);
+    setPageJumpOpen(false);
+    setPageJumpText('');
+  }, [manifest, pageJumpText, scrollToPage]);
+
+  const handleSamplePagePixel = useCallback(
+    (clientX: number, clientY: number) => {
+      for (const [, pageEl] of pageRefs.current.entries()) {
+        const r = pageEl.getBoundingClientRect();
+        if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) continue;
+        const rx = Math.max(0, Math.min(1, (clientX - r.left) / Math.max(1, r.width)));
+        const ry = Math.max(0, Math.min(1, (clientY - r.top) / Math.max(1, r.height)));
+        const probe = document.createElement('canvas');
+        probe.width = 1;
+        probe.height = 1;
+        const ctx = probe.getContext('2d');
+        if (!ctx) break;
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, 1, 1);
+        const img = pageEl.querySelector<HTMLImageElement>('img.pdf-page__img');
+        if (img && img.complete && img.naturalWidth > 0) {
+          try {
+            if (invertContrast) ctx.filter = 'invert(0.92) hue-rotate(180deg) contrast(1.05)';
+            ctx.drawImage(
+              img,
+              Math.min(img.naturalWidth - 1, Math.floor(rx * img.naturalWidth)),
+              Math.min(img.naturalHeight - 1, Math.floor(ry * img.naturalHeight)),
+              1,
+              1,
+              0,
+              0,
+              1,
+              1,
+            );
+            ctx.filter = 'none';
+          } catch {
+            // cross-origin fallback: sample ink canvases only
+          }
+        }
+        const hlCanvas = pageEl.querySelector<HTMLCanvasElement>('canvas.ink-canvas--highlighter');
+        if (hlCanvas && hlCanvas.width > 0) {
+          ctx.save();
+          ctx.globalAlpha = 0.38;
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.drawImage(
+            hlCanvas,
+            Math.min(hlCanvas.width - 1, Math.floor(rx * hlCanvas.width)),
+            Math.min(hlCanvas.height - 1, Math.floor(ry * hlCanvas.height)),
+            1,
+            1,
+            0,
+            0,
+            1,
+            1,
+          );
+          ctx.restore();
+        }
+        const inkCanvas = pageEl.querySelector<HTMLCanvasElement>('canvas.ink-canvas:not(.ink-canvas--highlighter):not(.ink-canvas--scratch)');
+        if (inkCanvas && inkCanvas.width > 0) {
+          ctx.drawImage(
+            inkCanvas,
+            Math.min(inkCanvas.width - 1, Math.floor(rx * inkCanvas.width)),
+            Math.min(inkCanvas.height - 1, Math.floor(ry * inkCanvas.height)),
+            1,
+            1,
+            0,
+            0,
+            1,
+            1,
+          );
+        }
+        try {
+          const [pr, pg, pb] = ctx.getImageData(0, 0, 1, 1).data;
+          const hex = `#${[pr, pg, pb].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+          setColor(hex);
+          pushRecentColor(hex);
+        } catch {
+          // ignore readback errors
+        }
+        probe.width = 0;
+        probe.height = 0;
+        setEyedropperActive(false);
+        return;
+      }
+      setEyedropperActive(false);
+    },
+    [invertContrast],
+  );
+
   const activeInkApi = inkApis.current.get(inkFocus ?? currentPage);
   const shownZoomPct = Math.round((gestureBadgeZoom ?? zoom) * 100);
+
+  // Stable toolbar callbacks: InkToolbar is memoized, so undo/redo/clear (which depend on
+  // the current page's ink api) read through a ref instead of being re-created each render.
+  const activeInkApiRef = useRef<InkApi | null>(null);
+  activeInkApiRef.current = activeInkApi ?? null;
+  const handleToolbarUndo = useCallback(() => activeInkApiRef.current?.undo(), []);
+  const handleToolbarRedo = useCallback(() => activeInkApiRef.current?.redo(), []);
+  const handleToolbarClear = useCallback(() => activeInkApiRef.current?.clear(), []);
+  const handleToolbarNotebook = useCallback(() => setNotebookOpen((v) => !v), []);
+  const handleToolbarFocus = useCallback(() => setFocusMode(true), []);
+  const handleToolbarThumbnails = useCallback(() => setOverviewOpen(true), []);
+  const handleToolbarInvert = useCallback(() => setInvertContrast((v) => !v), []);
+  const handleToolbarEyedropper = useCallback(() => setEyedropperActive((v) => !v), []);
+  const handleToolbarClearance = useCallback((bottomPx: number, leftInsetPx = 0) => {
+    setToolbarBottomClearance(bottomPx);
+    setToolbarSideClearance(leftInsetPx);
+  }, []);
+  const pagePillLift = (focusMode ? 0 : toolbarBottomClearance) + keyboardLift;
+  const pagePillInset = focusMode ? 0 : toolbarSideClearance;
 
   return (
     <div
@@ -1234,6 +1523,104 @@ export function ProtectedReaderView({
             >
               <span>{fa(shownZoomPct)}٪</span>
             </button>
+          )}
+
+          {/* شمارندهٔ شناور صفحه (پایین-چپ) هم‌خانواده با نشانگر زوم — در حالت عادی و تمام‌صفحه */}
+          <div
+            ref={(el) => {
+              pagePillWrapRef.current = el;
+              if (el) {
+                el.style.setProperty('--page-pill-lift', `${pagePillLift}px`);
+                el.style.setProperty('--page-pill-inset', `${pagePillInset}px`);
+              }
+            }}
+            className={`reader-page-pill-wrap${pagePillActive || pageJumpOpen ? ' is-active' : ' is-dimmed'}`}
+            onMouseEnter={() => setPagePillActive(true)}
+            onMouseLeave={() => wakePagePill()}
+          >
+            {pageJumpOpen && (
+              <form
+                className="reader-page-jump"
+                role="dialog"
+                aria-label="پرش به صفحه"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submitPageJump();
+                }}
+              >
+                <button
+                  type="button"
+                  className="reader-page-jump__step"
+                  disabled={currentPage <= 1}
+                  aria-label="صفحهٔ قبل"
+                  title="صفحهٔ قبل"
+                  onClick={() => scrollToPage(Math.max(1, currentPage - 1))}
+                >
+                  <Icon name="i-chevron-r" size={15} />
+                </button>
+                <input
+                  ref={pageJumpInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  enterKeyHint="go"
+                  dir="ltr"
+                  className="reader-page-jump__input num"
+                  placeholder={fa(currentPage)}
+                  aria-label="شماره صفحه"
+                  value={pageJumpText}
+                  onChange={(e) => setPageJumpText(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="reader-page-jump__go"
+                  disabled={!pageJumpText.trim()}
+                >
+                  برو
+                </button>
+                <button
+                  type="button"
+                  className="reader-page-jump__step"
+                  disabled={currentPage >= manifest.total_pages}
+                  aria-label="صفحهٔ بعد"
+                  title="صفحهٔ بعد"
+                  onClick={() => scrollToPage(Math.min(manifest.total_pages, currentPage + 1))}
+                >
+                  <Icon name="i-chevron" size={15} />
+                </button>
+              </form>
+            )}
+
+            <button
+              type="button"
+              className="reader-page-pill focus-counter-badge num"
+              aria-label={`صفحهٔ ${fa(currentPage)} از ${fa(manifest.total_pages)} — برای پرش به صفحه بزنید`}
+              aria-expanded={pageJumpOpen}
+              title="پرش به صفحه"
+              onClick={() => {
+                setPagePillActive(true);
+                setPageJumpOpen((v) => !v);
+              }}
+            >
+              <span dir="ltr">
+                {fa(currentPage)} / {fa(manifest.total_pages)}
+              </span>
+              <span className="sr-only" aria-live="polite">
+                صفحهٔ {fa(currentPage)} از {fa(manifest.total_pages)}
+              </span>
+            </button>
+          </div>
+
+          {eyedropperActive && (
+            <div
+              className="reader-eyedropper-overlay"
+              role="application"
+              aria-label="نمونه‌برداری رنگ از صفحه"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSamplePagePixel(e.clientX, e.clientY);
+              }}
+            />
           )}
 
           <div className="reader__canvas" ref={scrollRef}>
@@ -1363,18 +1750,18 @@ export function ProtectedReaderView({
           setColor={setColor}
           strokeWidth={strokeWidth}
           setStrokeWidth={setStrokeWidth}
-          undo={() => activeInkApi?.undo()}
-          redo={() => activeInkApi?.redo()}
-          clear={() => activeInkApi?.clear()}
+          undo={handleToolbarUndo}
+          redo={handleToolbarRedo}
+          clear={handleToolbarClear}
           count={inkCount}
           status={status}
           canUndo={history.undo > 0}
           canRedo={history.redo > 0}
-          onOpenNotebook={() => setNotebookOpen((v) => !v)}
+          onOpenNotebook={handleToolbarNotebook}
           onAddStickyNote={handleAddStickyNote}
-          onToggleFocus={() => setFocusMode(true)}
-          onOpenThumbnails={() => setOverviewOpen(true)}
-          onToggleInvert={() => setInvertContrast((v) => !v)}
+          onToggleFocus={handleToolbarFocus}
+          onOpenThumbnails={handleToolbarThumbnails}
+          onToggleInvert={handleToolbarInvert}
           inverted={invertContrast}
           eraserMode={eraserMode}
           setEraserMode={setEraserMode}
@@ -1384,32 +1771,26 @@ export function ProtectedReaderView({
           setShapeSnap={setShapeSnap}
           stylusOnly={stylusOnly}
           setStylusOnly={setStylusOnly}
-          currentPage={currentPage}
-          totalPages={manifest.total_pages}
-          onPrevPage={() => scrollToPage(Math.max(1, currentPage - 1))}
-          onNextPage={() => scrollToPage(Math.min(manifest.total_pages, currentPage + 1))}
           onToggleAi={onToggleSplitWorkspace}
           isAiOpen={isAiOpen}
           onVoiceNote={toggleVoiceArm}
           voiceArmed={voiceArmed}
+          onStartPageEyedropper={handleToolbarEyedropper}
+          isEyedropperActive={eyedropperActive}
+          onBottomClearanceChange={handleToolbarClearance}
         />
       )}
 
       {focusMode && manifest && (
-        <>
-          <div className="focus-counter-badge num">
-            صفحه {fa(currentPage)} از {fa(manifest.total_pages)}
-          </div>
-          <button
-            type="button"
-            className="focus-restore-trigger"
-            onClick={() => setFocusMode(false)}
-            aria-label="خروج از حالت تمرکز"
-            title="خروج از حالت تمرکز (Esc)"
-          >
-            <Icon name="i-x" size={16} />
-          </button>
-        </>
+        <button
+          type="button"
+          className="focus-restore-trigger"
+          onClick={() => setFocusMode(false)}
+          aria-label="خروج از حالت تمرکز"
+          title="خروج از حالت تمرکز (Esc)"
+        >
+          <Icon name="i-x" size={16} />
+        </button>
       )}
 
       <PageOverview
@@ -1422,12 +1803,23 @@ export function ProtectedReaderView({
         id={id}
         bookmarkedPages={bookmarkedPages}
         onToggleBookmark={handleToggleBookmark}
+        onUrlRejected={freshThumbUrl}
         targetRect={() => scrollRef.current?.getBoundingClientRect() ?? null}
         onInsertPage={() => {
           setOverviewOpen(false);
           setInsertPicker({ after: currentPage });
         }}
       />
+
+      {eyedropperActive && (
+        <div className="voice-banner" role="status" aria-live="polite">
+          <span className="voice-banner__dot" aria-hidden="true" />
+          <span>روی هر نقطه‌ای از صفحه بزن تا رنگ آن برداشته شود</span>
+          <button type="button" className="voice-banner__btn" onClick={() => setEyedropperActive(false)}>
+            لغو
+          </button>
+        </div>
+      )}
 
       {(voiceArmed || recordingAt || voiceMsg) && (
         <div className={`voice-banner${recordingAt ? ' is-recording' : ''}`} role="status" aria-live="polite">
@@ -1478,11 +1870,14 @@ export function ProtectedReaderView({
         onClose={() => setThumbnailDrawerOpen(false)}
         manifest={manifest}
         currentPage={currentPage}
-        onJump={(p) => scrollToPage(p)}
+        // پرش instant: انیمیشن zoom خودش جابه‌جایی را پوشش می‌دهد؛ smooth پس از آن
+        // باعث پرش مرئی دوم می‌شد
+        onJump={(p) => scrollToPage(p, true)}
         scope={scope}
         id={id}
         bookmarkedPages={bookmarkedPages}
         onToggleBookmark={handleToggleBookmark}
+        onUrlRejected={freshThumbUrl}
       />
     </div>
   );
@@ -1741,6 +2136,8 @@ function VirtualPageContainer({
             height={height}
             notes={notes}
             onUpdateNotes={handleNotesChange}
+            // با ابزار فعال، جوهر اولویت دارد: یادداشت رویدادها را عبور می‌دهد
+            interactive={!tool}
           />
 
           <InkLayer
@@ -1753,6 +2150,7 @@ function VirtualPageContainer({
             tool={tool}
             color={color}
             strokeWidth={strokeWidth}
+            notes={notes}
             onCount={onInkCount}
             onHistory={onInkHistory}
             onStatus={onInkStatus}

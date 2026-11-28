@@ -968,15 +968,23 @@ class TestCanvasPalmRejectionAndEraserGeometry(unittest.TestCase):
 
     def test_frontend_source_contract_assertions(self):
         """Verify InkLayer.tsx implements the exact algorithmic formulas and thresholds."""
-        ink_layer_path = os.path.join(ROOT, "apps", "student", "src", "screens", "reader", "InkLayer.tsx")
+        reader_dir = os.path.join(ROOT, "apps", "student", "src", "screens", "reader")
+        ink_layer_path = os.path.join(reader_dir, "InkLayer.tsx")
         self.assertTrue(os.path.exists(ink_layer_path), f"InkLayer.tsx not found at {ink_layer_path}")
 
         with open(ink_layer_path, "r", encoding="utf-8") as f:
             code = f.read()
 
-        # Palm rejection constants
+        # Palm rejection constants — the palm-contact bound moved to the shared
+        # penInput.ts module (rev. 2026-11: TextLayer/pen-selection round); InkLayer
+        # keeps the stylus decay window and imports PALM_CONTACT_PX from there.
         self.assertIn("STYLUS_DECAY_MS = 750", code)
-        self.assertIn("PALM_TOUCH_BOUND_PX = 70", code)
+        self.assertIn("PALM_CONTACT_PX", code)
+        pen_input_path = os.path.join(reader_dir, "penInput.ts")
+        self.assertTrue(os.path.exists(pen_input_path), "penInput.ts not found")
+        with open(pen_input_path, "r", encoding="utf-8") as f:
+            pen_code = f.read()
+        self.assertIn("PALM_CONTACT_PX = 70", pen_code)
         self.assertIn("touchPointers.current.size >= 2", code)
 
         # Vector line segment projection

@@ -389,7 +389,7 @@ export function ReaderScreen() {
                     onPosition={(seconds) => persist(kind, { position: seconds })}
                     onExpired={refreshUrl}
                     expiresAt={urlExpiresAt}
-                    bg={kind === 'audio' ? { scope: scopeTyped, id } : undefined}
+                    bg={kind === 'audio' || kind === 'video' ? { scope: scopeTyped, id } : undefined}
                   />
                 ) : (
                   <DocumentView

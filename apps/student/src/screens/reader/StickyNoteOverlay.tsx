@@ -8,6 +8,8 @@ interface StickyNoteOverlayProps {
   height: number;
   notes: StickyNote[];
   onUpdateNotes: (notes: StickyNote[]) => void;
+  /** ابزار جوهر فعال است؟ در آن حالت یادداشت رویدادها را به بوم جوهر عبور می‌دهد. */
+  interactive?: boolean;
 }
 
 export const STICKY_NOTE_COLORS: Array<{ id: 'yellow' | 'cyan' | 'green' | 'coral'; label: string }> = [
@@ -22,14 +24,39 @@ export function StickyNoteOverlay({
   height,
   notes,
   onUpdateNotes,
+  interactive = true,
 }: StickyNoteOverlayProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const dragStart = useRef<{ startX: number; startY: number; noteX: number; noteY: number } | null>(null);
   const dragPosRef = useRef<{ x: number; y: number } | null>(null);
   const didMove = useRef(false);
+  /** بعد از یک درگ واقعی، click بعدی که از همان pointer می‌آید باید نادیده گرفته شود */
+  const suppressClick = useRef(false);
+
+  const commitDrag = () => {
+    if (draggingId) {
+      const finalPos = dragPosRef.current;
+      if (didMove.current && finalPos) {
+        const nextNotes = notes.map((n) =>
+          n.note_id === draggingId
+            ? { ...n, x: finalPos.x, y: finalPos.y, updated_at: new Date().toISOString() }
+            : n,
+        );
+        onUpdateNotes(nextNotes);
+      }
+      suppressClick.current = didMove.current;
+      setDraggingId(null);
+      setDragPos(null);
+      dragPosRef.current = null;
+      dragStart.current = null;
+      didMove.current = false;
+    }
+  };
 
   const handlePointerDown = (e: React.PointerEvent, note: StickyNote) => {
+    // دکمه‌های داخل سربرگ نباید درگ را شروع کنند
+    if ((e.target as HTMLElement).closest('button')) return;
     e.stopPropagation();
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -56,14 +83,15 @@ export function StickyNoteOverlay({
     const dx = (e.clientX - dragStart.current.startX) / Math.max(1, width);
     const dy = (e.clientY - dragStart.current.startY) / Math.max(1, height);
 
-    let nextX = Math.min(0.92, Math.max(0.02, dragStart.current.noteX + dx));
-    let nextY = Math.min(0.92, Math.max(0.02, dragStart.current.noteY + dy));
+    // clamp وابسته به اندازهٔ واقعی یادداشت تا هیچ‌وقت از صفحه بیرون نزند
+    const noteEl = (e.currentTarget as HTMLElement).closest('.sticky-note') as HTMLElement | null;
+    const noteW = noteEl?.offsetWidth || 170;
+    const noteH = noteEl?.offsetHeight || 120;
+    const maxX = Math.max(0.02, (width - noteW) / Math.max(1, width) - 0.02);
+    const maxY = Math.max(0.02, (height - noteH) / Math.max(1, height) - 0.02);
 
-    // Margin snapping
-    if (nextX < 0.12) nextX = 0.03;
-    else if (nextX > 0.78) nextX = 0.82;
-    // Constrain right-margin coordinate so sticky notes (160px-240px) are not clipped by overflow: hidden
-    nextX = Math.min(0.68, nextX);
+    const nextX = Math.min(maxX, Math.max(0.02, dragStart.current.noteX + dx));
+    const nextY = Math.min(maxY, Math.max(0.02, dragStart.current.noteY + dy));
 
     didMove.current = true;
     const pos = { x: nextX, y: nextY };
@@ -72,23 +100,19 @@ export function StickyNoteOverlay({
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (draggingId) {
-      e.stopPropagation();
-      const finalPos = dragPosRef.current;
-      if (didMove.current && finalPos) {
-        const nextNotes = notes.map((n) =>
-          n.note_id === draggingId
-            ? { ...n, x: finalPos.x, y: finalPos.y, updated_at: new Date().toISOString() }
-            : n,
-        );
-        onUpdateNotes(nextNotes);
-      }
-      setDraggingId(null);
-      setDragPos(null);
-      dragPosRef.current = null;
-      dragStart.current = null;
-      didMove.current = false;
+    if (!draggingId) return;
+    e.stopPropagation();
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
     }
+    commitDrag();
+  };
+
+  const handlePointerCancel = () => {
+    // وسط درگ (اسکرول سیستم، تماس دوم…) — وضعیت همان‌جا ثبت شود، نه گیر کردن
+    commitDrag();
   };
 
   const updateText = (id: string, text: string) => {
@@ -109,7 +133,7 @@ export function StickyNoteOverlay({
     const colorOrder: Array<'yellow' | 'cyan' | 'green' | 'coral'> = ['yellow', 'cyan', 'green', 'coral'];
     const next = notes.map((n) => {
       if (n.note_id === id) {
-        const curIdx = colorOrder.indexOf((n.color as any) || 'yellow');
+        const curIdx = colorOrder.indexOf((n.color as 'yellow' | 'cyan' | 'green' | 'coral') || 'yellow');
         const nextColor = colorOrder[(curIdx + 1) % colorOrder.length];
         return { ...n, color: nextColor, updated_at: new Date().toISOString() };
       }
@@ -126,7 +150,10 @@ export function StickyNoteOverlay({
   if (!notes || notes.length === 0) return null;
 
   return (
-    <div className="sticky-note-layer" aria-label="یادداشت‌های چسبان">
+    <div
+      className={`sticky-note-layer${interactive ? '' : ' is-ink-mode'}`}
+      aria-label="یادداشت‌های چسبان"
+    >
       {notes.map((note) => {
         const isDragging = note.note_id === draggingId && dragPos !== null;
         const noteX = isDragging ? dragPos.x : note.x;
@@ -145,10 +172,19 @@ export function StickyNoteOverlay({
                 el?.style.setProperty('--note-y', `${posY}px`);
               }}
               className={`sticky-note ${colorClass} sticky-note--collapsed`}
-              onClick={() => toggleCollapse(note.note_id)}
+              onClick={() => {
+                // بعد از درگ سنجاق، click نباید آن را باز کند
+                if (suppressClick.current) {
+                  suppressClick.current = false;
+                  return;
+                }
+                toggleCollapse(note.note_id);
+              }}
               onPointerDown={(e) => handlePointerDown(e, note)}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerCancel}
+              onLostPointerCapture={handlePointerCancel}
               title={`یادداشت حاشیه (صفحه ${note.page}) — برای باز کردن کلیک کنید`}
               aria-label="باز کردن یادداشت چسبان"
             >
@@ -171,6 +207,8 @@ export function StickyNoteOverlay({
               onPointerDown={(e) => handlePointerDown(e, note)}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerCancel}
+              onLostPointerCapture={handlePointerCancel}
               title="برای جابه‌جایی بکشید"
             >
               <span>یادداشت</span>

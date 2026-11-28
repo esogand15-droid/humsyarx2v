@@ -1,0 +1,309 @@
+/* Floating/PiP video player box. Drag anywhere, snap to edges, fixed 16:9,
+   minimize to a bubble. Same visual language as the app (one surface, one
+   border, accent only on the play button) — as a free-floating overlay.
+   Perf: the box moves via transform (translate3d); no backdrop-filter here
+   (it re-filters every frame over playing video, janky in Safari). */
+
+.fvp {
+  position: fixed;
+  /* physical anchor on purpose: --fvp-x/--fvp-y come from JS in viewport
+     client coordinates (getBoundingClientRect), which never flip in RTL —
+     a logical inset-inline-start would pin to the right edge in RTL and
+     drag the box off-screen when combined with the transform. */
+  top: 0;
+  left: 0;
+  transform: translate3d(var(--fvp-x, 20px), var(--fvp-y, 20px), 0);
+  width: var(--fvp-w, 312px);
+  height: auto;
+  z-index: var(--hym-z-modal);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hym-hairline-strong);
+  border-radius: var(--hym-radius-lg);
+  background: var(--hym-surface-1);
+  color: var(--hym-text-primary);
+  box-shadow: var(--lg-shadow);
+  overflow: hidden;
+  animation: fvp-in 260ms var(--lg-spring, cubic-bezier(0.34, 1.32, 0.64, 1)) both;
+}
+
+@keyframes fvp-in {
+  from { opacity: 0; transform: translate3d(var(--fvp-x, 20px), calc(var(--fvp-y, 20px) + 14px), 0) scale(0.97); }
+  to { opacity: 1; transform: translate3d(var(--fvp-x, 20px), var(--fvp-y, 20px), 0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fvp { animation: none; }
+}
+
+/* while dragging: track the pointer 1:1 (no transition); will-change only during the gesture */
+.fvp.is-dragging,
+.fvp.is-resizing {
+  will-change: transform;
+  user-select: none;
+  box-shadow: var(--lg-shadow);
+}
+.fvp.is-settling {
+  transition: transform 280ms var(--lg-spring, cubic-bezier(0.34, 1.32, 0.64, 1));
+}
+
+.fvp__head {
+  display: flex;
+  align-items: center;
+  gap: var(--hym-space-1);
+  padding: 5px 6px 5px var(--hym-space-2);
+  background: var(--hym-surface-2);
+  cursor: grab;
+}
+.fvp.is-dragging .fvp__head { cursor: grabbing; }
+
+.fvp__title {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--hym-fs-caption);
+  font-weight: var(--hym-fw-bold);
+  text-align: start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  border-radius: var(--hym-radius-sm);
+}
+.fvp__title svg { flex: 0 0 auto; opacity: 0.75; }
+
+.fvp__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.fvp__btn {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--hym-text-primary);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 120ms ease, background 120ms ease;
+}
+@media (hover: hover) {
+  .fvp__btn:hover { background: var(--hym-bg-hover); }
+}
+.fvp__btn:active { transform: scale(0.92); }
+
+.fvp__stage {
+  position: relative;
+  width: 100%;
+  height: var(--fvp-h, 176px);
+  background: black;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.fvp__stage video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+
+.fvp__play-ov {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, black 52%, transparent);
+  color: white;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  backdrop-filter: none;
+}
+.fvp__play-ov:active { transform: scale(0.94); }
+
+/* resize: inline-start/block-end corner; fixed 16:9 — width only */
+.fvp__resize {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-end: 0;
+  width: 26px;
+  height: 26px;
+  cursor: nwse-resize;
+  touch-action: none;
+  z-index: 2;
+}
+[dir="rtl"] .fvp__resize { cursor: nesw-resize; }
+
+.fvp__resize::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 6px;
+  inset-block-end: 6px;
+  width: 11px;
+  height: 11px;
+  border-inline-start: 2px solid color-mix(in srgb, white 72%, transparent);
+  border-block-end: 2px solid color-mix(in srgb, white 72%, transparent);
+  border-radius: 0 0 0 3px;
+}
+
+.fvp__bar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px var(--hym-space-2);
+  background: var(--hym-surface-1);
+}
+
+.fvp__play {
+  background: var(--hym-accent);
+  color: var(--hym-text-on-brand);
+}
+@media (hover: hover) {
+  .fvp__play:hover { background: var(--hym-accent); filter: brightness(1.08); }
+}
+
+.fvp__skip { font-size: 11px; font-weight: var(--hym-fw-bold); }
+
+.fvp__rate {
+  width: auto;
+  min-width: 30px;
+  padding-inline: 6px;
+  font-size: 11px;
+  font-weight: var(--hym-fw-bold);
+  border-radius: 999px;
+}
+
+.fvp__range {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--hym-accent);
+  cursor: pointer;
+}
+
+.fvp__time {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--hym-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* first-time continuity hint */
+.fvp__hint {
+  position: absolute;
+  inset-block-start: calc(100% + 8px);
+  inset-inline: 0;
+  margin-inline: auto;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--lg-edge);
+  background: var(--lg-tint-strong);
+  color: var(--hym-text-primary);
+  font-size: var(--hym-fs-caption);
+  font-weight: var(--hym-fw-semibold);
+  box-shadow: var(--lg-shadow);
+  animation: fvp-hint 300ms var(--lg-spring, ease-out) both;
+  pointer-events: none;
+  white-space: nowrap;
+}
+@keyframes fvp-hint {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── bubble: 56px circle at the snapped edge; the single <video> keeps playing underneath ── */
+.fvp.is-bubble {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  box-shadow: var(--lg-shadow);
+  transition: width 220ms var(--lg-spring, ease-out), height 220ms var(--lg-spring, ease-out),
+    border-radius 220ms var(--lg-spring, ease-out);
+}
+.fvp.is-bubble .fvp__head,
+.fvp.is-bubble .fvp__stage,
+.fvp.is-bubble .fvp__bar {
+  display: none;
+}
+
+.fvp__bubble-ui {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--hym-surface-2);
+  z-index: 3;
+}
+
+.fvp__bubble-btn {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hym-accent);
+  color: var(--hym-text-on-brand);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.fvp__bubble-btn:active { transform: scale(0.92); }
+
+.fvp__bubble-expand,
+.fvp__bubble-close {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hym-surface-1);
+  border: 1px solid var(--hym-hairline);
+  color: var(--hym-text-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+/* داخل دایره می‌مانند — .fvp دارای overflow:hidden است و چیپ بیرون‌زده کلیپ می‌شود */
+.fvp__bubble-expand {
+  inset-block-start: 2px;
+  inset-inline-end: 2px;
+}
+.fvp__bubble-close {
+  inset-block-end: 2px;
+  inset-inline-end: 2px;
+  color: var(--hym-role-danger-text);
+}
+
+@media (max-width: 480px) {
+  .fvp { max-width: calc(100vw - 24px); }
+  .fvp__time { display: none; }
+}
+
+/* میزبان المنت مشترک ویدیو — شفاف برای چیدمان استیج */
+.fvp__media-host {
+  display: contents;
+}

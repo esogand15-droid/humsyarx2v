@@ -31,7 +31,7 @@ html, body, #root {
 
 body {
   margin: 0;
-  background: var(--hym-bg-page);
+  background: var(--hym-surface-0);
   color: var(--hym-text-primary);
   font-family: var(--hym-font-sans);
   font-size: 15px;

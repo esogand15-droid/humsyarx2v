@@ -50,6 +50,8 @@ interface Props {
   onPenDetected?: () => void;
   onPinchZoom?: (factor: number) => void;
   onNotesLoaded?: (page: number, notes: StickyNote[]) => void;
+  /** یادداشت‌های فعلی از والد (منبع حقیقت) — notesRef را هم‌گام نگه می‌دارد */
+  notes?: StickyNote[];
   isGesturing?: boolean;
 }
 
@@ -302,6 +304,7 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
     stylusOnly = false,
     onPenDetected,
     onNotesLoaded,
+    notes,
     isGesturing = false,
   },
   ref,
@@ -418,7 +421,8 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
       setStrokes(list);
       cbs.current.onCount(list.length);
       cbs.current.onHistory({ undo: 0, redo: 0 });
-      if (cached.notes.length > 0) cbs.current.onNotesLoaded?.(page, cached.notes);
+      // همیشه گزارش شود — حتی لیست خالی؛ وگرنه پس از حذف آخرین یادداشت «شبح» می‌ماند
+      cbs.current.onNotesLoaded?.(page, cached.notes);
       setReady(true);
       cbs.current.onStatus('idle');
       return () => {
@@ -444,7 +448,7 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
       setStrokes(list);
       cbs.current.onCount(list.length);
       cbs.current.onHistory({ undo: 0, redo: 0 });
-      if (loadedNotes.length > 0) cbs.current.onNotesLoaded?.(page, loadedNotes);
+      cbs.current.onNotesLoaded?.(page, loadedNotes);
       setReady(true);
       cbs.current.onStatus('idle');
     })();
@@ -452,6 +456,12 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
       cancelled = true;
     };
   }, [scope, id, page]);
+
+  // هم‌گام نگه‌داشتن notesRef با یادداشت‌های والد — وگرنه ذخیرهٔ بعدیِ استروک،
+  // کش و دیتابیس را با لیست کهنه بازنویسی می‌کرد و ویرایش یادداشت «برمی‌گشت»
+  useEffect(() => {
+    if (notes) notesRef.current = notes;
+  }, [notes]);
 
   // ── ذخیرهٔ دسته‌ای (debounce) ────────────────────────────────
   const flushSave = useCallback(async () => {
@@ -485,7 +495,7 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
           strokes: strokesRef.current,
           notes: notesRef.current,
         });
-        void ink.save(scope, id, page, strokesRef.current);
+        void ink.save(scope, id, page, strokesRef.current, notesRef.current);
       }
     };
   }, [scope, id, page]);

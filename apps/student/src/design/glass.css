@@ -5,12 +5,19 @@
    stay synchronized with zero raw hex or rgba literals.
    ========================================================================== */
 
-/* ── Ambient Canvas Depth Behind All Liquid Glass Surfaces ────────────── */
-.app-shell,
+/* ── Ambient Canvas Depth Behind All Liquid Glass Surfaces ──────────────
+   یک لایه، یک نقاشی: گرادیان فقط روی .app-shell رندر می‌شود و همه‌ی لایه‌های
+   داخل شفاف‌اند — قبلاً روی .app-shell و .main-stage همزمان نقاشی می‌شد که
+   دوبار رستر + درز مرئی در لبه‌ی سایدبار می‌ساخت و login/welcome/reader هر
+   کدام گرادیان متفاوت خودشان را داشتند (حس ناهمگامی بین صفحات). */
+.app-shell {
+  background: var(--hym-canvas-bg);
+}
+
 .main-stage,
 .auth-screen,
 .welcome-wrap {
-  background: var(--hym-canvas-bg);
+  background: transparent;
 }
 
 /* Shared frosted backdrop-filter across all primary chrome & floating overlays */
@@ -27,6 +34,9 @@
 .reader--ink .focus-counter-badge,
 .reader--ink .focus-restore-trigger,
 .reader-zoom-pill,
+.reader-page-pill,
+.reader-page-jump,
+.ink-dock__tooltip,
 .toast,
 .ds-sw-banner,
 .session-banner,
@@ -505,7 +515,10 @@ html .app-shell--nav .desktop-header {
 
 .reader--ink .focus-counter-badge,
 .reader--ink .focus-restore-trigger,
-.reader-zoom-pill {
+.reader-zoom-pill,
+.reader-page-pill,
+.reader-page-jump,
+.ink-dock__tooltip {
   background: var(--lg-tint-strong);
   border: 1px solid var(--lg-edge-strong);
   box-shadow:
@@ -696,6 +709,9 @@ html .app-shell--nav .desktop-header {
   .reader--ink .ink-dock__popover,
   .reader--ink .ink-dock__sheet,
   .reader-zoom-pill,
+  .reader-page-pill,
+  .reader-page-jump,
+  .ink-dock__tooltip,
   .sheet,
   .toast,
   .ds-sw-banner,

@@ -1,33 +1,42 @@
-/* Mini player: one surface, one border, no glow. Accent only on the play button. */
+/* Floating voice pill: draggable, edge-snapping (floatWidget). One surface,
+   one border, no glow; accent only on the play button; a 2px progress line
+   along the bottom edge. Moves via transform (translate3d) — layout never
+   reflows; no backdrop-filter on this moving surface. */
+
 .miniplayer {
   position: fixed;
+  /* physical anchor: --mp-x/--mp-y are viewport client coordinates from JS
+     (drag/rect based) and must not flip under RTL — see floating-video-player.css */
+  top: 0;
+  left: 0;
+  transform: translate3d(var(--mp-x, 16px), var(--mp-y, 16px), 0);
   z-index: var(--hym-z-overlay);
-  inset-inline: var(--hym-space-3);
-  inset-block-end: calc(var(--hym-app-tab-bar-height) + env(safe-area-inset-bottom, 0px) + var(--hym-space-2));
   display: flex;
   align-items: center;
-  gap: var(--hym-space-2);
-  padding: var(--hym-space-2) var(--hym-space-3);
+  gap: var(--hym-space-1);
+  width: min(336px, calc(100vw - 16px));
+  padding: var(--hym-space-2) var(--hym-space-2);
+  padding-block-end: calc(var(--hym-space-2) + 2px);
   border: 1px solid var(--hym-hairline-strong);
-  border-radius: var(--hym-radius-card);
+  border-radius: 18px;
   background: var(--hym-surface-1);
   color: var(--hym-text-primary);
-  animation: miniplayer-in var(--hym-duration-fast, 200ms) var(--hym-ease-default, ease-out) both;
+  box-shadow: var(--lg-shadow);
+  cursor: grab;
+  animation: miniplayer-in 240ms var(--lg-spring, cubic-bezier(0.34, 1.32, 0.64, 1)) both;
 }
-
-@media (min-width: 768px) {
-  /* RTL: inline-end is the left edge, away from the sidebar */
-  .miniplayer {
-    inset-inline-start: auto;
-    inset-inline-end: var(--hym-space-4);
-    inset-block-end: var(--hym-space-4);
-    width: min(380px, calc(100vw - 2 * var(--hym-space-4)));
-  }
+.miniplayer.is-dragging {
+  will-change: transform;
+  cursor: grabbing;
+  box-shadow: var(--lg-shadow);
+}
+.miniplayer.is-settling {
+  transition: transform 280ms var(--lg-spring, cubic-bezier(0.34, 1.32, 0.64, 1));
 }
 
 @keyframes miniplayer-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translate3d(var(--mp-x, 16px), calc(var(--mp-y, 16px) + 12px), 0) scale(0.97); }
+  to { opacity: 1; transform: translate3d(var(--mp-x, 16px), var(--mp-y, 16px), 0) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
   .miniplayer { animation: none; }
@@ -37,8 +46,8 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   border: 0;
   border-radius: 50%;
   background: transparent;
@@ -50,12 +59,11 @@
   .miniplayer__btn:hover { background: var(--hym-bg-hover); }
 }
 .miniplayer__btn:focus-visible,
-.miniplayer__title:focus-visible,
-.miniplayer__range:focus-visible {
+.miniplayer__title:focus-visible {
   outline: none;
   box-shadow: var(--hym-focus-ring-v2);
 }
-.miniplayer__btn:active { transform: scale(0.96); }
+.miniplayer__btn:active { transform: scale(0.94); }
 
 .miniplayer__play {
   background: var(--hym-accent);
@@ -67,15 +75,28 @@
 
 .miniplayer__skip { font-size: var(--hym-fs-caption); font-weight: var(--hym-fw-bold); }
 
+/* artwork chip: waveform glyph in a rounded square */
+.miniplayer__art {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--hym-accent-subtle);
+  color: var(--hym-accent-text);
+}
+
 .miniplayer__body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   flex: 1;
   min-width: 0;
+  padding-inline: 2px;
 }
 .miniplayer__title {
-  min-height: 24px;
+  min-height: 22px;
   padding: 0;
   border: 0;
   background: none;
@@ -90,23 +111,37 @@
   cursor: pointer;
   border-radius: var(--hym-radius-sm);
 }
-.miniplayer__track { display: flex; align-items: center; gap: var(--hym-space-2); }
-.miniplayer__range {
-  flex: 1;
-  min-width: 0;
-  height: 24px;
-  margin: 0;
-  accent-color: var(--hym-accent);
-  cursor: pointer;
-}
 .miniplayer__time {
-  flex: 0 0 auto;
-  font-size: var(--hym-fs-caption);
+  font-size: 11px;
   color: var(--hym-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-/* content must not hide under the bar */
+/* 2px progress line along the pill's bottom edge */
+.miniplayer__prog {
+  position: absolute;
+  inset-inline: 10px;
+  inset-block-end: 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hym-hairline-strong);
+  pointer-events: none;
+}
+.miniplayer__prog::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--mp-pct, 0%);
+  border-radius: inherit;
+  background: var(--hym-accent);
+  transition: width 240ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .miniplayer__prog::after { transition: none; }
+}
+
+/* content must not hide under the pill's default dock position */
 @media (max-width: 767px) {
   .app-shell--nav:has(.miniplayer) .stage-content {
     padding-block-end: calc(var(--hym-app-tab-bar-height) + env(safe-area-inset-bottom, 0px) + 96px);
@@ -114,4 +149,9 @@
 }
 @media (min-width: 768px) {
   .app-shell--nav:has(.miniplayer) .stage-content { padding-block-end: 96px; }
+}
+
+/* میزبان المنت مشترک صدا — بدون جعبه؛ audio خودش layout ندارد */
+.miniplayer__media-host {
+  display: contents;
 }

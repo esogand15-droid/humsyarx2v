@@ -9,6 +9,8 @@ import '../../design/media.css';
 import { Icon } from '../../icons';
 import { fa, humanSize } from '../../lib/library';
 import { bgAudio } from '../../lib/bgAudio';
+import { bgVideo } from '../../lib/bgVideo';
+import { adoptMedia, mediaHasSrc, sharedMedia } from '../../lib/mediaHost';
 import type { Scope } from '../../lib/ink';
 import { readerPath } from '../../lib/reader';
 
@@ -349,7 +351,16 @@ interface EngineOpts extends PlayerProps {
 }
 
 function useMediaEngine(opts: EngineOpts) {
+  // المنت مشترک کل اپ (lib/mediaHost): رفت‌وبرگشت بین پخش‌کنندهٔ کامل و ویجت
+  // شناور با reparent انجام می‌شود — بافر نمی‌ریزد و پخش قطع نمی‌شود.
   const ref = useRef<HTMLMediaElement | null>(null);
+  if (ref.current === null) ref.current = sharedMedia(opts.kind);
+  const mountRef = useCallback(
+    (node: HTMLElement | null) => {
+      if (node && ref.current) adoptMedia(opts.kind, node);
+    },
+    [opts.kind],
+  );
   const [src, setSrc] = useState(opts.url);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
@@ -432,6 +443,46 @@ function useMediaEngine(opts: EngineOpts) {
     // src عمداً در وابستگیها نیست: فقط تغییر لینک والد مهم است
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opts.url]);
+
+  // سوییچ منبع روی المنت مشترک — فقط وقتی واقعاً عوض شده تا بافر حفظ بماند
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (mediaHasSrc(opts.kind, src)) return;
+    el.src = src;
+    // اگر متادیتا از قبل حاضر است، ادامه‌ی پخش را همین‌جا اعمال کن
+    // (المنت زنده‌ی adopt شده دیگر loadedmetadata نمی‌فرستد)
+    if (el.readyState >= 1 && resumeAt.current >= 1) {
+      try {
+        el.currentTime = resumeAt.current;
+        lastSaved.current = resumeAt.current;
+      } catch {
+        /* فرمتهایی که seek اولیه را نمی‌پذیرند از ابتدا پخش میشوند */
+      }
+      resumeAt.current = 0;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src]);
+
+  // پس از adoption المنت زنده (هنداف از ویجت شناور): وضعیت را از خود المنت بگیر؛
+  // متادیتای تازه نمی‌آید و seek لازم نیست — پخش دقیقاً از همان ثانیه ادامه دارد.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || el.readyState < 1) return;
+    swapping.current = false;
+    setMetaLoaded(true);
+    const d = Number.isFinite(el.duration) ? el.duration : 0;
+    if (d > 0) setDur(d);
+    setTime(el.currentTime);
+    lastSaved.current = el.currentTime;
+    resumeAt.current = 0;
+    firstLoad.current = false;
+    if (!el.paused) setPlaying(true);
+    el.defaultPlaybackRate = rateRef.current;
+    el.playbackRate = rateRef.current;
+    // فقط هنگام mount یک بار
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // اگر بافر اول طول کشید، توضیح بده (اولین پخش فایل بزرگ از تلگرام)
   useEffect(() => {
@@ -858,8 +909,45 @@ function useMediaEngine(opts: EngineOpts) {
     onError: () => void onError(),
   };
 
+  // المنت از JSX رندر نمی‌شود (singleton مشترک)؛ شنونده‌ها imperative وصل می‌شوند
+  // و همیشه به آخرین نسخهٔ handlerها اشاره می‌کنند.
+  const handlersRef = useRef(handlers);
+  handlersRef.current = handlers;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const map = [
+      ['loadedmetadata', 'onLoadedMetadata'],
+      ['durationchange', 'onDurationChange'],
+      ['canplay', 'onCanPlay'],
+      ['waiting', 'onWaiting'],
+      ['stalled', 'onStalled'],
+      ['playing', 'onPlaying'],
+      ['play', 'onPlay'],
+      ['pause', 'onPause'],
+      ['ended', 'onEnded'],
+      ['timeupdate', 'onTimeUpdate'],
+      ['progress', 'onProgress'],
+      ['volumechange', 'onVolumeChange'],
+      ['error', 'onError'],
+    ] as const;
+    const bound = map.map(
+      ([name, key]) =>
+        [
+          name,
+          (e: Event) =>
+            (handlersRef.current[key] as unknown as ((ev: SyntheticEvent<HTMLMediaElement>) => void) | undefined)?.(
+              e as unknown as SyntheticEvent<HTMLMediaElement>,
+            ),
+        ] as [string, EventListener],
+    );
+    bound.forEach(([name, fn]) => el.addEventListener(name, fn));
+    return () => bound.forEach(([name, fn]) => el.removeEventListener(name, fn));
+  }, []);
+
   return {
     ref,
+    mountRef,
     src,
     playing,
     time,
@@ -912,6 +1000,9 @@ function VideoPlayer(p: PlayerProps) {
   const idleRef = useRef(idle);
   idleRef.current = idle;
 
+  // the same clip playing in the floating player continues here from its current second
+  const [taken] = useState(() => (p.bg ? bgVideo.takeOver(p.bg.scope, p.bg.id) : null));
+
   const toggleFs = useCallback(() => {
     const d = document as FsDoc;
     const st = stage.current as FsEl | null;
@@ -939,9 +1030,38 @@ function VideoPlayer(p: PlayerProps) {
     v?.webkitEnterFullscreen?.();
   }, []);
 
-  const m = useMediaEngine({ ...p, kind: 'video', onFullscreen: toggleFs });
+  const m = useMediaEngine({ ...p, startAt: taken ?? p.startAt, kind: 'video', onFullscreen: toggleFs });
   const playingRef = useRef(m.playing);
   playingRef.current = m.playing;
+
+  const autoplayedFromFloat = useRef(false);
+  useEffect(() => {
+    if (taken == null || autoplayedFromFloat.current || !(m.dur > 0)) return;
+    autoplayedFromFloat.current = true;
+    void m.ref.current?.play().catch(() => undefined);
+  }, [taken, m.dur, m.ref]);
+
+  // leaving the screen while playing: hand the clip to the floating player instead of stopping
+  const handoff = useRef({ playing: false, el: null as HTMLMediaElement | null, src: '', rate: 1, muted: false, p });
+  handoff.current = { ...handoff.current, playing: m.playing, el: m.ref.current, src: m.src, rate: m.rate, muted: m.muted, p };
+  useEffect(
+    () => () => {
+      const h = handoff.current;
+      const bg = h.p.bg;
+      if (!bg || !h.playing || !h.el || !h.src) return;
+      bgVideo.start({
+        scope: bg.scope,
+        id: bg.id,
+        name: h.p.name,
+        src: h.src,
+        at: h.el.currentTime,
+        rate: h.rate,
+        muted: h.muted,
+        returnTo: readerPath(bg.scope, bg.id),
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     const on = () => {
@@ -979,6 +1099,11 @@ function VideoPlayer(p: PlayerProps) {
 
   const pipOk =
     typeof document !== 'undefined' && 'pictureInPictureEnabled' in document && document.pictureInPictureEnabled;
+  // پرچم PiP روی المنت مشترک imperative ست می‌شود (المنت در JSX رندر نمی‌شود)
+  useEffect(() => {
+    const v = m.ref.current as HTMLVideoElement | null;
+    if (v) v.disablePictureInPicture = !pipOk;
+  }, [pipOk, m.ref]);
   const togglePip = async () => {
     const v = stage.current?.querySelector('video');
     if (!v) return;
@@ -1041,19 +1166,9 @@ function VideoPlayer(p: PlayerProps) {
         onPointerUp={onStageUp}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <video
-          ref={(el) => {
-            m.ref.current = el;
-          }}
-          src={m.src}
-          preload="metadata"
-          playsInline
-          controlsList="nodownload"
-          disablePictureInPicture={!pipOk}
-          {...m.handlers}
-        >
-          مرورگر تو پخش ویدیو را پشتیبانی نمی‌کند.
-        </video>
+        {/* المنت مشترک ویدیو — با adoption به این استیج منتقل می‌شود؛
+            هنداف به ویجت شناور بدون re-buffer انجام می‌شود */}
+        <div ref={m.mountRef} className="vstage__media-host" />
 
         <div className="vstage__shade" aria-hidden="true" />
         {!m.playing && !m.waiting && !m.fail && m.time === 0 && (
@@ -1182,7 +1297,7 @@ function AudioPlayer(p: PlayerProps) {
 
   // leaving the screen while playing: hand the voice to the mini player instead of stopping
   const handoff = useRef({ playing: false, el: null as HTMLMediaElement | null, src: '', rate: 1, p });
-  handoff.current = { ...handoff.current, playing: m.playing, src: m.src, rate: m.rate, p };
+  handoff.current = { ...handoff.current, playing: m.playing, el: m.ref.current, src: m.src, rate: m.rate, p };
   useEffect(
     () => () => {
       const h = handoff.current;
@@ -1215,17 +1330,8 @@ function AudioPlayer(p: PlayerProps) {
 
   return (
     <div className="mplayer mplayer--audio">
-      <audio
-        ref={(el) => {
-          m.ref.current = el;
-          if (el) handoff.current.el = el;
-        }}
-        src={m.src}
-        preload="metadata"
-        {...m.handlers}
-      >
-        مرورگر تو پخش صدا را پشتیبانی نمی‌کند.
-      </audio>
+      {/* المنت مشترک صدا — adoption به این پخش‌کننده؛ هنداف به پیل شناور بدون re-buffer */}
+      <div ref={m.mountRef} className="aplayer__media-host" />
 
       <div className={`aplayer${m.playing ? ' is-playing' : ''}`}>
         <div className="aplayer__art" aria-hidden="true">

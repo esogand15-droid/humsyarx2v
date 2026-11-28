@@ -4,8 +4,10 @@
    and .ds-* base styles — zero hex, rgba, !important, or physical props.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* پس‌زمینه از کانواس مشترک .app-shell می‌آید (glass.css) — صفحه‌های ورود هم
+   دیگر گرادیان مستقل ندارند تا نور و رنگ بین همه‌ی صفحات یکسان بماند */
 .app-shell--bare:has(.auth-screen) {
-  background: var(--hym-surface-0);
+  background: var(--hym-canvas-bg);
 }
 
 .auth-screen {
@@ -20,9 +22,6 @@
   justify-content: center;
   padding-block: max(var(--hym-space-6), env(safe-area-inset-top, 0px)) max(var(--hym-space-6), env(safe-area-inset-bottom, 0px));
   padding-inline: var(--hym-space-4);
-  background-color: var(--hym-surface-0);
-  background-image:
-    radial-gradient(ellipse 90% 45% at 50% -10%, color-mix(in srgb, var(--hym-accent) 7%, transparent), transparent 65%);
   color: var(--hym-text-primary);
   overflow-x: clip;
 }
@@ -799,13 +798,14 @@
   gap: var(--hym-space-2);
 }
 
-/* ── صفحهٔ فرود هامزیار (WelcomeScreen) ── */
+/* ── صفحهٔ فرود هامزیار (WelcomeScreen) ──
+   بکگراند از کانواس مشترک می‌آید (glass.css)؛ .auth-ambient هم حذف شد تا
+   هاله‌ی متفاوت لندینگ با بقیه‌ی صفحات یکسان شود */
 .welcome-wrap {
   position: relative;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--hym-bg-page);
   color: var(--hym-text-primary);
   overflow-x: clip;
 }

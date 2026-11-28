@@ -98,6 +98,13 @@ export const ICON_NAMES = [
   'i-mic',
   'i-mic-off',
   'i-waveform',
+  'i-eyedropper',
+  // Reader toolbar (Noteful-grade tool glyphs)
+  'i-collapse',
+  'i-dock',
+  'i-note',
+  'i-volume',
+  'i-volume-x',
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -129,9 +136,9 @@ export function IconSprite() {
       <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.6v10"/><path d="m8 9.8 4 4 4-4"/><path d="M4.6 16.8v1.6a2 2 0 0 0 2 2h10.8a2 2 0 0 0 2-2v-1.6"/></symbol>
       <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 20.4V10.4"/><path d="m8 14.2 4-4 4 4"/><path d="M4.6 7.2V5.6a2 2 0 0 1 2-2h10.8a2 2 0 0 1 2 2v1.6"/></symbol>
       <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 3.6h10a1.4 1.4 0 0 1 1.4 1.4v16L12 16.9 5.6 21V5A1.4 1.4 0 0 1 7 3.6z"/></symbol>
-      <symbol id="i-pen" viewBox="0 0 24 24"><path d="M15.6 3.9a2 2 0 0 1 2.85 0l1.65 1.65a2 2 0 0 1 0 2.85L9.5 19.1l-4.6 1.4 1.4-4.6z"/><path d="m14.1 5.4 4.5 4.5"/></symbol>
-      <symbol id="i-highlighter" viewBox="0 0 24 24"><path d="m6 14.4 8.8-8.8a2 2 0 0 1 2.8 0l.8.8a2 2 0 0 1 0 2.8L9.6 18"/><path d="M4 21h8"/><path d="m6 14.4 3.6 3.6"/></symbol>
-      <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M8.4 19.6 3.9 15.1a2 2 0 0 1 0-2.8l7-7a2 2 0 0 1 2.8 0l4.4 4.4a2 2 0 0 1 0 2.8l-7.2 7.1z"/><path d="m8.1 9.6 6.4 6.4"/><path d="M8.4 19.6H20"/></symbol>
+      <symbol id="i-pen" viewBox="0 0 24 24"><path d="m4.6 19.4 1.6-4.8L16.8 4.2a2.1 2.1 0 0 1 3 3L9.4 17.8l-4.8 1.6z"/><path d="m6.2 14.6 3.2 3.2"/><path d="m4.6 19.4-1.2 1.2"/></symbol>
+      <symbol id="i-highlighter" viewBox="0 0 24 24"><path d="m9.4 14.6 7.7-7.7a2.05 2.05 0 0 1 2.9 2.9l-7.7 7.7-4.4.7z"/><path d="m14.6 9.4 2.9 2.9"/><path d="M3.6 20.4h10.8"/></symbol>
+      <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M8.5 19.5 3.9 14.9a1.95 1.95 0 0 1 0-2.76l6.9-6.9a1.95 1.95 0 0 1 2.76 0l4.4 4.4a1.95 1.95 0 0 1 0 2.76l-7.06 7.1z"/><path d="m8 9.5 6.5 6.5"/><path d="M8.5 19.5H20"/></symbol>
       <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M14.4 5.6 8 12l6.4 6.4"/></symbol>
       <symbol id="i-chevron-r" viewBox="0 0 24 24"><path d="M9.6 5.6 16 12l-6.4 6.4"/></symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path d="m4.6 12.4 5 5 9.8-10.8"/></symbol>
@@ -171,9 +178,9 @@ export function IconSprite() {
       <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h10"/></symbol>
       <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m5.5 12.5 6.5 6.5 6.5-6.5"/></symbol>
       <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 2.8c.4 3.4-2.2 5.2-2.2 8.2a3.2 3.2 0 0 0 3.2 3.2 3.2 3.2 0 0 0 3-4.3c2.1 1.6 3.2 4 3.2 6.3a7.2 7.2 0 1 1-14.4 0c0-4 2.7-7.7 7.2-13.4z"/></symbol>
-      <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/><path d="m14 6 4 4"/></symbol>
-      <symbol id="i-fountain" viewBox="0 0 24 24"><path d="M12 3 8.2 10.5a4 4 0 0 0 .8 4.4L12 18l3-3.1a4 4 0 0 0 .8-4.4z"/><path d="M12 3v7"/><circle cx="12" cy="11.2" r="1"/><path d="M8.5 19.5h7"/></symbol>
-      <symbol id="i-lasso" viewBox="0 0 24 24"><path d="M11 4.5c4.7 0 8.5 2.7 8.5 6s-3.8 6-8.5 6-8.5-2.7-8.5-6 3.8-6 8.5-6z" strokeDasharray="3 2.5"/><path d="M8.5 16.2c-.8 1.3-.8 2.8.3 3.8 1.2 1 3 .6 3.5-.8.4-1.2-.3-2.5-1.6-2.8"/></symbol>
+      <symbol id="i-pencil" viewBox="0 0 24 24"><path d="m4.3 19.7 1.3-4.9L16.2 4.2a2 2 0 0 1 2.83 0l.77.77a2 2 0 0 1 0 2.83L9.2 18.4l-4.9 1.3z"/><path d="m5.6 14.8 3.6 3.6"/><path d="m14.4 6 3.6 3.6"/></symbol>
+      <symbol id="i-fountain" viewBox="0 0 24 24"><path d="M12 3 8.6 10.4a3.9 3.9 0 0 0 .7 4.3L12 17.4l2.7-2.7a3.9 3.9 0 0 0 .7-4.3z"/><path d="M12 3v7.2"/><circle cx="12" cy="11.4" r="1"/><path d="M8.5 19.5h7"/></symbol>
+      <symbol id="i-lasso" viewBox="0 0 24 24"><path d="M12 4.4c4.6 0 8.3 2.6 8.3 5.9s-3.7 5.9-8.3 5.9-8.3-2.6-8.3-5.9 3.7-5.9 8.3-5.9z" strokeDasharray="3 2.5"/><path d="M9.3 16c-.9 1.4-.8 2.9.3 3.9 1.2 1 3.1.6 3.6-.9.4-1.3-.4-2.6-1.7-2.9"/></symbol>
       <symbol id="i-shapes" viewBox="0 0 24 24"><circle cx="8" cy="15.5" r="4.2"/><rect x="13" y="11.5" width="7.2" height="7.2" rx="1.4"/><path d="m12 3.5 4.2 6.8H7.8z"/></symbol>
       <symbol id="i-expand" viewBox="0 0 24 24"><path d="M8.5 3.5H4.5a1 1 0 0 0-1 1v4"/><path d="M15.5 3.5h4a1 1 0 0 1 1 1v4"/><path d="M8.5 20.5H4.5a1 1 0 0 1-1-1v-4"/><path d="M15.5 20.5h4a1 1 0 0 0 1-1v-4"/></symbol>
       <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5.5 11.5 6.5-6.5 6.5 6.5"/></symbol>
@@ -203,6 +210,12 @@ export function IconSprite() {
       <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></symbol>
       <symbol id="i-mic-off" viewBox="0 0 24 24"><path d="M15 9.5V6a3 3 0 0 0-5.6-1.5M9 9v2a3 3 0 0 0 4.6 2.5"/><path d="M18.5 11a6.5 6.5 0 0 1-1 3.4M5.5 11a6.5 6.5 0 0 0 10 5.4M12 17.5V21M8.5 21h7M3.5 3.5l17 17"/></symbol>
       <symbol id="i-waveform" viewBox="0 0 24 24"><path d="M4 10v4M8 6.5v11M12 3.5v17M16 7.5v9M20 10.5v3"/></symbol>
+      <symbol id="i-eyedropper" viewBox="0 0 24 24"><path d="m19.5 4.5-1.9-1.9a1.8 1.8 0 0 0-2.5 0l-2.6 2.6 4.4 4.4 2.6-2.6a1.8 1.8 0 0 0 0-2.5z"/><path d="m13.5 6.5-8.1 8.1a2 2 0 0 0-.5.9L4 20l4.5-.9a2 2 0 0 0 .9-.5l8.1-8.1"/><path d="m11 5.5 7.5 7.5"/></symbol>
+      <symbol id="i-collapse" viewBox="0 0 24 24"><path d="m9.4 8.2-3.8 3.8 3.8 3.8"/><path d="m14.6 8.2 3.8 3.8-3.8 3.8"/></symbol>
+      <symbol id="i-dock" viewBox="0 0 24 24"><rect x="3.2" y="9.8" width="17.6" height="4.8" rx="2.4"/><path d="M7.4 12.2h1.6M11.2 12.2h1.6M15 12.2h1.6"/></symbol>
+      <symbol id="i-note" viewBox="0 0 24 24"><path d="M4.8 6.6a2 2 0 0 1 2-2h10.4a2 2 0 0 1 2 2v7.6l-5.2 5.2H6.8a2 2 0 0 1-2-2z"/><path d="M19.2 14.2h-3.4a1.8 1.8 0 0 0-1.8 1.8v3.4"/></symbol>
+      <symbol id="i-volume" viewBox="0 0 24 24"><path d="M11.5 4.8 6.8 8.6H3.6a.8.8 0 0 0-.8.8v5.2a.8.8 0 0 0 .8.8h3.2l4.7 3.8a.7.7 0 0 0 1.1-.5V5.3a.7.7 0 0 0-1.1-.5z"/><path d="M16.2 9.2a4 4 0 0 1 0 5.6"/><path d="M18.9 6.7a7.6 7.6 0 0 1 0 10.6"/></symbol>
+      <symbol id="i-volume-x" viewBox="0 0 24 24"><path d="M11.5 4.8 6.8 8.6H3.6a.8.8 0 0 0-.8.8v5.2a.8.8 0 0 0 .8.8h3.2l4.7 3.8a.7.7 0 0 0 1.1-.5V5.3a.7.7 0 0 0-1.1-.5z"/><path d="m16.5 9.5 5 5"/><path d="m21.5 9.5-5 5"/></symbol>
     </svg>
   );
 }

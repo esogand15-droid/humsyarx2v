@@ -5,6 +5,7 @@ import { fa } from '../../lib/library';
 import { ink, type Scope } from '../../lib/ink';
 import type { DocumentManifest, PageDimension } from './ProtectedReaderView';
 import { CachedThumbImg } from './ThumbnailDrawer';
+import { hasCachedThumbUrl } from './readerPageCache';
 import './page-overview.css';
 
 type Filter = 'all' | 'bookmarked' | 'inked';
@@ -24,10 +25,15 @@ interface PageOverviewProps {
   targetRect?: () => DOMRect | null;
   /** Insert a blank page after the current one (opens the template picker). */
   onInsertPage?: () => void;
+  onUrlRejected?: (page: number) => Promise<string | null>;
 }
 
 const ZOOM_MS = 300;
 const CLOSE_MS = 180;
+const VIRTUALIZE_THRESHOLD = 60;
+
+/** کش کوتاه‌عمر خلاصهٔ دست‌نوشته‌ها — باز کردن مکرر اورویو درخواست شبکه نمی‌زند */
+const inkSummaryCache = new Map<string, { at: number; set: Set<number> }>();
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -38,20 +44,28 @@ const toLatinDigits = (s: string) =>
     .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 0x06f0))
     .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660));
 
-/** Fetches a thumbnail only once its card scrolls near view; a 150-page deck must not fire 150 requests. */
+function setCssVar(name: string, value: string) {
+  return (el: HTMLElement | null) => {
+    if (el) el.style.setProperty(name, value);
+  };
+}
+
+/** Fetches a thumbnail only once its card scrolls near view; cached items render immediately without waiting for observer. */
 function LazyThumb({
   root,
   scope,
   id,
   dim,
+  onUrlRejected,
 }: {
   root: HTMLElement | null;
   scope: Scope;
   id: string;
   dim: PageDimension;
+  onUrlRejected?: (page: number) => Promise<string | null>;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [seen, setSeen] = useState(false);
+  const [seen, setSeen] = useState(() => hasCachedThumbUrl(scope, id, dim.page));
 
   useEffect(() => {
     if (seen) return;
@@ -68,15 +82,21 @@ function LazyThumb({
           obs.disconnect();
         }
       },
-      { root, rootMargin: '480px 0px' },
+      { root, rootMargin: '640px 0px' },
     );
     obs.observe(el);
     return () => obs.disconnect();
   }, [root, seen]);
 
   return (
-    <div ref={ref} className="page-ov__thumb" style={{ aspectRatio: String(dim.aspect_ratio || 0.7071) }}>
-      {seen && (
+    <div
+      ref={(el) => {
+        ref.current = el;
+        if (el) el.style.setProperty('--thumb-ar', String(dim.aspect_ratio || 0.7071));
+      }}
+      className="page-ov__thumb"
+    >
+      {seen ? (
         <CachedThumbImg
           scope={scope}
           id={id}
@@ -84,7 +104,13 @@ function LazyThumb({
           remoteUrl={dim.thumbnail_url || dim.url}
           fallbackUrl={dim.url}
           alt={`صفحهٔ ${fa(dim.page)}`}
+          onUrlRejected={onUrlRejected}
         />
+      ) : (
+        <div className="thumb-skel" aria-hidden="true">
+          <span className="thumb-skel__shimmer" />
+          <span className="thumb-skel__num num">{fa(dim.page)}</span>
+        </div>
       )}
     </div>
   );
@@ -106,6 +132,7 @@ export function PageOverview({
   onToggleBookmark,
   targetRect,
   onInsertPage,
+  onUrlRejected,
 }: PageOverviewProps) {
   const [filter, setFilter] = useState<Filter>('all');
   const [inked, setInked] = useState<Set<number>>(() => new Set());
@@ -118,6 +145,8 @@ export function PageOverview({
     go: boolean;
   } | null>(null);
   const [jumpText, setJumpText] = useState('');
+  const [gridMetrics, setGridMetrics] = useState({ cols: 4, rowH: 220, startRow: 0, endRow: 12 });
+
   const timers = useRef<number[]>([]);
   const busy = useRef(false);
 
@@ -140,10 +169,20 @@ export function PageOverview({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    // کش ۶۰ ثانیه‌ای: هر بار باز کردن اورویو نباید درخواست شبکه بزند
+    const cacheKey = `${scope}:${id}`;
+    const hit = inkSummaryCache.get(cacheKey);
+    if (hit && Date.now() - hit.at < 60_000) {
+      setInked(hit.set);
+      return;
+    }
     ink
       .summary(scope, id)
       .then((res) => {
-        if (!cancelled) setInked(new Set((res.pages ?? []).filter((p) => p.count > 0).map((p) => p.page)));
+        if (cancelled) return;
+        const set = new Set((res.pages ?? []).filter((p) => p.count > 0).map((p) => p.page));
+        inkSummaryCache.set(cacheKey, { at: Date.now(), set });
+        setInked(set);
       })
       .catch(() => {
         // the overview still works without ink badges
@@ -153,16 +192,81 @@ export function PageOverview({
     };
   }, [open, scope, id]);
 
+  const dims = manifest?.page_dimensions ?? [];
+  const shown = dims.filter((d) =>
+    filter === 'all' ? true : filter === 'bookmarked' ? bookmarkedPages.includes(d.page) : inked.has(d.page),
+  );
+  const virtualized = shown.length > VIRTUALIZE_THRESHOLD;
+
+  // Measure grid columns + row height and compute visible row window for 200+ page docs
+  const recomputeWindow = useCallback(() => {
+    if (!scroller) return;
+    const cs = getComputedStyle(scroller);
+    const tplCols = cs.gridTemplateColumns ? cs.gridTemplateColumns.split(' ').filter(Boolean).length : 0;
+    const cols = Math.max(1, tplCols || 3);
+    const gapRow = parseFloat(cs.rowGap || '18') || 18;
+    const sampleCard = scroller.querySelector<HTMLElement>('.page-ov__card');
+    const measuredRowH = sampleCard ? sampleCard.offsetHeight + gapRow : gridMetrics.rowH;
+    const rowH = Math.max(120, Math.round(measuredRowH));
+    const viewH = scroller.clientHeight || 600;
+    const scrollTop = scroller.scrollTop;
+    const totalRows = Math.ceil(shown.length / cols);
+    const startRow = Math.max(0, Math.floor(scrollTop / rowH) - 2);
+    const endRow = Math.min(totalRows - 1, Math.ceil((scrollTop + viewH) / rowH) + 3);
+    setGridMetrics((prev) =>
+      prev.cols === cols && prev.rowH === rowH && prev.startRow === startRow && prev.endRow === endRow
+        ? prev
+        : { cols, rowH, startRow, endRow },
+    );
+  }, [scroller, shown.length, gridMetrics.rowH]);
+
   // Open centred on the page being read. Runs once per opening, not on every page change.
   useLayoutEffect(() => {
     if (!open || !scroller) return;
-    const el = scroller.querySelector<HTMLElement>(`[data-ov-page="${currentPage}"]`);
-    if (el) {
-      el.scrollIntoView({ block: 'center' });
-      el.focus({ preventScroll: true });
+    if (virtualized) {
+      const cs = getComputedStyle(scroller);
+      const cols = Math.max(1, (cs.gridTemplateColumns || '').split(' ').filter(Boolean).length || 3);
+      const gapRow = parseFloat(cs.rowGap || '18') || 18;
+      const padLeft = parseFloat(cs.paddingLeft || '16') || 16;
+      const padRight = parseFloat(cs.paddingRight || '16') || 16;
+      const gapCol = parseFloat(cs.columnGap || '14') || 14;
+      const colW = Math.max(96, (scroller.clientWidth - padLeft - padRight - gapCol * (cols - 1)) / cols);
+      const avgAr = dims[0]?.aspect_ratio || 0.7071;
+      const estRowH = Math.round(colW / avgAr + 34 + gapRow);
+      const idx = Math.max(0, shown.findIndex((d) => d.page === currentPage));
+      const targetRow = Math.floor(idx / cols);
+      scroller.scrollTop = Math.max(0, targetRow * estRowH - scroller.clientHeight / 2 + estRowH / 2);
+      recomputeWindow();
+    } else {
+      const el = scroller.querySelector<HTMLElement>(`[data-ov-page="${currentPage}"]`);
+      if (el) {
+        el.scrollIntoView({ block: 'center' });
+        el.focus({ preventScroll: true });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, scroller]);
+
+  useEffect(() => {
+    if (!open || !scroller || !virtualized) return;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        recomputeWindow();
+      });
+    };
+    recomputeWindow();
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(recomputeWindow) : null;
+    ro?.observe(scroller);
+    return () => {
+      scroller.removeEventListener('scroll', onScroll);
+      ro?.disconnect();
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, [open, scroller, virtualized, recomputeWindow]);
 
   const dismiss = useCallback(() => {
     if (busy.current) return;
@@ -191,7 +295,7 @@ export function PageOverview({
     if (busy.current) return;
     const img = card?.querySelector('img');
     const src = img ? img.currentSrc || img.src : '';
-    if (prefersReducedMotion() || !img || !src || !img.complete) {
+    if (prefersReducedMotion() || !img || !src || !img.complete || img.naturalWidth === 0) {
       onJump(page);
       onClose();
       return;
@@ -222,16 +326,18 @@ export function PageOverview({
 
   if (!open || !manifest) return null;
 
-  const dims = manifest.page_dimensions;
-  const shown = dims.filter((d) =>
-    filter === 'all' ? true : filter === 'bookmarked' ? bookmarkedPages.includes(d.page) : inked.has(d.page),
-  );
-
   const filters: Array<{ key: Filter; label: string; count: number }> = [
     { key: 'all', label: 'همه', count: dims.length },
-    { key: 'bookmarked', label: 'نشانشده', count: bookmarkedPages.length },
-    { key: 'inked', label: 'دستنوشته', count: inked.size },
+    { key: 'bookmarked', label: 'نشان‌شده', count: bookmarkedPages.length },
+    { key: 'inked', label: 'دست‌نوشته', count: inked.size },
   ];
+
+  const totalRows = Math.ceil(shown.length / gridMetrics.cols);
+  const startIdx = virtualized ? Math.max(0, gridMetrics.startRow * gridMetrics.cols) : 0;
+  const endIdx = virtualized ? Math.min(shown.length, (gridMetrics.endRow + 1) * gridMetrics.cols) : shown.length;
+  const visibleCards = shown.slice(startIdx, endIdx);
+  const topSpace = virtualized ? gridMetrics.startRow * gridMetrics.rowH : 0;
+  const botSpace = virtualized ? Math.max(0, (totalRows - 1 - gridMetrics.endRow) * gridMetrics.rowH) : 0;
 
   let zoomStyle: CSSProperties | undefined;
   if (zoom) {
@@ -320,60 +426,82 @@ export function PageOverview({
             <div className="page-ov__empty">
               <DsEmpty
                 icon={<Icon name={filter === 'bookmarked' ? 'i-star' : 'i-pen'} size={28} />}
-                title={filter === 'bookmarked' ? 'هنوز صفحهای نشان نشده' : 'هنوز روی صفحهای ننوشتهای'}
+                title={filter === 'bookmarked' ? 'هنوز صفحه‌ای نشان نشده' : 'هنوز روی صفحه‌ای ننوشته‌ای'}
                 body={
                   filter === 'bookmarked'
                     ? 'روی ستارهٔ گوشهٔ هر صفحه بزن تا اینجا بیاید.'
-                    : 'صفحههایی که با قلم یا هایلایتر رویشان کار کنی اینجا جمع میشوند.'
+                    : 'صفحه‌هایی که با قلم یا هایلایتر رویشان کار کنی اینجا جمع می‌شوند.'
                 }
               />
             </div>
           ) : (
-            shown.map((d) => {
-              const isCurrent = d.page === currentPage;
-              const isBm = bookmarkedPages.includes(d.page);
-              return (
+            <>
+              {topSpace > 0 && (
                 <div
-                  key={d.page}
-                  data-ov-page={d.page}
-                  className={`page-ov__card${isCurrent ? ' is-current' : ''}`}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`صفحهٔ ${fa(d.page)}`}
-                  aria-current={isCurrent ? 'page' : undefined}
-                  style={{ '--i': Math.min(24, Math.abs(d.page - currentPage)) } as CSSProperties}
-                  onClick={(e) => choose(d.page, e.currentTarget)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      choose(d.page, e.currentTarget);
-                    }
-                  }}
-                >
-                  <div className="page-ov__frame">
-                    <LazyThumb root={scroller} scope={scope} id={id} dim={d} />
-                    <button
-                      type="button"
-                      className={`page-ov__bm${isBm ? ' is-on' : ''}`}
-                      aria-label={isBm ? `حذف نشان صفحهٔ ${fa(d.page)}` : `نشان کردن صفحهٔ ${fa(d.page)}`}
-                      aria-pressed={isBm}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleBookmark(d.page);
-                      }}
-                    >
-                      <Icon name={isBm ? 'i-star-filled' : 'i-star'} size={14} />
-                    </button>
-                    {inked.has(d.page) && (
-                      <span className="page-ov__ink" title="دارای دستنوشته">
-                        <Icon name="i-pen" size={11} />
-                      </span>
-                    )}
+                  className="page-ov__spacer"
+                  ref={setCssVar('--ov-spacer-h', `${topSpace}px`)}
+                  aria-hidden="true"
+                />
+              )}
+              {visibleCards.map((d) => {
+                const isCurrent = d.page === currentPage;
+                const isBm = bookmarkedPages.includes(d.page);
+                return (
+                  <div
+                    key={d.page}
+                    data-ov-page={d.page}
+                    className={`page-ov__card${isCurrent ? ' is-current' : ''}${virtualized ? ' is-virtual' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`صفحهٔ ${fa(d.page)}`}
+                    aria-current={isCurrent ? 'page' : undefined}
+                    ref={setCssVar('--i', String(Math.min(24, Math.abs(d.page - currentPage))))}
+                    onClick={(e) => choose(d.page, e.currentTarget)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        choose(d.page, e.currentTarget);
+                      }
+                    }}
+                  >
+                    <div className="page-ov__frame">
+                      <LazyThumb
+                        root={scroller}
+                        scope={scope}
+                        id={id}
+                        dim={d}
+                        onUrlRejected={onUrlRejected}
+                      />
+                      <button
+                        type="button"
+                        className={`page-ov__bm${isBm ? ' is-on' : ''}`}
+                        aria-label={isBm ? `حذف نشان صفحهٔ ${fa(d.page)}` : `نشان کردن صفحهٔ ${fa(d.page)}`}
+                        aria-pressed={isBm}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleBookmark(d.page);
+                        }}
+                      >
+                        <Icon name={isBm ? 'i-star-filled' : 'i-star'} size={14} />
+                      </button>
+                      {inked.has(d.page) && (
+                        <span className="page-ov__ink" title="دارای دست‌نوشته">
+                          <Icon name="i-pen" size={11} />
+                        </span>
+                      )}
+                    </div>
+                    <span className="page-ov__num num">{fa(d.page)}</span>
                   </div>
-                  <span className="page-ov__num num">{fa(d.page)}</span>
-                </div>
-              );
-            })
+                );
+              })}
+              {botSpace > 0 && (
+                <div
+                  className="page-ov__spacer"
+                  ref={setCssVar('--ov-spacer-h', `${botSpace}px`)}
+                  aria-hidden="true"
+                />
+              )}
+            </>
           )}
         </div>
       </div>

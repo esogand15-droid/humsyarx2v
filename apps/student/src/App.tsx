@@ -9,6 +9,7 @@ import { useSession } from './lib/session';
 import { SessionExpiredBanner } from './components/SessionExpiredBanner';
 import { SwUpdateBanner } from './components/SwUpdateBanner';
 import { MiniPlayer } from './components/MiniPlayer';
+import { FloatingVideoPlayer } from './components/FloatingVideoPlayer';
 
 const HomeScreen = lazy(() => import('./screens/HomeScreen').then((m) => ({ default: m.HomeScreen })));
 const LibraryScreen = lazy(() => import('./screens/library/LibraryScreen').then((m) => ({ default: m.LibraryScreen })));
@@ -270,8 +271,9 @@ export function App() {
         />
         </Routes>
       </Suspense>
-      {/* outside Routes: survives navigation, so a voice keeps playing across screens */}
+      {/* outside Routes: survives navigation, so a voice/video keeps playing across screens */}
       <MiniPlayer />
+      <FloatingVideoPlayer />
     </Layout>
   );
 }

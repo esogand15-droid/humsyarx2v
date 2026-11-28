@@ -29,23 +29,43 @@ class SteppedToolbarAndEraserSizingTests(unittest.TestCase):
         cls.ink_layer_code = (READER_DIR / "InkLayer.tsx").read_text(encoding="utf-8")
         cls.ui_css = ((DESIGN_DIR / "ui.css").read_text(encoding="utf-8") + (DESIGN_DIR.parent / "screens" / "reader" / "reader-shell.css").read_text(encoding="utf-8"))
 
-    def test_toolbar_telescopic_tier_state_and_contracts(self):
-        """Verify 3-tier telescopic state (dot, primary, full) in InkToolbar.tsx."""
-        self.assertIn("toolbarTier", self.toolbar_code)
-        self.assertIn("'dot' | 'primary' | 'full'", self.toolbar_code)
-        self.assertIn("ink-stepper-btn", self.toolbar_code)
-        self.assertIn("ink-stepped-drawer", self.toolbar_code)
-        self.assertIn("handleToggleTier", self.toolbar_code)
-        self.assertIn("ink-stylus-dot", self.toolbar_code)
+    def test_toolbar_fixed_height_flyout_contracts(self):
+        """Root redesign (2026-11-28): the telescopic tier system is gone.
+
+        The bar is fixed-height and icon-only; secondary tools open in a floating
+        tray (the bar itself never resizes); collapse morphs to a stylus dot;
+        a ghost mode fades the bar while inking; exactly one flyout is open at
+        a time (PencilKit/Noteful/Excalidraw conventions)."""
+        code = self.toolbar_code
+        # old telescopic tiers must stay removed (they caused the resize-jump bug)
+        self.assertNotIn("toolbarTier", code)
+        self.assertNotIn("handleToggleTier", code)
+        self.assertNotIn("ink-stepped-drawer", code)
+        self.assertNotIn("'dot' | 'primary' | 'full'", code)
+        # new contracts
+        self.assertIn("ink-stepper-btn", code)          # tray trigger kept
+        self.assertIn("ink-stylus-dot", code)           # collapsed dot kept
+        self.assertIn("ink-dock__tray", code)           # floating secondary-tools tray
+        self.assertIn("setGhost", code)                 # ghost fade while inking
+        self.assertIn("type Flyout", code)              # single flyout at a time
+        self.assertIn("placeFloatingPanel", code)       # collision-safe flyout placement
+        # icon-only bar: the old text-label spans are gone from markup AND CSS
+        self.assertNotIn("ink-dock__btn-label", code)
+        css = (READER_DIR / "reader.css").read_text(encoding="utf-8")
+        self.assertNotIn("ink-dock__btn-label", css)
+        self.assertNotIn("tier-full", css)
+        self.assertIn("is-ghost", css)
+        self.assertIn("ink-dock__tray--floating", css)
 
     def test_eraser_dedicated_subdock_and_mode_chips(self):
         """Verify dedicated eraser sub-dock, mode chips, and sizing presets."""
         self.assertIn("ink-subdock--eraser", self.toolbar_code)
         self.assertIn("ink-eraser-modes", self.toolbar_code)
         self.assertIn("ink-mode-chip", self.toolbar_code)
-        self.assertIn("🧹", self.toolbar_code)
+        # DS v2: sprite icons instead of emoji chrome
+        self.assertIn('<Icon name="i-eraser"', self.toolbar_code)
+        self.assertIn('<Icon name="i-scissors"', self.toolbar_code)
         self.assertIn("کل خط", self.toolbar_code)
-        self.assertIn("✂️", self.toolbar_code)
         self.assertIn("برشی دقیق", self.toolbar_code)
         self.assertIn("ink-slider--eraser", self.toolbar_code)
         self.assertIn("ink-eraser-preview-dot", self.toolbar_code)

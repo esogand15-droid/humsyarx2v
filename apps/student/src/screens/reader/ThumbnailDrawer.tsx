@@ -1,10 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DsButton, DsEmpty } from '../../design/components';
 import { Icon } from '../../icons';
 import { fa } from '../../lib/library';
 import { ink, type InkSummaryPage, type Scope } from '../../lib/ink';
 import type { DocumentManifest } from './ProtectedReaderView';
-import { acquireThumbUrl, getCachedThumbUrl } from './readerPageCache';
+import {
+  acquireThumbUrl,
+  getCachedThumbUrl,
+  invalidateThumbCache,
+  pinThumbUrl,
+  unpinThumbUrl,
+} from './readerPageCache';
 
 export function CachedThumbImg({
   scope,
@@ -13,6 +19,7 @@ export function CachedThumbImg({
   remoteUrl,
   fallbackUrl,
   alt,
+  onUrlRejected,
 }: {
   scope: Scope;
   id: string;
@@ -20,53 +27,127 @@ export function CachedThumbImg({
   remoteUrl: string;
   fallbackUrl: string;
   alt: string;
+  onUrlRejected?: (page: number) => Promise<string | null>;
 }) {
-  const [src, setSrc] = useState<string>(() => {
-    const cached = getCachedThumbUrl(scope, id, page);
-    if (cached) return cached;
-    return remoteUrl.startsWith('data:') ? remoteUrl : '';
-  });
+  const initialCached = getCachedThumbUrl(scope, id, page);
+  const initialDirect = !initialCached && remoteUrl.startsWith('data:') ? remoteUrl : '';
+
+  const [src, setSrc] = useState<string>(initialCached || initialDirect);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
+    initialCached || initialDirect ? 'ready' : 'loading',
+  );
+  const [imgLoaded, setImgLoaded] = useState<boolean>(Boolean(initialCached || initialDirect));
+  const [retryToken, setRetryToken] = useState(0);
+
+  const onRejectedRef = useRef(onUrlRejected);
+  onRejectedRef.current = onUrlRejected;
+
+  // Pin active blob URL in RAM LRU while mounted so eviction never breaks a visible thumbnail
+  useEffect(() => {
+    if (status !== 'ready' || !src || src.startsWith('data:')) return;
+    pinThumbUrl(scope, id, page);
+    return () => {
+      unpinThumbUrl(scope, id, page);
+    };
+  }, [scope, id, page, src, status]);
 
   useEffect(() => {
-    let cancelled = false;
     const cached = getCachedThumbUrl(scope, id, page);
     if (cached) {
       setSrc(cached);
+      setStatus('ready');
+      setImgLoaded(true);
       return;
     }
     if (remoteUrl.startsWith('data:')) {
       setSrc(remoteUrl);
+      setStatus('ready');
+      setImgLoaded(true);
       return;
     }
-    void acquireThumbUrl(scope, id, page, remoteUrl)
+
+    const ac = new AbortController();
+    setStatus('loading');
+    setImgLoaded(false);
+
+    void acquireThumbUrl(
+      scope,
+      id,
+      page,
+      remoteUrl,
+      onRejectedRef.current ? () => onRejectedRef.current!(page) : undefined,
+      { priority: 'high', fallbackUrl, signal: ac.signal },
+    )
       .then((objUrl) => {
-        if (!cancelled) setSrc(objUrl);
+        if (ac.signal.aborted) return;
+        setSrc(objUrl);
+        setStatus('ready');
+        setImgLoaded(true);
       })
       .catch(() => {
-        if (!cancelled && fallbackUrl && fallbackUrl !== remoteUrl) {
-          void acquireThumbUrl(scope, id, page, fallbackUrl)
-            .then((objUrl) => {
-              if (!cancelled) setSrc(objUrl);
-            })
-            .catch(() => {
-              if (!cancelled) setSrc(fallbackUrl);
-            });
-        }
+        if (ac.signal.aborted) return;
+        setSrc('');
+        setStatus('error');
       });
+
     return () => {
-      cancelled = true;
+      ac.abort();
     };
-  }, [scope, id, page, remoteUrl, fallbackUrl]);
+  }, [scope, id, page, remoteUrl, fallbackUrl, retryToken]);
+
+  const handleImgError = useCallback(() => {
+    invalidateThumbCache(scope, id, page);
+    setSrc('');
+    setStatus('error');
+  }, [scope, id, page]);
+
+  if (status === 'ready' && src) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={`thumb-card__img${imgLoaded ? ' is-loaded' : ''}`}
+        loading="lazy"
+        decoding="async"
+        draggable={false}
+        onLoad={() => setImgLoaded(true)}
+        onError={handleImgError}
+      />
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div
+        className="thumb-fallback"
+        role="button"
+        tabIndex={0}
+        aria-label={`تلاش دوباره برای پیش‌نمایش صفحه ${fa(page)}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          invalidateThumbCache(scope, id, page);
+          setRetryToken((n) => n + 1);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            invalidateThumbCache(scope, id, page);
+            setRetryToken((n) => n + 1);
+          }
+        }}
+      >
+        <Icon name="i-file-text" size={20} />
+        <span className="num">{fa(page)}</span>
+      </div>
+    );
+  }
 
   return (
-    <img
-      src={src || undefined}
-      alt={alt}
-      className="thumb-card__img"
-      loading="lazy"
-      decoding="async"
-      draggable={false}
-    />
+    <div className="thumb-skel" aria-busy="true" aria-label={`در حال بارگذاری صفحه ${fa(page)}`}>
+      <span className="thumb-skel__shimmer" aria-hidden="true" />
+      <span className="thumb-skel__num num">{fa(page)}</span>
+    </div>
   );
 }
 
@@ -80,6 +161,7 @@ interface ThumbnailDrawerProps {
   id: string;
   bookmarkedPages: number[];
   onToggleBookmark: (page: number) => void;
+  onUrlRejected?: (page: number) => Promise<string | null>;
 }
 
 type DrawerTab = 'thumbnails' | 'bookmarks' | 'notes';
@@ -94,6 +176,7 @@ export function ThumbnailDrawer({
   id,
   bookmarkedPages,
   onToggleBookmark,
+  onUrlRejected,
 }: ThumbnailDrawerProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>('thumbnails');
   const [annotatedPages, setAnnotatedPages] = useState<InkSummaryPage[]>([]);
@@ -205,14 +288,17 @@ export function ThumbnailDrawer({
                   tabIndex={0}
                   aria-label={`پرش به صفحه ${dim.page}`}
                 >
-                  <CachedThumbImg
-                    scope={scope}
-                    id={id}
-                    page={dim.page}
-                    remoteUrl={dim.thumbnail_url || dim.url}
-                    fallbackUrl={dim.url}
-                    alt={`صفحه ${dim.page}`}
-                  />
+                  <div className="thumb-card__media">
+                    <CachedThumbImg
+                      scope={scope}
+                      id={id}
+                      page={dim.page}
+                      remoteUrl={dim.thumbnail_url || dim.url}
+                      fallbackUrl={dim.url}
+                      alt={`صفحه ${dim.page}`}
+                      onUrlRejected={onUrlRejected}
+                    />
+                  </div>
                   <div className="thumb-card__footer">
                     <span className="thumb-card__num num">صفحه {fa(dim.page)}</span>
                     <div className="thumb-card__actions">
@@ -276,14 +362,17 @@ export function ThumbnailDrawer({
                       tabIndex={0}
                       aria-label={`پرش به صفحه ${dim.page}`}
                     >
-                      <CachedThumbImg
-                        scope={scope}
-                        id={id}
-                        page={dim.page}
-                        remoteUrl={dim.thumbnail_url || dim.url}
-                        fallbackUrl={dim.url}
-                        alt={`صفحه ${dim.page}`}
-                      />
+                      <div className="thumb-card__media">
+                        <CachedThumbImg
+                          scope={scope}
+                          id={id}
+                          page={dim.page}
+                          remoteUrl={dim.thumbnail_url || dim.url}
+                          fallbackUrl={dim.url}
+                          alt={`صفحه ${dim.page}`}
+                          onUrlRejected={onUrlRejected}
+                        />
+                      </div>
                       <div className="thumb-card__footer">
                         <span className="thumb-card__num num">صفحه {fa(dim.page)}</span>
                         <button

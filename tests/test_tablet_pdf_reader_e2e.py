@@ -249,12 +249,21 @@ class Tier1Feature6StickyNoteTests(ReaderBaseTest):
         self.assertEqual(0.85, valid_note.x)
         self.assertEqual(0.30, valid_note.y)
 
-    def test_tc_note_02_margin_snapping_boundaries(self):
-        """TC-NOTE-02: Verify margin snapping: nextX < 0.12 => 0.03 and nextX > 0.78 => 0.82."""
-        self.assertIn("nextX < 0.12", self.sticky_note_tsx)
-        self.assertIn("nextX > 0.78", self.sticky_note_tsx)
-        self.assertIn("0.03", self.sticky_note_tsx)
-        self.assertIn("0.82", self.sticky_note_tsx)
+    def test_tc_note_02_size_aware_drag_clamp(self):
+        """TC-NOTE-02 (rev. 2026-11-28): drag clamping is size-aware.
+
+        The old fixed margin-snap (0.12→0.03 / 0.78→0.82) contradicted its own
+        0.68 clip-guard: a note spawned at x=0.82 was born clipped, and the snap
+        targets were dead code. Notes now clamp against their measured px box so
+        they can never leave the page, at any page width or zoom."""
+        self.assertIn("noteW = noteEl?.offsetWidth", self.sticky_note_tsx)
+        self.assertIn("maxX = Math.max", self.sticky_note_tsx)
+        self.assertIn("(width - noteW) / Math.max(1, width)", self.sticky_note_tsx)
+        # the pointer-cancel/lost-capture path commits instead of sticking
+        self.assertIn("onPointerCancel", self.sticky_note_tsx)
+        self.assertIn("onLostPointerCapture", self.sticky_note_tsx)
+        # drag on the pin no longer expands it via the trailing click
+        self.assertIn("suppressClick.current", self.sticky_note_tsx)
 
     def test_tc_note_03_color_presets_inventory(self):
         """TC-NOTE-03: Verify 4 color presets: yellow, cyan, green, coral."""
@@ -389,9 +398,20 @@ class Tier1Feature10SmartHighlighterTests(ReaderBaseTest):
         self.assertIn("multiply", self.ink_layer_tsx)
         self.assertIn("s.tool === 'highlighter'", self.ink_layer_tsx)
 
-    def test_tc_hl_02_square_line_cap_for_highlighter(self):
-        """TC-HL-02: Verify chisel/square line cap for highlighter strokes."""
-        self.assertIn("s.tool === 'highlighter' ? 'square' : 'round'", self.ink_layer_tsx)
+    def test_tc_hl_02_round_marker_line_cap_for_highlighter(self):
+        """TC-HL-02 (rev. 2026-11-28): highlighter draws with rounded marker-like caps.
+
+        The old square-cap contract was replaced deliberately: highlighter strokes
+        now render opaque onto a dedicated highlighter canvas whose overall alpha
+        (HIGHLIGHTER_ALPHA) provides the translucency, so overlapping strokes keep
+        one even tint — and round caps avoid dark corner blobs at stroke joints."""
+        self.assertIn("s.tool === 'highlighter'", self.ink_layer_tsx)
+        self.assertIn("HIGHLIGHTER_ALPHA", self.ink_layer_tsx)
+        # the highlighter branch pins round caps explicitly
+        self.assertRegex(
+            self.ink_layer_tsx,
+            r"highlighter'\) \{[^}]*ctx\.lineCap = 'round'",
+        )
 
     def test_tc_hl_03_highlighter_opacity_clamping(self):
         """TC-HL-03: Verify default opacity 0.35 for highlighters preventing text obscuration."""

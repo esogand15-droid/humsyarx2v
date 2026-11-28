@@ -37,7 +37,6 @@ export function WelcomeScreen() {
 
   return (
     <div className="welcome-wrap" dir="rtl">
-      <div className="auth-ambient" aria-hidden="true" />
 
       <header className="welcome-nav" role="banner">
         <div className="welcome-nav__brand">
