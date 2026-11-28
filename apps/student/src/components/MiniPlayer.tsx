@@ -56,6 +56,13 @@ function defaultPos(): FloatPos {
 export function MiniPlayer() {
   const track = useSyncExternalStore(bgAudio.subscribe, bgAudio.get);
   const navigate = useNavigate();
+  // Inner فقط وقتی track هست mount می‌شود؛ هوک‌هایش هرگز با حالت track=null
+  // در یک fiber جمع نمی‌شوند — جداسازی container/inner ریشه‌کنِ کرش hooks است.
+  if (!track) return null;
+  return <MiniPlayerInner track={track} navigate={navigate} />;
+}
+
+function MiniPlayerInner({ track, navigate }: { track: BgTrack; navigate: ReturnType<typeof useNavigate> }) {
   const elRef = useRef<HTMLMediaElement | null>(null);
   if (elRef.current === null) elRef.current = sharedMedia('audio');
   const trackRef = useRef<BgTrack | null>(track);
@@ -65,6 +72,7 @@ export function MiniPlayer() {
   const [dur, setDur] = useState(0);
   const lastSaved = useRef(0);
   const refreshed = useRef(false);
+
 
   // floating pill state
   const [pos, setPos] = useState<FloatPos>(() => loadFloatState(POS_KEY, defaultPos()));
@@ -228,8 +236,6 @@ export function MiniPlayer() {
     },
     [],
   );
-
-  if (!track) return null;
 
   const el = () => elRef.current;
   const toggle = () => {

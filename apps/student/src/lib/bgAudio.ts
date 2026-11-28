@@ -46,13 +46,16 @@ export const bgAudio = {
     emit();
   },
   /** A player for this file is opening: stop background playback and return its second.
-      Repeat calls for the same file return the same second (StrictMode runs initializers twice). */
+      Repeat calls for the same file return the same second (StrictMode runs initializers twice).
+      takeOver در فاز render صدا زده می‌شود (useState initializer)؛ emit را به microtask
+      می‌بریم تا subscriberها (MiniPlayer) وسط رندرِ کامپوننت دیگر sync رندر نشوند —
+      همان کاری که باعث کرش متناوب «Rendered more hooks» می‌شد. */
   takeOver(scope: Scope, id: string): number | null {
     const t = track;
     if (!t) return lastTaken && lastTaken.scope === scope && lastTaken.id === id ? lastTaken.at : null;
     const at = liveAt;
     track = null;
-    emit();
+    queueMicrotask(emit);
     if (t.scope !== scope || t.id !== id) return null;
     lastTaken = { scope, id, at };
     return at;

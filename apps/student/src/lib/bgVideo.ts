@@ -53,12 +53,14 @@ export const bgVideo = {
   },
   /** A player for this file is opening: stop floating playback and return its second.
       Repeat calls for the same file return the same second (StrictMode runs initializers twice). */
+  /** See bgAudio.takeOver: emit is deferred so subscribers never re-render
+      synchronously inside another component's render/commit phase. */
   takeOver(scope: Scope, id: string): number | null {
     const t = track;
     if (!t) return lastTaken && lastTaken.scope === scope && lastTaken.id === id ? lastTaken.at : null;
     const at = liveAt;
     track = null;
-    emit();
+    queueMicrotask(emit);
     if (t.scope !== scope || t.id !== id) return null;
     lastTaken = { scope, id, at };
     return at;

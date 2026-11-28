@@ -28,6 +28,20 @@ type InputFormat = 'hex' | 'rgb' | 'hsl';
 const RECENT_KEY = 'hz.reader.recentColors';
 const SAVED_KEY = 'hz.reader.savedColors';
 const MAX_RECENT = 8;
+/** یک «انتخاب رنگ» = یک ثبت: فاصلهٔ کمتر از این با آخرین ثبتِ قبلی، ثبت نمی‌شود */
+const COMMIT_MIN_DISTANCE = 14;
+/** ژست‌های پشت‌سرهم (SV→hue→alpha) داخل همین پنجره یک جلسه‌اند */
+const COMMIT_DEBOUNCE_MS = 380;
+
+/** فاصلهٔ تقریبی دو رنگ (مجموع اختلاف کانال‌ها + آلفا) — برای آستانهٔ ثبت */
+function colorDistance(a: string, b: string): number {
+  const pa = parseColorToRgba(a);
+  const pb = parseColorToRgba(b);
+  if (!pa || !pb) return Number.POSITIVE_INFINITY;
+  return (
+    Math.abs(pa.r - pb.r) + Math.abs(pa.g - pb.g) + Math.abs(pa.b - pb.b) + Math.abs(pa.a - pb.a) * 128
+  );
+}
 const MAX_SAVED = 12;
 
 const clamp = (val: number, min: number, max: number) => Math.min(max, Math.max(min, val));
@@ -196,8 +210,11 @@ export function pushRecentColor(hex: string): string[] {
   const rgba = parseColorToRgba(hex);
   if (!rgba) return readRecentColors();
   const normalized = rgbaToHex(rgba);
-  const existing = readRecentColors().filter((c) => c.toUpperCase() !== normalized.toUpperCase());
-  const next = [normalized, ...existing].slice(0, MAX_RECENT);
+  const existing = readRecentColors();
+  // ضد flood: اگر تقریباً همان رنگ سرِ لیست است، ثبت نشود (قبلاً هر درگِ جدا
+  // یک ورودی تقریباً یکسان می‌ساخت و لیست اخیرها پر از تکرارهای نزدیک می‌شد)
+  if (existing.length > 0 && colorDistance(normalized, existing[0]) < 8) return existing;
+  const next = [normalized, ...existing.filter((c) => c.toUpperCase() !== normalized.toUpperCase())].slice(0, MAX_RECENT);
   writeColorList(RECENT_KEY, next);
   return next;
 }
@@ -276,6 +293,8 @@ export function CustomColorPicker({
   const nativeInputRef = useRef<HTMLInputElement | null>(null);
   const latestHexRef = useRef<string>(hexDraft);
   const lastEmittedRef = useRef<string>(color.toUpperCase());
+  /** آخرین رنگی که واقعاً ثبت شده — آستانهٔ فاصله با این مقایسه می‌شود */
+  const lastCommittedRef = useRef<string>(color.toUpperCase());
 
   // Sync external color updates (e.g. clicking a preset swatch or eyedropper finish)
   useEffect(() => {
@@ -295,6 +314,8 @@ export function CustomColorPicker({
     setHexDraft(hex);
     latestHexRef.current = hex;
     lastEmittedRef.current = hex.toUpperCase();
+    // تغییر از بیرون (سواچ پیش‌فرض، قطره‌چکان…) همین‌جا ثبت‌شده حساب می‌شود
+    lastCommittedRef.current = hex.toUpperCase();
   }, [color]);
 
   const rgba = hsvaToRgba(hsva);
@@ -316,7 +337,7 @@ export function CustomColorPicker({
   }, [hsva, solidHex, currentHex]);
 
   const emitHsva = useCallback(
-    (next: HsvaColor, commit = false) => {
+    (next: HsvaColor) => {
       setHsva(next);
       const nextRgba = hsvaToRgba(next);
       const nextHex = rgbaToHex(nextRgba, true);
@@ -324,26 +345,59 @@ export function CustomColorPicker({
       lastEmittedRef.current = nextHex.toUpperCase();
       setHexDraft(nextHex);
       onChange(nextHex);
-      if (commit) {
-        setRecentColors(pushRecentColor(nextHex));
-        onCommit?.(nextHex);
-      }
     },
-    [onChange, onCommit],
+    [onChange],
   );
 
-  const commitCurrent = useCallback(() => {
+  // ── ثبت «رنگ‌های اخیر»: یک انتخاب = حداکثر یک ثبت ──
+  // قبلاً هر ژست درگ (SV، hue، alpha) و هر pointercancel جداگانه کامیت می‌کرد و
+  // لیست اخیرها با رنگ‌های تقریباً یکسان پر می‌شد. حالا کامیت session-based است:
+  // trailing-debounce ۳۸۰ms + آستانهٔ فاصلهٔ رنگ؛ ژست‌های پشت‌سرهم در یک جلسه
+  // ادغام می‌شوند و فقط رنگ نهایی ثبت می‌شود.
+  const commitSessionRef = useRef<number | null>(null);
+  const sessionDirtyRef = useRef(false);
+
+  const doCommit = useCallback(() => {
     const cur = latestHexRef.current;
+    const norm = cur.toUpperCase();
+    if (norm === lastCommittedRef.current) return;
+    const dist = colorDistance(cur, lastCommittedRef.current);
+    if (dist < COMMIT_MIN_DISTANCE) return;
+    lastCommittedRef.current = norm;
     setRecentColors(pushRecentColor(cur));
     onCommit?.(cur);
   }, [onCommit]);
+
+  const scheduleCommit = useCallback(() => {
+    sessionDirtyRef.current = true;
+    if (commitSessionRef.current !== null) window.clearTimeout(commitSessionRef.current);
+    commitSessionRef.current = window.setTimeout(() => {
+      commitSessionRef.current = null;
+      if (!sessionDirtyRef.current) return;
+      sessionDirtyRef.current = false;
+      doCommit();
+    }, COMMIT_DEBOUNCE_MS);
+  }, [doCommit]);
+
+  // خروج از پیکر (بستن پالت) در میانهٔ جلسه: رنگ نهایی فلش شود
+  useEffect(() => {
+    return () => {
+      if (commitSessionRef.current !== null) {
+        window.clearTimeout(commitSessionRef.current);
+        commitSessionRef.current = null;
+        if (sessionDirtyRef.current) doCommit();
+      }
+    };
+  }, [doCommit]);
+
+  const commitCurrent = scheduleCommit;
 
   // Pointer-drag helper for SV box, Hue, and Alpha
   const useDragSurface = (
     ref: React.RefObject<HTMLDivElement | null>,
     onPoint: (rx: number, ry: number) => void,
   ) => {
-    const dragging = useRef(false);
+    const draggingId = useRef<number | null>(null);
 
     const updateFromClient = (clientX: number, clientY: number) => {
       const el = ref.current;
@@ -357,7 +411,7 @@ export function CustomColorPicker({
     const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
       e.preventDefault();
       e.stopPropagation();
-      dragging.current = true;
+      draggingId.current = e.pointerId;
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
@@ -367,23 +421,29 @@ export function CustomColorPicker({
     };
 
     const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!dragging.current) return;
+      if (draggingId.current !== e.pointerId) return;
       e.preventDefault();
       updateFromClient(e.clientX, e.clientY);
     };
 
-    const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!dragging.current) return;
-      dragging.current = false;
+    const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+      if (draggingId.current !== e.pointerId) return;
+      draggingId.current = null;
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
         // ignore
       }
-      commitCurrent();
+      // نقطه‌گذاری/درگ تمام شد — کامیت تأخیری؛ ژست بعدی داخل همان جلسه ادغام می‌شود
+      scheduleCommit();
     };
 
-    return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp };
+    return {
+      onPointerDown,
+      onPointerMove,
+      onPointerUp: endDrag,
+      onPointerCancel: endDrag,
+    };
   };
 
   const svBind = useDragSurface(svBoxRef, (rx, ry) => {
@@ -418,7 +478,8 @@ export function CustomColorPicker({
     const parsed = parseColorToRgba(withHash);
     if (parsed) {
       const next = rgbaToHsva(parsed);
-      emitHsva(next, true);
+      emitHsva(next);
+      scheduleCommit();
     } else {
       setHexDraft(currentHex);
     }
@@ -444,7 +505,8 @@ export function CustomColorPicker({
         const res = await new win.EyeDropper().open();
         const parsed = parseColorToRgba(res.sRGBHex);
         if (parsed) {
-          emitHsva(rgbaToHsva({ ...parsed, a: hsva.a }), true);
+          emitHsva(rgbaToHsva({ ...parsed, a: hsva.a }));
+        scheduleCommit();
         }
         return;
       } catch {
@@ -514,7 +576,8 @@ export function CustomColorPicker({
           aria-label="انتخابگر رنگ سیستم"
           onChange={(e) => {
             const parsed = parseColorToRgba(e.target.value);
-            if (parsed) emitHsva(rgbaToHsva({ ...parsed, a: hsva.a }), true);
+            if (parsed) emitHsva(rgbaToHsva({ ...parsed, a: hsva.a }));
+        scheduleCommit();
           }}
         />
       </div>
@@ -532,16 +595,20 @@ export function CustomColorPicker({
           const step = e.shiftKey ? 10 : 3;
           if (e.key === 'ArrowRight') {
             e.preventDefault();
-            emitHsva({ ...hsva, s: clamp(hsva.s + step, 0, 100) }, true);
+            emitHsva({ ...hsva, s: clamp(hsva.s + step, 0, 100) });
+            scheduleCommit();
           } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
-            emitHsva({ ...hsva, s: clamp(hsva.s - step, 0, 100) }, true);
+            emitHsva({ ...hsva, s: clamp(hsva.s - step, 0, 100) });
+            scheduleCommit();
           } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            emitHsva({ ...hsva, v: clamp(hsva.v + step, 0, 100) }, true);
+            emitHsva({ ...hsva, v: clamp(hsva.v + step, 0, 100) });
+            scheduleCommit();
           } else if (e.key === 'ArrowDown') {
             e.preventDefault();
-            emitHsva({ ...hsva, v: clamp(hsva.v - step, 0, 100) }, true);
+            emitHsva({ ...hsva, v: clamp(hsva.v - step, 0, 100) });
+            scheduleCommit();
           }
         }}
         {...svBind}
@@ -564,10 +631,12 @@ export function CustomColorPicker({
             const step = e.shiftKey ? 15 : 5;
             if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
               e.preventDefault();
-              emitHsva({ ...hsva, h: (hsva.h + step) % 360 }, true);
+              emitHsva({ ...hsva, h: (hsva.h + step) % 360 });
+            scheduleCommit();
             } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
               e.preventDefault();
-              emitHsva({ ...hsva, h: (hsva.h - step + 360) % 360 }, true);
+              emitHsva({ ...hsva, h: (hsva.h - step + 360) % 360 });
+            scheduleCommit();
             }
           }}
           {...hueBind}
@@ -591,10 +660,12 @@ export function CustomColorPicker({
             const step = e.shiftKey ? 0.1 : 0.03;
             if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
               e.preventDefault();
-              emitHsva({ ...hsva, a: clamp(Math.round((hsva.a + step) * 100) / 100, 0.05, 1) }, true);
+              emitHsva({ ...hsva, a: clamp(Math.round((hsva.a + step) * 100) / 100, 0.05, 1) });
+            scheduleCommit();
             } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
               e.preventDefault();
-              emitHsva({ ...hsva, a: clamp(Math.round((hsva.a - step) * 100) / 100, 0.05, 1) }, true);
+              emitHsva({ ...hsva, a: clamp(Math.round((hsva.a - step) * 100) / 100, 0.05, 1) });
+            scheduleCommit();
             }
           }}
           {...alphaBind}
@@ -738,7 +809,10 @@ export function CustomColorPicker({
                 aria-label={`رنگ اخیر ${rc}`}
                 onClick={() => {
                   const p = parseColorToRgba(rc);
-                  if (p) emitHsva(rgbaToHsva(p), true);
+                  if (p) {
+                    emitHsva(rgbaToHsva(p));
+                    scheduleCommit();
+                  }
                 }}
               />
             ))}
@@ -775,7 +849,10 @@ export function CustomColorPicker({
                   aria-label={`رنگ ذخیره شده ${sc}`}
                   onClick={() => {
                     const p = parseColorToRgba(sc);
-                    if (p) emitHsva(rgbaToHsva(p), true);
+                    if (p) {
+                      emitHsva(rgbaToHsva(p));
+                      scheduleCommit();
+                    }
                   }}
                 />
                 <button

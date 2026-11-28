@@ -402,11 +402,6 @@ export function ReaderScreen() {
                   />
                 )}
               </Suspense>
-
-              <p className="reader__foot tiny">
-                <Icon name="i-lock" size={13} /> این فایل فقط برای حساب تو و از سرور هامزیار سرو می‌شود؛
-                لینکش موقت است و بیرون از هامزیار کار نمی‌کند.
-              </p>
             </div>
           </div>
 

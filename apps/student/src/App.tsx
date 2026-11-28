@@ -9,6 +9,7 @@ import { useSession } from './lib/session';
 import { SessionExpiredBanner } from './components/SessionExpiredBanner';
 import { SwUpdateBanner } from './components/SwUpdateBanner';
 import { MiniPlayer } from './components/MiniPlayer';
+import { PlayerGate } from './components/PlayerGate';
 import { FloatingVideoPlayer } from './components/FloatingVideoPlayer';
 
 const HomeScreen = lazy(() => import('./screens/HomeScreen').then((m) => ({ default: m.HomeScreen })));
@@ -272,8 +273,13 @@ export function App() {
         </Routes>
       </Suspense>
       {/* outside Routes: survives navigation, so a voice/video keeps playing across screens */}
-      <MiniPlayer />
-      <FloatingVideoPlayer />
+      {/* gate سطح پیل: خطای گذرای پخش‌کنندهٔ شناور هرگز صفحه را نمی‌اندازد */}
+      <PlayerGate>
+        <MiniPlayer />
+      </PlayerGate>
+      <PlayerGate>
+        <FloatingVideoPlayer />
+      </PlayerGate>
     </Layout>
   );
 }

@@ -280,6 +280,8 @@ const thumbLru = new MemoryUrlLru(getThumbBudgetBytes());
 // ── Priority Concurrency Queue for Thumbnails ──
 interface ThumbJob {
   priority: 'high' | 'low';
+  /** پنجرهٔ گرم (visible) — جلوتر از بقیهٔ high ها خارج می‌شود */
+  front?: boolean;
   run: () => Promise<void>;
   signal?: AbortSignal;
 }
@@ -316,8 +318,12 @@ function pumpThumbQueue() {
 }
 
 function enqueueThumbJob(job: ThumbJob) {
-  if (job.priority === 'high') highQueue.push(job);
-  else lowQueue.push(job);
+  if (job.priority === 'high') {
+    if (job.front) highQueue.unshift(job);
+    else highQueue.push(job);
+  } else {
+    lowQueue.push(job);
+  }
   pumpThumbQueue();
 }
 
@@ -381,7 +387,7 @@ export function acquireThumbUrl(
   page: number,
   remoteUrl: string,
   onAuthRejected?: () => Promise<string | null>,
-  opts?: { priority?: 'high' | 'low'; fallbackUrl?: string; signal?: AbortSignal },
+  opts?: { priority?: 'high' | 'low'; front?: boolean; fallbackUrl?: string; signal?: AbortSignal },
 ): Promise<string> {
   const key = makeThumbKey(scope, fileId, page);
   const cached = thumbLru.get(key);
@@ -398,6 +404,7 @@ export function acquireThumbUrl(
     }
     enqueueThumbJob({
       priority: opts?.priority ?? 'high',
+      front: opts?.front,
       signal: opts?.signal,
       run: async () => {
         if (opts?.signal?.aborted) {

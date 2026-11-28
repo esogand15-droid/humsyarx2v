@@ -19,6 +19,7 @@ export function CachedThumbImg({
   remoteUrl,
   fallbackUrl,
   alt,
+  eager = false,
   onUrlRejected,
 }: {
   scope: Scope;
@@ -27,6 +28,8 @@ export function CachedThumbImg({
   remoteUrl: string;
   fallbackUrl: string;
   alt: string;
+  /** پنجرهٔ گرم اورویو: واکشی بی‌درنگ با fetchpriority=high */
+  eager?: boolean;
   onUrlRejected?: (page: number) => Promise<string | null>;
 }) {
   const initialCached = getCachedThumbUrl(scope, id, page);
@@ -76,7 +79,7 @@ export function CachedThumbImg({
       page,
       remoteUrl,
       onRejectedRef.current ? () => onRejectedRef.current!(page) : undefined,
-      { priority: 'high', fallbackUrl, signal: ac.signal },
+      { priority: 'high', front: eager, fallbackUrl, signal: ac.signal },
     )
       .then((objUrl) => {
         if (ac.signal.aborted) return;
@@ -104,10 +107,15 @@ export function CachedThumbImg({
   if (status === 'ready' && src) {
     return (
       <img
+        ref={(el) => {
+          // React 18 خاصیت fetchpriority را تایپ نمی‌کند؛ با attribute مستقیم ست می‌شود.
+          // high فقط برای پنجرهٔ گرم — high روی همه، هینت را بی‌اثر می‌کند.
+          el?.setAttribute('fetchpriority', eager ? 'high' : 'low');
+        }}
         src={src}
         alt={alt}
         className={`thumb-card__img${imgLoaded ? ' is-loaded' : ''}`}
-        loading="lazy"
+        loading={eager ? 'eager' : 'lazy'}
         decoding="async"
         draggable={false}
         onLoad={() => setImgLoaded(true)}

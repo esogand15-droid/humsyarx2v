@@ -23,17 +23,6 @@
   background: transparent;
 }
 
-.reader-shell .reader__foot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--hym-space-2);
-  padding: var(--hym-space-2) var(--hym-space-4);
-  color: var(--hym-text-muted);
-  border-block-start: 1px solid var(--hym-hairline);
-  background: var(--hym-surface-1);
-}
-
 .reader--ink {
   position: relative;
   display: flex;

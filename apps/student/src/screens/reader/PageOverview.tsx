@@ -50,22 +50,29 @@ function setCssVar(name: string, value: string) {
   };
 }
 
-/** Fetches a thumbnail only once its card scrolls near view; cached items render immediately without waiting for observer. */
+/**
+ * Fetches a thumbnail once its card scrolls near view — EXCEPT the eager window
+ * (صفحهٔ جاری ± ۱۲): those render immediately without waiting for the observer,
+ * because lazy-loading the initial viewport is exactly what made the first
+ * screenful of tiles black (web.dev: never lazy-load in-viewport images).
+ */
 function LazyThumb({
   root,
   scope,
   id,
   dim,
+  eager,
   onUrlRejected,
 }: {
   root: HTMLElement | null;
   scope: Scope;
   id: string;
   dim: PageDimension;
+  eager: boolean;
   onUrlRejected?: (page: number) => Promise<string | null>;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [seen, setSeen] = useState(() => hasCachedThumbUrl(scope, id, dim.page));
+  const [seen, setSeen] = useState(() => eager || hasCachedThumbUrl(scope, id, dim.page));
 
   useEffect(() => {
     if (seen) return;
@@ -104,6 +111,7 @@ function LazyThumb({
           remoteUrl={dim.thumbnail_url || dim.url}
           fallbackUrl={dim.url}
           alt={`صفحهٔ ${fa(dim.page)}`}
+          eager={eager}
           onUrlRejected={onUrlRejected}
         />
       ) : (
@@ -470,6 +478,7 @@ export function PageOverview({
                         scope={scope}
                         id={id}
                         dim={d}
+                        eager={Math.abs(d.page - currentPage) <= 12}
                         onUrlRejected={onUrlRejected}
                       />
                       <button

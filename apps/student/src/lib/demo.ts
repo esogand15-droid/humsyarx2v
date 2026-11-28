@@ -463,6 +463,20 @@ export function getMockResponse<T>(path: string, init?: RequestInit): T | undefi
     return { book: { id: 'book_1', name: 'براون‌والد' }, fa_files: [], en_files: [] } as unknown as T;
   }
   if (p.includes('/library/view-url/')) {
+    // ویس دمو واقعاً قابل‌پخش است تا چرخهٔ کامل handoff (صفحه ↔ پیل شناور) QA شود
+    if (p.includes('voice_')) {
+      const base = import.meta.env.BASE_URL || '/';
+      return {
+        id: p.split('/').pop() || 'voice_demo',
+        name: 'ویس دمو — جلسهٔ آموزشی',
+        mime: 'audio/wav',
+        size: 384044,
+        kind: 'audio',
+        available: true,
+        url: `${base}demo-voice.wav`,
+        expires_in: 600,
+      } as unknown as T;
+    }
     return { id: 'pdf_cardio_01', name: 'جزوه فیزیوپاتولوژی', mime: 'application/pdf', size: 12582912, kind: 'pdf', available: true, url: '' } as unknown as T;
   }
   if (p.includes('/library/progress/')) {

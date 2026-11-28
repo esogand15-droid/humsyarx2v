@@ -28,7 +28,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { useNavigate } from 'react-router-dom';
 
 import './floating-video-player.css';
-import { bgVideo } from '../lib/bgVideo';
+import { bgVideo, type BgVideoTrack } from '../lib/bgVideo';
 import { adoptMedia, mediaHasSrc, sharedMedia } from '../lib/mediaHost';
 import {
   clampFloatPos,
@@ -84,6 +84,14 @@ function defaultPos(w: number): FloatPos {
 export function FloatingVideoPlayer() {
   const track = useSyncExternalStore(bgVideo.subscribe, bgVideo.get);
   const navigate = useNavigate();
+  // همان جداسازی container/innerMiniPlayer: کامپوننت inner فقط وقتی track هست
+  // mount می‌شود؛ هوک‌های callbackهای درگ که بعد از early-return بودند باعث
+  // «Rendered more hooks» در گذر track=null→track می‌شدند.
+  if (!track) return null;
+  return <FloatingVideoPlayerInner track={track} navigate={navigate} />;
+}
+
+function FloatingVideoPlayerInner({ track, navigate }: { track: BgVideoTrack; navigate: ReturnType<typeof useNavigate> }) {
   const elRef = useRef<HTMLVideoElement | null>(null);
   if (elRef.current === null) elRef.current = sharedMedia('video') as HTMLVideoElement;
   const trackRef = useRef(track);
@@ -111,6 +119,7 @@ export function FloatingVideoPlayer() {
   const lastSaved = useRef(0);
   const refreshed = useRef(false);
   const lastTap = useRef(0);
+
   const dragStart = useRef<{ x: number; y: number; pos: FloatPos; moved: boolean } | null>(null);
   const resizeStart = useRef<{ x: number; w: number } | null>(null);
   const settleTimer = useRef<number | null>(null);
@@ -285,8 +294,6 @@ export function FloatingVideoPlayer() {
     // فقط هر ۵ ثانیه؛ time عمداً وابستگی نیست
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bucket, dur, rate]);
-
-  if (!track) return null;
 
   const el = () => elRef.current;
   const toggle = () => {

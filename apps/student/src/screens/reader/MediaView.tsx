@@ -1049,7 +1049,7 @@ function VideoPlayer(p: PlayerProps) {
       const h = handoff.current;
       const bg = h.p.bg;
       if (!bg || !h.playing || !h.el || !h.src) return;
-      bgVideo.start({
+      const payload = {
         scope: bg.scope,
         id: bg.id,
         name: h.p.name,
@@ -1058,7 +1058,9 @@ function VideoPlayer(p: PlayerProps) {
         rate: h.rate,
         muted: h.muted,
         returnTo: readerPath(bg.scope, bg.id),
-      });
+      };
+      // همان deferred-emit برای ویدیو (FloatingVideoPlayer)
+      queueMicrotask(() => bgVideo.start(payload));
     },
     [],
   );
@@ -1303,7 +1305,7 @@ function AudioPlayer(p: PlayerProps) {
       const h = handoff.current;
       const bg = h.p.bg;
       if (!bg || !h.playing || !h.el || !h.src) return;
-      bgAudio.start({
+      const payload = {
         scope: bg.scope,
         id: bg.id,
         name: h.p.name,
@@ -1311,7 +1313,10 @@ function AudioPlayer(p: PlayerProps) {
         at: h.el.currentTime,
         rate: h.rate,
         returnTo: readerPath(bg.scope, bg.id),
-      });
+      };
+      // cleanup در فاز commit است — emit هم‌زمان subscriber (پیل شناور) را وسط
+      // commit sync رندر می‌کرد و کرش «Rendered more hooks» می‌ساخت
+      queueMicrotask(() => bgAudio.start(payload));
     },
     [],
   );
