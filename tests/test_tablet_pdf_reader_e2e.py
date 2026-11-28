@@ -217,8 +217,10 @@ class Tier1Feature5ThumbnailDrawerTests(ReaderBaseTest):
         self.assertIn("'notes'", self.thumbnail_drawer_tsx)
 
     def test_tc_drawer_02_lazy_image_loading(self):
-        """TC-DRAWER-02: Verify thumbnail images declare loading='lazy' for memory efficiency."""
-        self.assertIn("loading=\"lazy\"", self.thumbnail_drawer_tsx)
+        """TC-DRAWER-02: Thumbnails stay lazy except the eager warm window (current page ±12),
+        which renders immediately — lazy-loading the first screenful made tiles black."""
+        self.assertIn("loading={eager ? 'eager' : 'lazy'}", self.thumbnail_drawer_tsx)
+        self.assertIn("fetchpriority", self.thumbnail_drawer_tsx)
 
     def test_tc_drawer_03_click_to_scroll_page_navigation(self):
         """TC-DRAWER-03: Verify selecting thumbnail calls onJump and scrollToPage."""
@@ -730,8 +732,8 @@ class Tier4RealWorldScenarioTests(ReaderBaseTest):
 
     def test_scenario_01_clinical_case_pdf_navigation(self):
         """SCENARIO-01: Student opens clinical cardiology PDF, previews thumbnails, jumps to Page 14."""
-        # 1. Drawer exposes lazy thumbnail loading
-        self.assertIn("loading=\"lazy\"", self.thumbnail_drawer_tsx)
+        # 1. Drawer keeps thumbnails lazy outside the eager warm window
+        self.assertIn("loading={eager ? 'eager' : 'lazy'}", self.thumbnail_drawer_tsx)
         # 2. Selecting page 14 scrolls to target container
         page_target = 14
         self.assertIn("scrollToPage", self.reader_view_tsx)

@@ -1,0 +1,370 @@
+/* ═══════════════════════════════════════════════════════════
+   Mind Map — XMind-style content tree (root right, branches left)
+   از توکن‌های هامزیار: صفر هگز خام در رنگ‌های نقش‌محور
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── لایهٔ نقشه روی خود صفحهٔ PDF ─────────────────────────── */
+.mind-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.mind-layer.is-active {
+  pointer-events: auto;
+  cursor: copy;
+}
+.mind-layer__edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+.mind-layer__edges path {
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 2;
+  opacity: 0.55;
+}
+
+.mind-chip {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  max-width: 200px;
+}
+.mind-chip__body {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 27px;
+  max-width: 200px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-2);
+  background: var(--lg-tint-strong, var(--paper-2));
+  backdrop-filter: var(--lg-blur, var(--blur-md));
+  -webkit-backdrop-filter: var(--lg-blur, var(--blur-md));
+  box-shadow: var(--hym-shadow-md);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: grab;
+  white-space: nowrap;
+}
+.mind-chip--manual .mind-chip__body {
+  border-style: dashed;
+}
+.mind-chip.is-sel .mind-chip__body {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+.mind-chip__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mind-chip__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.mind-chip__dot--note {
+  background: var(--hym-cyan-500);
+}
+.mind-chip__input {
+  min-height: 27px;
+  width: 150px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--brand);
+  background: var(--paper-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  outline: none;
+}
+.mind-chip__actions {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--lg-tint-strong, rgba(13, 19, 33, 0.95));
+  border: 1px solid var(--lg-edge-strong, rgba(255, 255, 255, 0.14));
+  box-shadow: var(--hym-shadow-md);
+}
+.mind-chip__act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.mind-chip__act:hover {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.mind-chip__act--danger:hover {
+  background: rgba(220, 38, 38, 0.16);
+  color: #fca5a5;
+}
+.mind-layer__hint {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--lg-tint-strong, rgba(13, 19, 33, 0.9));
+  border: 1px solid var(--lg-edge, rgba(255, 255, 255, 0.12));
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 700;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* پنل — چیدمان از .notebook ارث می‌رسد (گوشی: شیت پایین؛ دسکتاپ: ستون کنار) */
+.notebook.mindmap {
+  gap: 10px;
+}
+/* در پنل کنارِ ریدر، بوم کل ارتفاع را می‌گیرد */
+.study-workspace__secondary-body .notebook.mindmap {
+  height: 100%;
+  box-sizing: border-box;
+}
+@media (min-width: 900px) {
+  .notebook.mindmap {
+    width: 340px;
+    flex: 0 0 340px;
+  }
+}
+
+.mm-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 260px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    radial-gradient(var(--hym-hairline) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-color: var(--paper-3);
+  touch-action: none;
+  cursor: grab;
+}
+.mm-viewport:active {
+  cursor: grabbing;
+}
+
+/* لنگر بوم باید فیزیکی (left/top) باشد — inset-inline-start در RTL بوم را
+   به لبهٔ راست می‌چسباند و همهٔ مختصات JS از قاب بیرون می‌زند */
+.mm-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.mm-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+.mm-edges path {
+  fill: none;
+  stroke: var(--line-2);
+  stroke-width: 1.6;
+}
+
+/* ── گره‌ها ── */
+.mm-node {
+  position: absolute;
+  display: flex;
+  align-items: center;
+}
+
+.mm-node__body {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: var(--mm-node-h, 40px);
+  padding: 7px 12px;
+  border-radius: 11px;
+  border: 1.5px solid var(--line);
+  background: var(--paper-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: start;
+  box-shadow: var(--hym-shadow-sm);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
+}
+.mm-node__body:hover {
+  border-color: var(--line-2);
+  box-shadow: var(--hym-shadow-md);
+}
+.mm-node__body:active {
+  transform: scale(0.98);
+}
+.mm-node.is-sel .mm-node__body {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+.mm-node.is-now .mm-node__body {
+  border-color: var(--hym-cyan-500);
+}
+
+.mm-node__text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mm-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.mm-dot--note {
+  background: var(--hym-cyan-500);
+}
+
+/* ریشه — هویت برند */
+.mm-node--root .mm-node__body {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+/* صفحات — سطح دوم */
+.mm-node--page .mm-node__body {
+  background: var(--paper-3);
+  font-weight: 800;
+}
+
+/* برگ‌ها — لبهٔ رنگی نوع */
+.mm-node--highlight .mm-node__body {
+  border-inline-start-width: 3px;
+}
+.mm-node--note .mm-node__body {
+  border-inline-start: 3px solid var(--hym-cyan-500);
+}
+.mm-node--voice .mm-node__body {
+  border-inline-start: 3px solid var(--brand);
+}
+.mm-node--bookmark .mm-node__body {
+  border-inline-start: 3px solid var(--hym-amber-400, #FBBF24);
+}
+.mm-node--manual .mm-node__body {
+  border-style: dashed;
+  border-inline-start: 3px solid var(--line-2);
+}
+
+/* دکمهٔ جمع‌کردن شاخه */
+.mm-node__fold {
+  position: absolute;
+  inset-inline-start: -13px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-2);
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.mm-node__fold:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* ── زوم و نوار عمل ── */
+.mm-zoom {
+  position: absolute;
+  bottom: 10px;
+  inset-inline-start: 10px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--hym-shadow-md);
+}
+.mm-zoom .iconbtn {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.mm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 2px 2px;
+  min-height: 42px;
+}
+.mm-actions__hint {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+  max-width: 130px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mm-actions__input {
+  flex: 1;
+  min-width: 120px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--paper-3);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.mm-actions__input:focus-visible {
+  border-color: var(--brand);
+}
+.mm-actions__danger {
+  color: var(--hym-danger-600, #DC2626);
+}
+.mm-actions .ds-btn--ghost:disabled {
+  opacity: 0.45;
+}

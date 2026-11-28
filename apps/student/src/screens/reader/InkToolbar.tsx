@@ -239,6 +239,9 @@ interface Props {
   canUndo: boolean;
   canRedo: boolean;
   onOpenNotebook: () => void;
+  /** نقشهٔ ذهنی روی خود صفحه (XMind روی جزوه) — حالت فعال/غیرفعال */
+  mindOnPage?: boolean;
+  onToggleMindOverlay?: () => void;
   onAddStickyNote?: () => void;
   onToggleFocus?: () => void;
   onOpenThumbnails?: () => void;
@@ -279,6 +282,8 @@ export const InkToolbar = memo(function InkToolbar({
   canUndo,
   canRedo,
   onOpenNotebook,
+  mindOnPage = false,
+  onToggleMindOverlay,
   onAddStickyNote,
   onToggleFocus,
   onOpenThumbnails,
@@ -1282,6 +1287,17 @@ export const InkToolbar = memo(function InkToolbar({
       onClick: () => {
         closeFlyouts();
         onOpenNotebook();
+      },
+    },
+    {
+      key: 'mindmap',
+      label: 'نقشهٔ ذهنی روی صفحه',
+      icon: <Icon name="i-shapes" size={18} />,
+      on: mindOnPage,
+      hidden: !onToggleMindOverlay,
+      onClick: () => {
+        closeFlyouts();
+        onToggleMindOverlay?.();
       },
     },
     {

@@ -639,6 +639,58 @@ export function getMockResponse<T>(path: string, init?: RequestInit): T | undefi
   if (p.includes('/ink/strokes/')) {
     return { strokes: [], count: 0 } as unknown as T;
   }
+  if (p.includes('/ink/notebook/')) {
+    // دفتر دمو با محتوای واقعی تا پرش به هایلایت/ویس در حالت دمو هم QA شود
+    return {
+      pages: [
+        { page: 2, count: 6, updated_at: '' },
+        { page: 5, count: 11, updated_at: '' },
+      ],
+      highlights: [
+        { page: 2, stroke_id: 'demo_hl_1', bbox: [0.1, 0.3, 0.88, 0.37], color: '#F59E0B' },
+        { page: 2, stroke_id: 'demo_hl_2', bbox: [0.1, 0.52, 0.8, 0.58], color: '#DC2626' },
+        { page: 5, stroke_id: 'demo_hl_3', bbox: [0.12, 0.42, 0.9, 0.48], color: '#16A34A' },
+      ],
+      notes: [
+        {
+          note_id: 'demo_note_1',
+          page: 2,
+          x: 0.82,
+          y: 0.12,
+          text: 'این بخش در آزمون میان‌ترم زیاد پرسیده شده — قبل از آزمون مرور کن.',
+          color: 'yellow',
+          created_at: '',
+        },
+        {
+          note_id: 'demo_note_2',
+          page: 5,
+          x: 0.78,
+          y: 0.24,
+          text: 'مقایسهٔ حفره‌های بدن را با جدول همین صفحه یاد بگیر.',
+          color: 'cyan',
+          created_at: '',
+        },
+      ],
+      total: 17,
+    } as unknown as T;
+  }
+  if (p.includes('/ink/voice/')) {
+    // یک ویس دمو روی صفحهٔ ۵ — کلیک در دفتر باید به همان پین برسد
+    return {
+      items: [
+        {
+          voice_id: 'voice_demo_1',
+          file_id: 'demo',
+          page: 5,
+          x: 0.5,
+          y: 0.72,
+          duration_ms: 42000,
+          mime: 'audio/wav',
+          created_at: '',
+        },
+      ],
+    } as unknown as T;
+  }
   if (p.includes('/ink/summary/')) {
     return { pages: [], total: 0 } as unknown as T;
   }

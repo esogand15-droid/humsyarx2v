@@ -39,6 +39,33 @@
   color: var(--hym-text-secondary);
 }
 
+/* حلقهٔ پالس روی نقطهٔ مقصد پرش (هایلایت/ویس/یادداشت از دفتر) */
+.reader-spot-flash {
+  position: absolute;
+  z-index: 6;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  border: 2.5px solid var(--hym-brand-600);
+  box-shadow: 0 0 0 6px var(--hym-accent-subtle), var(--hym-shadow-md);
+  animation: spot-flash 1.3s ease-out 2;
+}
+
+@keyframes spot-flash {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-spot-flash {
+    animation: none;
+    opacity: 0.9;
+  }
+}
+
 .reader__canvas {
   touch-action: pan-x pan-y;
 }

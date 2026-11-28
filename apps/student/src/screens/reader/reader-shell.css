@@ -18,8 +18,6 @@
 html.is-inking,html.is-inking body,html.is-inking .text-layer span{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
 html.is-inking input,html.is-inking textarea,html.is-inking [contenteditable="true"]{-webkit-user-select:text!important;user-select:text!important}
 .notebook__head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.notebook__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.notebook__num{font-size:13px;font-weight:700}
 .notebook__empty{padding:6px 0 2px}
 
 /* ═══════════════════════════════════════════════════════════

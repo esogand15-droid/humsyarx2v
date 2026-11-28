@@ -12,7 +12,7 @@
 import { apiCall } from './api';
 
 export type Scope = 'res' | 'ref';
-export type InkTool = 'pen' | 'pencil' | 'highlighter' | 'ballpoint' | 'fountain';
+export type InkTool = 'pen' | 'pencil' | 'highlighter' | 'ballpoint' | 'fountain' | 'whiteout';
 
 export interface Point {
   x: number;
@@ -41,6 +41,34 @@ export interface Stroke {
 export interface InkSummaryPage {
   page: number;
   count: number;
+}
+
+/** یک هایلایت ماژیکی با جعبهٔ مکان دقیق — برای پرش نقطه‌ای از دفتر */
+export interface NotebookHighlight {
+  page: number;
+  stroke_id: string;
+  /** [minX, minY, maxX, maxY] نرمال‌شده در بازهٔ [0,1] صفحه */
+  bbox: [number, number, number, number];
+  color: string;
+}
+
+/** یادداشت چسبان با متن و جای پین — آیتم کلیک‌پذیر دفتر */
+export interface NotebookNote {
+  note_id: string;
+  page: number;
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  created_at: string;
+}
+
+/** پاسخ «دفتر محتوامحور»: خودِ یادداشت‌ها، نه شمار خطوط */
+export interface NotebookIndex {
+  pages: InkSummaryPage[];
+  highlights: NotebookHighlight[];
+  notes: NotebookNote[];
+  total: number;
 }
 
 export interface NoteItem {
@@ -342,6 +370,10 @@ export const ink = {
     apiCall<{ pages: InkSummaryPage[]; total: number }>(
       `/ink/summary/${scope}/${encodeURIComponent(id)}`,
     ),
+
+  /** دفترِ محتوامحور — هایلایت‌ها با جا، یادداشت‌ها با متن؛ نه فقط شمار خطوط */
+  notebook: (scope: Scope, id: string) =>
+    apiCall<NotebookIndex>(`/ink/notebook/${scope}/${encodeURIComponent(id)}`),
 
   notes: () => apiCall<{ items: NoteItem[] }>('/ink/notes'),
 

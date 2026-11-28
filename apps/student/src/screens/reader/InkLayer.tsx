@@ -85,23 +85,23 @@ type SelMenu =
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
-function CameraGlyph() {
+function WhiteoutGlyph() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.4-2h5l1.4 2h1.6A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" />
-      <circle cx="12" cy="12.5" r="3.4" />
+      <rect x="4" y="4" width="16" height="16" rx="2.4" />
+      <path d="M4.6 14.6 14.6 4.6" />
+      <path d="M9.4 19.4 19.4 9.4" />
     </svg>
   );
 }
 
-function SaveGlyph() {
+function DuplicateGlyph() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 4v11" />
-      <path d="m7.5 10.5 4.5 4.5 4.5-4.5" />
-      <path d="M5 19h14" />
+      <rect x="8.5" y="8.5" width="12" height="12" rx="2.4" />
+      <path d="M15.5 4.5h-9A2 2 0 0 0 4.5 6.5v9" />
     </svg>
   );
 }
@@ -506,6 +506,21 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
       const pts = s.points;
       if (!pts || pts.length === 0) return;
 
+      // سفیدکن: چندضلعی توپر (مستطیل بسته) روی محتوای صفحه — نه خطِ قلم
+      if (s.tool === 'whiteout') {
+        ctx.save();
+        ctx.globalAlpha = s.opacity ?? 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = s.color;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x * width, pts[0].y * height);
+        for (let i = 1; i < pts.length; i += 1) ctx.lineTo(pts[i].x * width, pts[i].y * height);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        return;
+      }
+
       ctx.save();
       if (s.tool === 'pencil') {
         ctx.lineCap = 'round';
@@ -839,6 +854,11 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
 
         for (const s of strokesRef.current) {
           if (eraseHighlighterOnly && s.tool !== 'highlighter') {
+            nextList.push(s);
+            continue;
+          }
+          // سفیدکن مستطیل توپر است؛ برش جزئیِ نقاطش چندضلعی را خراب می‌کند — فقط با «کل خط» پاک می‌شود
+          if (s.tool === 'whiteout') {
             nextList.push(s);
             continue;
           }
@@ -1471,6 +1491,49 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
     paint();
   };
 
+  /** سفیدکردن ناحیه — مستطیل سفید روی انتخابِ خطوط یا ناحیهٔ خامِ کمند؛
+   *  همان whiteout اپ‌های نوت: محتوای زیر را می‌پوشاند و با پاک‌کنِ «کل خط» برداشته می‌شود. */
+  const whiteoutRegion = (): boolean => {
+    const box = selectedIds.current.size > 0 ? selectionBBox.current : regionBox.current;
+    if (!box) return false;
+    const pad = 0.004;
+    const x0 = clamp01(Math.max(0, box.minX - pad));
+    const y0 = clamp01(Math.max(0, box.minY - pad));
+    const x1 = clamp01(Math.min(1, box.maxX + pad));
+    const y1 = clamp01(Math.min(1, box.maxY + pad));
+    const now = new Date().toISOString();
+    const patch: Stroke = {
+      stroke_id: generateUUID(),
+      tool: 'whiteout',
+      color: '#FFFFFF',
+      width: 0.0035,
+      opacity: 1,
+      blend_mode: 'source-over',
+      points: [
+        { x: x0, y: y0, pressure: 0.5, time: 0 },
+        { x: x1, y: y0, pressure: 0.5, time: 0 },
+        { x: x1, y: y1, pressure: 0.5, time: 0 },
+        { x: x0, y: y1, pressure: 0.5, time: 0 },
+      ],
+      created_at: now,
+      updated_at: now,
+    };
+    commit([...strokesRef.current, patch]);
+    clearSelection();
+    return true;
+  };
+
+  /** تکثیر — کپی انتخاب و چسباندنش درست پایین‌تر، مثل Duplicate اپ‌های نوت؛
+   *  بعدش نسخهٔ جدید همان‌جا انتخاب می‌ماند تا جابه‌جا شود. */
+  const duplicateSelection = (): boolean => {
+    const box = selectionBBox.current;
+    if (!box || !copySelection()) return false;
+    const gap = 0.02;
+    const ny = clamp01(Math.min(1 - (inkClipboard?.h ?? 0), box.maxY + gap));
+    pasteAt(box.minX, ny);
+    return true;
+  };
+
   const pasteAt = (x: number, y: number) => {
     const clip = inkClipboard;
     if (!clip || clip.strokes.length === 0) return;
@@ -1490,123 +1553,6 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
     regionBox.current = null;
     showSelectionMenu();
     paint();
-  };
-
-  /** Renders the selected area (PDF page + ink, re-drawn as vectors) into a fresh canvas. */
-  const captureRegion = (withPage: boolean): HTMLCanvasElement | null => {
-    const sel = selectedIds.current.size > 0 ? selectionBBox.current : null;
-    const box = sel
-      ? { minX: sel.minX - 0.01, minY: sel.minY - 0.01, maxX: sel.maxX + 0.01, maxY: sel.maxY + 0.01 }
-      : regionBox.current;
-    if (!box || !width || !height) return null;
-    const host = canvasRef.current?.parentElement ?? null;
-    const img = withPage ? host?.querySelector<HTMLImageElement>('img.pdf-page__img') ?? null : null;
-    const imgReady = !!img && img.complete && img.naturalWidth > 0;
-    const scale = Math.min(3, Math.max(1.5, imgReady ? img!.naturalWidth / width : 2));
-    const rx = clamp01(box.minX) * width;
-    const ry = clamp01(box.minY) * height;
-    const rw = Math.max(1, (clamp01(box.maxX) - clamp01(box.minX)) * width);
-    const rh = Math.max(1, (clamp01(box.maxY) - clamp01(box.minY)) * height);
-    const out = document.createElement('canvas');
-    out.width = Math.round(rw * scale);
-    out.height = Math.round(rh * scale);
-    const o = out.getContext('2d');
-    if (!o) return null;
-    o.fillStyle = '#ffffff';
-    o.fillRect(0, 0, out.width, out.height);
-    if (imgReady && img) {
-      const kx = img.naturalWidth / width;
-      const ky = img.naturalHeight / height;
-      o.drawImage(img, rx * kx, ry * ky, rw * kx, rh * ky, 0, 0, out.width, out.height);
-    }
-    const place = (c: CanvasRenderingContext2D) => c.setTransform(scale, 0, 0, scale, -rx * scale, -ry * scale);
-    const hl = strokesRef.current.filter((s) => s.tool === 'highlighter');
-    if (hl.length > 0) {
-      const h = document.createElement('canvas');
-      h.width = out.width;
-      h.height = out.height;
-      const hc = h.getContext('2d');
-      if (hc) {
-        place(hc);
-        for (const s of hl) drawStrokeOnCtx(hc, s);
-        o.save();
-        o.globalAlpha = HIGHLIGHTER_ALPHA;
-        o.globalCompositeOperation = 'multiply';
-        o.drawImage(h, 0, 0);
-        o.restore();
-      }
-      h.width = 0;
-    }
-    o.save();
-    place(o);
-    for (const s of strokesRef.current) if (s.tool !== 'highlighter') drawStrokeOnCtx(o, s);
-    o.restore();
-    return out;
-  };
-
-  const selectionImage = (): Promise<Blob> => {
-    const toBlob = (c: HTMLCanvasElement | null) =>
-      new Promise<Blob>((resolve, reject) => {
-        if (!c) return reject(new Error('no_region'));
-        try {
-          c.toBlob((b) => (b ? resolve(b) : reject(new Error('no_blob'))), 'image/png');
-        } catch (err) {
-          reject(err);
-        }
-      });
-    // A cross-origin page image taints the canvas; fall back to the ink alone.
-    return toBlob(captureRegion(true)).catch(() => toBlob(captureRegion(false)));
-  };
-
-  const saveBlob = async (blob: Blob) => {
-    const name = `hamyar-page-${page}.png`;
-    const file = typeof File !== 'undefined' ? new File([blob], name, { type: 'image/png' }) : null;
-    const nav = navigator as Navigator & { canShare?: (d: unknown) => boolean };
-    if (file && nav.canShare?.({ files: [file] }) && typeof nav.share === 'function') {
-      // iPad/phone: the share sheet offers "Save Image" to Photos.
-      await nav.share({ files: [file] });
-      return;
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 4000);
-  };
-
-  const screenshotSelection = () => {
-    // The blob promise goes straight into ClipboardItem inside the tap, as Safari requires.
-    const blob = selectionImage();
-    const CI = (window as unknown as { ClipboardItem?: new (items: Record<string, Promise<Blob>>) => ClipboardItem })
-      .ClipboardItem;
-    if (CI && navigator.clipboard?.write) {
-      navigator.clipboard.write([new CI({ 'image/png': blob })]).then(
-        () => flashNote('تصویر کپی شد'),
-        () =>
-          blob
-            .then(saveBlob)
-            .then(() => flashNote('تصویر ذخیره شد'))
-            .catch(() => flashNote('ثبت تصویر انجام نشد', true)),
-      );
-      return;
-    }
-    blob
-      .then(saveBlob)
-      .then(() => flashNote('تصویر ذخیره شد'))
-      .catch(() => flashNote('ثبت تصویر انجام نشد', true));
-  };
-
-  const saveSelectionImage = () => {
-    selectionImage()
-      .then(saveBlob)
-      .then(() => flashNote('تصویر ذخیره شد'))
-      .catch((err: unknown) => {
-        if ((err as { name?: string })?.name === 'AbortError') return;
-        flashNote('ذخیرهٔ تصویر انجام نشد', true);
-      });
   };
 
   const selActions = useRef({ copySelection, deleteSelection, clearSelection, flashNote });
@@ -1777,6 +1723,17 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
                     </button>
                     <button
                       type="button"
+                      className="ink-sel-menu__btn"
+                      onClick={() => {
+                        if (duplicateSelection()) flashNote('تکثیر شد');
+                      }}
+                      title="کپی و چسباندن درست پایین‌تر"
+                    >
+                      <DuplicateGlyph />
+                      تکثیر
+                    </button>
+                    <button
+                      type="button"
                       className={`ink-sel-menu__btn${selColors ? ' is-on' : ''}`}
                       aria-pressed={selColors}
                       onClick={() => setSelColors((v) => !v)}
@@ -1795,18 +1752,16 @@ export const InkLayer = forwardRef<InkApi, Props>(function InkLayer(
                     <span className="ink-sel-menu__sep" aria-hidden="true" />
                   </>
                 )}
-                <button type="button" className="ink-sel-menu__btn" onClick={screenshotSelection}>
-                  <CameraGlyph />
-                  اسکرینشات
-                </button>
                 <button
                   type="button"
                   className="ink-sel-menu__btn"
-                  onClick={saveSelectionImage}
-                  aria-label="ذخیرهٔ تصویر"
-                  title="ذخیرهٔ تصویر"
+                  onClick={() => {
+                    if (whiteoutRegion()) flashNote('ناحیه سفید شد');
+                  }}
+                  title="پوشاندن ناحیه با سفید — با پاک‌کن «کل خط» برمی‌گردد"
                 >
-                  <SaveGlyph />
+                  <WhiteoutGlyph />
+                  سفیدکردن
                 </button>
                 {selMenu.mode === 'strokes' && (
                   <button

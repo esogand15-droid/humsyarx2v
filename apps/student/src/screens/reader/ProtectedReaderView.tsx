@@ -21,6 +21,14 @@ import { InkLayer, type InkApi, type InkStatus } from './InkLayer';
 import { INK_COLORS, InkToolbar, type ReaderTool } from './InkToolbar';
 import { pushRecentColor } from './CustomColorPicker';
 import { NotebookPanel } from './NotebookPanel';
+import { MindMapPanel } from './MindMapPanel';
+import { MindMapPageLayer, newMindNode } from './MindMapPageLayer';
+import {
+  loadMindNodes,
+  saveMindNodes,
+  useNotebookIndex,
+  type MindNodeRec,
+} from './notebookData';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { ThumbnailDrawer } from './ThumbnailDrawer';
 import { PageOverview } from './PageOverview';
@@ -118,7 +126,7 @@ export interface ProtectedReaderViewProps {
   id: string;
   url?: string;
   startPage?: number;
-  jumpRequest?: { page: number; seq: number } | null;
+  jumpRequest?: { page: number; seq: number; x?: number; y?: number } | null;
   onProgress: (page: number, total: number) => void;
   onExpired?: () => Promise<string | null>;
   onToggleSplitWorkspace?: () => void;
@@ -209,7 +217,129 @@ export function ProtectedReaderView({
   const [thumbnailDrawerOpen, setThumbnailDrawerOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [notebookOpen, setNotebookOpen] = useState(false);
+  const [mindMapOpen, setMindMapOpen] = useState(false);
   const [notebookKey, setNotebookKey] = useState(0);
+  /** فلش نقطهٔ مقصد — از دفتر/ویس که روی آیتمی کلیک می‌شود، مکان دقیقش روی صفحه می‌درخشد */
+  const [flashSpot, setFlashSpot] = useState<{ page: number; x: number; y: number; seq: number } | null>(null);
+
+  // نقشهٔ ذهنی روی خود صفحه — XMind روی جزوه
+  const [mindOnPage, setMindOnPage] = useState(false);
+  const [mindNodes, setMindNodes] = useState<MindNodeRec[]>([]);
+  const [mindSelected, setMindSelected] = useState<string | null>(null);
+  const [mindEditing, setMindEditing] = useState<string | null>(null);
+  const notebookIndex = useNotebookIndex(scope, id, mindOnPage, notebookKey);
+
+  const persistMindNodes = useCallback(
+    (next: MindNodeRec[]) => {
+      setMindNodes(next);
+      saveMindNodes(scope, id, next);
+    },
+    [scope, id],
+  );
+
+  const handleToggleMindOverlay = useCallback(() => {
+    setMindOnPage((v) => {
+      const next = !v;
+      if (next) {
+        // حالت نقشه جای قلم را می‌گیرد: ضربه به صفحه = ساخت شاخه، نه خط کشیدن
+        setTool(null);
+        setMindNodes(loadMindNodes(scope, id));
+      } else {
+        setMindSelected(null);
+        setMindEditing(null);
+      }
+      return next;
+    });
+  }, [scope, id]);
+
+  const handleAddMindChild = useCallback(
+    (parentId: string, parentX: number, parentY: number, page: number) => {
+      const rec = newMindNode(parentId, page, parentX + 0.02, parentY + 0.08);
+      setMindNodes((prev) => {
+        const next = [...prev, rec];
+        saveMindNodes(scope, id, next);
+        return next;
+      });
+      setMindSelected(`man:${rec.id}`);
+      setMindEditing(`man:${rec.id}`);
+    },
+    [scope, id],
+  );
+
+  const handleAddMindFree = useCallback(
+    (page: number, x: number, y: number) => {
+      handleAddMindChild('root', x - 0.02, y - 0.08, page);
+    },
+    [handleAddMindChild],
+  );
+
+  const handleMoveMindNode = useCallback(
+    (manId: string, x: number, y: number) => {
+      persistMindNodes(mindNodes.map((n) => (n.id === manId ? { ...n, x, y } : n)));
+    },
+    [mindNodes, persistMindNodes],
+  );
+
+  const handleCommitMindEdit = useCallback(
+    (manId: string, text: string) => {
+      persistMindNodes(mindNodes.map((n) => (n.id === manId ? { ...n, text: text.trim() } : n)));
+      setMindEditing(null);
+    },
+    [mindNodes, persistMindNodes],
+  );
+
+  const handleDeleteMindNode = useCallback(
+    (manId: string) => {
+      const doomed = new Set<string>([manId]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const m of mindNodes) {
+          if (doomed.has(m.id)) continue;
+          if (doomed.has(m.parent) || doomed.has(m.parent.replace(/^man:/, ''))) {
+            doomed.add(m.id);
+            grew = true;
+          }
+        }
+      }
+      persistMindNodes(mindNodes.filter((m) => !doomed.has(m.id)));
+      setMindSelected(null);
+      setMindEditing(null);
+    },
+    [mindNodes, persistMindNodes],
+  );
+
+  /** لایهٔ نقشهٔ روی صفحه — فقط برای صفحات اصلی جزوه (صفحات افزوده فعلاً بدون نقشه) */
+  const renderMind = (page: number, w: number, h: number) => {
+    if (!mindOnPage) return null;
+    const items = notebookIndex.items.filter((it) => !it.inserted && it.page === page);
+    const nodes = mindNodes.filter((n) => n.page === page);
+    return (
+      <MindMapPageLayer
+        width={w}
+        height={h}
+        active={mindOnPage}
+        items={items}
+        nodes={nodes}
+        selectedId={mindSelected}
+        editingId={mindEditing}
+        onSelect={setMindSelected}
+        onStartEdit={(id) => {
+          setMindSelected(id);
+          setMindEditing(id);
+        }}
+        onCommitEdit={(manChipId, text) => handleCommitMindEdit(manChipId.slice(4), text)}
+        onAddChild={(parentId, px, py) => handleAddMindChild(parentId, px, py, page)}
+        onAddFree={(x, y) => handleAddMindFree(page, x, y)}
+        onMove={(manChipId, x, y) => handleMoveMindNode(manChipId.slice(4), x, y)}
+        onDelete={(manChipId) => handleDeleteMindNode(manChipId.slice(4))}
+        onJumpItem={(it) => {
+          scrollToPage(it.page);
+          if (it.at) setFlashSpot({ page: it.page, x: it.at.x, y: it.at.y, seq: Date.now() });
+        }}
+      />
+    );
+  };
 
   // شمارندهٔ شناور صفحه (پایین-چپ) + پرش سریع + رفع تداخل با نوار ابزار و کیبورد
   const [pagePillActive, setPagePillActive] = useState(true);
@@ -928,11 +1058,34 @@ export function ProtectedReaderView({
     }
   }, [manifest, startPage, scrollToPage]);
 
-  // پرش بدون رفرش صفحه از پنل دفترچه یا والد
+  // پرش بدون رفرش صفحه از پنل دفترچه یا والد — با مکان دقیق اگر همراهش باشد
   useEffect(() => {
     if (!jumpRequest || !manifest) return;
     scrollToPage(jumpRequest.page);
+    if (typeof jumpRequest.x === 'number' && typeof jumpRequest.y === 'number') {
+      setFlashSpot({ page: jumpRequest.page, x: jumpRequest.x, y: jumpRequest.y, seq: jumpRequest.seq });
+    }
   }, [jumpRequest, manifest, scrollToPage]);
+
+  // فلش بعد از چند ثانیه خودش خاموش می‌شود
+  useEffect(() => {
+    if (!flashSpot) return;
+    const t = window.setTimeout(() => setFlashSpot(null), 2600);
+    return () => window.clearTimeout(t);
+  }, [flashSpot]);
+
+  /** حلقهٔ پالس روی نقطهٔ مقصد پرش (هایلایت/ویس/یادداشت) */
+  const renderFlash = (page: number) => {
+    if (!flashSpot || flashSpot.page !== page) return null;
+    return (
+      <div
+        key={flashSpot.seq}
+        className="reader-spot-flash"
+        style={{ left: `${flashSpot.x * 100}%`, top: `${flashSpot.y * 100}%` }}
+        aria-hidden="true"
+      />
+    );
+  };
 
   // کلیدهای میانبر صفحه‌کلید
   useEffect(() => {
@@ -1645,7 +1798,13 @@ export function ProtectedReaderView({
                   <Fragment key={dim.page}>
                   <VirtualPageContainer
                     onActivate={() => setInkFocus(dim.page)}
-                    overlay={renderVoice(id, dim.page, targetW, targetH)}
+                    overlay={
+                      <>
+                        {renderVoice(id, dim.page, targetW, targetH)}
+                        {renderMind(dim.page, targetW, targetH)}
+                        {renderFlash(dim.page)}
+                      </>
+                    }
                     page={dim.page}
                     width={targetW}
                     height={targetH}
@@ -1723,7 +1882,12 @@ export function ProtectedReaderView({
                         notes={pageNotes.get(-entry.slot) || []}
                         onUpdateNotes={(next) => handleUpdatePageNotes(-entry.slot, next)}
                         onActivate={() => setInkFocus(-entry.slot)}
-                        overlay={renderVoice(insertedInkId(id), entry.slot, targetW, targetH)}
+                        overlay={
+                          <>
+                            {renderVoice(insertedInkId(id), entry.slot, targetW, targetH)}
+                            {renderFlash(entry.slot)}
+                          </>
+                        }
                         onChangeTemplate={() =>
                           setInsertPicker({ after: entry.after, editId: entry.id, current: entry.template })
                         }
@@ -1747,9 +1911,25 @@ export function ProtectedReaderView({
             page={currentPage}
             open={notebookOpen}
             onClose={() => setNotebookOpen(false)}
-            onJump={(p) => {
+            onJump={(p, at) => {
               scrollToPage(p);
+              if (at) setFlashSpot({ page: p, x: at.x, y: at.y, seq: Date.now() });
               if (window.innerWidth < 900) setNotebookOpen(false);
+            }}
+            refreshKey={notebookKey}
+          />
+
+          <MindMapPanel
+            scope={scope}
+            id={id}
+            title={manifest?.title || id}
+            page={currentPage}
+            open={mindMapOpen}
+            onClose={() => setMindMapOpen(false)}
+            onJump={(p, at) => {
+              scrollToPage(p);
+              if (at) setFlashSpot({ page: p, x: at.x, y: at.y, seq: Date.now() });
+              if (window.innerWidth < 900) setMindMapOpen(false);
             }}
             refreshKey={notebookKey}
           />
@@ -1772,6 +1952,8 @@ export function ProtectedReaderView({
           canUndo={history.undo > 0}
           canRedo={history.redo > 0}
           onOpenNotebook={handleToolbarNotebook}
+          mindOnPage={mindOnPage}
+          onToggleMindOverlay={handleToggleMindOverlay}
           onAddStickyNote={handleAddStickyNote}
           onToggleFocus={handleToolbarFocus}
           onOpenThumbnails={handleToolbarThumbnails}

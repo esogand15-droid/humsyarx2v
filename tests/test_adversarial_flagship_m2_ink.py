@@ -817,8 +817,10 @@ class TestVisualTokensAndCssContracts(unittest.TestCase):
         self.assertIn("cyan", content)
         self.assertIn("green", content)
         self.assertIn("coral", content)
-        self.assertIn("0.12", content)
-        self.assertIn("0.78", content)
+        # snapping is note-size-aware now: clamp to the page minus the note's real
+        # box (was fixed 0.12 / 0.78 margins that ignored note dimensions)
+        self.assertIn("(width - noteW) / Math.max(1, width) - 0.02", content)
+        self.assertIn("(height - noteH) / Math.max(1, height) - 0.02", content)
 
     def test_protected_reader_focus_mode_and_shortcuts(self):
         """Verify keyboard shortcuts and focus mode classes in ProtectedReaderView.tsx."""

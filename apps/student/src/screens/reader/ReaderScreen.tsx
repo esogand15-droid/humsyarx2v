@@ -23,8 +23,11 @@ const EmbeddedAiStudyPanel = lazy(() =>
 const NotebookPanel = lazy(() =>
   import('./NotebookPanel').then((m) => ({ default: m.NotebookPanel })),
 );
+const MindMapPanel = lazy(() =>
+  import('./MindMapPanel').then((m) => ({ default: m.MindMapPanel })),
+);
 
-type StudySidePanel = 'none' | 'ai_chat' | 'notes';
+type StudySidePanel = 'none' | 'ai_chat' | 'notes' | 'map';
 
 const MEDIA_REFRESH_LEAD_MS = 120_000;
 
@@ -57,7 +60,9 @@ export function ReaderScreen() {
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
   const [notebookKey, setNotebookKey] = useState(0);
   const [activePage, setActivePage] = useState(1);
-  const [jumpRequest, setJumpRequest] = useState<{ page: number; seq: number } | null>(null);
+  const [jumpRequest, setJumpRequest] = useState<{ page: number; seq: number; x?: number; y?: number } | null>(
+    null,
+  );
   const [reportOpen, setReportOpen] = useState(false);
   const dividerCleanupRef = useRef<(() => void) | null>(null);
 
@@ -262,6 +267,15 @@ export function ReaderScreen() {
                   >
                     <Icon name="i-pen" size={18} />
                   </button>
+                  <button
+                    type="button"
+                    className={`iconbtn ${sidePanel === 'map' ? 'is-active' : ''}`}
+                    onClick={() => setSidePanel((p) => (p === 'map' ? 'none' : 'map'))}
+                    title="نقشهٔ ذهنی"
+                    aria-label="نقشهٔ ذهنی"
+                  >
+                    <Icon name="i-shapes" size={18} />
+                  </button>
                 </>
               )}
               {info.allow_download && info.download_url && (
@@ -326,7 +340,11 @@ export function ReaderScreen() {
       )}
 
       {!loading && !error && info && info.available && (url || kind === 'pdf' || kind === 'slides' || kind === 'document' || kind === 'sheet' || kind === 'archive' || kind === 'attachment') && (
-        <div className={`study-workspace reader-workspace ${sidePanel === 'notes' ? 'is-split' : ''}`}>
+        <div
+          className={`study-workspace reader-workspace ${
+            sidePanel === 'notes' || sidePanel === 'map' ? 'is-split' : ''
+          }`}
+        >
           <div className="study-workspace__primary">
             <div className="reader-shell">
               <Suspense
@@ -405,8 +423,8 @@ export function ReaderScreen() {
             </div>
           </div>
 
-          {/* پنل ثانویه مطالعه دسکتاپ (دفترچه یادداشت) */}
-          {sidePanel === 'notes' && (
+          {/* پنل ثانویه مطالعه دسکتاپ (دفترچه یادداشت / نقشهٔ ذهنی) */}
+          {(sidePanel === 'notes' || sidePanel === 'map') && (
             <>
               <div
                 className={`study-workspace__divider ${isDraggingDivider ? 'is-dragging' : ''}`}
@@ -423,7 +441,7 @@ export function ReaderScreen() {
                 }}
               >
                 <div className="study-workspace__secondary-header">
-                  <span className="h3">دفترچه یادداشت</span>
+                  <span className="h3">{sidePanel === 'map' ? 'نقشهٔ ذهنی' : 'دفترچه یادداشت'}</span>
                   <button
                     type="button"
                     className="iconbtn"
@@ -436,20 +454,47 @@ export function ReaderScreen() {
                 </div>
                 <div className="study-workspace__secondary-body">
                   <Suspense fallback={<LoadingBlock rows={3} />}>
-                    <NotebookPanel
-                      scope={scopeTyped}
-                      id={id}
-                      page={activePage}
-                      open={true}
-                      hideHeader
-                      onClose={() => setSidePanel('none')}
-                      onJump={(p) => {
-                        setJumpRequest((prev) => ({ page: p, seq: (prev?.seq ?? 0) + 1 }));
-                        navigate(`?p=${p}`, { replace: true });
-                        if (window.innerWidth < 768) setSidePanel('none');
-                      }}
-                      refreshKey={notebookKey}
-                    />
+                    {sidePanel === 'notes' ? (
+                      <NotebookPanel
+                        scope={scopeTyped}
+                        id={id}
+                        page={activePage}
+                        open={true}
+                        hideHeader
+                        onClose={() => setSidePanel('none')}
+                        onJump={(p, at) => {
+                          setJumpRequest((prev) => ({
+                            page: p,
+                            seq: (prev?.seq ?? 0) + 1,
+                            x: at?.x,
+                            y: at?.y,
+                          }));
+                          navigate(`?p=${p}`, { replace: true });
+                          if (window.innerWidth < 768) setSidePanel('none');
+                        }}
+                        refreshKey={notebookKey}
+                      />
+                    ) : (
+                      <MindMapPanel
+                        scope={scopeTyped}
+                        id={id}
+                        title={info?.name ?? id}
+                        page={activePage}
+                        open={true}
+                        hideHeader
+                        onClose={() => setSidePanel('none')}
+                        onJump={(p, at) => {
+                          setJumpRequest((prev) => ({
+                            page: p,
+                            seq: (prev?.seq ?? 0) + 1,
+                            x: at?.x,
+                            y: at?.y,
+                          }));
+                          navigate(`?p=${p}`, { replace: true });
+                        }}
+                        refreshKey={notebookKey}
+                      />
+                    )}
                   </Suspense>
                 </div>
               </aside>
