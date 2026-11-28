@@ -747,19 +747,19 @@ class Tier1Feature13RouteBaselineSyncTests(Tier1BaseTest):
 
     # +2 since ed9b6f0: GET /api/web/exam/catalog, /exam/filters (kept in step with
     # api/main.py `_ROUTE_BASELINE` and tests/test_route_inventory.py).
-    def test_01_openapi_operations_matches_764(self):
-        """Verify openapi_operations count matches 764."""
+    def test_01_openapi_operations_matches_797(self):
+        """Verify openapi_operations count matches 797."""
         counts = _count_api_operations()
-        self.assertEqual(counts["openapi_operations"], 764)
+        self.assertEqual(counts["openapi_operations"], 797)
 
-    def test_02_route_objects_matches_771(self):
-        """Verify route_objects count under /api matches 771."""
+    def test_02_route_objects_matches_804(self):
+        """Verify route_objects count under /api matches 804."""
         counts = _count_api_operations()
-        self.assertEqual(counts["api_route_objects"], 771)
+        self.assertEqual(counts["api_route_objects"], 804)
 
-    def test_03_route_baseline_constant_is_764(self):
-        """Verify _ROUTE_BASELINE in main.py is 764."""
-        self.assertEqual(_ROUTE_BASELINE, 764)
+    def test_03_route_baseline_constant_is_797(self):
+        """Verify _ROUTE_BASELINE in main.py is 797."""
+        self.assertEqual(_ROUTE_BASELINE, 797)
 
     def test_04_every_route_has_valid_method(self):
         """Verify all mounted routes define valid HTTP methods."""

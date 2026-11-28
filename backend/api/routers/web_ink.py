@@ -55,7 +55,7 @@ router = APIRouter()
 MAX_STROKES = 400
 MAX_POINTS = 2000
 MAX_PAGE = 2000
-TOOLS = ("pen", "pencil", "highlighter", "eraser", "ballpoint", "fountain", "lasso")
+TOOLS = ("pen", "pencil", "highlighter", "eraser", "ballpoint", "fountain", "lasso", "whiteout")
 BLEND_MODES = ("source-over", "multiply")
 
 
@@ -298,6 +298,81 @@ async def summary(scope: str, file_id: str, user: dict = Depends(current_student
         key=lambda x: x["page"],
     )
     return {"pages": pages, "total": sum(p["count"] for p in pages)}
+
+
+@router.get("/ink/notebook/{scope}/{file_id}")
+async def notebook(scope: str, file_id: str, user: dict = Depends(current_student)):
+    """دفترِ محتوامحور — خودِ یادداشت‌ها، نه شمار خطوط.
+
+    برخلاف «summary» که فقط «صفحهٔ ۶ — ۲ خط» می‌دهد، این نقطهٔ پایانی
+    هایلایت‌ها را با جعبهٔ مکان دقیق، یادداشت‌های چسبان را با متن، و
+    شمار خطوط هر صفحه برمی‌گرداند تا پنل دفتر بتواند روی هر آیتم کلیک‌پذیر بسازد
+    و با پرش به همان نقطهٔ صفحه.
+    """
+    if scope not in SCOPES:
+        raise HTTPException(status_code=422, detail="scope_invalid")
+    await _guard(scope, file_id, user)
+    uid = int(user["user_id"])
+    pipeline = [
+        {"$match": {"scope": scope, "file_id": file_id, "uid": uid}},
+        {"$project": {
+            "page": 1,
+            "count": 1,
+            "updated_at": 1,
+            "notes": 1,
+            "highlights": {
+                "$filter": {
+                    "input": {"$ifNull": ["$strokes", []]},
+                    "cond": {"$eq": ["$$this.tool", "highlighter"]},
+                }
+            },
+        }},
+        {"$sort": {"page": 1}},
+    ]
+    try:
+        docs = [d async for d in _coll("web_ink_pages").aggregate(pipeline)]
+    except Exception as exc:  # pragma: no cover
+        logger.warning("ink_notebook_failed uid=%s err=%s", uid, type(exc).__name__)
+        raise HTTPException(status_code=503, detail="ink_unavailable")
+
+    MAX_HIGHLIGHTS = 600
+    MAX_NOTES = 300
+    pages: list[dict] = []
+    highlights: list[dict] = []
+    notes: list[dict] = []
+    total = 0
+    for d in docs:
+        page = int(d.get("page") or 0)
+        count = int(d.get("count") or 0)
+        total += count
+        pages.append({"page": page, "count": count, "updated_at": str(d.get("updated_at") or "")})
+        for s in (d.get("highlights") or []):
+            if len(highlights) >= MAX_HIGHLIGHTS:
+                break
+            pts = (s or {}).get("points") or []
+            xs = [float(p["x"]) for p in pts if isinstance(p, dict) and p.get("x") is not None]
+            ys = [float(p["y"]) for p in pts if isinstance(p, dict) and p.get("y") is not None]
+            if not xs or not ys:
+                continue
+            highlights.append({
+                "page": page,
+                "stroke_id": str((s or {}).get("stroke_id") or ""),
+                "bbox": [min(xs), min(ys), max(xs), max(ys)],
+                "color": str((s or {}).get("color") or "#F59E0B"),
+            })
+        for n in (d.get("notes") or []):
+            if len(notes) >= MAX_NOTES:
+                break
+            notes.append({
+                "note_id": str((n or {}).get("note_id") or ""),
+                "page": page,
+                "x": float((n or {}).get("x") or 0.5),
+                "y": float((n or {}).get("y") or 0.1),
+                "text": str((n or {}).get("text") or ""),
+                "color": str((n or {}).get("color") or "yellow"),
+                "created_at": str((n or {}).get("created_at") or ""),
+            })
+    return {"pages": pages, "highlights": highlights, "notes": notes, "total": total}
 
 
 # ─────────────────────────────────────────────────────────────

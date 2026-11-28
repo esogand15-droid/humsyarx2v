@@ -600,7 +600,8 @@ app.include_router(
 _web_schedule = APIRouter()
 _web_schedule.routes = [
     r for r in schedule.router.routes
-    if getattr(r, "path", "") not in ("/items", "/items/{task_id}/toggle")
+    # toggle و PATCH/DELETE تسک از طریق aliasهای web_exam سرو می‌شوند تا دوبار ثبت نشوند
+    if getattr(r, "path", "") not in ("/items", "/items/{task_id}/toggle", "/items/{task_id}")
 ]
 app.include_router(
     _web_schedule,
@@ -766,7 +767,7 @@ async def health_deep():
 # حالا تست واقعاً وجود دارد و روی هر push اجرا می‌شود.
 # هر تغییر عمدیِ سطح API باید این عدد و EXPECTED_OPENAPI_OPERATIONS در
 # tests/test_route_inventory.py را هم‌زمان به‌روز کند.
-_ROUTE_BASELINE = 785  # +21: web_reader(+3), schedule pdf(+2), web_quiz(+9), web_lecture(+6), profile regen(+1)
+_ROUTE_BASELINE = 797  # 785 +11 تسک‌های بورد برنامه (PATCH/DELETE/…) +1 ink/notebook −2 حذف ثبت دوبارهٔ مسیرهای تسک
 
 
 def _walk_included_routes(routes, prefix: str = "") -> list:
